@@ -1,0 +1,51 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_call:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - name: Install
+        run: npm ci
+      - name: Lint + format (lint-only deps, not in the package manifest)
+        run: |
+          npm install --no-save --no-audit --no-fund \
+            eslint@^10 @eslint/js@^10 typescript-eslint@^8 prettier@^3
+          npx eslint src
+          npx prettier --check "src/**/*.ts"
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Tests + coverage
+        run: npm run test:coverage
+      - name: Build + publint + arethetypeswrong
+        run: npm run pack:check
+      - name: Tarball content assertion
+        run: |
+          npm pack --json > pack.json
+          node -e '
+            const files = require("./pack.json")[0].files.map((f) => f.path);
+            const bad = files.filter(
+              (p) => !(p.startsWith("dist/") || p === "README.md" || p === "LICENSE" || p === "package.json"),
+            );
+            if (bad.length) { console.error("unexpected files in tarball:", bad); process.exit(1); }
+            if (!files.includes("dist/index.js") || !files.includes("dist/index.d.ts")) {
+              console.error("expected dist entrypoints missing"); process.exit(1);
+            }
+          '

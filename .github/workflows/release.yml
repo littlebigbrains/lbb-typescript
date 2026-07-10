@@ -1,0 +1,53 @@
+name: release
+
+# Publishes @littlebigbrain/client to npm from a signed vX.Y.Z tag via npm
+# trusted publishing (OIDC) — no long-lived registry tokens. Publishing is
+# immutable: a bad release is deprecated and fixed forward, never
+# re-published.
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+jobs:
+  ci:
+    uses: ./.github/workflows/ci.yml
+
+  version-check:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - name: Tag matches package version
+        run: |
+          set -euo pipefail
+          tag="${GITHUB_REF_NAME#v}"
+          version=$(node -p "require('./package.json').version")
+          [ "$tag" = "$version" ] || { echo "::error::tag v${tag} != package version ${version}"; exit 1; }
+
+  publish-npm:
+    needs: [ci, version-check]
+    runs-on: ubuntu-24.04
+    environment: npm
+    permissions:
+      contents: read
+      id-token: write # npm trusted publishing (OIDC) + provenance
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24 # trusted publishing needs npm >= 11.5.1
+          registry-url: https://registry.npmjs.org
+      - run: npm ci
+      - run: npm run build
+      - name: Publish @littlebigbrain/client (skip if version already published)
+        run: |
+          set -euo pipefail
+          version=$(node -p "require('./package.json').version")
+          if npm view "@littlebigbrain/client@${version}" version >/dev/null 2>&1; then
+            echo "@littlebigbrain/client@${version} already on npm; skipping"
+            exit 0
+          fi
+          npm publish

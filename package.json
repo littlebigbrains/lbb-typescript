@@ -1,0 +1,43 @@
+{
+  "name": "@littlebigbrain/client",
+  "version": "0.1.0",
+  "description": "TypeScript client for the Little Big Brain graph + hybrid search HTTP API",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/littlebigbrains/lbb-typescript.git"
+  },
+  "homepage": "https://docs.littlebigbrain.com/sdks/typescript/",
+  "bugs": "https://github.com/littlebigbrains/lbb-typescript/issues",
+  "keywords": ["little-big-brain", "graph", "search", "sdk", "typescript"],
+  "type": "module",
+  "sideEffects": false,
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": ["dist", "README.md", "LICENSE"],
+  "publishConfig": { "access": "public" },
+  "engines": { "node": ">=18" },
+  "scripts": {
+    "clean": "node clean.mjs",
+    "clean:test": "node clean.mjs test-dist",
+    "generate": "openapi-typescript ../../contracts/openapi.json -o src/schema.ts",
+    "build": "npm run clean && tsc -p tsconfig.build.json",
+    "pack:check": "npm run build && publint --strict && attw --pack . --profile esm-only",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "npm run clean:test && tsc -p tsconfig.test.json && node --test \"test-dist/**/*.test.js\"",
+    "test:coverage": "npm run clean:test && tsc -p tsconfig.test.json && node --test --experimental-test-coverage --test-coverage-include=test-dist/*.js --test-coverage-exclude=test-dist/schema.js --test-coverage-exclude=test-dist/*.test.js --test-coverage-lines=75 --test-coverage-branches=80 --test-coverage-functions=45 \"test-dist/**/*.test.js\""
+  },
+  "devDependencies": {
+    "@arethetypeswrong/cli": "^0.18.4",
+    "@types/node": "^22",
+    "openapi-typescript": "^7",
+    "publint": "^0.3.21",
+    "typescript": "^5.6"
+  }
+}
