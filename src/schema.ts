@@ -4327,8 +4327,10 @@ export interface components {
             name: string;
             required: boolean;
             /**
-             * @description Lowercase scalar value type: bool | i64 | f64 | datetime | keyword |
-             *     text | bytes | vector_f32.
+             * @description Lowercase value type: bool | i64 | f64 | datetime | keyword | text |
+             *     bytes | vector_f32 | keyword_set | i64_set. The `*_set` types hold a
+             *     sorted, deduplicated member set filterable by membership
+             *     (`overlaps`/`contains_all`/`not_overlaps`).
              */
             value_type: string;
         };
@@ -4664,6 +4666,15 @@ export interface components {
             keyword: string;
         } | {
             text: string;
+        } | {
+            /**
+             * @description Members of a `keyword_set` field. Order and duplicates don't matter on
+             *     the wire; the commit path canonicalizes (sorts, deduplicates) at rest.
+             */
+            keyword_set: string[];
+        } | {
+            /** @description Members of an `i64_set` field; canonicalized like `keyword_set`. */
+            i64_set: number[];
         };
         /**
          * @description One leaf of a derived edge's provenance trail. A tagged union so a calibrated
@@ -5408,6 +5419,21 @@ export interface components {
             /** @enum {string} */
             op: "gte";
             value: components["schemas"]["SearchFilterValue"];
+        } | {
+            field: string;
+            /** @enum {string} */
+            op: "overlaps";
+            values: components["schemas"]["SearchFilterValue"][];
+        } | {
+            field: string;
+            /** @enum {string} */
+            op: "contains_all";
+            values: components["schemas"]["SearchFilterValue"][];
+        } | {
+            field: string;
+            /** @enum {string} */
+            op: "not_overlaps";
+            values: components["schemas"]["SearchFilterValue"][];
         } | {
             field: string;
             last_as_prefix?: boolean;
