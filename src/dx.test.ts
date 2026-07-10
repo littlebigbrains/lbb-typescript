@@ -90,7 +90,7 @@ test("context namespace covers completion, resolution, decoding, and groundabili
 
 test("ontology namespace covers its complete read and lifecycle family", async () => {
   const { fetch, urls } = queuedFetch(
-    Array.from({ length: 6 }, () => ({ body: {} })),
+    Array.from({ length: 7 }, () => ({ body: {} })),
   );
   const client = new LbbClient({ baseUrl: "http://h", fetch });
 
@@ -100,6 +100,7 @@ test("ontology namespace covers its complete read and lifecycle family", async (
   await client.ontology.resolve({} as never);
   await client.ontology.define({} as never);
   await client.ontology.evolve({} as never);
+  await client.ontology.induce({} as never);
 
   assert.deepEqual(urls, [
     "http://h/v1/ontology",
@@ -108,6 +109,26 @@ test("ontology namespace covers its complete read and lifecycle family", async (
     "http://h/v1/ontology/resolve",
     "http://h/v1/ontology/define",
     "http://h/v1/ontology/evolve",
+    "http://h/v1/ontology/induce",
+  ]);
+});
+
+test("graph namespace covers managed embedding lifecycle routes", async () => {
+  const { fetch, urls } = queuedFetch(
+    Array.from({ length: 4 }, () => ({ body: {} })),
+  );
+  const graph = new LbbClient({ baseUrl: "http://h", fetch }).graph("main");
+
+  await graph.embeddingConfig();
+  await graph.setEmbeddingConfig({ model_id: "m", dim: 384 });
+  await graph.backfillEmbeddings({ batchSize: 64, limit: 1000, full: true });
+  await graph.promoteEmbedding({ runId: "run-1", allowRegression: true });
+
+  assert.deepEqual(urls, [
+    "http://h/v1/graph/embedding?graph=main",
+    "http://h/v1/graph/embedding?graph=main",
+    "http://h/v1/graph/embedding/backfill?graph=main&batch_size=64&limit=1000&full=true",
+    "http://h/v1/graph/embedding/promote?graph=main&run_id=run-1&allow_regression=true",
   ]);
 });
 

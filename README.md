@@ -95,13 +95,14 @@ and `elapsedMs`.
 | Area | Methods |
 | --- | --- |
 | Write | `graph("main").facts.create` |
+| Managed embeddings | `graph("main").embeddingConfig`, `graph("main").setEmbeddingConfig`, `graph("main").backfillEmbeddings`, `graph("main").promoteEmbedding` |
 | Search | `search.hybrid`, `search.multi`, `search.fullText`, `search.vector` |
 | Context substrate | `context.ask`, `context.suggest`, `context.resolve`, `context.decode`, `context.groundability` |
 | Search feedback (training data) | `search.feedback`, `search.feedbackExport` |
 | Traversal | `traverse`, `semanticTraverse` |
 | Temporal / lineage / shapes | `currentState`, `history`, `why`, `shacl` |
 | Query | `query.sparql`, `query.structured`, `query.analytics`, `query.shacl`, `query.infer`, `query.premises` |
-| Ontology | `ontology.view`, `ontology.conformance`, `ontology.search`, `ontology.resolve`, `ontology.define`, `ontology.evolve` |
+| Ontology | `ontology.view`, `ontology.conformance`, `ontology.search`, `ontology.resolve`, `ontology.define`, `ontology.evolve`, `ontology.induce` |
 | Index lifecycle | `indexes.run`, `indexes.build`, `indexes.delta`, `indexes.gc`, `compact` |
 | Inspection | `entities.list`, `entities.filterByAttributes`, `status`, `metadata`, `summary` |
 | Schema activation | `schema.view`, `schema.preview`, `schema.publish`, `schema.audit` |
