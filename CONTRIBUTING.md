@@ -36,9 +36,11 @@ npx eslint src       # uses eslint.config.js at the repo root
 
 ## Releases
 
-Maintainers release by pushing a signed `vX.Y.Z` tag matching the
-`package.json` version, which publishes `@littlebigbrain/client` via npm
-trusted publishing after CI passes.
+When a canonical sync lands a package version that is not yet on npm, CI runs
+the release suite and pauses at the protected `npm` environment. A maintainer
+approves that deployment; trusted publishing uploads
+`@littlebigbrain/client`, then CI creates the matching `vX.Y.Z` tag and GitHub
+Release. No local tag push or registry token is required.
 
 ## Conduct & security
 

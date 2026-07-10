@@ -1,79 +1,98 @@
 name: release
 
-# Publishes @littlebigbrain/client to npm from a signed vX.Y.Z tag via npm
-# trusted publishing (OIDC) — no long-lived registry tokens. Publishing is
-# immutable: a bad release is deprecated and fixed forward, never
-# re-published.
+# A canonical sync that lands a new package version on public main is the
+# release trigger. Already-published versions are a no-op. New versions run CI,
+# pause at the protected `npm` environment, publish through trusted publishing,
+# then receive their matching tag and GitHub Release.
 
 on:
   push:
-    tags: ["v*"]
+    branches: [main]
+  workflow_dispatch:
 
 permissions:
   contents: read
 
 jobs:
-  ci:
-    uses: ./.github/workflows/ci.yml
-
-  version-check:
+  preflight:
     runs-on: ubuntu-24.04
+    outputs:
+      publish: ${{ steps.version.outputs.publish }}
+      version: ${{ steps.version.outputs.version }}
+      tag: ${{ steps.version.outputs.tag }}
     steps:
       - uses: actions/checkout@v5
-      - name: Tag matches package version
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - id: version
+        name: Detect an unpublished package version
         run: |
           set -euo pipefail
-          tag="${GITHUB_REF_NAME#v}"
           version=$(node -p "require('./package.json').version")
-          [ "$tag" = "$version" ] || { echo "::error::tag v${tag} != package version ${version}"; exit 1; }
+          node -e "const v=process.argv[1]; if (!/^\\d+\\.\\d+\\.\\d+([+-][0-9A-Za-z.-]+)?$/.test(v)) process.exit(1)" "$version" \
+            || { echo "::error::invalid package version: $version"; exit 1; }
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "tag=v$version" >> "$GITHUB_OUTPUT"
+          if npm view "@littlebigbrain/client@${version}" version >/dev/null 2>&1; then
+            echo "@littlebigbrain/client@${version} is already published; release is a no-op"
+            echo "publish=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "@littlebigbrain/client@${version} is not on npm; release is required"
+            echo "publish=true" >> "$GITHUB_OUTPUT"
+          fi
+
+  ci:
+    needs: [preflight]
+    if: ${{ needs.preflight.outputs.publish == 'true' }}
+    uses: ./.github/workflows/ci.yml
 
   publish-npm:
-    needs: [ci, version-check]
+    needs: [preflight, ci]
+    if: ${{ needs.preflight.outputs.publish == 'true' }}
     runs-on: ubuntu-24.04
     environment: npm
     permissions:
       contents: read
-      id-token: write # npm trusted publishing (OIDC) + provenance
+      id-token: write
     steps:
       - uses: actions/checkout@v5
-      # No registry-url here: setup-node's registry-url writes an .npmrc with
-      # an _authToken=${NODE_AUTH_TOKEN} line, and npm treats that (even
-      # unset) as configured auth and never attempts the OIDC exchange —
-      # trusted publishing requires no auth config at all.
       - uses: actions/setup-node@v4
         with:
           node-version: 24
-      - name: Update npm (trusted publishing needs >= 11.5.1; Node 24 images can bundle older)
-        run: |
-          npm install -g npm@^11.5.1
-          npm --version
+      - name: Update npm for trusted publishing
+        run: npm install -g npm@^11.5.1
       - run: npm ci
       - run: npm run build
-      - name: Publish @littlebigbrain/client (skip if version already published)
+      - name: Verify package version
+        env:
+          EXPECTED_VERSION: ${{ needs.preflight.outputs.version }}
         run: |
-          set -euo pipefail
-          version=$(node -p "require('./package.json').version")
-          if npm view "@littlebigbrain/client@${version}" version >/dev/null 2>&1; then
-            echo "@littlebigbrain/client@${version} already on npm; skipping"
-            exit 0
-          fi
-          npm publish
+          actual=$(node -p "require('./package.json').version")
+          [ "$actual" = "$EXPECTED_VERSION" ] \
+            || { echo "::error::package version $actual != expected $EXPECTED_VERSION"; exit 1; }
+      - name: Publish @littlebigbrain/client
+        run: npm publish
 
   github-release:
-    needs: [publish-npm]
+    needs: [preflight, publish-npm]
+    if: ${{ needs.preflight.outputs.publish == 'true' }}
     runs-on: ubuntu-24.04
     permissions:
-      contents: write # create the GitHub Release object for the tag
+      contents: write
     steps:
       - uses: actions/checkout@v5
-      - name: Create the GitHub Release for the tag (idempotent)
+      - name: Create the version tag and GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ needs.preflight.outputs.tag }}
         run: |
           set -euo pipefail
-          tag="${GITHUB_REF_NAME}"
-          if gh release view "$tag" >/dev/null 2>&1; then
-            echo "release $tag already exists; nothing to do"
+          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            echo "release $RELEASE_TAG already exists; nothing to do"
           else
-            gh release create "$tag" --verify-tag --title "$tag" --generate-notes
+            gh release create "$RELEASE_TAG" \
+              --target "$GITHUB_SHA" \
+              --title "$RELEASE_TAG" \
+              --generate-notes
           fi
