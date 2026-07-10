@@ -36,10 +36,13 @@ jobs:
       id-token: write # npm trusted publishing (OIDC) + provenance
     steps:
       - uses: actions/checkout@v5
+      # No registry-url here: setup-node's registry-url writes an .npmrc with
+      # an _authToken=${NODE_AUTH_TOKEN} line, and npm treats that (even
+      # unset) as configured auth and never attempts the OIDC exchange —
+      # trusted publishing requires no auth config at all.
       - uses: actions/setup-node@v4
         with:
           node-version: 24
-          registry-url: https://registry.npmjs.org
       - name: Update npm (trusted publishing needs >= 11.5.1; Node 24 images can bundle older)
         run: |
           npm install -g npm@^11.5.1
