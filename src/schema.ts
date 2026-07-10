@@ -5174,6 +5174,13 @@ export interface components {
              *     surface here. Absent for entities with no SAME_AS component.
              */
             aliases?: string[];
+            /**
+             * @description Requested entity attributes, read from the same loaded snapshot used to
+             *     rank this hit. Absent when the request did not ask for a projection.
+             */
+            attributes?: {
+                [key: string]: unknown;
+            } | null;
             entity: components["schemas"]["EntityView"];
             matched_concepts: string[];
             /** Format: float */
@@ -5694,6 +5701,12 @@ export interface components {
              */
             as_of_valid_time?: string | null;
             explain?: boolean;
+            /**
+             * @description Entity attributes to project onto each entity hit from the same graph
+             *     snapshot used for ranking. Omitted or empty keeps the lean response;
+             *     `"*"` or `"all"` returns every attribute.
+             */
+            fields?: string[];
             /** Format: int32 */
             max_hops?: number;
             ontology?: null | components["schemas"]["OntologySearchOptions"];
