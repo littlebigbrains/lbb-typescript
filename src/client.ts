@@ -564,6 +564,37 @@ export class LbbClient {
     });
   }
 
+  embeddingConfig(): Promise<Schemas["ManagedEmbeddingConfigResponse"]> {
+    return this.request("GET", "/v1/graph/embedding");
+  }
+
+  setEmbeddingConfig(
+    body: Schemas["ManagedEmbeddingConfigRequest"],
+  ): Promise<Schemas["ManagedEmbeddingConfigResponse"]> {
+    return this.request("POST", "/v1/graph/embedding", { body });
+  }
+
+  backfillEmbeddings(
+    opts: {
+      batchSize?: number;
+      limit?: number;
+      full?: boolean;
+    } = {},
+  ): Promise<Schemas["ManagedEmbeddingBackfillResponse"]> {
+    return this.request("POST", "/v1/graph/embedding/backfill", {
+      query: { batch_size: opts.batchSize, limit: opts.limit, full: opts.full },
+    });
+  }
+
+  promoteEmbedding(opts: {
+    runId: string;
+    allowRegression?: boolean;
+  }): Promise<Schemas["ManagedEmbeddingPromoteResponse"]> {
+    return this.request("POST", "/v1/graph/embedding/promote", {
+      query: { run_id: opts.runId, allow_regression: opts.allowRegression },
+    });
+  }
+
   // --- models as runs (training-run registry + eval machinery) ---
 
   /**
@@ -1208,6 +1239,13 @@ export class LbbClient {
     body: Schemas["OntologyEvolveRequest"],
   ): Promise<Schemas["OntologyEvolveResponse"]> {
     return this.request("POST", "/v1/ontology/evolve", { body });
+  }
+
+  /** Suggest ontology additions from the current graph without mutating it. */
+  induceOntology(
+    body: Schemas["OntologyInduceRequest"],
+  ): Promise<Schemas["OntologyInduceResponse"]> {
+    return this.request("POST", "/v1/ontology/induce", { body, retry: true });
   }
 
   // --- index lifecycle ---

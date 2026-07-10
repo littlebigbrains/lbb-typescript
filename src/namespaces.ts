@@ -77,6 +77,46 @@ export class GraphNamespace {
     });
   }
 
+  embeddingConfig(
+    opts: CallOptions = {},
+  ): Promise<Schemas["ManagedEmbeddingConfigResponse"]> {
+    return this.client.request("GET", "/v1/graph/embedding", opts);
+  }
+
+  setEmbeddingConfig(
+    body: Schemas["ManagedEmbeddingConfigRequest"],
+    opts: CallOptions = {},
+  ): Promise<Schemas["ManagedEmbeddingConfigResponse"]> {
+    return this.client.request("POST", "/v1/graph/embedding", {
+      ...opts,
+      body,
+    });
+  }
+
+  backfillEmbeddings(
+    options: CallOptions & {
+      batchSize?: number;
+      limit?: number;
+      full?: boolean;
+    } = {},
+  ): Promise<Schemas["ManagedEmbeddingBackfillResponse"]> {
+    const { batchSize, limit, full, ...request } = options;
+    return this.client.request("POST", "/v1/graph/embedding/backfill", {
+      ...request,
+      query: { batch_size: batchSize, limit, full },
+    });
+  }
+
+  promoteEmbedding(
+    options: CallOptions & { runId: string; allowRegression?: boolean },
+  ): Promise<Schemas["ManagedEmbeddingPromoteResponse"]> {
+    const { runId, allowRegression, ...request } = options;
+    return this.client.request("POST", "/v1/graph/embedding/promote", {
+      ...request,
+      query: { run_id: runId, allow_regression: allowRegression },
+    });
+  }
+
   /** Retract edges/entities from the scoped graph. See {@link LbbClient.retract}. */
   retract(
     body: Schemas["GraphRetractRequest"],
@@ -600,6 +640,17 @@ export class OntologyNamespace {
   ): Promise<Schemas["OntologyEvolveResponse"]> {
     return this.client.request("POST", "/v1/ontology/evolve", {
       ...opts,
+      body,
+    });
+  }
+
+  induce(
+    body: Schemas["OntologyInduceRequest"],
+    opts: CallOptions = {},
+  ): Promise<Schemas["OntologyInduceResponse"]> {
+    return this.client.request("POST", "/v1/ontology/induce", {
+      ...opts,
+      retry: opts.retry ?? true,
       body,
     });
   }
