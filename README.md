@@ -1,6 +1,6 @@
 # @littlebigbrain/client
 
-TypeScript client for the [Little Big Brain](https://littlebigbrain.com) graph + hybrid search HTTP
+TypeScript client for the [little big brain](https://littlebigbrain.com) graph + hybrid search HTTP
 API. Request and response types are generated from the committed
 [`contracts/openapi.json`](https://github.com/littlebigbrains/lbb-typescript/blob/main/contracts/openapi.json) (the single source of
 truth, derived from the Rust `lbb-api` types); the client itself is a thin,
@@ -105,7 +105,6 @@ and `elapsedMs`.
 | Index lifecycle | `indexes.run`, `indexes.build`, `indexes.delta`, `indexes.gc`, `compact` |
 | Inspection | `entities.list`, `entities.filterByAttributes`, `status`, `metadata`, `summary` |
 | Schema activation | `schema.view`, `schema.preview`, `schema.publish`, `schema.audit` |
-| Database admin | `admin.createStack`, `admin.stack`, `admin.rotateStackKey`, `admin.deleteStack` |
 
 Common request/response shapes have direct imports such as `SearchRequest`,
 `SearchResponse`, `Entity`, `GraphSummary`, `CommitRequest`, `AskResponse`, and

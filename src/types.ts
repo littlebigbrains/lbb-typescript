@@ -59,6 +59,29 @@ export type EntityPropertiesLine = {
 /** One bulk-import line: a triplet, or an entity-properties record. */
 export type ImportLine = Schemas["TripletInput"] | EntityPropertiesLine;
 
+export interface RdfImportOptions {
+  format?: "ntriples" | "turtle" | "nquads" | "trig";
+  baseIri?: string;
+  graphUri?: string;
+  /** Stable document scope for blank labels across chunks; omit for legacy stable labels. */
+  blankNodeScope?: string;
+  batch?: number;
+  strict?: boolean;
+  observedAt?: string;
+  resourceType?: string;
+  edgeIdempotency?: "append" | "skip_unchanged";
+  idempotencyKey?: string;
+}
+
+export interface RdfExportOptions {
+  format?: "turtle" | "ntriples" | "trig" | "nquads";
+  maxTriples?: number;
+  asOfValidTime?: string;
+  asOfCommitSeq?: number;
+  entailment?: "subclass" | "none";
+  reason?: boolean;
+}
+
 export type AttributeFilterOp = "eq" | "ne" | "lt" | "le" | "gt" | "ge";
 
 export type AttributeFilterValue =
@@ -201,7 +224,7 @@ export function attributeFilter(
 }
 
 export interface LbbClientOptions {
-  /** Base URL of the Little Big Brain server, e.g. `https://db.eu.littlebigbrain.com`. */
+  /** Base URL of the little big brain server, e.g. `https://db.eu.littlebigbrain.com`. */
   baseUrl: string;
   /** Stack API key (`lbb_sk_test_…` / `lbb_sk_live_…`) or single-mode token. */
   apiKey?: string;
@@ -247,32 +270,6 @@ export interface LbbResponseEvent {
   attempts: number;
   retryCount: number;
   elapsedMs: number;
-}
-
-export interface LbbStackView {
-  stack_id: string;
-  owner_id?: string;
-  name: string;
-  slug: string;
-  tenant_id: string;
-  default_graph: string;
-  default_branch: string;
-  created_at_micros: number;
-  api_key_hint: string;
-  api_key_rotated_at_micros: number;
-}
-
-export interface LbbAdminStackCreateRequest {
-  owner_id: string;
-  name: string;
-  slug?: string;
-}
-
-export interface LbbAdminStackResponse {
-  ok: true;
-  stack: LbbStackView;
-  api_key?: string;
-  active_api_key_count?: number;
 }
 
 export type LbbStackActivityWindow = "1h" | "4h" | "12h" | "24h";
@@ -351,21 +348,6 @@ export interface LbbStackActivityResponse {
     byte_share: number;
   }>;
   partial: boolean;
-}
-
-export interface LbbAdminSessionResponse {
-  ok: true;
-  /** A `lbb_ses_…` session token scoped to the account. */
-  token: string;
-  expires_at_micros: number;
-}
-
-export interface LbbAdminStackDeleteResponse {
-  ok: true;
-  deleted_stack: LbbStackView;
-  tenant_prefix: string;
-  objects_deleted: number;
-  bytes_deleted: number;
 }
 
 export interface LbbErrorPayload {

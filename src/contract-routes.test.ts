@@ -29,19 +29,12 @@ function findContract(): string {
 const OPENAPI = findContract();
 const CLIENT = resolve(process.cwd(), "src/client.ts");
 
-// Control-plane routes the TS client legitimately calls that are intentionally
-// NOT in the public data-plane OpenAPI contract (SaaS admin/session
-// orchestration). This allow-list is the visible debt register: adding a route
-// here is a conscious decision to leave it uncontracted.
-const UNCONTRACTED = new Set<string>([
-  "DELETE /api/admin/stacks",
-  "GET /api/admin/stacks",
-  "GET /api/admin/stacks/activity",
-  "GET /v1/stack/activity",
-  "POST /api/admin/sessions",
-  "POST /api/admin/stacks",
-  "POST /api/admin/stacks/rotate-key",
-]);
+// Routes the TS client legitimately calls that are intentionally NOT in the
+// public data-plane OpenAPI contract. This allow-list is the visible debt
+// register: adding a route here is a conscious decision to leave it
+// uncontracted. (The /api/admin/* control-plane surface lives in
+// apps/saas-api/src/controlPlaneClient.ts, not in this SDK.)
+const UNCONTRACTED = new Set<string>(["GET /v1/stack/activity"]);
 
 const HTTP_METHODS = new Set(["get", "post", "put", "patch", "delete"]);
 

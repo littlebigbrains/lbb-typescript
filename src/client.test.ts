@@ -728,51 +728,16 @@ test("throws typed LbbError on structured errors", async () => {
   );
 });
 
-test("database admin helpers stay on admin routes and bearer auth", async () => {
+test("stack activity stays on the bearer-scoped /v1 route", async () => {
   const { fetch, calls } = recordingFetch({
-    body: JSON.stringify({
-      ok: true,
-      stack: {
-        slug: "acme",
-        stack_id: "stk",
-        tenant_id: "acme",
-        name: "Acme",
-        default_graph: "main",
-        default_branch: "main",
-        created_at_micros: 1,
-        api_key_hint: "…",
-        api_key_rotated_at_micros: 1,
-      },
-      api_key: "lbb_sk_test_client",
-    }),
+    body: JSON.stringify({ ok: true }),
   });
-  const client = new LbbClient({ baseUrl: "http://h", apiKey: "admin", fetch });
+  const client = new LbbClient({ baseUrl: "http://h", apiKey: "k", fetch });
 
-  await client.adminCreateStack({
-    owner_id: "acct_1",
-    name: "Acme",
-    slug: "acme",
-  });
-  await client.adminRotateStackKey("acme");
-  await client.adminStackActivity("acme", "4h");
   await client.stackActivity("1h");
 
-  assert.equal(calls[0].input, "http://h/api/admin/stacks");
-  assert.equal(
-    calls[1].input,
-    "http://h/api/admin/stacks/rotate-key?stack=acme",
-  );
-  assert.equal(
-    calls[2].input,
-    "http://h/api/admin/stacks/activity?stack=acme&window=4h",
-  );
-  assert.equal(calls[3].input, "http://h/v1/stack/activity?window=1h");
-  assert.equal(calls[0].init.headers?.authorization, "Bearer admin");
-  assert.deepEqual(JSON.parse(calls[0].init.body ?? ""), {
-    owner_id: "acct_1",
-    name: "Acme",
-    slug: "acme",
-  });
+  assert.equal(calls[0].input, "http://h/v1/stack/activity?window=1h");
+  assert.equal(calls[0].init.headers?.authorization, "Bearer k");
 });
 
 test("facts.import serializes lines to NDJSON with batch/strict params", async () => {
@@ -843,6 +808,7 @@ test("facts.importRdf posts N-Triples through the native RDF endpoint", async ()
   const result = await client.graph("main").facts.importRdf(body, {
     batch: 500,
     strict: true,
+    blankNodeScope: "document-42",
     resourceType: "RdfResource",
     edgeIdempotency: "append",
   });
@@ -851,12 +817,57 @@ test("facts.importRdf posts N-Triples through the native RDF endpoint", async ()
   assert.match(call.input, /\/v1\/graph\/import\/rdf\?/);
   assert.match(call.input, /batch=500/);
   assert.match(call.input, /strict=true/);
+  assert.match(call.input, /blank_node_scope=document-42/);
   assert.match(call.input, /format=ntriples/);
   assert.match(call.input, /resource_type=RdfResource/);
   assert.match(call.init.headers?.["idempotency-key"] ?? "", /^import-rdf:/);
   assert.match(call.input, /edge_idempotency=append/);
   assert.equal(call.init.headers?.["content-type"], "application/n-triples");
   assert.equal(call.init.body, body);
+});
+
+test("facts.importRdf selects Turtle and forwards its base IRI", async () => {
+  const { fetch, calls } = recordingFetch({
+    status: 200,
+    body: JSON.stringify({ imported_triplets: 1 }),
+  });
+  const client = new LbbClient({ baseUrl: "http://h", graph: "main", fetch });
+  const body = "@prefix ex: <http://ex/> . ex:s ex:p ex:o .";
+  const result = await client.graph("main").facts.importRdf(body, {
+    format: "turtle",
+    baseIri: "http://base/",
+    graphUri: "http://ex/graph",
+  });
+  assert.equal(result.imported_triplets, 1);
+  const call = calls[0];
+  assert.match(call.input, /format=turtle/);
+  assert.match(call.input, /base_iri=http%3A%2F%2Fbase%2F/);
+  assert.match(call.input, /graph_uri=http%3A%2F%2Fex%2Fgraph/);
+  assert.equal(call.init.headers?.["content-type"], "text/turtle");
+  assert.equal(call.init.body, body);
+});
+
+test("graph.exportRdf returns RDF dataset text instead of JSON parsing it", async () => {
+  const turtle = "<http://ex/s> <http://ex/p> <http://ex/o> <http://ex/g> .\n";
+  const { fetch, calls } = recordingFetch({
+    status: 200,
+    body: turtle,
+    headers: { "content-type": "application/n-quads; charset=utf-8" },
+  });
+  const client = new LbbClient({ baseUrl: "http://h", fetch });
+  const result = await client.graph("research", { branch: "draft" }).exportRdf({
+    format: "nquads",
+    maxTriples: 500,
+    asOfCommitSeq: 7,
+  });
+  assert.equal(result, turtle);
+  const call = calls[0];
+  assert.match(call.input, /\/v1\/graph\/export\/rdf\?/);
+  assert.match(call.input, /graph=research/);
+  assert.match(call.input, /branch=draft/);
+  assert.match(call.input, /max_triples=500/);
+  assert.match(call.input, /as_of_commit_seq=7/);
+  assert.match(call.input, /format=nquads/);
 });
 
 test("graph.retract posts edge/entity retractions", async () => {

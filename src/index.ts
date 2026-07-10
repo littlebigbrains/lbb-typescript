@@ -1,8 +1,5 @@
 export { LbbClient, LbbError, parseSparqlResults } from "./client.js";
 export type {
-  LbbAdminStackCreateRequest,
-  LbbAdminStackDeleteResponse,
-  LbbAdminStackResponse,
   LbbClientOptions,
   CallOptions,
   RequestOptions,
@@ -12,7 +9,6 @@ export type {
   LbbResponseEvent,
   LbbStackActivityResponse,
   LbbStackActivityWindow,
-  LbbStackView,
   FetchLike,
   Schemas,
   SparqlResults,

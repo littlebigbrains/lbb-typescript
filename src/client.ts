@@ -1,10 +1,6 @@
 import type {
   FetchLike,
   ImportLine,
-  LbbAdminSessionResponse,
-  LbbAdminStackCreateRequest,
-  LbbAdminStackDeleteResponse,
-  LbbAdminStackResponse,
   LbbClientOptions,
   LbbRequestEvent,
   LbbResponseEvent,
@@ -12,6 +8,8 @@ import type {
   LbbStackActivityWindow,
   ListResponse,
   RawLbbResponse,
+  RdfExportOptions,
+  RdfImportOptions,
   Schemas,
   SparqlResults,
 } from "./types.js";
@@ -27,7 +25,6 @@ import {
   type RequestOptions,
 } from "./transport.js";
 import {
-  AdminNamespace,
   ContextNamespace,
   EntityNamespace,
   GraphNamespace,
@@ -48,19 +45,16 @@ export type {
   FetchLike,
   FlatProperties,
   ImportLine,
-  LbbAdminSessionResponse,
-  LbbAdminStackCreateRequest,
-  LbbAdminStackDeleteResponse,
-  LbbAdminStackResponse,
   LbbClientOptions,
   LbbRequestEvent,
   LbbResponseEvent,
   LbbErrorPayload,
   LbbStackActivityResponse,
   LbbStackActivityWindow,
-  LbbStackView,
   ListResponse,
   RawLbbResponse,
+  RdfExportOptions,
+  RdfImportOptions,
   Schemas,
   SparqlResults,
   SparqlResultsJson,
@@ -88,7 +82,6 @@ export type {
 } from "./transport.js";
 export type { EntityListOptions, HybridSearchOptions } from "./namespaces.js";
 export {
-  AdminNamespace,
   ContextNamespace,
   EntityNamespace,
   FactsNamespace,
@@ -101,7 +94,7 @@ export {
 } from "./namespaces.js";
 
 /**
- * A typed HTTP client for a Little Big Brain graph server. One instance is scoped to a
+ * A typed HTTP client for a little big brain graph server. One instance is scoped to a
  * single graph/branch; construct another for a different scope. All methods
  * return the parsed JSON response and throw {@link LbbError} on failure.
  */
@@ -119,7 +112,6 @@ export class LbbClient {
   private readonly onRequest?: (event: LbbRequestEvent) => void;
   private readonly onResponse?: (event: LbbResponseEvent) => void;
 
-  readonly admin: AdminNamespace;
   readonly context: ContextNamespace;
   readonly search: SearchNamespace;
   readonly indexes: IndexNamespace;
@@ -156,7 +148,6 @@ export class LbbClient {
       throw new Error("no fetch implementation available; pass options.fetch");
     }
     this.fetchImpl = chosen;
-    this.admin = new AdminNamespace(this);
     this.context = new ContextNamespace(this);
     this.search = new SearchNamespace(this);
     this.indexes = new IndexNamespace(this);
@@ -342,9 +333,18 @@ export class LbbClient {
     });
     if (!response.ok)
       throw parseLbbError(response.status, text.trim(), requestId);
+    const responseContentType =
+      response.headers?.get("content-type")?.toLowerCase() ?? "";
+    const isRdfText =
+      responseContentType.includes("text/turtle") ||
+      responseContentType.includes("application/n-triples") ||
+      responseContentType.includes("application/trig") ||
+      responseContentType.includes("application/n-quads");
     return {
       data: text
-        ? parseResponseJson<T>(text, response.status, requestId)
+        ? isRdfText
+          ? (text as T)
+          : parseResponseJson<T>(text, response.status, requestId)
         : (undefined as T),
       status: response.status,
       requestId,
@@ -446,33 +446,50 @@ export class LbbClient {
   }
 
   /**
-   * Bulk-ingest N-Triples without client-side conversion. Resource-object
+   * Bulk-ingest N-Triples, Turtle, N-Quads, or TriG without client-side conversion. Resource-object
    * triples become keyed Resource edges; literal-object triples become text
    * properties on the subject Resource.
    */
   importRdf(
-    ntriples: string,
-    opts: {
-      batch?: number;
-      strict?: boolean;
-      observedAt?: string;
-      resourceType?: string;
-      edgeIdempotency?: "append" | "skip_unchanged";
-      idempotencyKey?: string;
-    } = {},
+    rdf: string,
+    opts: RdfImportOptions = {},
   ): Promise<Schemas["GraphRdfImportResponse"]> {
+    const format = opts.format ?? "ntriples";
+    const contentTypes = {
+      ntriples: "application/n-triples",
+      turtle: "text/turtle",
+      nquads: "application/n-quads",
+      trig: "application/trig",
+    } as const;
     return this.request("POST", "/v1/graph/import/rdf", {
-      rawBody: ntriples,
-      contentType: "application/n-triples",
+      rawBody: rdf,
+      contentType: contentTypes[format],
       query: {
         batch: opts.batch,
         strict: opts.strict,
         observed_at: opts.observedAt,
-        format: "ntriples",
+        format,
+        base_iri: opts.baseIri,
+        graph_uri: opts.graphUri,
+        blank_node_scope: opts.blankNodeScope,
         resource_type: opts.resourceType,
         edge_idempotency: opts.edgeIdempotency,
       },
       idempotencyKey: opts.idempotencyKey ?? this.idempotencyKey("import-rdf"),
+    });
+  }
+
+  /** Export the snapshot-visible RDF projection as Turtle, N-Triples, TriG, or N-Quads. */
+  exportRdf(opts: RdfExportOptions = {}): Promise<string> {
+    return this.request<string>("GET", "/v1/graph/export/rdf", {
+      query: {
+        format: opts.format === "ntriples" ? "nt" : opts.format,
+        max_triples: opts.maxTriples,
+        as_of_valid_time: opts.asOfValidTime,
+        as_of_commit_seq: opts.asOfCommitSeq,
+        entailment: opts.entailment,
+        reason: opts.reason,
+      },
     });
   }
 
@@ -505,7 +522,7 @@ export class LbbClient {
   }
 
   /**
-   * WS16 validate-then-merge: replay `from_branch`'s post-fork commits onto the
+   * Validate-then-merge: replay `from_branch`'s post-fork commits onto the
    * SCOPED branch (its fork parent) as one new commit. A write — sends an
    * Idempotency-Key so a retry replays instead of re-applying.
    */
@@ -521,7 +538,7 @@ export class LbbClient {
   }
 
   /**
-   * WS15 observe: store a conversation episode verbatim as EPISODE evidence,
+   * Observe: store a conversation episode verbatim as EPISODE evidence,
    * anchor + gate extracted facts on an observe branch, and optionally
    * auto-merge when validation is clean. Flag-gated server-side
    * (`--enable-observe`). A write — carries an Idempotency-Key.
@@ -547,7 +564,7 @@ export class LbbClient {
     });
   }
 
-  // --- models as runs (WS9 registry + eval machinery) ---
+  // --- models as runs (training-run registry + eval machinery) ---
 
   /**
    * The graph's grounding vocabulary as byte-sorted, deduped string sections —
@@ -563,7 +580,7 @@ export class LbbClient {
   }
 
   /**
-   * Captured signals by flush-seq range, oldest first — the flywheel training
+   * Captured signals by flush-seq range, oldest first — the model-training
    * feed. The `seq` on each signal is the temporal-split coordinate (train ≤ T,
    * eval > T).
    */
@@ -741,7 +758,7 @@ export class LbbClient {
 
   /**
    * Promote a finished `extractor_lora` training run: gated on held-out fact
-   * F1, recorded as a WS9 `kind=extractor` run whose adapter resident
+   * F1, recorded as a `kind=extractor` training run whose adapter resident
    * extraction then serves.
    */
   promoteExtractor(opts: {
@@ -755,7 +772,7 @@ export class LbbClient {
 
   /**
    * Promote a finished `planner_lora` training run: gated on held-out slot
-   * exactness, recorded as a WS9 `kind=planner` run whose adapter `/v1/ask`
+   * exactness, recorded as a `kind=planner` training run whose adapter `/v1/ask`
    * then serves.
    */
   promotePlanner(opts: {
@@ -785,7 +802,7 @@ export class LbbClient {
 
   /**
    * Grounded prefix completion from the index vocabulary + ontology. Optionally
-   * narrow relation completions by a type-signature `context` (WS10) — a type
+   * narrow relation completions by a type-signature `context` — a type
    * pair that admits a single relation flags `signature_forced`.
    */
   suggest(
@@ -795,7 +812,7 @@ export class LbbClient {
   }
 
   /**
-   * Snap free text to the nearest real vocabulary item (WS11). Embedding cosine
+   * Snap free text to the nearest real vocabulary item. Embedding cosine
    * on a managed graph, else lexical; never fabricates a term.
    */
   resolveTerm(
@@ -806,7 +823,7 @@ export class LbbClient {
 
   /**
    * Ground a natural-language question to the graph's real vocabulary, retrieve
-   * against the pinned snapshot, and answer with citations (WS12, `/v1/ask`).
+   * against the pinned snapshot, and answer with citations (`/v1/ask`).
    */
   ask(body: Schemas["AskRequest"]): Promise<Schemas["AskResponse"]> {
     return this.request("POST", "/v1/ask", { body });
@@ -814,7 +831,7 @@ export class LbbClient {
 
   /**
    * Name the relation between two entities (`/v1/decode`): the DB narrows the
-   * candidates to the type pair's admissible relations (WS10), answers alone
+   * candidates to the type pair's admissible relations, answers alone
    * when the pair forces a single relation, and otherwise decodes it with the
    * graph-native fine-tuned model — the "DB narrows, cheap model decodes" call.
    */
@@ -823,7 +840,7 @@ export class LbbClient {
   }
 
   /**
-   * Report which completion mechanisms will carry on this graph (WS13):
+   * Report which completion mechanisms will carry on this graph:
    * signature sparsity, name semantics, sampled narrowing recall, and a
    * narrow / narrow+finetune / lexical-first recommendation.
    */
@@ -836,7 +853,7 @@ export class LbbClient {
   }
 
   /**
-   * Append relevance labels for a set of search results — how Little Big Brain
+   * Append relevance labels for a set of search results — how little big brain
    * gathers customer-specific qrels. Grade results (3 ideal/good, 1 partial,
    * 0 bad), referencing the search response's `search_id` so labels tie back to
    * that ranking. Stored apart from customer facts and exported via
@@ -1121,7 +1138,7 @@ export class LbbClient {
   }
 
   /**
-   * Stage G — derive edges from calibrated retrieval matches (preview): each
+   * Derive edges from calibrated retrieval matches (preview): each
    * candidate scored `P >= threshold` becomes a derived edge `(anchor, relation,
    * matched)` with a typed `Retrieval` provenance leaf. Pass either explicit
    * `candidates` or a `query` the server runs as BM25 entity retrieval.
@@ -1267,57 +1284,7 @@ export class LbbClient {
     return this.request("GET", "/v1/graphs");
   }
 
-  // --- database admin ---
-
-  /** Create a database stack and return its one-time stack API key. */
-  adminCreateStack(
-    body: LbbAdminStackCreateRequest,
-  ): Promise<LbbAdminStackResponse> {
-    return this.request("POST", "/api/admin/stacks", { body });
-  }
-
-  /** Inspect a database stack without returning secret key material. */
-  adminStack(slug: string): Promise<LbbAdminStackResponse> {
-    return this.request("GET", "/api/admin/stacks", { query: { stack: slug } });
-  }
-
-  /** Rotate a database stack key and return the new one-time API key. */
-  adminRotateStackKey(slug: string): Promise<LbbAdminStackResponse> {
-    return this.request("POST", "/api/admin/stacks/rotate-key", {
-      query: { stack: slug },
-    });
-  }
-
-  /** Delete a database stack after confirming the slug. */
-  adminDeleteStack(slug: string): Promise<LbbAdminStackDeleteResponse> {
-    return this.request("DELETE", "/api/admin/stacks", {
-      query: { stack: slug, confirm: slug },
-    });
-  }
-
-  /**
-   * Mint a short-lived `lbb_ses_…` session token for an account. A trusted
-   * co-located service uses it (with `?stack=<slug>`) to call the data plane on
-   * the account's behalf without handling the stack's mode-bearing stack key.
-   */
-  adminMintSession(
-    accountId: string,
-    ttlSeconds?: number,
-  ): Promise<LbbAdminSessionResponse> {
-    const body: Record<string, unknown> = { account_id: accountId };
-    if (ttlSeconds !== undefined) body.ttl_seconds = ttlSeconds;
-    return this.request("POST", "/api/admin/sessions", { body });
-  }
-
-  /** Customer-visible activity for one database stack. */
-  adminStackActivity(
-    slug: string,
-    window: LbbStackActivityWindow = "24h",
-  ): Promise<LbbStackActivityResponse> {
-    return this.request("GET", "/api/admin/stacks/activity", {
-      query: { stack: slug, window },
-    });
-  }
+  // --- stack activity ---
 
   /** Activity for the stack selected by the bearer stack key or session. */
   stackActivity(
