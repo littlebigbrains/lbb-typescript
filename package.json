@@ -1,6 +1,6 @@
 {
   "name": "@littlebigbrain/client",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "TypeScript client for the Little Big Brain graph + hybrid search HTTP API",
   "license": "Apache-2.0",
   "repository": {
@@ -9,7 +9,13 @@
   },
   "homepage": "https://docs.littlebigbrain.com/sdks/typescript/",
   "bugs": "https://github.com/littlebigbrains/lbb-typescript/issues",
-  "keywords": ["little-big-brain", "graph", "search", "sdk", "typescript"],
+  "keywords": [
+    "little-big-brain",
+    "graph",
+    "search",
+    "sdk",
+    "typescript"
+  ],
   "type": "module",
   "sideEffects": false,
   "main": "./dist/index.js",
@@ -20,9 +26,17 @@
       "import": "./dist/index.js"
     }
   },
-  "files": ["dist", "README.md", "LICENSE"],
-  "publishConfig": { "access": "public" },
-  "engines": { "node": ">=18" },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "engines": {
+    "node": ">=18"
+  },
   "scripts": {
     "clean": "node clean.mjs",
     "clean:test": "node clean.mjs test-dist",
