@@ -361,6 +361,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/graph/export/rdf": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Export the snapshot-visible RDF projection as Turtle, N-Triples, TriG, or N-Quads (hard 100,000-statement materialization ceiling) */
+        get: operations["get_v1_graph_export_rdf"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/graph/groundability": {
         parameters: {
             query?: never;
@@ -404,7 +421,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Bulk-ingest N-Triples directly through the fixed RDF_TRIPLE relation; source predicates and literal terms are preserved as edge metadata */
+        /** Bulk-ingest N-Triples, Turtle, N-Quads, or TriG through the fixed RDF_TRIPLE relation; RDF terms and named-graph labels are preserved as edge metadata */
         post: operations["post_v1_graph_import_rdf"];
         delete?: never;
         options?: never;
@@ -1274,7 +1291,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Audit current graph data against the active SHACL schema bundle */
+        /** Audit current graph data against the active SHACL schema bundle; JSON by default, or a standard RDF sh:ValidationReport as Turtle/N-Triples */
         post: operations["post_v1_schema_audit"];
         delete?: never;
         options?: never;
@@ -3280,7 +3297,7 @@ export interface components {
             uri: string;
         };
         /**
-         * @description Aggregate outcome of an RDF import. Every N-Triples statement is committed
+         * @description Aggregate outcome of an RDF import. Every RDF statement is committed
          *     through a fixed `RDF_TRIPLE` edge; source predicate and literal term metadata
          *     are stored on the edge so the RDF/SPARQL projection can emit source RDF terms
          *     while avoiding one ontology relation/property per source predicate.
@@ -10061,6 +10078,157 @@ export interface operations {
             };
         };
     };
+    get_v1_graph_export_rdf: {
+        parameters: {
+            query?: {
+                /** @description Graph name (default `main`) */
+                graph?: string;
+                /** @description Branch name (default `main`) */
+                branch?: string;
+                /** @description RDF format: turtle (default), nt/ntriples, trig, or nq/nquads */
+                format?: string;
+                /** @description Optional lower output ceiling; cannot exceed the server hard cap */
+                max_triples?: string;
+                /** @description RFC3339 valid-time snapshot pin */
+                as_of_valid_time?: string;
+                /** @description Commit-sequence snapshot pin */
+                as_of_commit_seq?: string;
+                /** @description subclass (default) or none */
+                entailment?: string;
+                /** @description Include stored rule-derived facts when true */
+                reason?: string;
+            };
+            header?: {
+                /** @description API contract version to pin. Use `2026-06-22` for this beta-breaking shape. */
+                "Lbb-Version"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description RDF graph */
+            200: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/n-quads": string;
+                    "application/n-triples": string;
+                    "application/trig": string;
+                    "text/turtle": string;
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Rate limit exceeded */
+            429: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Service unavailable */
+            503: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+        };
+    };
     get_v1_graph_groundability: {
         parameters: {
             query?: {
@@ -10358,8 +10526,14 @@ export interface operations {
                 observed_at?: string;
                 /** @description Edge duplicate handling: skip_unchanged (default) or append for fresh high-throughput loads */
                 edge_idempotency?: string;
-                /** @description RDF format; only ntriples is supported today */
+                /** @description RDF format: ntriples (default), turtle, nquads, or trig */
                 format?: string;
+                /** @description Optional base IRI for resolving relative IRIs in Turtle or TriG */
+                base_iri?: string;
+                /** @description Optional named-graph IRI for N-Triples or Turtle input */
+                graph_uri?: string;
+                /** @description Optional stable document scope for blank-node labels across chunks; omit to preserve labels exactly across retries and chunk boundaries */
+                blank_node_scope?: string;
                 /** @description Entity type name for imported RDF resources (default Resource) */
                 resource_type?: string;
             };
@@ -17960,6 +18134,8 @@ export interface operations {
                 graph?: string;
                 /** @description Branch name (default `main`) */
                 branch?: string;
+                /** @description Response format: json (default), turtle, or nt/ntriples */
+                format?: string;
             };
             header?: {
                 /** @description API contract version to pin. Use `2026-06-22` for this beta-breaking shape. */
@@ -17972,7 +18148,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description OK */
+            /** @description SHACL validation report */
             200: {
                 headers: {
                     /** @description API contract version used for the response */
@@ -17983,6 +18159,8 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SchemaAuditReport"];
+                    "application/n-triples": string;
+                    "text/turtle": string;
                 };
             };
             /** @description Bad request */

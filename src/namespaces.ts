@@ -7,6 +7,8 @@ import {
   type ImportLine,
   type ListResponse,
   parseSparqlResults,
+  type RdfExportOptions,
+  type RdfImportOptions,
   type Schemas,
 } from "./types.js";
 
@@ -87,6 +89,11 @@ export class GraphNamespace {
       body,
     });
   }
+
+  /** Export this graph's current snapshot as Turtle, N-Triples, TriG, or N-Quads. */
+  exportRdf(opts: RdfExportOptions = {}): Promise<string> {
+    return this.client.exportRdf(opts);
+  }
 }
 
 export class FactsNamespace {
@@ -131,23 +138,20 @@ export class FactsNamespace {
   }
 
   /**
-   * Bulk-load N-Triples through the native RDF import endpoint.
+   * Bulk-load N-Triples, Turtle, N-Quads, or TriG through the native RDF import endpoint.
    *
    * Statements are committed through the fixed RDF_TRIPLE relation; source RDF
    * predicates and literal term details are preserved as edge metadata.
    */
   importRdf(
-    ntriples: string,
-    opts: CallOptions & {
-      batch?: number;
-      strict?: boolean;
-      observedAt?: string;
-      resourceType?: string;
-      edgeIdempotency?: "append" | "skip_unchanged";
-      idempotencyKey?: string;
-    } = {},
+    rdf: string,
+    opts: CallOptions & RdfImportOptions = {},
   ): Promise<Schemas["GraphRdfImportResponse"]> {
     const {
+      format = "ntriples",
+      baseIri,
+      graphUri,
+      blankNodeScope,
       batch,
       strict,
       observedAt,
@@ -159,13 +163,21 @@ export class FactsNamespace {
       ...request,
       idempotencyKey:
         request.idempotencyKey ?? this.client.idempotencyKey("import-rdf"),
-      rawBody: ntriples,
-      contentType: "application/n-triples",
+      rawBody: rdf,
+      contentType: {
+        ntriples: "application/n-triples",
+        turtle: "text/turtle",
+        nquads: "application/n-quads",
+        trig: "application/trig",
+      }[format],
       query: {
         batch,
         strict,
         observed_at: observedAt,
-        format: "ntriples",
+        format,
+        base_iri: baseIri,
+        graph_uri: graphUri,
+        blank_node_scope: blankNodeScope,
         resource_type: resourceType,
         edge_idempotency: edgeIdempotency,
       },
@@ -670,37 +682,5 @@ export class QueryNamespace {
       retry: opts.retry ?? true,
       body,
     });
-  }
-}
-
-/** Database administration. Keep stack credentials on trusted servers only. */
-export class AdminNamespace {
-  constructor(private readonly client: LbbClient) {}
-
-  createStack(body: import("./types.js").LbbAdminStackCreateRequest) {
-    return this.client.adminCreateStack(body);
-  }
-
-  stack(slug: string) {
-    return this.client.adminStack(slug);
-  }
-
-  rotateStackKey(slug: string) {
-    return this.client.adminRotateStackKey(slug);
-  }
-
-  deleteStack(slug: string) {
-    return this.client.adminDeleteStack(slug);
-  }
-
-  mintSession(accountId: string, ttlSeconds?: number) {
-    return this.client.adminMintSession(accountId, ttlSeconds);
-  }
-
-  stackActivity(
-    slug: string,
-    window: import("./types.js").LbbStackActivityWindow = "24h",
-  ) {
-    return this.client.adminStackActivity(slug, window);
   }
 }
