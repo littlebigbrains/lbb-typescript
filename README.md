@@ -98,7 +98,7 @@ and `elapsedMs`.
 | Managed embeddings | `graph("main").embeddingConfig`, `graph("main").setEmbeddingConfig`, `graph("main").backfillEmbeddings`, `graph("main").promoteEmbedding` |
 | Search | `search.hybrid`, `search.multi`, `search.fullText`, `search.vector` |
 | Context substrate | `context.ask`, `context.suggest`, `context.resolve`, `context.decode`, `context.groundability` |
-| Search feedback (training data) | `search.feedback`, `search.feedbackExport` |
+| Search feedback (training data) | `search.feedback`, `search.feedbackSummary`, `search.feedbackExport` |
 | Traversal | `traverse`, `semanticTraverse` |
 | Temporal / lineage / shapes | `currentState`, `history`, `why`, `shacl` |
 | Query | `query.sparql`, `query.structured`, `query.analytics`, `query.shacl`, `query.infer`, `query.premises` |

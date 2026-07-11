@@ -448,6 +448,31 @@ test("search.feedbackExport reads scoped feedback rows", async () => {
   assert.equal(calls[0].init.method, "GET");
 });
 
+test("search.feedbackSummary reads scoped feedback administration counts", async () => {
+  const { fetch, calls } = recordingFetch({
+    body: JSON.stringify({
+      raw_events: 0,
+      deduped_events: 0,
+      grades: {},
+      splits: {},
+      graph: {},
+      feedback_graph: {},
+    }),
+  });
+  const client = new LbbClient({
+    baseUrl: "http://h",
+    graph: "crm",
+    branch: "main",
+    fetch,
+  });
+  await client.search.feedbackSummary();
+  assert.equal(
+    calls[0].input,
+    "http://h/v1/search/feedback/summary?graph=crm&branch=main",
+  );
+  assert.equal(calls[0].init.method, "GET");
+});
+
 test("entities namespace encodes list filters", async () => {
   const { fetch, calls } = recordingFetch({
     body: JSON.stringify({ entities: [] }),

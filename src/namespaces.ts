@@ -293,6 +293,12 @@ export class SearchNamespace {
     return this.client.request("GET", "/v1/search/feedback/export", opts);
   }
 
+  feedbackSummary(
+    opts: CallOptions = {},
+  ): Promise<Schemas["SearchFeedbackSummaryResponse"]> {
+    return this.client.request("GET", "/v1/search/feedback/summary", opts);
+  }
+
   fullText(
     body: Schemas["FullTextSearchRequest"],
     opts: CallOptions = {},
