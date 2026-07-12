@@ -3122,6 +3122,12 @@ export interface components {
             type: string;
         };
         EvidenceInput: string | {
+            /**
+             * @description Stable observation id used by full-fidelity export/import. Ordinary
+             *     callers omit it and receive the existing deterministic request id.
+             */
+            observation_id?: string | null;
+            region?: null | components["schemas"]["RegionAnchorInput"];
             source_id?: string | null;
             text?: string | null;
         };
@@ -3706,6 +3712,8 @@ export interface components {
              *     exact receipt and the original terminal commit sequence.
              */
             mutation_receipt_id: string;
+            /** @description Exact observation records imported from a full-fidelity export. */
+            observations?: number;
             properties: number;
             triplets: number;
         };
@@ -5430,6 +5438,32 @@ export interface components {
             snapshot: components["schemas"]["SnapshotView"];
             total_triples: number;
             truncated: boolean;
+        };
+        /**
+         * @description A page-region provenance anchor on a fact's evidence (region provenance
+         *     §4.1/§6.4(b) BYO import): where the evidence appears in the source
+         *     document. Coordinates are **normalized to the page box** (`[0, 1]`, origin
+         *     top-left, y down) with `x0 <= x1` and `y0 <= y1`; `confidence` is the
+         *     extraction confidence in `[0, 1]`. The commit path validates and quantizes
+         *     (`round(v * 65535)` coords, `round(c * 255)` confidence) into the canonical
+         *     stored anchor; out-of-range, non-finite, or inverted boxes are rejected.
+         */
+        RegionAnchorInput: {
+            /** Format: double */
+            confidence: number;
+            /**
+             * Format: int32
+             * @description 0-based page index within the source document.
+             */
+            page: number;
+            /** Format: double */
+            x0: number;
+            /** Format: double */
+            x1: number;
+            /** Format: double */
+            y0: number;
+            /** Format: double */
+            y1: number;
         };
         RelationSearchResult: {
             name: string;
