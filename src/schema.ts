@@ -320,9 +320,28 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Embed the graph corpus with the managed model and rebuild the Stored ANN index */
+        /** Submit a durable managed-embedding backfill job (legacy path alias) */
         post: operations["post_v1_graph_embedding_backfill"];
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/graph/embedding/backfill-jobs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read one managed-embedding backfill job */
+        get: operations["get_v1_graph_embedding_backfill_jobs"];
+        put?: never;
+        /** Submit a durable managed-embedding backfill job */
+        post: operations["post_v1_graph_embedding_backfill_jobs"];
+        /** Request cancellation of a managed-embedding backfill job */
+        delete: operations["delete_v1_graph_embedding_backfill_jobs"];
         options?: never;
         head?: never;
         patch?: never;
@@ -2122,7 +2141,7 @@ export interface components {
         AskFeedbackRequest: {
             /** @description The `ask_id` the ask response carried. */
             ask_id: string;
-            corrected_plan?: null | components["schemas"]["AskStructuredQuery"];
+            corrected_plan?: null | components["schemas"]["AskStructuredPlanV2"];
             /** @description Optional free-text note (bounded server-side). */
             note?: string | null;
             verdict: components["schemas"]["AskFeedbackVerdict"];
@@ -2134,6 +2153,15 @@ export interface components {
              *     clients never break when the flag flips.
              */
             accepted: boolean;
+            accepted_count: number;
+            event_id: string;
+            excluded_count: number;
+            exclusions?: {
+                [key: string]: number;
+            };
+            receipt_id: string;
+            replayed: boolean;
+            trainable_count: number;
         };
         /**
          * @description A user verdict on one ask (`POST /v1/ask/feedback`) — the planner's
@@ -2142,6 +2170,14 @@ export interface components {
          * @enum {string}
          */
         AskFeedbackVerdict: "accepted" | "rejected" | "corrected";
+        /** @enum {string} */
+        AskFilterOperatorV2: "eq" | "ne" | "in" | "contains" | "gt" | "gte" | "lt" | "lte";
+        /** @enum {string} */
+        AskGraphAnchorBehaviorV2: "filter" | "boost";
+        AskGraphAnchorV2: {
+            behavior: components["schemas"]["AskGraphAnchorBehaviorV2"];
+            entity: string;
+        };
         AskGrounding: {
             /**
              * @description Real vocabulary the question snapped to (classes/relations/properties/
@@ -2176,11 +2212,20 @@ export interface components {
              */
             vocab_candidates: number;
         };
+        /** @enum {string} */
+        AskPlanExecutionModeV2: "entity_search" | "path_search" | "hybrid";
         AskQuery: {
             /** @description The retrieval query text that was executed. */
             query: string;
             structured?: null | components["schemas"]["AskStructuredQuery"];
+            structured_v2?: null | components["schemas"]["AskStructuredPlanV2"];
             top_k: number;
+        };
+        /** @enum {string} */
+        AskRelationDirectionV2: "outgoing" | "incoming" | "either";
+        AskRelationStepV2: {
+            direction: components["schemas"]["AskRelationDirectionV2"];
+            relation: string;
         };
         AskRequest: {
             /**
@@ -2200,8 +2245,17 @@ export interface components {
              *     grounding is computed — the caller drives its own retrieval/model.
              */
             execute?: boolean | null;
+            /** @description Entity attributes retained as evidence on the internal execution trace. */
+            fields?: string[];
+            filters?: null | components["schemas"]["SearchFilterExpr"];
             /** @description The natural-language question. */
             question: string;
+            /**
+             * @description Opaque alternative to `as_of_commit_seq`. Exactly one pin spelling may
+             *     be supplied; grounding, validation, execution, trace, and citations all
+             *     use the resolved commit.
+             */
+            snapshot_token?: string | null;
             /** @description Max citations to return (default 8, clamped to 25). */
             top_k?: number | null;
         };
@@ -2237,6 +2291,23 @@ export interface components {
             mode: components["schemas"]["AskMode"];
             query?: null | components["schemas"]["AskQuery"];
             snapshot: components["schemas"]["SnapshotView"];
+        };
+        AskStructuredPlanV2: {
+            execution_mode: components["schemas"]["AskPlanExecutionModeV2"];
+            filters?: components["schemas"]["AskTypedFilterV2"][];
+            frontier_limit: number;
+            graph_anchor?: null | components["schemas"]["AskGraphAnchorV2"];
+            /** Format: int32 */
+            hop_limit: number;
+            path_limit: number;
+            relation_steps: components["schemas"]["AskRelationStepV2"][];
+            result_limit: number;
+            target_types: string[];
+            /**
+             * Format: int32
+             * @description Contract version; must be exactly 2.
+             */
+            v: number;
         };
         /**
          * @description The constrained structured plan: the entity type the answer set is
@@ -2292,6 +2363,11 @@ export interface components {
              * @description End-to-end latency of the whole call.
              */
             total_ms: number;
+        };
+        AskTypedFilterV2: {
+            field: string;
+            operator: components["schemas"]["AskFilterOperatorV2"];
+            value: unknown;
         };
         AssertionSearchResult: {
             /** Format: float */
@@ -2918,9 +2994,11 @@ export interface components {
         };
         EntityId: string;
         EntityMetadataResponse: {
+            adjacency_indexed_commit_seq?: null | components["schemas"]["CommitSeq"];
             ann_indexed_commit_seq?: null | components["schemas"]["CommitSeq"];
             bm25_indexed_commit_seq?: null | components["schemas"]["CommitSeq"];
             entity: components["schemas"]["EntityView"];
+            index_lineage?: null | components["schemas"]["IndexLineage"];
             last_commit?: null | components["schemas"]["CommitSeq"];
             object_hash?: string | null;
             object_key?: string | null;
@@ -3080,6 +3158,33 @@ export interface components {
             key?: string | null;
             text?: string | null;
             vector: number[];
+        };
+        ExternalPlannerTraceV1: {
+            ask_id: string;
+            citations?: unknown[];
+            /** Format: double */
+            cost?: number | null;
+            entities?: unknown[];
+            execution_error?: string | null;
+            execution_outcome: string;
+            failure_reason?: string | null;
+            final_user_outcome?: string | null;
+            /** Format: double */
+            latency_ms: number;
+            original_question: string;
+            paths?: unknown[];
+            planner_model: string;
+            planner_provider: string;
+            prompt_hash: string;
+            prompt_version: string;
+            raw_output: unknown;
+            snapshot_token: string;
+            /** Format: int64 */
+            tokens?: number | null;
+            /** Format: int32 */
+            v: number;
+            validated_plan?: null | components["schemas"]["AskStructuredPlanV2"];
+            validation_result: string;
         };
         /**
          * @description `GET /v1/models/extractor-dataset` — the extractor fine-tune's training
@@ -3586,9 +3691,21 @@ export interface components {
             error_count: number;
             errors?: components["schemas"]["GraphImportLineError"][];
             graph_created: boolean;
+            /** @description The caller key, or the server-minted key when the caller omitted one. */
+            idempotency_key: string;
+            /**
+             * @description True when every internal mutation batch was the already-committed
+             *     receipt for this idempotency key.
+             */
+            idempotent_replay: boolean;
             index?: null | components["schemas"]["GraphImportIndexOutcome"];
             indexed: boolean;
             lines_read: number;
+            /**
+             * @description Stable identity for the whole multi-batch mutation. Replays return this
+             *     exact receipt and the original terminal commit sequence.
+             */
+            mutation_receipt_id: string;
             properties: number;
             triplets: number;
         };
@@ -3617,6 +3734,7 @@ export interface components {
             targets: components["schemas"]["AnnTargetKind"][];
         };
         GraphMetadataResponse: {
+            adjacency_indexed_commit_seq?: null | components["schemas"]["CommitSeq"];
             ann_indexed_commit_seq?: null | components["schemas"]["CommitSeq"];
             bm25_indexed_commit_seq?: null | components["schemas"]["CommitSeq"];
             graph: components["schemas"]["GraphKey"];
@@ -3633,6 +3751,7 @@ export interface components {
              *     the persisted fast path being current, not queryability.
              */
             index_caught_up?: boolean | null;
+            index_lineage?: null | components["schemas"]["IndexLineage"];
             /** Format: int64 */
             object_bytes: number;
             object_count: number;
@@ -3977,6 +4096,21 @@ export interface components {
             skipped_branch_shared: boolean;
             snapshot: components["schemas"]["SnapshotView"];
         };
+        /** @description Typed convergence view over the persisted serving families. */
+        IndexLineage: {
+            adjacency_indexed_commit_seq?: null | components["schemas"]["CommitSeq"];
+            ann_indexed_commit_seq?: null | components["schemas"]["CommitSeq"];
+            bm25_indexed_commit_seq?: null | components["schemas"]["CommitSeq"];
+            caught_up: boolean;
+            head_commit_seq: components["schemas"]["CommitSeq"];
+            /**
+             * @description Content identity of the head generation plus the exact three manifest
+             *     views observed while constructing this response.
+             */
+            manifest_view_token: string;
+            /** Format: int64 */
+            observed_at_micros: number;
+        };
         IndexRunView: {
             /** Format: int64 */
             bytes: number;
@@ -4071,15 +4205,61 @@ export interface components {
         LbbErrorEnvelope: {
             error: components["schemas"]["LbbErrorBody"];
         };
+        ManagedEmbeddingBackfillJobProgress: {
+            continuation?: string | null;
+            embedded: number;
+            failed: number;
+            final_index_job_id?: string | null;
+            /** Format: int64 */
+            heartbeat_micros: number;
+            index_lineage?: null | components["schemas"]["IndexLineage"];
+            missing: number;
+            processed: number;
+            skipped: number;
+            /** Format: int64 */
+            source_commit_seq: number;
+            source_snapshot_token: string;
+            total: number;
+            worker?: string | null;
+        };
+        ManagedEmbeddingBackfillJobRequest: {
+            batch_size?: number | null;
+            full?: boolean;
+            limit?: number | null;
+        };
+        ManagedEmbeddingBackfillJobStatusResponse: {
+            /** Format: int32 */
+            attempts: number;
+            /** Format: int64 */
+            enqueued_at_micros: number;
+            graph: components["schemas"]["GraphKey"];
+            idempotency_key: string;
+            job_id: string;
+            progress?: null | components["schemas"]["ManagedEmbeddingBackfillJobProgress"];
+            result?: null | components["schemas"]["ManagedEmbeddingBackfillResponse"];
+            status: string;
+            terminal_error?: string | null;
+            /** Format: int64 */
+            updated_at_micros: number;
+        };
         /** @description Outcome of embedding the corpus and rebuilding its Stored ANN index. */
         ManagedEmbeddingBackfillResponse: {
             batches: number;
+            continuation?: string | null;
             embedded: number;
             entities_total: number;
+            failed: number;
+            final_index_job_id?: string | null;
+            index_lineage?: null | components["schemas"]["IndexLineage"];
             /** Format: int64 */
             indexed_commit_seq: number;
+            missing: number;
             model_id: string;
+            processed: number;
             skipped: number;
+            /** Format: int64 */
+            source_commit_seq: number;
+            source_snapshot_token: string;
             truncated: boolean;
         };
         /** @description The resolved, versioned managed embedding configuration. */
@@ -4662,6 +4842,7 @@ export interface components {
              */
             allow_data_conflicts?: boolean;
             ops: components["schemas"]["OntologyEvolveOp"][];
+            preconditions?: null | components["schemas"]["WritePreconditions"];
         };
         OntologyEvolveResponse: {
             /**
@@ -4994,7 +5175,10 @@ export interface components {
          *     exact serving prompt.
          */
         PlannerExample: {
+            ask_id?: string | null;
+            example_id: string;
             plan: components["schemas"]["AskStructuredQuery"];
+            plan_v2: components["schemas"]["AskStructuredPlanV2"];
             question: string;
             /**
              * @description The `ask_trace` shortlists (`{classes, relations, anchors}`) for
@@ -5042,9 +5226,18 @@ export interface components {
          *     corrupt one slot of an execution-verified gold plan.
          */
         PlannerPreferencePair: {
+            ask_id?: string | null;
             chosen: components["schemas"]["AskStructuredQuery"];
+            chosen_v2: components["schemas"]["AskStructuredPlanV2"];
+            /**
+             * @description True when the corrected ask produced no original structured plan. Such
+             *     a row is retained as an explicit absent-original preference pair.
+             */
+            original_absent: boolean;
+            pair_id: string;
             question: string;
-            rejected: components["schemas"]["AskStructuredQuery"];
+            rejected?: null | components["schemas"]["AskStructuredQuery"];
+            rejected_v2?: null | components["schemas"]["AskStructuredPlanV2"];
             /** @description The `ask_trace` shortlists for feedback pairs; `None` for synthetic. */
             shortlists?: unknown;
             /** @description `corrected` | `rejected_paired` | `synthetic`. */
@@ -5349,6 +5542,8 @@ export interface components {
          *     by construction — the resolver never fabricates a term.
          */
         ResolveTermRequest: {
+            /** Format: int64 */
+            as_of_commit_seq?: number | null;
             /**
              * @description Restrict resolution to this explicit candidate set (the narrowed
              *     shortlist — e.g. relations WS10 admitted for a type pair). Each candidate
@@ -5361,10 +5556,12 @@ export interface components {
              *     `candidates` is supplied (the candidate list is the search space).
              */
             kinds?: components["schemas"]["SuggestKind"][];
+            snapshot_token?: string | null;
             /** @description The free text to snap to real vocabulary (1..=256 chars). */
             text: string;
             /** @description Max matches to return (default 3, clamped to 25). */
             top_k?: number | null;
+            vocabulary_filter?: null | components["schemas"]["VocabularyFilter"];
         };
         ResolveTermResponse: {
             matches: components["schemas"]["ResolvedTerm"][];
@@ -5375,6 +5572,7 @@ export interface components {
              */
             method: components["schemas"]["ResolveMethod"];
             snapshot: components["schemas"]["SnapshotView"];
+            snapshot_token: string;
         };
         /** @enum {string} */
         ResolvedKind: "concept" | "entity" | "relation" | "candidate_concept" | "candidate_relation" | "rejected";
@@ -5388,6 +5586,7 @@ export interface components {
         };
         ResolvedTerm: {
             kind: components["schemas"]["SuggestKind"];
+            provenance?: null | components["schemas"]["VocabularyProvenance"];
             /**
              * Format: float
              * @description Similarity to the input in [0, 1]; higher is closer.
@@ -5693,6 +5892,7 @@ export interface components {
             attributes?: {
                 [key: string]: unknown;
             } | null;
+            contributions?: null | components["schemas"]["SearchHitContributions"];
             entity: components["schemas"]["EntityView"];
             matched_concepts: string[];
             /** Format: float */
@@ -5704,6 +5904,14 @@ export interface components {
             score: number;
             source_id: string;
             text?: string | null;
+        };
+        SearchChannelContribution: {
+            /** Format: float */
+            raw_score: number;
+            /** Format: float */
+            weight: number;
+            /** Format: float */
+            weighted_score: number;
         };
         /** @enum {string} */
         SearchConsistency: "strong" | "eventual";
@@ -6038,6 +6246,30 @@ export interface components {
             op: "not";
         };
         SearchFilterValue: null | boolean | number | string;
+        SearchHitContributions: {
+            adjacency_indexed_commit_seq?: null | components["schemas"]["CommitSeq"];
+            bm25: components["schemas"]["SearchChannelContribution"];
+            bm25_indexed_commit_seq?: null | components["schemas"]["CommitSeq"];
+            bm25_manifest_key?: string | null;
+            filter_pruned: boolean;
+            /** Format: float */
+            final_score: number;
+            graph: components["schemas"]["SearchChannelContribution"];
+            lexical: components["schemas"]["SearchChannelContribution"];
+            ontology: components["schemas"]["SearchChannelContribution"];
+            /**
+             * Format: float
+             * @description Type boosts, score floors/clamps, graph-anchor boosts, observation-owner
+             *     promotion, and class-intent promotion are accounted for here.
+             */
+            post_fusion_adjustment: number;
+            snapshot_commit_seq: components["schemas"]["CommitSeq"];
+            /** Format: int64 */
+            trained_fusion_run?: number | null;
+            vector: components["schemas"]["SearchChannelContribution"];
+            vector_indexed_commit_seq?: null | components["schemas"]["CommitSeq"];
+            vector_manifest_key?: string | null;
+        };
         SearchIndexFamilyRun: {
             family: string;
             indexed_commit_seq_after: components["schemas"]["CommitSeq"];
@@ -6090,6 +6322,12 @@ export interface components {
             adjacency?: null | components["schemas"]["SearchIndexFamilyRun"];
             embeddings?: null | components["schemas"]["SearchIndexFamilyRun"];
             full_text?: null | components["schemas"]["SearchIndexFamilyRun"];
+            /**
+             * @description One coherent observation of every serving index family after this run.
+             *     Unlike the per-family build outcomes, this also includes families the
+             *     request did not rebuild and is therefore the convergence contract.
+             */
+            index_lineage: components["schemas"]["IndexLineage"];
             permutation?: null | components["schemas"]["SearchIndexFamilyRun"];
             snapshot: components["schemas"]["SnapshotView"];
         };
@@ -6221,6 +6459,12 @@ export interface components {
          *     completions are strings that provably exist in the graph at this snapshot.
          */
         SearchSuggestRequest: {
+            /**
+             * Format: int64
+             * @description Transaction-time vocabulary pin. Mutually exclusive with
+             *     `snapshot_token`.
+             */
+            as_of_commit_seq?: number | null;
             context?: null | components["schemas"]["SuggestContext"];
             /** @description Restrict `attribute_value` suggestions to one attribute field. */
             field?: string | null;
@@ -6230,9 +6474,21 @@ export interface components {
             limit?: number | null;
             prefix: string;
             ranker?: null | components["schemas"]["SuggestRankerWeights"];
+            /**
+             * @description Opaque graph snapshot identity previously returned by LBB. Mutually
+             *     exclusive with `as_of_commit_seq`.
+             */
+            snapshot_token?: string | null;
+            vocabulary_filter?: null | components["schemas"]["VocabularyFilter"];
         };
         SearchSuggestResponse: {
             snapshot: components["schemas"]["SnapshotView"];
+            /**
+             * @description Opaque vocabulary token binding graph epoch, commit, and ontology
+             *     version. Feed it to a subsequent suggest/resolve request to fail closed
+             *     on vocabulary drift.
+             */
+            snapshot_token: string;
             suggestions: components["schemas"]["SearchSuggestion"][];
             /**
              * Format: int64
@@ -6250,6 +6506,7 @@ export interface components {
             /** @description The attribute field, for `attribute_value` suggestions. */
             field?: string | null;
             kind: components["schemas"]["SuggestKind"];
+            provenance?: null | components["schemas"]["VocabularyProvenance"];
             /** Format: float */
             score: number;
             /**
@@ -6856,8 +7113,17 @@ export interface components {
         SignalIngestResponse: {
             /** @description Number of signals written (0 when the feature flag is off). */
             accepted: number;
+            accepted_count: number;
+            event_id: string;
+            excluded_count: number;
+            exclusions?: {
+                [key: string]: number;
+            };
             /** @description The object the batch was flushed to, absent when nothing was written. */
             object_key?: string | null;
+            receipt_id: string;
+            replayed: boolean;
+            trainable_count: number;
         };
         /**
          * @description One signal as a client sends it. The server stamps `v`, `ts`, and (when the
@@ -6880,7 +7146,7 @@ export interface components {
          *     material the planner fine-tune trains on.
          * @enum {string}
          */
-        SignalKind: "suggestion_shown" | "suggestion_adopted" | "zero_result" | "atom_cited" | "branch_merge_accepted" | "branch_merge_rejected" | "tool_error" | "speculation_summary" | "ask_trace" | "ask_feedback";
+        SignalKind: "suggestion_shown" | "suggestion_adopted" | "zero_result" | "atom_cited" | "branch_merge_accepted" | "branch_merge_rejected" | "tool_error" | "speculation_summary" | "ask_trace" | "ask_feedback" | "external_planner_trace";
         /**
          * @description `GET /v1/signals?from=&to=&limit=` — the consumer side of the signal bus:
          *     signals whose flush seq lies in `[from, to]`, oldest first. Trainers split
@@ -7408,6 +7674,24 @@ export interface components {
             query: string;
             reason: components["schemas"]["SuggestReason"];
         };
+        SuggestionAdoptedV1: {
+            candidate_id: string;
+            prefix: string;
+            rank: number;
+            suggestion_id: string;
+            text: string;
+            /** Format: int32 */
+            v: number;
+        };
+        SuggestionShownV1: {
+            candidate_id: string;
+            prefix: string;
+            rank: number;
+            suggestion_id: string;
+            text: string;
+            /** Format: int32 */
+            v: number;
+        };
         /**
          * @description `GET /v1/models/synthetic-eval` — execution-verified QA pairs generated
          *     FROM the graph: each question is templated from a current edge and its
@@ -7498,6 +7782,8 @@ export interface components {
              * @description Challenger − champion hit-rate on the held-out eval slice.
              */
             effect: number;
+            /** Format: float */
+            hit_rate_delta?: number | null;
             /** @description Labeled eval probes the decision is over. */
             labeled: number;
             /**
@@ -7518,15 +7804,31 @@ export interface components {
             min_effect: number;
             /** @description Minimum labeled probes for any promotion. */
             min_labeled: number;
+            /** Format: float */
+            mrr_delta?: number | null;
+            /**
+             * Format: float
+             * @description Deterministic paired-bootstrap 95% interval for challenger − champion
+             *     nDCG@10. Promotion requires the lower bound to be at least zero.
+             */
+            ndcg_ci95_lower?: number | null;
+            /** Format: float */
+            ndcg_ci95_upper?: number | null;
+            /** Format: float */
+            non_inferiority_boundary?: number | null;
             passed: boolean;
             /** @description Human-readable one-liner for the console status surface. */
             reason: string;
+            /**
+             * Format: float
+             * @description Fusion-only paired held-out deltas. All must be non-negative.
+             */
+            recall_delta?: number | null;
         };
         /** @description Bounded in-flight work counters for a durable trainer job. */
         TrainModelJobProgress: {
-            completed_candidates: number;
-            /** @description Completed expensive probe replays, not merely distinct input probes. */
-            completed_probes: number;
+            candidates_completed: number;
+            candidates_total: number;
             /**
              * Format: int64
              * @description Linear estimate from work completed so far. Absent before the first
@@ -7545,8 +7847,12 @@ export interface components {
             percentage: number;
             /** @description `preparing` | `candidate_search` | `held_out_gate` | kind-specific stage. */
             phase: string;
-            total_candidates: number;
-            total_probes: number;
+            /** @description Expensive search executions or cached-score evaluations completed. */
+            replay_evaluations_completed: number;
+            replay_evaluations_total: number;
+            /** @description Distinct input probes prepared at the pinned source snapshot. */
+            source_probes_completed: number;
+            source_probes_total: number;
         };
         /**
          * @description Durable background trainer status. The terminal `result` carries the full
@@ -7662,6 +7968,12 @@ export interface components {
             as_of_valid_time?: string | null;
             direction: components["schemas"]["ExpansionDirection"];
             /**
+             * @description Entity fields projected for every seed/intermediate/terminal node in
+             *     `TraverseResponse.projected_nodes`.
+             */
+            fields?: string[];
+            filter?: null | components["schemas"]["SearchFilterExpr"];
+            /**
              * Format: int64
              * @description Decoded adjacency-block working-set byte budget for the ranged path.
              *     Defaults to the server/store budget. A request may lower the budget,
@@ -7684,6 +7996,16 @@ export interface components {
         };
         TraverseResponse: {
             paths: components["schemas"]["PathResult"][];
+            /**
+             * @description Same-snapshot field evidence for every node appearing in `paths`, keyed
+             *     by stable entity-id hex. Present as an empty map when no fields were
+             *     requested.
+             */
+            projected_nodes?: {
+                [key: string]: {
+                    [key: string]: unknown;
+                };
+            };
             ranged?: null | components["schemas"]["RangedTraverseStats"];
             snapshot: components["schemas"]["SnapshotView"];
         };
@@ -7714,6 +8036,7 @@ export interface components {
              *     `as_of` returns empty. Omit it for normal live writes (stamped now).
              */
             observed_at?: string | null;
+            preconditions?: null | components["schemas"]["WritePreconditions"];
             property_merge?: null | components["schemas"]["PropertyMergeMode"];
             /**
              * @description The edges to commit. Defaults to empty so a properties-only or
@@ -7741,6 +8064,16 @@ export interface components {
             source: components["schemas"]["EntityView"];
             target: components["schemas"]["EntityView"];
             valid_time: components["schemas"]["ValidTime"];
+        };
+        TypedAskFeedbackV1: {
+            ask_id: string;
+            note?: string | null;
+            original_absent: boolean;
+            original_plan?: null | components["schemas"]["AskStructuredPlanV2"];
+            preferred_plan?: null | components["schemas"]["AskStructuredPlanV2"];
+            /** Format: int32 */
+            v: number;
+            verdict: string;
         };
         ValidTime: {
             /** Format: int64 */
@@ -7784,6 +8117,22 @@ export interface components {
             terms?: string[];
             /** @description True when any section hit its cap (silent truncation is never OK). */
             truncated: boolean;
+        };
+        VocabularyFilter: {
+            include_builtin?: boolean | null;
+            namespace_allow?: string[];
+            namespace_deny?: string[];
+            origins?: components["schemas"]["VocabularyOrigin"][];
+        };
+        /** @enum {string} */
+        VocabularyOrigin: "builtin" | "tenant" | "imported";
+        VocabularyProvenance: {
+            candidate_id: string;
+            namespace: string;
+            /** Format: int64 */
+            ontology_version: number;
+            origin: components["schemas"]["VocabularyOrigin"];
+            source_reference: string;
         };
         WalCompactRequest: {
             /**
@@ -7869,6 +8218,13 @@ export interface components {
             /** @description Relation to widen, by name (case-insensitive). */
             relation: string;
         };
+        WritePreconditions: {
+            /** Format: int64 */
+            expected_head_commit_seq?: number | null;
+            /** Format: int64 */
+            expected_ontology_version?: number | null;
+            expected_snapshot_token?: string | null;
+        };
     };
     responses: never;
     parameters: never;
@@ -7889,7 +8245,7 @@ export interface operations {
             header?: {
                 /** @description API contract version to pin. Use `2026-06-22` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
-                /** @description Stable client-generated key for safely retrying mutations. Required for fact commits. */
+                /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
             };
             path?: never;
@@ -8028,11 +8384,11 @@ export interface operations {
                 /** @description Branch name (default `main`) */
                 branch?: string;
             };
-            header?: {
+            header: {
                 /** @description API contract version to pin. Use `2026-06-22` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
-                /** @description Stable client-generated key for safely retrying mutations. Required for fact commits. */
-                "Idempotency-Key"?: string;
+                /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
+                "Idempotency-Key": string;
             };
             path?: never;
             cookie?: never;
@@ -8173,7 +8529,7 @@ export interface operations {
             header?: {
                 /** @description API contract version to pin. Use `2026-06-22` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
-                /** @description Stable client-generated key for safely retrying mutations. Required for fact commits. */
+                /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
             };
             path?: never;
@@ -8453,7 +8809,7 @@ export interface operations {
             header?: {
                 /** @description API contract version to pin. Use `2026-06-22` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
-                /** @description Stable client-generated key for safely retrying mutations. Required for fact commits. */
+                /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
             };
             path?: never;
@@ -8595,7 +8951,7 @@ export interface operations {
             header?: {
                 /** @description API contract version to pin. Use `2026-06-22` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
-                /** @description Stable client-generated key for safely retrying mutations. Required for fact commits. */
+                /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
             };
             path?: never;
@@ -8873,7 +9229,7 @@ export interface operations {
             header?: {
                 /** @description API contract version to pin. Use `2026-06-22` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
-                /** @description Stable client-generated key for safely retrying mutations. Required for fact commits. */
+                /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
             };
             path?: never;
@@ -9011,7 +9367,7 @@ export interface operations {
             header?: {
                 /** @description API contract version to pin. Use `2026-06-22` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
-                /** @description Stable client-generated key for safely retrying mutations. Required for fact commits. */
+                /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
             };
             path?: never;
@@ -9153,7 +9509,7 @@ export interface operations {
             header?: {
                 /** @description API contract version to pin. Use `2026-06-22` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
-                /** @description Stable client-generated key for safely retrying mutations. Required for fact commits. */
+                /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
             };
             path?: never;
@@ -9573,7 +9929,7 @@ export interface operations {
             header: {
                 /** @description API contract version to pin. Use `2026-06-22` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
-                /** @description Stable client-generated key for safely retrying mutations. Required for fact commits. */
+                /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key": string;
             };
             path?: never;
@@ -9719,7 +10075,7 @@ export interface operations {
             header?: {
                 /** @description API contract version to pin. Use `2026-06-22` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
-                /** @description Stable client-generated key for safely retrying mutations. Required for fact commits. */
+                /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
             };
             path?: never;
@@ -9857,7 +10213,7 @@ export interface operations {
             header?: {
                 /** @description API contract version to pin. Use `2026-06-22` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
-                /** @description Stable client-generated key for safely retrying mutations. Required for fact commits. */
+                /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
             };
             path?: never;
@@ -9997,7 +10353,7 @@ export interface operations {
             header?: {
                 /** @description API contract version to pin. Use `2026-06-22` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
-                /** @description Stable client-generated key for safely retrying mutations. Required for fact commits. */
+                /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
             };
             path?: never;
@@ -10415,7 +10771,7 @@ export interface operations {
             header?: {
                 /** @description API contract version to pin. Use `2026-06-22` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
-                /** @description Stable client-generated key for safely retrying mutations. Required for fact commits. */
+                /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
             };
             path?: never;
@@ -10563,7 +10919,431 @@ export interface operations {
             header?: {
                 /** @description API contract version to pin. Use `2026-06-22` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
-                /** @description Stable client-generated key for safely retrying mutations. Required for fact commits. */
+                /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
+                "Idempotency-Key"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ManagedEmbeddingBackfillJobRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ManagedEmbeddingBackfillJobStatusResponse"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Rate limit exceeded */
+            429: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Service unavailable */
+            503: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+        };
+    };
+    get_v1_graph_embedding_backfill_jobs: {
+        parameters: {
+            query?: {
+                /** @description Graph name (default `main`) */
+                graph?: string;
+                /** @description Branch name (default `main`) */
+                branch?: string;
+                /** @description Stable backfill job id */
+                job_id?: string;
+            };
+            header?: {
+                /** @description API contract version to pin. Use `2026-06-22` for this beta-breaking shape. */
+                "Lbb-Version"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ManagedEmbeddingBackfillJobStatusResponse"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Rate limit exceeded */
+            429: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Service unavailable */
+            503: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+        };
+    };
+    post_v1_graph_embedding_backfill_jobs: {
+        parameters: {
+            query?: {
+                /** @description Graph name (default `main`) */
+                graph?: string;
+                /** @description Branch name (default `main`) */
+                branch?: string;
+            };
+            header?: {
+                /** @description API contract version to pin. Use `2026-06-22` for this beta-breaking shape. */
+                "Lbb-Version"?: string;
+                /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
+                "Idempotency-Key"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ManagedEmbeddingBackfillJobRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ManagedEmbeddingBackfillJobStatusResponse"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Rate limit exceeded */
+            429: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Service unavailable */
+            503: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+        };
+    };
+    delete_v1_graph_embedding_backfill_jobs: {
+        parameters: {
+            query?: {
+                /** @description Graph name (default `main`) */
+                graph?: string;
+                /** @description Branch name (default `main`) */
+                branch?: string;
+                /** @description Stable backfill job id */
+                job_id?: string;
+            };
+            header?: {
+                /** @description API contract version to pin. Use `2026-06-22` for this beta-breaking shape. */
+                "Lbb-Version"?: string;
+                /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
             };
             path?: never;
@@ -10581,7 +11361,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ManagedEmbeddingBackfillResponse"];
+                    "application/json": components["schemas"]["ManagedEmbeddingBackfillJobStatusResponse"];
                 };
             };
             /** @description Bad request */
@@ -10705,7 +11485,7 @@ export interface operations {
             header?: {
                 /** @description API contract version to pin. Use `2026-06-22` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
-                /** @description Stable client-generated key for safely retrying mutations. Required for fact commits. */
+                /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
             };
             path?: never;
@@ -10991,7 +11771,7 @@ export interface operations {
             header?: {
                 /** @description API contract version to pin. Use `2026-06-22` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
-                /** @description Stable client-generated key for safely retrying mutations. Required for fact commits. */
+                /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
             };
             path?: never;
@@ -11847,7 +12627,7 @@ export interface operations {
             header?: {
                 /** @description API contract version to pin. Use `2026-06-22` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
-                /** @description Stable client-generated key for safely retrying mutations. Required for fact commits. */
+                /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
             };
             path?: never;
@@ -12283,7 +13063,7 @@ export interface operations {
             header?: {
                 /** @description API contract version to pin. Use `2026-06-22` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
-                /** @description Stable client-generated key for safely retrying mutations. Required for fact commits. */
+                /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
             };
             path?: never;
@@ -12439,7 +13219,7 @@ export interface operations {
             header?: {
                 /** @description API contract version to pin. Use `2026-06-22` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
-                /** @description Stable client-generated key for safely retrying mutations. Required for fact commits. */
+                /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
             };
             path?: never;
@@ -12855,7 +13635,7 @@ export interface operations {
             header?: {
                 /** @description API contract version to pin. Use `2026-06-22` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
-                /** @description Stable client-generated key for safely retrying mutations. Required for fact commits. */
+                /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
             };
             path?: never;
@@ -12997,7 +13777,7 @@ export interface operations {
             header?: {
                 /** @description API contract version to pin. Use `2026-06-22` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
-                /** @description Stable client-generated key for safely retrying mutations. Required for fact commits. */
+                /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
             };
             path?: never;
@@ -13139,7 +13919,7 @@ export interface operations {
             header?: {
                 /** @description API contract version to pin. Use `2026-06-22` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
-                /** @description Stable client-generated key for safely retrying mutations. Required for fact commits. */
+                /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
             };
             path?: never;
@@ -13281,7 +14061,7 @@ export interface operations {
             header?: {
                 /** @description API contract version to pin. Use `2026-06-22` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
-                /** @description Stable client-generated key for safely retrying mutations. Required for fact commits. */
+                /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
             };
             path?: never;
@@ -13701,7 +14481,7 @@ export interface operations {
             header?: {
                 /** @description API contract version to pin. Use `2026-06-22` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
-                /** @description Stable client-generated key for safely retrying mutations. Required for fact commits. */
+                /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
             };
             path?: never;
@@ -14123,7 +14903,7 @@ export interface operations {
             header?: {
                 /** @description API contract version to pin. Use `2026-06-22` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
-                /** @description Stable client-generated key for safely retrying mutations. Required for fact commits. */
+                /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
             };
             path?: never;
@@ -14265,7 +15045,7 @@ export interface operations {
             header?: {
                 /** @description API contract version to pin. Use `2026-06-22` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
-                /** @description Stable client-generated key for safely retrying mutations. Required for fact commits. */
+                /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
             };
             path?: never;
@@ -14409,7 +15189,7 @@ export interface operations {
             header?: {
                 /** @description API contract version to pin. Use `2026-06-22` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
-                /** @description Stable client-generated key for safely retrying mutations. Required for fact commits. */
+                /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
             };
             path?: never;
@@ -14685,7 +15465,7 @@ export interface operations {
             header?: {
                 /** @description API contract version to pin. Use `2026-06-22` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
-                /** @description Stable client-generated key for safely retrying mutations. Required for fact commits. */
+                /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
             };
             path?: never;
@@ -14829,7 +15609,7 @@ export interface operations {
             header?: {
                 /** @description API contract version to pin. Use `2026-06-22` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
-                /** @description Stable client-generated key for safely retrying mutations. Required for fact commits. */
+                /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
             };
             path?: never;
@@ -14971,7 +15751,7 @@ export interface operations {
             header?: {
                 /** @description API contract version to pin. Use `2026-06-22` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
-                /** @description Stable client-generated key for safely retrying mutations. Required for fact commits. */
+                /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
             };
             path?: never;
@@ -15249,7 +16029,7 @@ export interface operations {
             header?: {
                 /** @description API contract version to pin. Use `2026-06-22` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
-                /** @description Stable client-generated key for safely retrying mutations. Required for fact commits. */
+                /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
             };
             path?: never;
@@ -15391,7 +16171,7 @@ export interface operations {
             header?: {
                 /** @description API contract version to pin. Use `2026-06-22` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
-                /** @description Stable client-generated key for safely retrying mutations. Required for fact commits. */
+                /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
             };
             path?: never;
@@ -15533,7 +16313,7 @@ export interface operations {
             header?: {
                 /** @description API contract version to pin. Use `2026-06-22` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
-                /** @description Stable client-generated key for safely retrying mutations. Required for fact commits. */
+                /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
             };
             path?: never;
@@ -16237,7 +17017,7 @@ export interface operations {
             header?: {
                 /** @description API contract version to pin. Use `2026-06-22` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
-                /** @description Stable client-generated key for safely retrying mutations. Required for fact commits. */
+                /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
             };
             path?: never;
@@ -16379,7 +17159,7 @@ export interface operations {
             header?: {
                 /** @description API contract version to pin. Use `2026-06-22` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
-                /** @description Stable client-generated key for safely retrying mutations. Required for fact commits. */
+                /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
             };
             path?: never;
@@ -16521,7 +17301,7 @@ export interface operations {
             header?: {
                 /** @description API contract version to pin. Use `2026-06-22` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
-                /** @description Stable client-generated key for safely retrying mutations. Required for fact commits. */
+                /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
             };
             path?: never;
@@ -16659,7 +17439,7 @@ export interface operations {
             header?: {
                 /** @description API contract version to pin. Use `2026-06-22` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
-                /** @description Stable client-generated key for safely retrying mutations. Required for fact commits. */
+                /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
             };
             path?: never;
@@ -16943,7 +17723,7 @@ export interface operations {
             header?: {
                 /** @description API contract version to pin. Use `2026-06-22` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
-                /** @description Stable client-generated key for safely retrying mutations. Required for fact commits. */
+                /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
             };
             path?: never;
@@ -17081,7 +17861,7 @@ export interface operations {
             header?: {
                 /** @description API contract version to pin. Use `2026-06-22` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
-                /** @description Stable client-generated key for safely retrying mutations. Required for fact commits. */
+                /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
             };
             path?: never;
@@ -17779,7 +18559,7 @@ export interface operations {
             header?: {
                 /** @description API contract version to pin. Use `2026-06-22` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
-                /** @description Stable client-generated key for safely retrying mutations. Required for fact commits. */
+                /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
             };
             path?: never;
@@ -17921,7 +18701,7 @@ export interface operations {
             header?: {
                 /** @description API contract version to pin. Use `2026-06-22` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
-                /** @description Stable client-generated key for safely retrying mutations. Required for fact commits. */
+                /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
             };
             path?: never;
@@ -18199,7 +18979,7 @@ export interface operations {
             header?: {
                 /** @description API contract version to pin. Use `2026-06-22` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
-                /** @description Stable client-generated key for safely retrying mutations. Required for fact commits. */
+                /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
             };
             path?: never;
@@ -18613,7 +19393,7 @@ export interface operations {
             header?: {
                 /** @description API contract version to pin. Use `2026-06-22` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
-                /** @description Stable client-generated key for safely retrying mutations. Required for fact commits. */
+                /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
             };
             path?: never;
@@ -18893,7 +19673,7 @@ export interface operations {
             header?: {
                 /** @description API contract version to pin. Use `2026-06-22` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
-                /** @description Stable client-generated key for safely retrying mutations. Required for fact commits. */
+                /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
             };
             path?: never;
@@ -19037,7 +19817,7 @@ export interface operations {
             header: {
                 /** @description API contract version to pin. Use `2026-06-22` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
-                /** @description Stable client-generated key for safely retrying mutations. Required for fact commits. */
+                /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key": string;
             };
             path?: never;
@@ -19179,7 +19959,7 @@ export interface operations {
             header?: {
                 /** @description API contract version to pin. Use `2026-06-22` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
-                /** @description Stable client-generated key for safely retrying mutations. Required for fact commits. */
+                /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
             };
             path?: never;
@@ -19319,7 +20099,7 @@ export interface operations {
             header?: {
                 /** @description API contract version to pin. Use `2026-06-22` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
-                /** @description Stable client-generated key for safely retrying mutations. Required for fact commits. */
+                /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
             };
             path?: never;
@@ -19459,7 +20239,7 @@ export interface operations {
             header?: {
                 /** @description API contract version to pin. Use `2026-06-22` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
-                /** @description Stable client-generated key for safely retrying mutations. Required for fact commits. */
+                /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
             };
             path?: never;
@@ -19601,7 +20381,7 @@ export interface operations {
             header?: {
                 /** @description API contract version to pin. Use `2026-06-22` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
-                /** @description Stable client-generated key for safely retrying mutations. Required for fact commits. */
+                /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
             };
             path?: never;
@@ -19743,7 +20523,7 @@ export interface operations {
             header?: {
                 /** @description API contract version to pin. Use `2026-06-22` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
-                /** @description Stable client-generated key for safely retrying mutations. Required for fact commits. */
+                /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
             };
             path?: never;
@@ -19885,7 +20665,7 @@ export interface operations {
             header?: {
                 /** @description API contract version to pin. Use `2026-06-22` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
-                /** @description Stable client-generated key for safely retrying mutations. Required for fact commits. */
+                /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
             };
             path?: never;
@@ -20027,7 +20807,7 @@ export interface operations {
             header?: {
                 /** @description API contract version to pin. Use `2026-06-22` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
-                /** @description Stable client-generated key for safely retrying mutations. Required for fact commits. */
+                /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
             };
             path?: never;
@@ -20169,7 +20949,7 @@ export interface operations {
             header?: {
                 /** @description API contract version to pin. Use `2026-06-22` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
-                /** @description Stable client-generated key for safely retrying mutations. Required for fact commits. */
+                /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
             };
             path?: never;
@@ -20311,7 +21091,7 @@ export interface operations {
             header?: {
                 /** @description API contract version to pin. Use `2026-06-22` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
-                /** @description Stable client-generated key for safely retrying mutations. Required for fact commits. */
+                /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
             };
             path?: never;
@@ -20453,7 +21233,7 @@ export interface operations {
             header?: {
                 /** @description API contract version to pin. Use `2026-06-22` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
-                /** @description Stable client-generated key for safely retrying mutations. Required for fact commits. */
+                /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
             };
             path?: never;
@@ -20595,7 +21375,7 @@ export interface operations {
             header?: {
                 /** @description API contract version to pin. Use `2026-06-22` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
-                /** @description Stable client-generated key for safely retrying mutations. Required for fact commits. */
+                /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
             };
             path?: never;
@@ -20737,7 +21517,7 @@ export interface operations {
             header?: {
                 /** @description API contract version to pin. Use `2026-06-22` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
-                /** @description Stable client-generated key for safely retrying mutations. Required for fact commits. */
+                /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
             };
             path?: never;
@@ -20879,7 +21659,7 @@ export interface operations {
             header?: {
                 /** @description API contract version to pin. Use `2026-06-22` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
-                /** @description Stable client-generated key for safely retrying mutations. Required for fact commits. */
+                /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
             };
             path?: never;
@@ -21021,7 +21801,7 @@ export interface operations {
             header?: {
                 /** @description API contract version to pin. Use `2026-06-22` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
-                /** @description Stable client-generated key for safely retrying mutations. Required for fact commits. */
+                /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
             };
             path?: never;
@@ -21163,7 +21943,7 @@ export interface operations {
             header?: {
                 /** @description API contract version to pin. Use `2026-06-22` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
-                /** @description Stable client-generated key for safely retrying mutations. Required for fact commits. */
+                /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
             };
             path?: never;
@@ -21445,7 +22225,7 @@ export interface operations {
             header?: {
                 /** @description API contract version to pin. Use `2026-06-22` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
-                /** @description Stable client-generated key for safely retrying mutations. Required for fact commits. */
+                /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
             };
             path?: never;
@@ -21585,7 +22365,7 @@ export interface operations {
             header?: {
                 /** @description API contract version to pin. Use `2026-06-22` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
-                /** @description Stable client-generated key for safely retrying mutations. Required for fact commits. */
+                /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
             };
             path?: never;
@@ -21727,7 +22507,7 @@ export interface operations {
             header?: {
                 /** @description API contract version to pin. Use `2026-06-22` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
-                /** @description Stable client-generated key for safely retrying mutations. Required for fact commits. */
+                /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
             };
             path?: never;
@@ -22013,7 +22793,7 @@ export interface operations {
             header?: {
                 /** @description API contract version to pin. Use `2026-06-22` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
-                /** @description Stable client-generated key for safely retrying mutations. Required for fact commits. */
+                /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
             };
             path?: never;
@@ -22155,7 +22935,7 @@ export interface operations {
             header?: {
                 /** @description API contract version to pin. Use `2026-06-22` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
-                /** @description Stable client-generated key for safely retrying mutations. Required for fact commits. */
+                /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
             };
             path?: never;
@@ -22297,7 +23077,7 @@ export interface operations {
             header?: {
                 /** @description API contract version to pin. Use `2026-06-22` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
-                /** @description Stable client-generated key for safely retrying mutations. Required for fact commits. */
+                /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
             };
             path?: never;
@@ -22711,7 +23491,7 @@ export interface operations {
             header?: {
                 /** @description API contract version to pin. Use `2026-06-22` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
-                /** @description Stable client-generated key for safely retrying mutations. Required for fact commits. */
+                /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
             };
             path?: never;
@@ -22853,7 +23633,7 @@ export interface operations {
             header?: {
                 /** @description API contract version to pin. Use `2026-06-22` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
-                /** @description Stable client-generated key for safely retrying mutations. Required for fact commits. */
+                /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
             };
             path?: never;
@@ -22995,7 +23775,7 @@ export interface operations {
             header?: {
                 /** @description API contract version to pin. Use `2026-06-22` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
-                /** @description Stable client-generated key for safely retrying mutations. Required for fact commits. */
+                /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
             };
             path?: never;
@@ -23137,7 +23917,7 @@ export interface operations {
             header?: {
                 /** @description API contract version to pin. Use `2026-06-22` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
-                /** @description Stable client-generated key for safely retrying mutations. Required for fact commits. */
+                /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
             };
             path?: never;
@@ -23279,7 +24059,7 @@ export interface operations {
             header?: {
                 /** @description API contract version to pin. Use `2026-06-22` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
-                /** @description Stable client-generated key for safely retrying mutations. Required for fact commits. */
+                /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
             };
             path?: never;
@@ -23417,7 +24197,7 @@ export interface operations {
             header?: {
                 /** @description API contract version to pin. Use `2026-06-22` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
-                /** @description Stable client-generated key for safely retrying mutations. Required for fact commits. */
+                /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
             };
             path?: never;
@@ -23559,7 +24339,7 @@ export interface operations {
             header?: {
                 /** @description API contract version to pin. Use `2026-06-22` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
-                /** @description Stable client-generated key for safely retrying mutations. Required for fact commits. */
+                /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
             };
             path?: never;
@@ -23701,7 +24481,7 @@ export interface operations {
             header?: {
                 /** @description API contract version to pin. Use `2026-06-22` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
-                /** @description Stable client-generated key for safely retrying mutations. Required for fact commits. */
+                /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
             };
             path?: never;
@@ -24122,11 +24902,11 @@ export interface operations {
                 /** @description Branch name (default `main`) */
                 branch?: string;
             };
-            header?: {
+            header: {
                 /** @description API contract version to pin. Use `2026-06-22` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
-                /** @description Stable client-generated key for safely retrying mutations. Required for fact commits. */
-                "Idempotency-Key"?: string;
+                /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
+                "Idempotency-Key": string;
             };
             path?: never;
             cookie?: never;

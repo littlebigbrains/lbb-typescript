@@ -54,6 +54,11 @@ feedback, and model runs in little big brain:
 5. Grade cited results, reconnect to durable trainer jobs, and require a
    held-out quality plus latency gate before promotion.
 
+`suggestionShown`, `suggestionAdopted`, `externalPlannerTrace`, and
+`askFeedback` use generated versioned payload types and idempotency keys. Their
+acknowledgements expose stable receipt/event identity, replay state, and why an
+event is or is not trainable.
+
 For an LLM query planner, call `lbb.context.suggest(...)` to fill grounded
 schema/value prefixes, then `lbb.context.resolve(...)` to snap free-text guesses
 onto real vocabulary. `resolve` uses managed embeddings when configured. Record

@@ -5,7 +5,24 @@ import {
   LbbError,
   parseSparqlResults,
   type FetchLike,
+  type Schemas,
 } from "./client.js";
+
+const validStructuredPlanV2: Schemas["AskStructuredPlanV2"] = {
+  v: 2,
+  target_types: ["DATABASE"],
+  relation_steps: [{ relation: "STORES", direction: "either" }],
+  filters: [],
+  hop_limit: 2,
+  result_limit: 10,
+  path_limit: 10,
+  frontier_limit: 1000,
+  execution_mode: "hybrid",
+};
+// @ts-expect-error malformed V2 plans are rejected by the generated SDK type.
+const malformedStructuredPlanV2: Schemas["AskStructuredPlanV2"] = { v: 2 };
+void validStructuredPlanV2;
+void malformedStructuredPlanV2;
 
 type FetchCall = {
   input: string;
@@ -52,6 +69,50 @@ function recordingFetch(
   };
   return { fetch, calls };
 }
+
+test("waitForIndexLineage retains the satisfying build and replica headers", async () => {
+  const lineage = {
+    head_commit_seq: 7,
+    bm25_indexed_commit_seq: 7,
+    ann_indexed_commit_seq: 7,
+    adjacency_indexed_commit_seq: 7,
+    caught_up: true,
+    manifest_view_token: "index-view:abc",
+    observed_at_micros: 1,
+  };
+  const { fetch, calls } = recordingFetch({
+    body: JSON.stringify({
+      graph: { tenant_id: "t", graph_id: "g", branch_id: "main" },
+      snapshot: { commit_seq: 7, compacted_seq: 0 },
+      ontology_version: 1,
+      head_generation: 1,
+      wal_tail_commits: 0,
+      wal_tail_bytes: 0,
+      segment_count: 0,
+      segment_bytes: 0,
+      object_count: 0,
+      object_bytes: 0,
+      adjacency_indexed_commit_seq: 7,
+      unindexed_tail_commits: 0,
+      index_lineage: lineage,
+      temporal_coverage: {},
+    }),
+    headers: {
+      "lbb-build-commit": "deadbeef",
+      "lbb-replica": "eu1-node2",
+      "x-request-id": "req-1",
+    },
+  });
+  const observed = await new LbbClient({
+    baseUrl: "http://h",
+    fetch,
+  }).waitForIndexLineage(7);
+  assert.equal(observed.lineage.manifest_view_token, "index-view:abc");
+  assert.equal(observed.buildCommit, "deadbeef");
+  assert.equal(observed.replica, "eu1-node2");
+  assert.equal(observed.requestId, "req-1");
+  assert.equal(calls.length, 1);
+});
 
 test("namespace facts.create injects auth, scope, version, and idempotency", async () => {
   const { fetch, calls } = recordingFetch({
@@ -423,6 +484,39 @@ test("search.feedback posts labels with idempotency", async () => {
       },
     ],
   });
+});
+
+test("typed suggestion adoption posts a replay-safe trainable signal", async () => {
+  const { fetch, calls } = recordingFetch({
+    body: JSON.stringify({
+      accepted: 1,
+      receipt_id: "signal-receipt:r1",
+      event_id: "signal-event:r1:0",
+      replayed: false,
+      accepted_count: 1,
+      trainable_count: 1,
+      excluded_count: 0,
+      exclusions: {},
+    }),
+  });
+  const client = new LbbClient({ baseUrl: "http://h", fetch });
+  const ack = await client.suggestionAdopted(
+    {
+      v: 1,
+      suggestion_id: "s-1",
+      candidate_id: "c-1",
+      prefix: "sto",
+      text: "STORES",
+      rank: 0,
+    },
+    { idempotencyKey: "suggestion-retry-1" },
+  );
+  assert.equal(ack.trainable_count, 1);
+  assert.equal(
+    calls[0].init.headers?.["idempotency-key"],
+    "suggestion-retry-1",
+  );
+  assert.equal(calls[0].input, "http://h/v1/signals");
 });
 
 test("search.feedbackExport reads scoped feedback rows", async () => {

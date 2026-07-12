@@ -93,6 +93,16 @@ export {
   SearchNamespace,
 } from "./namespaces.js";
 
+export interface IndexLineageObservation {
+  metadata: Schemas["GraphMetadataResponse"];
+  lineage: Schemas["IndexLineage"];
+  buildCommit?: string;
+  replica?: string;
+  requestId?: string;
+  attempts: number;
+  elapsedMs: number;
+}
+
 /**
  * A typed HTTP client for a little big brain graph server. One instance is scoped to a
  * single graph/branch; construct another for a different scope. All methods
@@ -574,16 +584,67 @@ export class LbbClient {
     return this.request("POST", "/v1/graph/embedding", { body });
   }
 
-  backfillEmbeddings(
+  submitEmbeddingBackfill(
     opts: {
       batchSize?: number;
       limit?: number;
       full?: boolean;
+      idempotencyKey?: string;
+    } = {},
+  ): Promise<Schemas["ManagedEmbeddingBackfillJobStatusResponse"]> {
+    return this.request("POST", "/v1/graph/embedding/backfill-jobs", {
+      body: {
+        batch_size: opts.batchSize,
+        limit: opts.limit,
+        full: opts.full ?? false,
+      },
+      idempotencyKey:
+        opts.idempotencyKey ?? this.idempotencyKey("embedding-backfill"),
+    });
+  }
+
+  embeddingBackfillJob(
+    jobId: string,
+  ): Promise<Schemas["ManagedEmbeddingBackfillJobStatusResponse"]> {
+    return this.request("GET", "/v1/graph/embedding/backfill-jobs", {
+      query: { job_id: jobId },
+    });
+  }
+
+  cancelEmbeddingBackfill(
+    jobId: string,
+  ): Promise<Schemas["ManagedEmbeddingBackfillJobStatusResponse"]> {
+    return this.request("DELETE", "/v1/graph/embedding/backfill-jobs", {
+      query: { job_id: jobId },
+    });
+  }
+
+  async backfillEmbeddings(
+    opts: {
+      batchSize?: number;
+      limit?: number;
+      full?: boolean;
+      idempotencyKey?: string;
+      timeoutMs?: number;
+      pollIntervalMs?: number;
     } = {},
   ): Promise<Schemas["ManagedEmbeddingBackfillResponse"]> {
-    return this.request("POST", "/v1/graph/embedding/backfill", {
-      query: { batch_size: opts.batchSize, limit: opts.limit, full: opts.full },
-    });
+    let status = await this.submitEmbeddingBackfill(opts);
+    const deadline = Date.now() + (opts.timeoutMs ?? 30 * 60_000);
+    while (status.status === "pending" || status.status === "running") {
+      if (Date.now() >= deadline)
+        throw new Error(
+          `embedding backfill ${status.job_id} did not finish before timeout`,
+        );
+      await sleep(opts.pollIntervalMs ?? 2_000);
+      status = await this.embeddingBackfillJob(status.job_id);
+    }
+    if (status.status !== "succeeded" || status.result == null)
+      throw new Error(
+        status.terminal_error ??
+          `embedding backfill ${status.job_id} ended ${status.status}`,
+      );
+    return status.result;
   }
 
   promoteEmbedding(opts: {
@@ -733,8 +794,62 @@ export class LbbClient {
    */
   askFeedback(
     body: Schemas["AskFeedbackRequest"],
+    opts: { idempotencyKey?: string } = {},
   ): Promise<Schemas["AskFeedbackResponse"]> {
-    return this.request("POST", "/v1/ask/feedback", { body });
+    return this.request("POST", "/v1/ask/feedback", {
+      body,
+      idempotencyKey:
+        opts.idempotencyKey ?? this.idempotencyKey("ask-feedback"),
+    });
+  }
+
+  ingestSignals(
+    body: Schemas["SignalIngestRequest"],
+    opts: { idempotencyKey?: string } = {},
+  ): Promise<Schemas["SignalIngestResponse"]> {
+    return this.request("POST", "/v1/signals", {
+      body,
+      idempotencyKey: opts.idempotencyKey ?? this.idempotencyKey("signals"),
+    });
+  }
+
+  suggestionShown(
+    payload: Schemas["SuggestionShownV1"],
+    opts: { idempotencyKey?: string } = {},
+  ): Promise<Schemas["SignalIngestResponse"]> {
+    return this.ingestSignals(
+      { signals: [{ kind: "suggestion_shown", payload }] },
+      opts,
+    );
+  }
+
+  suggestionAdopted(
+    payload: Schemas["SuggestionAdoptedV1"],
+    opts: { idempotencyKey?: string } = {},
+  ): Promise<Schemas["SignalIngestResponse"]> {
+    return this.ingestSignals(
+      { signals: [{ kind: "suggestion_adopted", payload }] },
+      opts,
+    );
+  }
+
+  externalPlannerTrace(
+    payload: Schemas["ExternalPlannerTraceV1"],
+    opts: { idempotencyKey?: string } = {},
+  ): Promise<Schemas["SignalIngestResponse"]> {
+    return this.ingestSignals(
+      {
+        signals: [
+          {
+            kind: "external_planner_trace",
+            request_id: payload.ask_id,
+            snapshot_token: payload.snapshot_token,
+            payload,
+          },
+        ],
+      },
+      opts,
+    );
   }
 
   /**
@@ -1310,6 +1425,45 @@ export class LbbClient {
   /** Graph footprint, WAL tail, and index coverage. */
   metadata(): Promise<Schemas["GraphMetadataResponse"]> {
     return this.request("GET", "/v1/graph/metadata");
+  }
+
+  async waitForIndexLineage(
+    targetSeq: number,
+    opts: { timeoutMs?: number; pollIntervalMs?: number } = {},
+  ): Promise<IndexLineageObservation> {
+    const deadline = Date.now() + (opts.timeoutMs ?? 30_000);
+    let last: RawLbbResponse<Schemas["GraphMetadataResponse"]> | undefined;
+    while (true) {
+      last = await this.rawRequest("GET", "/v1/graph/metadata");
+      const lineage = last.data.index_lineage;
+      if (
+        lineage != null &&
+        lineage.bm25_indexed_commit_seq != null &&
+        lineage.bm25_indexed_commit_seq >= targetSeq &&
+        lineage.ann_indexed_commit_seq != null &&
+        lineage.ann_indexed_commit_seq >= targetSeq &&
+        lineage.adjacency_indexed_commit_seq != null &&
+        lineage.adjacency_indexed_commit_seq >= targetSeq
+      ) {
+        return {
+          metadata: last.data,
+          lineage,
+          buildCommit: last.headers?.get("lbb-build-commit") ?? undefined,
+          replica: last.headers?.get("lbb-replica") ?? undefined,
+          requestId: last.requestId,
+          attempts: last.attempts,
+          elapsedMs: last.elapsedMs,
+        };
+      }
+      if (Date.now() >= deadline) {
+        const build = last.headers?.get("lbb-build-commit") ?? "unknown";
+        const replica = last.headers?.get("lbb-replica") ?? "unknown";
+        throw new Error(
+          `index lineage did not reach ${targetSeq} before timeout (build=${build}, replica=${replica}, last=${JSON.stringify(last.data.index_lineage)})`,
+        );
+      }
+      await sleep(opts.pollIntervalMs ?? 250);
+    }
   }
 
   /** Graph counts and type/relation buckets. */
