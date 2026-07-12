@@ -54,6 +54,12 @@ feedback, and model runs in little big brain:
 5. Grade cited results, reconnect to durable trainer jobs, and require a
    held-out quality plus latency gate before promotion.
 
+For an LLM query planner, call `lbb.context.suggest(...)` to fill grounded
+schema/value prefixes, then `lbb.context.resolve(...)` to snap free-text guesses
+onto real vocabulary. `resolve` uses managed embeddings when configured. Record
+adopted suggestions and accepted/rejected/corrected plans so a smaller planner
+and suggest ranker can be trained on the product's actual workload.
+
 The [enterprise-search integration guide](https://docs.littlebigbrain.com/guides/enterprise-search/)
 contains the graph model, migration sequence, and acceptance tests.
 
