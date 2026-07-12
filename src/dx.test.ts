@@ -114,9 +114,12 @@ test("ontology namespace covers its complete read and lifecycle family", async (
 });
 
 test("graph namespace covers managed embedding lifecycle routes", async () => {
-  const { fetch, urls } = queuedFetch(
-    Array.from({ length: 4 }, () => ({ body: {} })),
-  );
+  const { fetch, urls } = queuedFetch([
+    { body: {} },
+    { body: {} },
+    { body: { job_id: "job-1", status: "succeeded", result: {} } },
+    { body: {} },
+  ]);
   const graph = new LbbClient({ baseUrl: "http://h", fetch }).graph("main");
 
   await graph.embeddingConfig();
@@ -127,7 +130,7 @@ test("graph namespace covers managed embedding lifecycle routes", async () => {
   assert.deepEqual(urls, [
     "http://h/v1/graph/embedding?graph=main",
     "http://h/v1/graph/embedding?graph=main",
-    "http://h/v1/graph/embedding/backfill?graph=main&batch_size=64&limit=1000&full=true",
+    "http://h/v1/graph/embedding/backfill-jobs?graph=main",
     "http://h/v1/graph/embedding/promote?graph=main&run_id=run-1&allow_regression=true",
   ]);
 });

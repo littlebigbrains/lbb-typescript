@@ -98,13 +98,44 @@ export class GraphNamespace {
       batchSize?: number;
       limit?: number;
       full?: boolean;
+      pollIntervalMs?: number;
     } = {},
   ): Promise<Schemas["ManagedEmbeddingBackfillResponse"]> {
-    const { batchSize, limit, full, ...request } = options;
-    return this.client.request("POST", "/v1/graph/embedding/backfill", {
-      ...request,
-      query: { batch_size: batchSize, limit, full },
+    return this.client.backfillEmbeddings({
+      batchSize: options.batchSize,
+      limit: options.limit,
+      full: options.full,
+      idempotencyKey: options.idempotencyKey,
+      timeoutMs: options.timeoutMs,
+      pollIntervalMs: options.pollIntervalMs,
     });
+  }
+
+  submitEmbeddingBackfill(
+    options: CallOptions & {
+      batchSize?: number;
+      limit?: number;
+      full?: boolean;
+    } = {},
+  ): Promise<Schemas["ManagedEmbeddingBackfillJobStatusResponse"]> {
+    return this.client.submitEmbeddingBackfill({
+      batchSize: options.batchSize,
+      limit: options.limit,
+      full: options.full,
+      idempotencyKey: options.idempotencyKey,
+    });
+  }
+
+  embeddingBackfillJob(
+    jobId: string,
+  ): Promise<Schemas["ManagedEmbeddingBackfillJobStatusResponse"]> {
+    return this.client.embeddingBackfillJob(jobId);
+  }
+
+  cancelEmbeddingBackfill(
+    jobId: string,
+  ): Promise<Schemas["ManagedEmbeddingBackfillJobStatusResponse"]> {
+    return this.client.cancelEmbeddingBackfill(jobId);
   }
 
   promoteEmbedding(
