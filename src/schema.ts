@@ -5905,6 +5905,10 @@ export interface components {
              *     idempotent replays do not advance it and retractions do.
              */
             latest_label_sequence: number;
+            /**
+             * @description Label objects fetched for this request. Zero on a materialized-cache hit;
+             *     a rebuild reports the bounded source objects it read.
+             */
             objects_scanned: number;
             promoted_models: components["schemas"]["SearchFeedbackPromotedModel"][];
             raw_events: number;
@@ -6758,7 +6762,28 @@ export interface components {
              */
             hit_rate_at_k: number;
             /** Format: double */
+            latency_p50_ms?: number;
+            /** Format: double */
+            latency_p95_ms?: number;
+            /** Format: double */
+            latency_p99_ms?: number;
+            /** Format: double */
             mean_latency_ms: number;
+            /**
+             * Format: float
+             * @description Mean reciprocal rank of the first expected target in top-k.
+             */
+            mrr_at_k?: number;
+            /**
+             * Format: float
+             * @description Mean binary-relevance nDCG over top-k.
+             */
+            ndcg_at_k?: number;
+            /**
+             * Format: float
+             * @description Mean fraction of each query's expected targets recovered in top-k.
+             */
+            recall_at_k?: number;
         };
         /**
          * @description `POST /v1/models/shadow-eval` — champion vs challenger retrieval over the
@@ -7497,6 +7522,32 @@ export interface components {
             /** @description Human-readable one-liner for the console status surface. */
             reason: string;
         };
+        /** @description Bounded in-flight work counters for a durable trainer job. */
+        TrainModelJobProgress: {
+            completed_candidates: number;
+            /** @description Completed expensive probe replays, not merely distinct input probes. */
+            completed_probes: number;
+            /**
+             * Format: int64
+             * @description Linear estimate from work completed so far. Absent before the first
+             *     measured probe or for trainers without fine-grained progress.
+             */
+            estimated_duration_ms?: number | null;
+            /**
+             * Format: int64
+             * @description Worker heartbeat attached to this progress snapshot.
+             */
+            heartbeat_micros: number;
+            /**
+             * Format: float
+             * @description Monotonic completion percentage in `[0, 100]`.
+             */
+            percentage: number;
+            /** @description `preparing` | `candidate_search` | `held_out_gate` | kind-specific stage. */
+            phase: string;
+            total_candidates: number;
+            total_probes: number;
+        };
         /**
          * @description Durable background trainer status. The terminal `result` carries the full
          *     snapshot lineage, held-out gate evidence, and recorded run number.
@@ -7509,6 +7560,7 @@ export interface components {
             graph: components["schemas"]["GraphKey"];
             job_id: string;
             kind: string;
+            progress?: null | components["schemas"]["TrainModelJobProgress"];
             result?: null | components["schemas"]["TrainModelResponse"];
             stage?: string | null;
             /** @description `pending` | `running` | `succeeded` | `failed`. */
