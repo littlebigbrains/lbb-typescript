@@ -2829,9 +2829,24 @@ export interface components {
             reranked_candidates?: number;
             source: components["schemas"]["EmbeddingIndexSource"];
             spaces_searched: number;
+            temporal_coverage?: null | components["schemas"]["SearchTemporalCoverage"];
             unindexed_tail_commits: number;
         };
         EmbeddingSearchRequest: {
+            /**
+             * Format: int64
+             * @description Snapshot pin (transaction-time ceiling): results hide every event
+             *     committed after this sequence, reproducing that past snapshot. The ANN
+             *     run is selected as the newest run at or below the pin and the pin bounds
+             *     the forward overlay; candidate generation is never the correctness layer.
+             *     Omitted means the current head.
+             */
+            as_of_commit_seq?: number | null;
+            /**
+             * @description Valid-time cursor (RFC 3339): results reflect facts true at this
+             *     instant. Omitted means the latest valid time.
+             */
+            as_of_valid_time?: string | null;
             consistency?: null | components["schemas"]["SearchConsistency"];
             /** Format: int32 */
             dim?: number | null;
@@ -3298,10 +3313,25 @@ export interface components {
             overlay_candidates: number;
             ranged?: null | components["schemas"]["RangedReadStats"];
             source: components["schemas"]["FullTextIndexSource"];
+            temporal_coverage?: null | components["schemas"]["SearchTemporalCoverage"];
             term_count: number;
             unindexed_tail_commits: number;
         };
         FullTextSearchRequest: {
+            /**
+             * Format: int64
+             * @description Snapshot pin (transaction-time ceiling): results hide every event
+             *     committed after this sequence, reproducing that past snapshot. The BM25
+             *     run is selected as the newest run at or below the pin and the pin bounds
+             *     the forward overlay; candidate generation is never the correctness layer.
+             *     Omitted means the current head.
+             */
+            as_of_commit_seq?: number | null;
+            /**
+             * @description Valid-time cursor (RFC 3339): results reflect facts true at this
+             *     instant. Omitted means the latest valid time.
+             */
+            as_of_valid_time?: string | null;
             consistency?: null | components["schemas"]["SearchConsistency"];
             explain: boolean;
             facets?: components["schemas"]["FacetRequest"][] | null;
@@ -6555,6 +6585,25 @@ export interface components {
             signature_forced?: boolean;
             text: string;
         };
+        /**
+         * @description How a temporally-pinned (or head) search resolved run selection: the
+         *     effective `as_of` ceiling, the base snapshot of the selected persisted
+         *     run(s), and the highest commit each leg's run+segments actually covered
+         *     (the forward WAL overlay covers `(covered_through, ceiling]`). Distinct from
+         *     the ontology-inspect `TemporalCoverage` type. Per-leg fields are `None` when
+         *     that leg served from an ephemeral rebuild (no persisted run at the ceiling).
+         */
+        SearchTemporalCoverage: {
+            bm25_covered_through?: null | components["schemas"]["CommitSeq"];
+            bm25_run_snapshot_commit_seq?: null | components["schemas"]["CommitSeq"];
+            /**
+             * @description Resolved transaction-time ceiling: the `as_of_commit_seq` pin, or the
+             *     head commit_seq when the query was unpinned.
+             */
+            ceiling_commit_seq: components["schemas"]["CommitSeq"];
+            vector_covered_through?: null | components["schemas"]["CommitSeq"];
+            vector_run_snapshot_commit_seq?: null | components["schemas"]["CommitSeq"];
+        };
         SemanticGraphSearchRequest: {
             /**
              * Format: int64
@@ -6674,6 +6723,7 @@ export interface components {
              *     candidate generation.
              */
             target_prep_ms?: number;
+            temporal_coverage?: null | components["schemas"]["SearchTemporalCoverage"];
             /** Format: int64 */
             total_ms?: number;
             /**
