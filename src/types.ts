@@ -357,6 +357,8 @@ export interface LbbErrorPayload {
   param?: string | null;
   request_id?: string | null;
   doc_url?: string | null;
+  retryable?: boolean;
+  retry_after_seconds?: number;
 }
 
 export interface RawLbbResponse<T> {

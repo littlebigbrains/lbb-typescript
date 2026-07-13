@@ -30,6 +30,8 @@ export class LbbError extends Error {
   readonly param?: string | null;
   readonly requestId?: string | null;
   readonly docUrl?: string | null;
+  readonly retryable?: boolean;
+  readonly retryAfterSeconds?: number;
 
   constructor(
     readonly status: number,
@@ -43,6 +45,8 @@ export class LbbError extends Error {
     this.param = error?.param;
     this.requestId = error?.request_id;
     this.docUrl = error?.doc_url;
+    this.retryable = error?.retryable;
+    this.retryAfterSeconds = error?.retry_after_seconds;
   }
 }
 

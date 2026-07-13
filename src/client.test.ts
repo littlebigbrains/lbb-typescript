@@ -831,6 +831,8 @@ test("throws typed LbbError on structured errors", async () => {
         param: null,
         request_id: "req_body",
         doc_url: "https://littlebigbrain.com/errors/unauthorized",
+        retryable: true,
+        retry_after_seconds: 2,
       },
     }),
   });
@@ -843,6 +845,8 @@ test("throws typed LbbError on structured errors", async () => {
       error.code === "unauthorized" &&
       error.type === "auth_error" &&
       error.requestId === "req_body" &&
+      error.retryable === true &&
+      error.retryAfterSeconds === 2 &&
       error.message === "missing bearer",
   );
 });

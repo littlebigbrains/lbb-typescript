@@ -4207,6 +4207,8 @@ export interface components {
             message: string;
             param?: string | null;
             request_id: string | null;
+            retry_after_seconds?: number;
+            retryable?: boolean;
             /** @example invalid_request_error */
             type: string;
         };
