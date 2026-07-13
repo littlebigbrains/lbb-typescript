@@ -2214,7 +2214,18 @@ export interface components {
         };
         /** @enum {string} */
         AskPlanExecutionModeV2: "entity_search" | "path_search" | "hybrid";
+        AskPlanFailure: {
+            code: components["schemas"]["AskPlanFailureCode"];
+            /** @description True when retrying after the planner recovers can produce a plan. */
+            retryable: boolean;
+            stage: components["schemas"]["AskPlanFailureStage"];
+        };
+        /** @enum {string} */
+        AskPlanFailureCode: "planner_disabled" | "planner_unavailable" | "no_class_candidates" | "generation_failed" | "validation_failed";
+        /** @enum {string} */
+        AskPlanFailureStage: "configuration" | "target_type" | "relation" | "anchor";
         AskQuery: {
+            plan_failure?: null | components["schemas"]["AskPlanFailure"];
             /** @description The retrieval query text that was executed. */
             query: string;
             structured?: null | components["schemas"]["AskStructuredQuery"];
@@ -5651,6 +5662,12 @@ export interface components {
             terms: components["schemas"]["ResolutionResult"][];
         };
         ResolvedTerm: {
+            /**
+             * @description Ontology description/definition when the resolved schema term carries
+             *     one. Candidate-free class resolution preserves tenant-authored class
+             *     documentation instead of returning only a bare label.
+             */
+            description?: string | null;
             kind: components["schemas"]["SuggestKind"];
             provenance?: null | components["schemas"]["VocabularyProvenance"];
             /**
@@ -5659,6 +5676,7 @@ export interface components {
              */
             score: number;
             text: string;
+            type_signature?: null | components["schemas"]["VocabularyTypeSignature"];
         };
         /** @description One edge to retract, identified the same way it was asserted. */
         RetractEdgeInput: {
@@ -6780,6 +6798,13 @@ export interface components {
             direction: components["schemas"]["ExpansionDirection"];
             explain: boolean;
             /**
+             * @description Entity properties to project for every returned seed and path node.
+             *     Projections are reduced from the same snapshot used for authorization
+             *     and traversal. Requesting fields routes the operation through the exact
+             *     snapshot path rather than ranged adjacency.
+             */
+            fields?: string[];
+            /**
              * Format: int64
              * @description Decoded adjacency-block working-set byte budget for persisted-vector
              *     ranged expansion. Defaults to the server/store budget. A request may
@@ -6804,6 +6829,15 @@ export interface components {
         SemanticTraverseResponse: {
             explain?: null | components["schemas"]["SemanticTraverseExplain"];
             paths: components["schemas"]["PathResult"][];
+            /**
+             * @description Requested properties keyed by entity id for every returned seed and
+             *     path node. Empty when `fields` was omitted.
+             */
+            projected_nodes?: {
+                [key: string]: {
+                    [key: string]: unknown;
+                };
+            };
             ranged?: null | components["schemas"]["RangedTraverseStats"];
             seeds: components["schemas"]["ScoredEntityView"][];
             snapshot: components["schemas"]["SnapshotView"];
@@ -7149,6 +7183,13 @@ export interface components {
         ShadowEvalResponse: {
             challenger: components["schemas"]["ShadowArmResult"];
             champion: components["schemas"]["ShadowArmResult"];
+            /**
+             * @description Fail-closed promotion verdict over the same labeled queries and pinned
+             *     snapshot. Requires quality non-regression plus p50/p95/p99 latency
+             *     ratios within the configured ceiling; this endpoint still never
+             *     performs the promotion itself.
+             */
+            gate: components["schemas"]["TrainGateReport"];
             /** @description Labeled queries (those with `expected`) the hit rates are over. */
             labeled: number;
             /** Format: float */
@@ -7865,7 +7906,8 @@ export interface components {
         TrainGateReport: {
             /**
              * Format: float
-             * @description Challenger − champion hit-rate on the held-out eval slice.
+             * @description Challenger − champion primary quality metric on the held-out eval
+             *     slice (nDCG for fusion and retrieval-profile comparisons).
              */
             effect: number;
             /** Format: float */
@@ -7874,7 +7916,18 @@ export interface components {
             labeled: number;
             /**
              * Format: double
-             * @description Challenger / champion mean-latency ratio on the eval slice.
+             * @description Challenger / champion latency ratios at each reported percentile.
+             */
+            latency_p50_ratio?: number | null;
+            /** Format: double */
+            latency_p95_ratio?: number | null;
+            /** Format: double */
+            latency_p99_ratio?: number | null;
+            /**
+             * Format: double
+             * @description Legacy decision latency ratio. For configuration shadow evaluation this
+             *     is the worst of p50/p95/p99; older trainer kinds may use their primary
+             *     latency statistic.
              */
             latency_ratio: number;
             /**
@@ -7907,7 +7960,8 @@ export interface components {
             reason: string;
             /**
              * Format: float
-             * @description Fusion-only paired held-out deltas. All must be non-negative.
+             * @description Paired held-out retrieval deltas. When present, all must be
+             *     non-negative.
              */
             recall_delta?: number | null;
         };
@@ -8212,6 +8266,11 @@ export interface components {
         };
         /** @enum {string} */
         VocabularyOrigin: "builtin" | "tenant" | "imported";
+        VocabularyPropertySignature: {
+            name: string;
+            required: boolean;
+            value_type: string;
+        };
         VocabularyProvenance: {
             candidate_id: string;
             namespace: string;
@@ -8219,6 +8278,15 @@ export interface components {
             ontology_version: number;
             origin: components["schemas"]["VocabularyOrigin"];
             source_reference: string;
+        };
+        VocabularyTypeSignature: {
+            properties?: components["schemas"]["VocabularyPropertySignature"][];
+            source_types?: string[];
+            /** @description Frozen normalized schema identity. */
+            stable_id: string;
+            super_types?: string[];
+            target_types?: string[];
+            value_type?: string | null;
         };
         WalCompactRequest: {
             /**
