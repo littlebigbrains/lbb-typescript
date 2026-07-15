@@ -2506,6 +2506,13 @@ export interface components {
         CommitResponse: {
             commit_seq: components["schemas"]["CommitSeq"];
             conformance?: null | components["schemas"]["ConformanceReport"];
+            /**
+             * Format: float
+             * @description R27d(1) advisory pacing telemetry: the WAL drain pressure at ack time as a
+             *     `0.0`–`1.0` tail-fill ratio. Present only once the tail is over half full.
+             *     Clients SHOULD reduce write concurrency as this rises; advisory only.
+             */
+            drain_pressure?: number | null;
             edge_event_ids: components["schemas"]["EdgeEventId"][];
             entity_ids: components["schemas"]["EntityId"][];
             idempotent_replay: boolean;
@@ -2514,6 +2521,15 @@ export interface components {
             observation_ids: components["schemas"]["ObservationId"][];
             schema_validation?: null | components["schemas"]["SchemaAuditReport"];
             skipped_edges?: components["schemas"]["SkippedEdge"][];
+            /**
+             * Format: int32
+             * @description R27d(1) advisory pacing telemetry: the pacing latency this write ack
+             *     absorbed — head-lane serialization plus admission wait — in whole
+             *     milliseconds. Present only past a noise floor (a fast commit omits it) and
+             *     mirrored to the `X-LBB-Throttle-Ms` response header. Clients SHOULD reduce
+             *     write concurrency as this rises; it is never load-bearing for correctness.
+             */
+            throttle_ms?: number | null;
             visibility_token: string;
             /**
              * @description Property fields actually written by this commit, per entity (canonical
@@ -3632,6 +3648,12 @@ export interface components {
         GraphCommitResponse: {
             commit: components["schemas"]["CommitResponse"];
             commit_seq: components["schemas"]["CommitSeq"];
+            /**
+             * Format: float
+             * @description R27d(1) advisory WAL drain pressure (0.0–1.0), mirrored from
+             *     `commit.drain_pressure`. Present only once the tail is over half full.
+             */
+            drain_pressure?: number | null;
             edges_written: number;
             entities_written: number;
             graph_created: boolean;
@@ -3643,6 +3665,14 @@ export interface components {
              *     envelope before deciding whether anything new was written.
              */
             replayed: boolean;
+            /**
+             * Format: int32
+             * @description R27d(1) advisory pacing telemetry, mirrored from `commit.throttle_ms` to
+             *     the envelope top level (like `replayed`) and to the `X-LBB-Throttle-Ms`
+             *     response header. Present only past a noise floor; clients SHOULD reduce
+             *     write concurrency as it rises.
+             */
+            throttle_ms?: number | null;
             visibility_token: string;
             /**
              * @description Top-level echo of property fields actually written by this request.
