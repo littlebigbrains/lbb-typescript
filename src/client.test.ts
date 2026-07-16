@@ -983,6 +983,65 @@ test("throws typed LbbError on structured errors", async () => {
   );
 });
 
+test("requires an explicit non-empty baseUrl", () => {
+  assert.throws(() => new LbbClient({ baseUrl: "" }), /copy endpoint_url/);
+});
+
+test("preserves composite endpoint error codes with migration guidance", async () => {
+  const { fetch } = recordingFetch({
+    status: 421,
+    body: JSON.stringify({
+      error: {
+        type: "routing_error",
+        code: "stack_endpoint_required",
+        message: "use the composite stack endpoint",
+      },
+    }),
+  });
+  const client = new LbbClient({ baseUrl: "http://h", fetch });
+  await assert.rejects(
+    () => client.status(),
+    (error: unknown) =>
+      error instanceof LbbError &&
+      error.status === 421 &&
+      error.code === "stack_endpoint_required" &&
+      error.endpointHint?.includes("endpoint_url") === true,
+  );
+});
+
+test("composite-endpoint 421/403 are terminal — the hint is never masked by retries", async () => {
+  // Misdirection (421) and authorization (403) are not retryable by status
+  // (only 429/5xx are). A retry would waste the budget and delay the actionable
+  // endpoint hint, so a generous retry budget must be spent on exactly ONE
+  // attempt. This pins that contract against a future retry-classification drift.
+  for (const { status, code } of [
+    { status: 421, code: "stack_endpoint_required" },
+    { status: 403, code: "stack_endpoint_mismatch" },
+  ]) {
+    const { fetch, calls } = recordingFetch({
+      status,
+      body: JSON.stringify({
+        error: { type: "routing_error", code, message: "misrouted" },
+      }),
+    });
+    const client = new LbbClient({
+      baseUrl: "http://h",
+      fetch,
+      maxRetries: 5,
+      retryDelayMs: 0,
+    });
+    await assert.rejects(
+      () => client.status(),
+      (error: unknown) =>
+        error instanceof LbbError &&
+        error.status === status &&
+        error.code === code &&
+        error.endpointHint !== undefined,
+    );
+    assert.equal(calls.length, 1);
+  }
+});
+
 test("stack activity stays on the bearer-scoped /v1 route", async () => {
   const { fetch, calls } = recordingFetch({
     body: JSON.stringify({ ok: true }),

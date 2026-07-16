@@ -34,6 +34,8 @@ export class LbbError extends Error {
   readonly docUrl?: string | null;
   readonly retryable?: boolean;
   readonly retryAfterSeconds?: number;
+  /** Actionable guidance for composite stack-endpoint routing errors. */
+  readonly endpointHint?: string;
 
   constructor(
     readonly status: number,
@@ -49,7 +51,18 @@ export class LbbError extends Error {
     this.docUrl = error?.doc_url;
     this.retryable = error?.retryable;
     this.retryAfterSeconds = error?.retry_after_seconds;
+    this.endpointHint = endpointMigrationHint(this.code);
   }
+}
+
+function endpointMigrationHint(code: string | undefined): string | undefined {
+  if (code === "stack_endpoint_required") {
+    return "Copy endpoint_url from the stack's Connect page and use it as baseUrl.";
+  }
+  if (code === "stack_endpoint_mismatch") {
+    return "Use the endpoint_url and API key from the same stack.";
+  }
+  return undefined;
 }
 
 export type QueryValue = string | number | boolean | undefined;

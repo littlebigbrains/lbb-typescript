@@ -224,7 +224,7 @@ export function attributeFilter(
 }
 
 export interface LbbClientOptions {
-  /** Base URL of the little big brain server, e.g. `https://db.eu.littlebigbrain.com`. */
+  /** Hosted stack endpoint, e.g. `https://7k3m9q2x--production.db.eu.littlebigbrain.com`. */
   baseUrl: string;
   /** Stack API key (`lbb_sk_test_…` / `lbb_sk_live_…`) or single-mode token. */
   apiKey?: string;
