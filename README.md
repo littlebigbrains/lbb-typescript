@@ -12,7 +12,7 @@ npm install @littlebigbrain/client
 import { LbbClient } from "@littlebigbrain/client";
 
 const lbb = new LbbClient({
-  baseUrl: "https://db.eu.littlebigbrain.com",
+  baseUrl: "https://0abc1def--production.db.eu.littlebigbrain.com",
   apiKey: process.env.LBB_API_KEY, // lbb_sk_live_… — keep it server-side
 });
 const graph = lbb.graph("main");
@@ -41,6 +41,10 @@ const results = await graph.search.hybrid(
   { topK: 10, source: "persisted", consistency: "strong" },
 );
 ```
+
+For hosted use, `baseUrl` is required and must be the exact `endpoint_url`
+shown on the stack's Connect page. Graph and branch remain client scope
+parameters; they are not encoded in the hostname.
 
 ## Examples
 

@@ -138,7 +138,13 @@ export class LbbClient {
   readonly query: QueryNamespace;
 
   constructor(options: LbbClientOptions) {
-    this.baseUrl = options.baseUrl.replace(/\/+$/, "");
+    const baseUrl = options.baseUrl?.trim();
+    if (!baseUrl) {
+      throw new Error(
+        "baseUrl is required; copy endpoint_url from the stack's Connect page for hosted use",
+      );
+    }
+    this.baseUrl = baseUrl.replace(/\/+$/, "");
     this.apiKey = options.apiKey;
     this.graphName = options.graph;
     this.branchName = options.branch;

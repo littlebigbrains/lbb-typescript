@@ -2,6 +2,30 @@
 
 All notable changes to the `@littlebigbrain/client` package are documented here.
 
+## 0.6.1
+
+Composite stack endpoints: hosted stacks are addressed by their own
+`endpoint_url`, and a misroute is surfaced with actionable guidance instead of
+being retried away.
+
+### Endpoints
+
+- **`baseUrl` is required.** For hosted use it must be the exact `endpoint_url`
+  shown on the stack's Connect page
+  (`https://<tenant-short-id>--<stack-slug>.db.eu.littlebigbrain.com`). Graph and
+  branch stay client scope parameters; they are not encoded in the hostname. An
+  empty `baseUrl` now throws at construction instead of silently defaulting.
+- **Actionable routing hints.** `LbbError.endpointHint` carries copy-paste
+  guidance for the composite-endpoint error codes `stack_endpoint_required`
+  (HTTP `421`) and `stack_endpoint_mismatch` (HTTP `403`).
+
+### Retry behavior
+
+- **`421`/`403` are terminal.** Misdirection (`421`) and authorization (`403`)
+  failures surface immediately — they were never retryable by status (only
+  `429`/`5xx` are), and a test now pins that so the actionable `endpointHint` is
+  never masked by retries.
+
 ## 0.6.0
 
 Honest, deadline-bounded retries — so server-side backpressure stays invisible
