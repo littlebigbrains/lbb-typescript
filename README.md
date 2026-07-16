@@ -1,106 +1,85 @@
 # @littlebigbrain/client
 
-Typed TypeScript client for little big brain: ingest, BM25/vector/graph index,
-authorized hybrid search, traversal, ontology, feedback, and training jobs.
-Runs on Node 18+, browsers, and edge workers using the platform `fetch`.
+The typed TypeScript client for [Little Big Brain](https://littlebigbrain.com) — write graph facts, build indexes, and run hybrid search over one snapshot. Request and response types are generated from the API contract, so every call is fully typed. Runs anywhere there's a global `fetch`: Node 18+, browsers, and edge workers.
 
 ```sh
 npm install @littlebigbrain/client
 ```
 
-## Five-minute start
+## Quickstart
 
 ```ts
 import { LbbClient } from "@littlebigbrain/client";
 
 const lbb = new LbbClient({
   baseUrl: "https://db.eu.littlebigbrain.com",
-  apiKey: process.env.LBB_API_KEY,
+  apiKey: process.env.LBB_API_KEY, // lbb_sk_live_… — keep it server-side
 });
 const graph = lbb.graph("main");
 
-await graph.facts.create({
-  triplets: [{
-    source: { type: "CONCEPT", name: "policy-42" },
-    relation: "RELATED_TO",
-    target: { type: "CONCEPT", name: "seven-year retention" },
-    evidence: "Customer records are retained for seven years.",
-  }],
-}, { idempotencyKey: "policy-42-v1" });
+// 1. Write a fact.
+await graph.facts.create(
+  {
+    triplets: [
+      {
+        source: { type: "CONCEPT", name: "policy-42" },
+        relation: "RELATED_TO",
+        target: { type: "CONCEPT", name: "seven-year retention" },
+        evidence: "Customer records are retained for seven years.",
+      },
+    ],
+  },
+  { idempotencyKey: "policy-42-v1" },
+);
 
+// 2. Build persisted BM25 + vector + adjacency indexes and wait.
 await graph.indexes.run({ wait: true });
 
+// 3. Hybrid search over the snapshot.
 const results = await graph.search.hybrid(
   "How long are customer records retained?",
   { topK: 10, source: "persisted", consistency: "strong" },
 );
 ```
 
-Methods return parsed JSON and throw `LbbError` on non-2xx responses. Safe
-reads and idempotency-keyed writes retry transient failures and honor
-`Retry-After`. Keep live stack keys on the server, never in browser bundles.
+## Examples
 
-## Enterprise search integrations
-
-Keep the host product's users, connectors, tasks, and cursors in its existing
-database. Put searchable documents, passages, facts, embeddings, indexes,
-feedback, and model runs in little big brain:
-
-1. Give every document/chunk/passage a stable external key.
-2. Bulk-import content, provenance, and native ACL/tag/project sets.
-3. Configure managed embeddings; build ANN, BM25, and adjacency once per batch.
-4. Filter by ACL inside the search request before ranking and return projected
-   fields on the ranked hits.
-5. Grade cited results, reconnect to durable trainer jobs, and require a
-   held-out quality plus latency gate before promotion.
-
-`suggestionShown`, `suggestionAdopted`, `externalPlannerTrace`, and
-`askFeedback` use generated versioned payload types and idempotency keys. Their
-acknowledgements expose stable receipt/event identity, replay state, and why an
-event is or is not trainable.
-
-For an LLM query planner, call `lbb.context.suggest(...)` to fill grounded
-schema/value prefixes, then `lbb.context.resolve(...)` to snap free-text guesses
-onto real vocabulary. `resolve` uses managed embeddings when configured. Record
-adopted suggestions and accepted/rejected/corrected plans so a smaller planner
-and suggest ranker can be trained on the product's actual workload.
-
-The [enterprise-search integration guide](https://docs.littlebigbrain.com/guides/enterprise-search/)
-contains the graph model, migration sequence, and acceptance tests.
-
-## Main surface
+**Search with filters.** Pass the request body to filter before ranking — here, only facts an ACL principal may see:
 
 ```ts
-graph.facts.create(...)
-graph.facts.import(...)
-graph.search.hybrid(...)
-graph.entities.iterate(...)
-graph.context.ask(...)
-graph.ontology.view(...)
-graph.query.sparql(...)
-graph.schema.audit(...)
-
-const build = await graph.indexes.submit({}, { idempotencyKey: "index:head:147" })
-await graph.indexes.job(build.job_id)
-await graph.indexes.cancel(build.job_id)
-
-const gc = await graph.indexes.submitGc({ dry_run: false }, { idempotencyKey: "gc:2026-07-15" })
-await graph.indexes.gcJob(gc.job_id)
-
-await graph.branch("review").deleteBranch({ confirm: "review" })
-await graph.delete({ confirm: "main" }) // whole graph, every branch
+const results = await graph.search.hybrid({
+  query: "incident response runbook",
+  targets: ["entities"],
+  search: {
+    filters: {
+      op: "overlaps",
+      field: "acl",
+      values: ["user:rino@example.com", "group:engineering"],
+    },
+  },
+  top_k: 20,
+});
 ```
 
-Other focused methods cover managed embeddings, full-text/vector search,
-multi-query fusion, traversal, temporal state/history, SHACL, ontology
-evolution, feedback, indexing, and graph inspection. Request/response types are
-generated from `contracts/openapi.json`; common aliases and the complete
-`Schemas` map are exported from the package.
+**Bulk import.** Load an array of records (or an NDJSON string) in one call:
 
-Use `rawRequest()` when you need response headers, request ID, retry count, or
-elapsed time. `onRequest` and `onResponse` provide body-free instrumentation.
+```ts
+await graph.facts.import(
+  [
+    { source: { type: "DOC", name: "handbook", key: "doc:42" }, relation: "HAS_PASSAGE", target: { type: "PASSAGE", name: "leave-policy", key: "p:42:1" } },
+    // …one record per line
+  ],
+  { idempotencyKey: "handbook-batch-1" },
+);
+```
 
-## SPARQL
+**Time-travel read.** Pin any search to a past instant — results reflect the graph as it was then:
+
+```ts
+const asOf = await graph.search.hybrid("retention policy", { asOf: "2026-01-01T00:00:00Z" });
+```
+
+**SPARQL.** `sparqlRows` runs a SPARQL 1.1 SELECT/ASK and returns parsed rows:
 
 ```ts
 const { rows } = await lbb.sparqlRows({
@@ -108,15 +87,21 @@ const { rows } = await lbb.sparqlRows({
 });
 ```
 
-`sparqlRows` parses SELECT/ASK results. The native SPARQL 1.1 Protocol is also
-available at `/sparql` for standard RDF clients.
+## Errors & retries
+
+Methods return parsed JSON and throw `LbbError` (with `status`, `code`, `message`, `param`, `requestId`, `docUrl`) on any non-2xx response. Safe reads and idempotency-keyed writes retry `429`/`5xx` and network failures with full-jitter backoff, bounded by a retry budget (`retryBudgetMs`, default 60s) rather than a fixed count, and honor `Retry-After` — a terminal error the server marks non-retryable surfaces immediately. Use `rawRequest()` for response headers, request id, and retry/timing metadata.
+
+## More
+
+The `graph(...)` scope exposes `facts`, `search`, `entities`, `indexes`, `ontology`, `query`, `schema`, and `context` namespaces — covering managed embeddings, multi-query fusion, traversal, temporal state and history, SHACL, ontology evolution, and durable index jobs. Every generated shape is available as `Schemas["TypeName"]`.
+
+Full reference and guides: [docs.littlebigbrain.com/sdks/typescript](https://docs.littlebigbrain.com/sdks/typescript/).
 
 ## Develop
 
 ```sh
 npm install
-npm run generate
+npm run generate    # regenerate types from contracts/openapi.json
 npm run typecheck
 npm test
-npm run pack:check
 ```
