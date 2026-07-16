@@ -18,12 +18,15 @@ function queuedFetch(
   fetch: FetchLike;
   urls: string[];
   headers: Array<Record<string, string>>;
+  bodies: Array<string | undefined>;
 } {
   const urls: string[] = [];
   const headers: Array<Record<string, string>> = [];
+  const bodies: Array<string | undefined> = [];
   const fetch: FetchLike = async (url, init) => {
     urls.push(url);
     headers.push(init?.headers ?? {});
+    bodies.push(init?.body);
     const next = payloads.shift() ?? { body: {} };
     const responseHeaders = new Map(
       Object.entries(next.headers ?? {}).map(([key, value]) => [
@@ -41,7 +44,7 @@ function queuedFetch(
       text: async () => JSON.stringify(next.body),
     };
   };
-  return { fetch, urls, headers };
+  return { fetch, urls, headers, bodies };
 }
 
 test("preferred namespaces make context, ontology, and query operations discoverable", async () => {
@@ -114,9 +117,11 @@ test("ontology namespace covers its complete read and lifecycle family", async (
 });
 
 test("graph namespace covers managed embedding lifecycle routes", async () => {
-  const { fetch, urls } = queuedFetch([
+  const { fetch, urls, bodies } = queuedFetch([
     { body: {} },
     { body: {} },
+    { body: {} },
+    { body: { service: "open_router", configured: true, models: [] } },
     { body: { job_id: "job-1", status: "succeeded", result: {} } },
     { body: {} },
   ]);
@@ -124,15 +129,24 @@ test("graph namespace covers managed embedding lifecycle routes", async () => {
 
   await graph.embeddingConfig();
   await graph.setEmbeddingConfig({ model_id: "m", dim: 384 });
+  await graph.setEmbeddingModel("openai/text-embedding-3-small");
+  await graph.embeddingModels();
   await graph.backfillEmbeddings({ batchSize: 64, limit: 1000, full: true });
   await graph.promoteEmbedding({ runId: "run-1", allowRegression: true });
 
   assert.deepEqual(urls, [
     "http://h/v1/graph/embedding?graph=main",
     "http://h/v1/graph/embedding?graph=main",
+    "http://h/v1/graph/embedding?graph=main",
+    "http://h/v1/graph/embedding/models?graph=main",
     "http://h/v1/graph/embedding/backfill-jobs?graph=main",
     "http://h/v1/graph/embedding/promote?graph=main&run_id=run-1&allow_regression=true",
   ]);
+  assert.deepEqual(JSON.parse(bodies[2] ?? "{}"), {
+    model_id: "openai/text-embedding-3-small",
+    service: "open_router",
+    auto_embed_query: true,
+  });
 });
 
 test("query namespace covers parsed, raw, analytical, SHACL, and inference reads", async () => {

@@ -5,6 +5,7 @@ import {
   LbbError,
   parseSparqlResults,
   type FetchLike,
+  type LbbRetryEvent,
   type Schemas,
 } from "./client.js";
 
@@ -683,6 +684,48 @@ test("creates graph and forks branch with scoped v1 URLs", async () => {
   });
 });
 
+test("uses whole-graph, branch-delete, cancellable index, and durable GC routes", async () => {
+  const { fetch, calls } = recordingFetch({ body: "{}" });
+  const client = new LbbClient({
+    baseUrl: "http://h",
+    graph: "research",
+    branch: "review",
+    fetch,
+  });
+
+  await client.deleteGraph({ confirm: "research" });
+  await client.deleteBranch({ confirm: "review" });
+  await client.indexSubmit({}, { idempotencyKey: "index-1" });
+  await client.indexJob("index_run:abc");
+  await client.cancelIndexJob("index_run:abc");
+  await client.indexGcSubmit({ dry_run: false }, { idempotencyKey: "gc-1" });
+  await client.indexGcJob("index_gc:abc");
+  await client.cancelIndexGcJob("index_gc:abc");
+
+  assert.equal(
+    calls[0].input,
+    "http://h/v1/graph/delete?graph=research&branch=review&confirm=research",
+  );
+  assert.equal(calls[0].init.method, "POST");
+  assert.equal(
+    calls[1].input,
+    "http://h/v1/graph/branch?graph=research&branch=review&confirm=review",
+  );
+  assert.equal(calls[1].init.method, "DELETE");
+  assert.equal(calls[2].init.headers?.["idempotency-key"], "index-1");
+  assert.equal(
+    calls[3].input,
+    "http://h/v1/index/jobs?graph=research&branch=review&job_id=index_run%3Aabc",
+  );
+  assert.equal(calls[4].init.method, "DELETE");
+  assert.equal(calls[5].init.headers?.["idempotency-key"], "gc-1");
+  assert.equal(
+    calls[6].input,
+    "http://h/v1/index/gc-jobs?graph=research&branch=review&job_id=index_gc%3Aabc",
+  );
+  assert.equal(calls[7].init.method, "DELETE");
+});
+
 test("rawRequest returns request metadata", async () => {
   const { fetch } = recordingFetch({
     body: JSON.stringify({ ok: true }),
@@ -818,6 +861,95 @@ test("retries idempotency-keyed writes", async () => {
   assert.equal(calls.length, 2);
   assert.equal(calls[0].init.headers?.["idempotency-key"], "retry-safe");
   assert.equal(calls[1].init.headers?.["idempotency-key"], "retry-safe");
+});
+
+test("retryable:false body short-circuits retries", async () => {
+  // A 429 the server marks terminal (`retryable: false`, e.g. a durable quota
+  // rejection) is surfaced at once, not retried to the budget.
+  const { fetch, calls } = recordingFetch([
+    {
+      status: 429,
+      body: JSON.stringify({
+        error: { code: "training_budget_exceeded", retryable: false },
+      }),
+    },
+    { status: 200, body: JSON.stringify({ ok: true }) },
+  ]);
+  const client = new LbbClient({
+    baseUrl: "http://h",
+    fetch,
+    maxRetries: 5,
+    retryDelayMs: 0,
+  });
+  await assert.rejects(
+    () => client.status(),
+    (error: unknown) =>
+      error instanceof LbbError &&
+      error.status === 429 &&
+      error.retryable === false,
+  );
+  assert.equal(calls.length, 1); // terminal body ⇒ no retry
+});
+
+test("deadline budget binds before the retry count", async () => {
+  // retryBudgetMs 0 under a 5s advertised Retry-After ⇒ surface the first 429
+  // instead of burning any of the five allowed retries.
+  const { fetch, calls } = recordingFetch([
+    {
+      status: 429,
+      headers: { "retry-after": "5" },
+      body: JSON.stringify({ error: { code: "ingest_busy" } }),
+    },
+    { status: 200, body: JSON.stringify({ ok: true }) },
+  ]);
+  const client = new LbbClient({
+    baseUrl: "http://h",
+    fetch,
+    maxRetries: 5,
+    retryDelayMs: 0,
+    retryBudgetMs: 0,
+  });
+  await assert.rejects(
+    () => client.status(),
+    (error: unknown) => error instanceof LbbError && error.status === 429,
+  );
+  assert.equal(calls.length, 1);
+});
+
+test("naked LB 5xx (no envelope) is retried with backoff", async () => {
+  const { fetch, calls } = recordingFetch([
+    { status: 502, body: "<html>502 Bad Gateway</html>" },
+    { status: 200, body: JSON.stringify({ ok: true }) },
+  ]);
+  const client = new LbbClient({
+    baseUrl: "http://h",
+    fetch,
+    maxRetries: 3,
+    retryDelayMs: 0,
+  });
+  await client.status();
+  assert.equal(calls.length, 2);
+});
+
+test("onRetry surfaces each absorbed retry", async () => {
+  const events: LbbRetryEvent[] = [];
+  const { fetch } = recordingFetch([
+    { status: 429, body: JSON.stringify({ error: { code: "ingest_busy" } }) },
+    { status: 200, body: JSON.stringify({ ok: true }) },
+  ]);
+  const client = new LbbClient({
+    baseUrl: "http://h",
+    fetch,
+    maxRetries: 3,
+    retryDelayMs: 0,
+    onRetry: (event) => events.push(event),
+  });
+  await client.status();
+  assert.equal(events.length, 1);
+  assert.equal(events[0].status, 429);
+  assert.equal(events[0].errorCode, "ingest_busy");
+  assert.equal(events[0].attempt, 1);
+  assert.ok(events[0].delayMs >= 0);
 });
 
 test("throws typed LbbError on structured errors", async () => {

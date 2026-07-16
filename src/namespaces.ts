@@ -69,9 +69,22 @@ export class GraphNamespace {
     return this.client.request("POST", "/v1/graph/create", opts);
   }
 
-  delete(opts: { confirm: string } & CallOptions): Promise<unknown> {
+  delete(
+    opts: { confirm: string } & CallOptions,
+  ): Promise<Schemas["GraphDeleteResponse"]> {
     const { confirm, ...request } = opts;
     return this.client.request("POST", "/v1/graph/delete", {
+      ...request,
+      query: { confirm },
+      retry: request.retry ?? true,
+    });
+  }
+
+  deleteBranch(
+    opts: { confirm: string } & CallOptions,
+  ): Promise<Schemas["GraphBranchDeleteResponse"]> {
+    const { confirm, ...request } = opts;
+    return this.client.request("DELETE", "/v1/graph/branch", {
       ...request,
       query: { confirm },
     });
@@ -83,6 +96,30 @@ export class GraphNamespace {
     return this.client.request("GET", "/v1/graph/embedding", opts);
   }
 
+  /** List the embedding models available on this deployment. */
+  embeddingModels(
+    opts: CallOptions = {},
+  ): Promise<Schemas["ManagedEmbeddingModelsResponse"]> {
+    return this.client.request("GET", "/v1/graph/embedding/models", opts);
+  }
+
+  /** Choose the model used automatically for writes and vector queries. */
+  setEmbeddingModel(
+    modelId: string,
+    options: CallOptions & { autoEmbedQuery?: boolean } = {},
+  ): Promise<Schemas["ManagedEmbeddingConfigResponse"]> {
+    const { autoEmbedQuery, ...request } = options;
+    return this.client.request("POST", "/v1/graph/embedding", {
+      ...request,
+      body: {
+        model_id: modelId,
+        service: "open_router",
+        auto_embed_query: autoEmbedQuery ?? true,
+      },
+    });
+  }
+
+  /** Advanced configuration escape hatch. Prefer `setEmbeddingModel`. */
   setEmbeddingConfig(
     body: Schemas["ManagedEmbeddingConfigRequest"],
     opts: CallOptions = {},
@@ -428,6 +465,33 @@ export class IndexNamespace {
     return this.client.request("POST", "/v1/index/delta", opts);
   }
 
+  submit(
+    body: Partial<Schemas["IndexBuildOptions"]> = {},
+    opts: CallOptions & { idempotencyKey: string },
+  ): Promise<Schemas["SearchIndexJobStatusResponse"]> {
+    return this.client.request("POST", "/v1/index/jobs", { ...opts, body });
+  }
+
+  job(
+    jobId: string,
+    opts: CallOptions = {},
+  ): Promise<Schemas["SearchIndexJobStatusResponse"]> {
+    return this.client.request("GET", "/v1/index/jobs", {
+      ...opts,
+      query: { job_id: jobId },
+    });
+  }
+
+  cancel(
+    jobId: string,
+    opts: CallOptions = {},
+  ): Promise<Schemas["SearchIndexJobStatusResponse"]> {
+    return this.client.request("DELETE", "/v1/index/jobs", {
+      ...opts,
+      query: { job_id: jobId },
+    });
+  }
+
   gc(
     opts: { keepRuns?: number; dryRun?: boolean } & CallOptions = {},
   ): Promise<Schemas["IndexGcResponse"]> {
@@ -435,6 +499,33 @@ export class IndexNamespace {
     return this.client.request("POST", "/v1/index/gc", {
       ...request,
       query: { keep_runs: keepRuns, dry_run: dryRun },
+    });
+  }
+
+  submitGc(
+    body: Schemas["IndexGcRequest"] = {},
+    opts: CallOptions & { idempotencyKey: string },
+  ): Promise<Schemas["IndexGcJobStatusResponse"]> {
+    return this.client.request("POST", "/v1/index/gc-jobs", { ...opts, body });
+  }
+
+  gcJob(
+    jobId: string,
+    opts: CallOptions = {},
+  ): Promise<Schemas["IndexGcJobStatusResponse"]> {
+    return this.client.request("GET", "/v1/index/gc-jobs", {
+      ...opts,
+      query: { job_id: jobId },
+    });
+  }
+
+  cancelGc(
+    jobId: string,
+    opts: CallOptions = {},
+  ): Promise<Schemas["IndexGcJobStatusResponse"]> {
+    return this.client.request("DELETE", "/v1/index/gc-jobs", {
+      ...opts,
+      query: { job_id: jobId },
     });
   }
 }
