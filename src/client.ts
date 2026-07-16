@@ -4,6 +4,7 @@ import type {
   LbbClientOptions,
   LbbRequestEvent,
   LbbResponseEvent,
+  LbbRetryEvent,
   LbbStackActivityResponse,
   LbbStackActivityWindow,
   ListResponse,
@@ -15,11 +16,14 @@ import type {
 } from "./types.js";
 import { parseSparqlResults } from "./types.js";
 import {
+  bodyMarksTerminal,
+  errorCodeFromBody,
+  fullJitterBackoffMs,
   parseLbbError,
   parseResponseJson,
   retryAllowed,
-  retryDelayForAttempt,
   retryableStatus,
+  retryDelayMs,
   sleep,
   type Query,
   type RequestOptions,
@@ -48,6 +52,7 @@ export type {
   LbbClientOptions,
   LbbRequestEvent,
   LbbResponseEvent,
+  LbbRetryEvent,
   LbbErrorPayload,
   LbbStackActivityResponse,
   LbbStackActivityWindow,
@@ -118,9 +123,11 @@ export class LbbClient {
   private readonly apiVersion: string;
   private readonly maxRetries: number;
   private readonly retryDelayMs: number;
+  private readonly retryBudgetMs: number;
   private readonly timeoutMs: number;
   private readonly onRequest?: (event: LbbRequestEvent) => void;
   private readonly onResponse?: (event: LbbResponseEvent) => void;
+  private readonly onRetry?: (event: LbbRetryEvent) => void;
 
   readonly context: ContextNamespace;
   readonly search: SearchNamespace;
@@ -137,16 +144,21 @@ export class LbbClient {
     this.branchName = options.branch;
     this.stack = options.stack;
     this.apiVersion = options.apiVersion ?? "2026-06-22";
-    this.maxRetries = options.maxRetries ?? 2;
+    this.maxRetries = options.maxRetries ?? 6;
     this.retryDelayMs = options.retryDelayMs ?? 100;
+    this.retryBudgetMs = options.retryBudgetMs ?? 60_000;
     this.timeoutMs = options.timeoutMs ?? 120_000;
     this.onRequest = options.onRequest;
     this.onResponse = options.onResponse;
+    this.onRetry = options.onRetry;
     if (!Number.isInteger(this.maxRetries) || this.maxRetries < 0) {
       throw new RangeError("maxRetries must be a non-negative integer");
     }
     if (!Number.isFinite(this.retryDelayMs) || this.retryDelayMs < 0) {
       throw new RangeError("retryDelayMs must be a non-negative number");
+    }
+    if (!Number.isFinite(this.retryBudgetMs) || this.retryBudgetMs < 0) {
+      throw new RangeError("retryBudgetMs must be a non-negative number");
     }
     if (!Number.isFinite(this.timeoutMs) || this.timeoutMs < 0) {
       throw new RangeError("timeoutMs must be a non-negative number");
@@ -200,9 +212,11 @@ export class LbbClient {
       apiVersion: this.apiVersion,
       maxRetries: this.maxRetries,
       retryDelayMs: this.retryDelayMs,
+      retryBudgetMs: this.retryBudgetMs,
       timeoutMs: this.timeoutMs,
       onRequest: this.onRequest,
       onResponse: this.onResponse,
+      onRetry: this.onRetry,
     });
   }
 
@@ -254,6 +268,9 @@ export class LbbClient {
       throw new RangeError("maxRetries must be a non-negative integer");
     }
     const startedAt = Date.now();
+    // Deadline is the binding limit; `maxRetries` is a secondary safety cap.
+    const deadline =
+      startedAt + Math.max(0, opts.retryBudgetMs ?? this.retryBudgetMs);
     const url = this.buildUrl(path, opts.query);
     let attempts = 0;
     let response: Awaited<ReturnType<FetchLike>> | undefined;
@@ -301,8 +318,19 @@ export class LbbClient {
               )
             : error;
         if (!callerAborted && canRetry && attempt < maxRetries) {
-          await sleep(this.retryDelayMs * (attempt + 1));
-          continue;
+          const delayMs = fullJitterBackoffMs(this.retryDelayMs, attempt);
+          if (Date.now() + delayMs <= deadline) {
+            this.onRetry?.({
+              method: method.toUpperCase(),
+              url,
+              attempt: attempts,
+              status: undefined,
+              delayMs,
+              elapsedMs: Math.max(0, Date.now() - startedAt),
+            });
+            await sleep(delayMs);
+            continue;
+          }
         }
         throw requestError;
       } finally {
@@ -319,13 +347,29 @@ export class LbbClient {
       if (!canRetry) {
         break;
       }
-      await sleep(
-        retryDelayForAttempt(
-          this.retryDelayMs,
-          attempt,
-          response.headers?.get("retry-after"),
-        ),
-      );
+      // Honor the server's typed body verdict: a terminal error
+      // (`retryable: false`, e.g. an exhausted quota) is surfaced at once
+      // rather than retried to the budget.
+      if (bodyMarksTerminal(text)) {
+        break;
+      }
+      const delayMs = retryDelayMs(this.retryDelayMs, attempt, {
+        retryAfterHeader: response.headers?.get("retry-after"),
+        body: text,
+      });
+      if (Date.now() + delayMs > deadline) {
+        break;
+      }
+      this.onRetry?.({
+        method: method.toUpperCase(),
+        url,
+        attempt: attempts,
+        status: response.status,
+        errorCode: errorCodeFromBody(text),
+        delayMs,
+        elapsedMs: Math.max(0, Date.now() - startedAt),
+      });
+      await sleep(delayMs);
     }
     if (response === undefined)
       throw new Error("request did not produce a response");
@@ -563,13 +607,21 @@ export class LbbClient {
     });
   }
 
-  /**
-   * Delete every object under the scoped graph/branch — a destructive reset.
-   * `confirm` must equal the scoped graph id; the next commit re-initializes the
-   * graph. Branch-scoped: sibling branches are untouched.
-   */
-  deleteGraph(opts: { confirm: string }): Promise<unknown> {
+  /** Delete the scoped graph, including every branch, feedback, and active graph-scoped job. */
+  deleteGraph(opts: {
+    confirm: string;
+  }): Promise<Schemas["GraphDeleteResponse"]> {
     return this.request("POST", "/v1/graph/delete", {
+      query: { confirm: opts.confirm },
+      retry: true,
+    });
+  }
+
+  /** Delete only the scoped branch. The server refuses to delete a graph's final live branch. */
+  deleteBranch(opts: {
+    confirm: string;
+  }): Promise<Schemas["GraphBranchDeleteResponse"]> {
+    return this.request("DELETE", "/v1/graph/branch", {
       query: { confirm: opts.confirm },
     });
   }
@@ -578,6 +630,27 @@ export class LbbClient {
     return this.request("GET", "/v1/graph/embedding");
   }
 
+  /** List the embedding models available on this deployment. */
+  embeddingModels(): Promise<Schemas["ManagedEmbeddingModelsResponse"]> {
+    return this.request("GET", "/v1/graph/embedding/models");
+  }
+
+  /**
+   * Choose the model used automatically for writes and vector queries.
+   * Provider credentials and native dimension discovery stay server-side.
+   */
+  setEmbeddingModel(
+    modelId: string,
+    opts: { autoEmbedQuery?: boolean } = {},
+  ): Promise<Schemas["ManagedEmbeddingConfigResponse"]> {
+    return this.setEmbeddingConfig({
+      model_id: modelId,
+      service: "open_router",
+      auto_embed_query: opts.autoEmbedQuery ?? true,
+    });
+  }
+
+  /** Advanced configuration escape hatch. Prefer `setEmbeddingModel`. */
   setEmbeddingConfig(
     body: Schemas["ManagedEmbeddingConfigRequest"],
   ): Promise<Schemas["ManagedEmbeddingConfigResponse"]> {
@@ -1389,6 +1462,31 @@ export class LbbClient {
     });
   }
 
+  /** Submit a durable full-index build. Requires a reconnect-safe idempotency key. */
+  indexSubmit(
+    body: Partial<Schemas["IndexBuildOptions"]> = {},
+    opts: { idempotencyKey: string },
+  ): Promise<Schemas["SearchIndexJobStatusResponse"]> {
+    return this.request("POST", "/v1/index/jobs", {
+      body,
+      idempotencyKey: opts.idempotencyKey,
+    });
+  }
+
+  /** Poll a durable full-index build. */
+  indexJob(jobId: string): Promise<Schemas["SearchIndexJobStatusResponse"]> {
+    return this.request("GET", "/v1/index/jobs", { query: { job_id: jobId } });
+  }
+
+  /** Cancel a durable full-index build. Repeated cancellation returns its current terminal status. */
+  cancelIndexJob(
+    jobId: string,
+  ): Promise<Schemas["SearchIndexJobStatusResponse"]> {
+    return this.request("DELETE", "/v1/index/jobs", {
+      query: { job_id: jobId },
+    });
+  }
+
   /** Append a BM25 delta segment for the unindexed WAL tail. */
   indexDelta(): Promise<Schemas["IndexDeltaResponse"]> {
     return this.request("POST", "/v1/index/delta");
@@ -1400,6 +1498,33 @@ export class LbbClient {
   ): Promise<Schemas["IndexGcResponse"]> {
     return this.request("POST", "/v1/index/gc", {
       query: { keep_runs: opts.keepRuns, dry_run: opts.dryRun },
+    });
+  }
+
+  /** Submit durable, cancellable index garbage collection. */
+  indexGcSubmit(
+    body: Schemas["IndexGcRequest"] = {},
+    opts: { idempotencyKey: string },
+  ): Promise<Schemas["IndexGcJobStatusResponse"]> {
+    return this.request("POST", "/v1/index/gc-jobs", {
+      body,
+      idempotencyKey: opts.idempotencyKey,
+    });
+  }
+
+  /** Poll exact planning/deletion progress for durable index garbage collection. */
+  indexGcJob(jobId: string): Promise<Schemas["IndexGcJobStatusResponse"]> {
+    return this.request("GET", "/v1/index/gc-jobs", {
+      query: { job_id: jobId },
+    });
+  }
+
+  /** Cancel durable index garbage collection. */
+  cancelIndexGcJob(
+    jobId: string,
+  ): Promise<Schemas["IndexGcJobStatusResponse"]> {
+    return this.request("DELETE", "/v1/index/gc-jobs", {
+      query: { job_id: jobId },
     });
   }
 

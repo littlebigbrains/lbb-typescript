@@ -242,16 +242,27 @@ export interface LbbClientOptions {
   fetch?: FetchLike;
   /** API version header sent on every request. Defaults to the beta reset contract. */
   apiVersion?: string;
-  /** Retry count for 429/5xx responses and network failures. Defaults to 2. */
+  /**
+   * Secondary safety cap on retries for 429/5xx responses and network failures.
+   * The binding limit is `retryBudgetMs`. Defaults to 6.
+   */
   maxRetries?: number;
   /** Base delay between retries. Defaults to 100ms. Tests can set 0. */
   retryDelayMs?: number;
+  /**
+   * Deadline-based retry budget (ms): keep retrying a retryable request until
+   * this much wall-clock has elapsed, so a server's advertised `Retry-After`
+   * window is honored rather than truncated by `maxRetries`. Defaults to 60000.
+   */
+  retryBudgetMs?: number;
   /** Per-attempt timeout, including response-body reads. Defaults to 120 seconds; 0 disables it. */
   timeoutMs?: number;
   /** Called immediately before each network attempt. Bodies and credentials are never included. */
   onRequest?: (event: LbbRequestEvent) => void;
   /** Called once after the final HTTP response. Bodies and credentials are never included. */
   onResponse?: (event: LbbResponseEvent) => void;
+  /** Called before each backoff sleep, so absorbed retries are observable. Bodies and credentials are never included. */
+  onRetry?: (event: LbbRetryEvent) => void;
 }
 
 export interface LbbRequestEvent {
@@ -269,6 +280,21 @@ export interface LbbResponseEvent {
   requestId?: string;
   attempts: number;
   retryCount: number;
+  elapsedMs: number;
+}
+
+export interface LbbRetryEvent {
+  method: string;
+  url: string;
+  /** 1-based number of the attempt that just failed and triggered this retry. */
+  attempt: number;
+  /** HTTP status of the failed attempt, or `undefined` for a network error. */
+  status?: number;
+  /** Parsed `error.code` of the failed attempt, when the body carried one. */
+  errorCode?: string;
+  /** The backoff (ms) about to be slept — header, body hint, or jittered backoff. */
+  delayMs: number;
+  /** Inclusive wall-clock elapsed (ms) across attempts and waits so far. */
   elapsedMs: number;
 }
 

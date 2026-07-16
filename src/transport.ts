@@ -4,8 +4,10 @@ export interface CallOptions {
   idempotencyKey?: string;
   /** Override the client's per-attempt timeout. Set 0 to disable it. */
   timeoutMs?: number;
-  /** Override the client's retry count for this request. */
+  /** Override the client's retry count (secondary cap) for this request. */
   maxRetries?: number;
+  /** Override the client's deadline-based retry budget (ms) for this request. */
+  retryBudgetMs?: number;
   /** Override retry safety classification. Read-only POST namespaces set this automatically. */
   retry?: boolean;
   /** Abort the request and suppress any further retries. */
@@ -98,13 +100,89 @@ export function parseRetryAfterMs(
   return Math.min(Math.max(0, dateMs - nowMs), MAX_RETRY_AFTER_MS);
 }
 
-export function retryDelayForAttempt(
+/**
+ * Full-jitter exponential backoff: `uniform(0, base * 2**attempt)`, capped at
+ * one minute. Replaces linear backoff so many clients recovering from one
+ * outage do not retry in lockstep (a thundering herd that re-triggers it).
+ */
+export function fullJitterBackoffMs(
   baseDelayMs: number,
   attempt: number,
-  retryAfter?: string | null,
+  rng: () => number = Math.random,
 ): number {
-  const fallback = Math.max(0, baseDelayMs) * (attempt + 1);
-  return parseRetryAfterMs(retryAfter) ?? fallback;
+  const ceiling = Math.min(
+    Math.max(0, baseDelayMs) * 2 ** attempt,
+    MAX_RETRY_AFTER_MS,
+  );
+  return rng() * ceiling;
+}
+
+/**
+ * The server's own body hint `error.retry_after_seconds` in ms (capped), or
+ * `undefined` when the body is naked (a bare LB 5xx) or carries no hint. Used
+ * as the backoff when the `Retry-After` *header* is absent.
+ */
+export function retryAfterFromBodyMs(body: string): number | undefined {
+  try {
+    const parsed = JSON.parse(body) as {
+      error?: { retry_after_seconds?: number };
+    };
+    const seconds = parsed.error?.retry_after_seconds;
+    if (
+      typeof seconds === "number" &&
+      Number.isFinite(seconds) &&
+      seconds >= 0
+    ) {
+      return Math.min(seconds * 1_000, MAX_RETRY_AFTER_MS);
+    }
+  } catch {
+    // Naked LB body (no error envelope) — no hint.
+  }
+  return undefined;
+}
+
+/** The parsed `error.code` from an error body, or `undefined` when absent/naked. */
+export function errorCodeFromBody(body: string): string | undefined {
+  try {
+    const parsed = JSON.parse(body) as { error?: { code?: string } };
+    const code = parsed.error?.code;
+    return typeof code === "string" ? code : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * True iff the server explicitly marked this error non-retryable in the body
+ * (`error.retryable === false`) — a durable rejection (e.g. an exhausted quota)
+ * the client must surface immediately instead of spending its retry budget.
+ */
+export function bodyMarksTerminal(body: string): boolean {
+  try {
+    const parsed = JSON.parse(body) as { error?: { retryable?: boolean } };
+    return parsed.error?.retryable === false;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * The backoff (ms) before the next attempt: the `Retry-After` header, else the
+ * server's body `retry_after_seconds` hint, else full-jitter exponential
+ * backoff.
+ */
+export function retryDelayMs(
+  baseDelayMs: number,
+  attempt: number,
+  opts: { retryAfterHeader?: string | null; body?: string } = {},
+  rng: () => number = Math.random,
+): number {
+  const header = parseRetryAfterMs(opts.retryAfterHeader);
+  if (header !== undefined) return header;
+  const bodyHint =
+    opts.body !== undefined ? retryAfterFromBodyMs(opts.body) : undefined;
+  if (bodyHint !== undefined) return bodyHint;
+  return fullJitterBackoffMs(baseDelayMs, attempt, rng);
 }
 
 export function parseResponseJson<T>(

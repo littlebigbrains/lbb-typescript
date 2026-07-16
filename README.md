@@ -79,6 +79,16 @@ graph.context.ask(...)
 graph.ontology.view(...)
 graph.query.sparql(...)
 graph.schema.audit(...)
+
+const build = await graph.indexes.submit({}, { idempotencyKey: "index:head:147" })
+await graph.indexes.job(build.job_id)
+await graph.indexes.cancel(build.job_id)
+
+const gc = await graph.indexes.submitGc({ dry_run: false }, { idempotencyKey: "gc:2026-07-15" })
+await graph.indexes.gcJob(gc.job_id)
+
+await graph.branch("review").deleteBranch({ confirm: "review" })
+await graph.delete({ confirm: "main" }) // whole graph, every branch
 ```
 
 Other focused methods cover managed embeddings, full-text/vector search,
