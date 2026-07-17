@@ -6900,6 +6900,14 @@ export interface components {
             trained_fusion_run?: number | null;
             unindexed_tail_commits: number;
             vector_candidates: number;
+            /**
+             * @description True when latest-head hybrid search requested the persisted vector/ANN
+             *     channel but no matching run existed, so the optional vector channel was
+             *     skipped instead of silently rebuilding an O(corpus) ephemeral ANN on the
+             *     request path. Explicit ephemeral and historical pinned searches retain
+             *     their existing behavior.
+             */
+            vector_channel_skipped?: boolean;
             /** @description As `bm25_degraded_to_ephemeral`, for the persisted vector/ANN index. */
             vector_degraded_to_ephemeral?: boolean;
             vector_indexed_commit_seq?: null | components["schemas"]["CommitSeq"];
