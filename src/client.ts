@@ -5,8 +5,6 @@ import type {
   LbbRequestEvent,
   LbbResponseEvent,
   LbbRetryEvent,
-  LbbStackActivityResponse,
-  LbbStackActivityWindow,
   ListResponse,
   RawLbbResponse,
   RdfExportOptions,
@@ -54,8 +52,6 @@ export type {
   LbbResponseEvent,
   LbbRetryEvent,
   LbbErrorPayload,
-  LbbStackActivityResponse,
-  LbbStackActivityWindow,
   ListResponse,
   RawLbbResponse,
   RdfExportOptions,
@@ -1617,14 +1613,5 @@ export class LbbClient {
   /** List the graphs (and branches) under the scoped tenant. */
   listGraphs(): Promise<Schemas["GraphListResponse"]> {
     return this.request("GET", "/v1/graphs");
-  }
-
-  // --- stack activity ---
-
-  /** Activity for the stack selected by the bearer stack key or session. */
-  stackActivity(
-    window: LbbStackActivityWindow = "24h",
-  ): Promise<LbbStackActivityResponse> {
-    return this.request("GET", "/v1/stack/activity", { query: { window } });
   }
 }

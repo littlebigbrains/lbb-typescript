@@ -34,7 +34,7 @@ const CLIENT = resolve(process.cwd(), "src/client.ts");
 // register: adding a route here is a conscious decision to leave it
 // uncontracted. (The /api/admin/* control-plane surface lives in
 // apps/saas-api/src/controlPlaneClient.ts, not in this SDK.)
-const UNCONTRACTED = new Set<string>(["GET /v1/stack/activity"]);
+const UNCONTRACTED = new Set<string>();
 
 const HTTP_METHODS = new Set(["get", "post", "put", "patch", "delete"]);
 
