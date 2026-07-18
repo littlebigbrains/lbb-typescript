@@ -1553,9 +1553,21 @@ export class LbbClient {
     return this.request("GET", "/v1/status");
   }
 
-  /** Graph footprint, WAL tail, and index coverage. */
-  metadata(): Promise<Schemas["GraphMetadataResponse"]> {
-    return this.request("GET", "/v1/graph/metadata");
+  /** Graph footprint, WAL tail, and index coverage. Exact object inventory is opt-in. */
+  metadata(
+    opts: {
+      includeObjects?: boolean;
+      includeIndexes?: boolean;
+      includeTemporalCoverage?: boolean;
+    } = {},
+  ): Promise<Schemas["GraphMetadataResponse"]> {
+    return this.request("GET", "/v1/graph/metadata", {
+      query: {
+        include_objects: opts.includeObjects,
+        include_indexes: opts.includeIndexes,
+        include_temporal_coverage: opts.includeTemporalCoverage,
+      },
+    });
   }
 
   async waitForIndexLineage(
