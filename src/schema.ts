@@ -4042,6 +4042,7 @@ export interface components {
             observation_count: number;
             /** Format: int64 */
             ontology_version: number;
+            relation_adjacency?: components["schemas"]["RelationAdjacencyCount"][];
             relations: components["schemas"]["NamedCount"][];
             snapshot: components["schemas"]["SnapshotView"];
         };
@@ -5652,6 +5653,18 @@ export interface components {
             y0: number;
             /** Format: double */
             y1: number;
+        };
+        /**
+         * @description Exact current-edge count for one observed source-type / relation /
+         *     target-type combination. The graph summary already scans the reduced edge
+         *     set, so exposing this rollup lets schema visualizations avoid one additional
+         *     whole-snapshot query per populated relation.
+         */
+        RelationAdjacencyCount: {
+            count: number;
+            relation: string;
+            source_type: string;
+            target_type: string;
         };
         RelationSearchResult: {
             name: string;
