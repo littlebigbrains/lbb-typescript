@@ -1060,18 +1060,6 @@ test("composite-endpoint 421/403 are terminal — the hint is never masked by re
   }
 });
 
-test("stack activity stays on the bearer-scoped /v1 route", async () => {
-  const { fetch, calls } = recordingFetch({
-    body: JSON.stringify({ ok: true }),
-  });
-  const client = new LbbClient({ baseUrl: "http://h", apiKey: "k", fetch });
-
-  await client.stackActivity("1h");
-
-  assert.equal(calls[0].input, "http://h/v1/stack/activity?window=1h");
-  assert.equal(calls[0].init.headers?.authorization, "Bearer k");
-});
-
 test("facts.import serializes lines to NDJSON with batch/strict params", async () => {
   const { fetch, calls } = recordingFetch({
     status: 200,

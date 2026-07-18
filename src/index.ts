@@ -7,8 +7,6 @@ export type {
   HybridSearchOptions,
   LbbRequestEvent,
   LbbResponseEvent,
-  LbbStackActivityResponse,
-  LbbStackActivityWindow,
   FetchLike,
   Schemas,
   SparqlResults,
