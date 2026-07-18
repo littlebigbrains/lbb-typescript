@@ -3901,6 +3901,12 @@ export interface components {
              *     every as-of returns the same picture.
              */
             temporal_coverage?: components["schemas"]["TemporalCoverage"];
+            /**
+             * @description Whether `temporal_coverage` was computed from the full snapshot. The
+             *     bounded HTTP metadata path is head-only by default; callers that need
+             *     exact event-time coverage opt in explicitly.
+             */
+            temporal_coverage_computed?: boolean;
             unindexed_tail_commits: number;
             /** Format: int64 */
             wal_tail_bytes: number;
@@ -5975,6 +5981,12 @@ export interface components {
             messages?: string[];
             result_count: number;
             results?: components["schemas"]["SchemaAuditResult"][];
+            /**
+             * @description True when `result_count` is exact but `results` contains only the
+             *     caller-requested leading window. Whole-graph audits can produce one row
+             *     per offending focus node, so HTTP responses are bounded by default.
+             */
+            truncated?: boolean;
         };
         SchemaAuditResult: {
             component: string;

@@ -71,6 +71,24 @@ function recordingFetch(
   return { fetch, calls };
 }
 
+test("metadata keeps recursive object inventory opt-in", async () => {
+  const { fetch, calls } = recordingFetch();
+  const client = new LbbClient({ baseUrl: "http://h", fetch });
+
+  await client.metadata();
+  assert.equal(calls[0].input, "http://h/v1/graph/metadata");
+
+  await client.metadata({
+    includeObjects: true,
+    includeIndexes: false,
+    includeTemporalCoverage: true,
+  });
+  assert.match(calls[1].input, /^http:\/\/h\/v1\/graph\/metadata\?/);
+  assert.match(calls[1].input, /include_objects=true/);
+  assert.match(calls[1].input, /include_indexes=false/);
+  assert.match(calls[1].input, /include_temporal_coverage=true/);
+});
+
 test("waitForIndexLineage retains the satisfying build and replica headers", async () => {
   const lineage = {
     head_commit_seq: 7,
