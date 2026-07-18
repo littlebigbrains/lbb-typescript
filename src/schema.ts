@@ -4505,7 +4505,7 @@ export interface components {
          * @description Service used to generate managed corpus and query embeddings.
          * @enum {string}
          */
-        ManagedEmbeddingService: "modal" | "open_router";
+        ManagedEmbeddingService: "open_router" | "modal";
         /**
          * @description Where a managed embedding model came from.
          * @enum {string}
