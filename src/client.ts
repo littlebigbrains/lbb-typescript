@@ -23,6 +23,7 @@ import {
   retryableStatus,
   retryDelayMs,
   sleep,
+  type CallOptions,
   type Query,
   type RequestOptions,
 } from "./transport.js";
@@ -1132,6 +1133,8 @@ export class LbbClient {
     name?: string;
     relations?: string[];
     asOf?: string;
+    /** Require the bounded ranged-adjacency path; returns `index_busy` while unavailable. */
+    indexed?: boolean;
   }): Promise<Schemas["EntityNeighborhoodResponse"]> {
     return this.request("GET", "/v1/graph/entity/neighborhood", {
       query: {
@@ -1140,7 +1143,19 @@ export class LbbClient {
         name: opts.name,
         relations: opts.relations?.join(","),
         as_of: opts.asOf,
+        indexed: opts.indexed,
       },
+    });
+  }
+
+  /** Exact type cardinality plus a bounded deterministic sample from ranged adjacency. */
+  entityTypeSample(
+    opts: { type: string; limit?: number } & CallOptions,
+  ): Promise<Schemas["EntityTypeSampleResponse"]> {
+    const { type, limit, ...request } = opts;
+    return this.request("GET", "/v1/graph/entities/sample", {
+      ...request,
+      query: { type, limit },
     });
   }
 
