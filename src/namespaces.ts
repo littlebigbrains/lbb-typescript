@@ -534,6 +534,17 @@ export class EntityNamespace {
   constructor(private readonly client: LbbClient) {}
 
   /**
+   * Return the exact type cardinality and a bounded deterministic sample from
+   * the ranged adjacency index. The server returns `index_busy` rather than
+   * falling back to an exhaustive snapshot scan when the index is unavailable.
+   */
+  sample(
+    opts: { type: string; limit?: number } & CallOptions,
+  ): Promise<Schemas["EntityTypeSampleResponse"]> {
+    return this.client.entityTypeSample(opts);
+  }
+
+  /**
    * Browse entities as the unified list envelope. Pass `fields` (names or `*`)
    * to inline each row's typed attributes as native JSON (under `attributes`) —
    * "list entities and their titles" in one call instead of a list plus N point

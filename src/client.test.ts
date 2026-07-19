@@ -288,6 +288,43 @@ test("entities.list projects fields and bulk-fetches ids in one call", async () 
   assert.equal(page.total_count, 1);
 });
 
+test("entities.sample uses the bounded adjacency sample route", async () => {
+  const { fetch, calls } = recordingFetch({
+    body: JSON.stringify({
+      entity_type: "SERVICE",
+      total_count: 59150,
+      entities: [],
+      snapshot: { commit_seq: 3 },
+      indexed_commit_seq: 3,
+    }),
+  });
+  const client = new LbbClient({ baseUrl: "http://h", graph: "main", fetch });
+
+  const sample = await client.entities.sample({ type: "SERVICE", limit: 48 });
+
+  assert.match(calls[0].input, /^http:\/\/h\/v1\/graph\/entities\/sample\?/);
+  assert.match(calls[0].input, /type=SERVICE/);
+  assert.match(calls[0].input, /limit=48/);
+  assert.equal(sample.total_count, 59150);
+});
+
+test("entityNeighborhood can require the ranged indexed path", async () => {
+  const { fetch, calls } = recordingFetch({
+    body: JSON.stringify({
+      center: { id: "abc", entity_type: "SERVICE", name: "api" },
+      nodes: [],
+      edges: [],
+      snapshot: { commit_seq: 3 },
+      ranged: true,
+    }),
+  });
+  const client = new LbbClient({ baseUrl: "http://h", graph: "main", fetch });
+
+  await client.entityNeighborhood({ id: "abc", indexed: true });
+
+  assert.match(calls[0].input, /indexed=true/);
+});
+
 test("entities.filterByAttributes builds structured SPARQL property filters", async () => {
   const { fetch, calls } = recordingFetch({
     body: JSON.stringify({

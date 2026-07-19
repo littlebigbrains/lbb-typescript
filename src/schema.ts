@@ -416,6 +416,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/graph/entities/sample": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Bounded class sample from the ranged adjacency index */
+        get: operations["get_v1_graph_entities_sample"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/graph/entity": {
         parameters: {
             query?: never;
@@ -3195,6 +3212,29 @@ export interface components {
             relation: components["schemas"]["RelationView"];
             snapshot: components["schemas"]["SnapshotView"];
             transitions: components["schemas"]["TransitionEntry"][];
+        };
+        /**
+         * @description Exact class cardinality plus a bounded deterministic sample served from the
+         *     ranged adjacency meta. `indexed_commit_seq` makes index lag explicit while
+         *     `snapshot.commit_seq` reports the current graph head.
+         */
+        EntityTypeSampleResponse: {
+            entities: components["schemas"]["EntityTypeSampleRow"][];
+            entity_type: string;
+            indexed_commit_seq: components["schemas"]["CommitSeq"];
+            snapshot: components["schemas"]["SnapshotView"];
+            total_count: number;
+        };
+        /**
+         * @description One bounded, index-backed class member for interactive graph exploration.
+         *     Unlike [`EntityExplorerRow`], this deliberately carries only fields the
+         *     adjacency build already knows; exhaustive attributes and observation counts
+         *     remain on the full entity/browse reads.
+         */
+        EntityTypeSampleRow: {
+            entity: components["schemas"]["EntityView"];
+            in_degree: number;
+            out_degree: number;
         };
         EntityView: {
             id: components["schemas"]["EntityId"];
@@ -12510,6 +12550,146 @@ export interface operations {
             };
         };
     };
+    get_v1_graph_entities_sample: {
+        parameters: {
+            query?: {
+                /** @description Graph name (default `main`) */
+                graph?: string;
+                /** @description Branch name (default `main`) */
+                branch?: string;
+                /** @description Exact entity type */
+                type?: string;
+                /** @description Max sampled rows (up to 128) */
+                limit?: string;
+            };
+            header?: {
+                /** @description API contract version to pin. Use `2026-06-22` for this beta-breaking shape. */
+                "Lbb-Version"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EntityTypeSampleResponse"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Rate limit exceeded */
+            429: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Service unavailable */
+            503: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+        };
+    };
     get_v1_graph_entity: {
         parameters: {
             query?: {
@@ -12813,6 +12993,8 @@ export interface operations {
                 relations?: string;
                 /** @description RFC3339 as-of timestamp */
                 as_of?: string;
+                /** @description When true, require ranged adjacency and never fall back to a whole-snapshot scan */
+                indexed?: string;
             };
             header?: {
                 /** @description API contract version to pin. Use `2026-06-22` for this beta-breaking shape. */
