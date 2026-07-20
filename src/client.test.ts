@@ -1255,3 +1255,121 @@ test("graph.retract posts edge/entity retractions", async () => {
     "retract gets an idempotency key",
   );
 });
+
+test("forkGraph enqueues a copy with confirm pinned to the destination", async () => {
+  const { fetch, calls } = recordingFetch({
+    status: 200,
+    body: JSON.stringify({
+      ok: true,
+      queued: true,
+      src_graph_id: "research",
+      dst_graph_id: "research-copy",
+      job_id: "graph_fork:abc",
+      poll: "GET /v1/graph/metadata?graph=research-copy",
+    }),
+  });
+  const client = new LbbClient({
+    baseUrl: "http://h",
+    graph: "research",
+    fetch,
+  });
+  const result = await client.forkGraph({
+    src: "research",
+    dst: "research-copy",
+  });
+  assert.equal(result.dst_graph_id, "research-copy");
+  const call = calls[0];
+  assert.equal(call.init.method, "POST");
+  assert.match(call.input, /\/v1\/graph\/fork\?/);
+  assert.match(call.input, /src=research/);
+  assert.match(call.input, /dst=research-copy/);
+  // confirm must equal the destination graph id to authorize the fork.
+  assert.match(call.input, /confirm=research-copy/);
+});
+
+test("reload posts NDJSON with confirm/dry_run and a rollback anchor", async () => {
+  const { fetch, calls } = recordingFetch({
+    status: 200,
+    body: JSON.stringify({
+      dry_run: true,
+      lines_read: 2,
+      entities_added: 1,
+      entities_changed: 0,
+      entities_removed: 1,
+      edges_added: 1,
+      edges_changed: 0,
+      edges_removed: 0,
+      error_count: 0,
+      idempotency_key: "reload:xyz",
+      new_commit_seq: 8,
+      new_snapshot_token: "snap-new",
+      prior_commit_seq: 7,
+      prior_snapshot_token: "snap-old",
+    }),
+  });
+  const client = new LbbClient({ baseUrl: "http://h", graph: "main", fetch });
+  const result = await client.reload(
+    [
+      {
+        source: { type: "Author", name: "Ada", key: "orcid:1" },
+        relation: "AFFILIATED_WITH",
+        target: { type: "University", name: "Cambridge", key: "ror:1" },
+      },
+      { type: "Author", name: "Ada", key: "orcid:1", properties: { h_index: 52 } },
+    ],
+    { confirm: "main", dryRun: true, strict: true, observedAt: "2026-07-20T00:00:00Z" },
+  );
+  assert.equal(result.dry_run, true);
+  // prior_* is the rollback anchor.
+  assert.equal(result.prior_commit_seq, 7);
+  assert.equal(result.prior_snapshot_token, "snap-old");
+  const call = calls[0];
+  assert.equal(call.init.method, "POST");
+  assert.match(call.input, /\/v1\/graph\/reload\?/);
+  assert.match(call.input, /confirm=main/);
+  assert.match(call.input, /dry_run=true/);
+  assert.match(call.input, /strict=true/);
+  assert.match(call.input, /observed_at=2026-07-20T00%3A00%3A00Z/);
+  assert.equal(call.init.headers?.["content-type"], "application/x-ndjson");
+  assert.match(call.init.headers?.["idempotency-key"] ?? "", /^reload:/);
+  const lines = (call.init.body ?? "").split("\n");
+  assert.equal(lines.length, 2);
+  assert.equal(JSON.parse(lines[0]).relation, "AFFILIATED_WITH");
+  assert.equal(JSON.parse(lines[1]).properties.h_index, 52);
+});
+
+test("reload accepts a pre-built NDJSON string unchanged", async () => {
+  const { fetch, calls } = recordingFetch({
+    status: 200,
+    body: JSON.stringify({
+      dry_run: false,
+      lines_read: 1,
+      entities_added: 0,
+      entities_changed: 0,
+      entities_removed: 0,
+      edges_added: 0,
+      edges_changed: 1,
+      edges_removed: 0,
+      error_count: 0,
+      idempotency_key: "reload:custom",
+      new_commit_seq: 2,
+      new_snapshot_token: "snap",
+      prior_commit_seq: 1,
+      prior_snapshot_token: "snap0",
+    }),
+  });
+  const client = new LbbClient({ baseUrl: "http://h", graph: "main", fetch });
+  const ndjson =
+    '{"type":"Author","name":"Ada","key":"orcid:1","properties":{}}';
+  await client.reload(ndjson, {
+    confirm: "main",
+    idempotencyKey: "reload:custom",
+  });
+  const call = calls[0];
+  assert.equal(call.init.body, ndjson);
+  assert.equal(call.init.headers?.["idempotency-key"], "reload:custom");
+  // Unset flags are omitted from the query string.
+  assert.doesNotMatch(call.input, /dry_run=/);
+  assert.doesNotMatch(call.input, /strict=/);
+  assert.doesNotMatch(call.input, /observed_at=/);
+});
