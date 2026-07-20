@@ -571,6 +571,68 @@ export class LbbClient {
     return this.request("POST", "/v1/graph/create");
   }
 
+  /**
+   * Fork a whole graph into a brand-new destination graph in the same tenant.
+   * The copy runs as a durable background job (`confirm` is fixed to `dst`, which
+   * the route requires to authorize the fork); the destination must not already
+   * exist, so the create-only CAS on the server side makes the call safe to
+   * retry. The response only acknowledges the enqueue — poll the destination
+   * graph's metadata (see `response.poll`) to observe the fork completing: the
+   * destination becomes readable once its head is published.
+   */
+  forkGraph(opts: {
+    src: string;
+    dst: string;
+  }): Promise<Schemas["GraphForkResponse"]> {
+    return this.request("POST", "/v1/graph/fork", {
+      query: { src: opts.src, dst: opts.dst, confirm: opts.dst },
+      retry: true,
+    });
+  }
+
+  /**
+   * Declarative full-state replace: reconcile the scoped graph so its current
+   * state matches exactly the NDJSON payload (same line grammar as
+   * {@link import} — triplets or `{type,name,properties}` entity records; pass an
+   * array, serialized here, or a pre-built NDJSON string). The whole
+   * reconciliation lands as one atomic cutover: payload records are upserted, and
+   * entities present at the pre-reload head but absent from the payload leave
+   * current state (retraction semantics — history is preserved, so an `as_of`
+   * read pinned before the cutover still sees the old state). `confirm` must
+   * equal the target graph id (reload is semi-destructive). `dryRun` previews the
+   * full delta with zero durable changes. The response carries
+   * `prior_commit_seq` / `prior_snapshot_token` as the rollback anchor — read
+   * them back with `?as_of_commit_seq=<prior_commit_seq>` to see the pre-reload
+   * state. An Idempotency-Key scopes the single cutover commit, so a retry
+   * replays rather than re-applying.
+   */
+  reload(
+    lines: ImportLine[] | string,
+    opts: {
+      confirm: string;
+      dryRun?: boolean;
+      strict?: boolean;
+      observedAt?: string;
+      idempotencyKey?: string;
+    },
+  ): Promise<Schemas["GraphReloadResponse"]> {
+    const ndjson =
+      typeof lines === "string"
+        ? lines
+        : lines.map((line) => JSON.stringify(line)).join("\n");
+    return this.request("POST", "/v1/graph/reload", {
+      rawBody: ndjson,
+      contentType: "application/x-ndjson",
+      query: {
+        confirm: opts.confirm,
+        dry_run: opts.dryRun,
+        strict: opts.strict,
+        observed_at: opts.observedAt,
+      },
+      idempotencyKey: opts.idempotencyKey ?? this.idempotencyKey("reload"),
+    });
+  }
+
   /** Fork the scoped branch from an existing branch in the same graph. */
   createBranch(
     body: Schemas["GraphBranchCreateRequest"],
