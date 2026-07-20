@@ -536,6 +536,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/graph/fork": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Fork a graph: copy-based clone of the source graph's current head into a new graph in the same tenant — no data replay, no re-embedding; runs as a durable job (poll the destination's metadata) */
+        post: operations["post_v1_graph_fork"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/graph/groundability": {
         parameters: {
             query?: never;
@@ -632,6 +649,23 @@ export interface paths {
         put?: never;
         /** Run a SPARQL query (text) against the graph — discoverable alias for /v1/query/sparql-text */
         post: operations["post_v1_graph_query"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/graph/reload": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Declarative full-state replace: body is bulk-import NDJSON of the desired state; entities absent from the payload leave current state (history kept for as_of), payload entities are upserted, and the cutover is one atomic visibility boundary. dry_run=true previews the full delta without changing anything */
+        post: operations["post_v1_graph_reload"];
         delete?: never;
         options?: never;
         head?: never;
@@ -3816,6 +3850,23 @@ export interface components {
              */
             snapshot_token: string;
         };
+        /**
+         * @description Response to `POST /v1/graph/fork`: the fork runs as a durable background job
+         *     (a create-only copy of the source graph into a new graph id in the same
+         *     tenant), so this acknowledges the enqueue and points at the poll surface.
+         */
+        GraphForkResponse: {
+            dst_graph_id: string;
+            job_id: string;
+            ok: boolean;
+            /**
+             * @description Poll the destination graph's metadata to observe the fork completing
+             *     (the destination becomes readable once its head is published).
+             */
+            poll: string;
+            queued: boolean;
+            src_graph_id: string;
+        };
         GraphId: string;
         /**
          * @description Outcome of the optional one-shot index build a bulk import runs at the end
@@ -4020,6 +4071,96 @@ export interface components {
             /** Format: float */
             recall_at_k: number;
             snapshot: components["schemas"]["SnapshotView"];
+        };
+        /**
+         * @description Outcome of `POST /v1/graph/reload` — the declarative "make the graph match
+         *     this full dataset" verb. One atomic cutover replaces the whole current state:
+         *     records present in the payload are upserted, and entities present at the
+         *     pre-reload head but absent from the payload are removed from current state
+         *     (retraction semantics — history stays queryable via `?as_of_commit_seq=`).
+         *     The delta report is the "prove I don't have wrong data" aid.
+         *
+         *     The whole reconciliation lands as a single graph-head advance, so a reader
+         *     never observes a mixed old/new state: a snapshot pinned at `prior_commit_seq`
+         *     sees only the old state, and `new_commit_seq` sees only the new state, with
+         *     nothing in between.
+         */
+        GraphReloadResponse: {
+            /**
+             * @description True when this was a `?dry_run=true` preview: nothing durable changed and
+             *     the counts + `new_commit_seq`/`new_snapshot_token` are the *proposed*
+             *     effect of a real reload against the same pre-reload head.
+             */
+            dry_run: boolean;
+            /** @description Payload edges not currently present, within the reconciled scopes. */
+            edges_added: number;
+            /** @description Payload edges already present (re-asserted), within the reconciled scopes. */
+            edges_changed: number;
+            /** @description Current edges retracted because an endpoint left current state. */
+            edges_removed: number;
+            /** @description Entities present in the payload but not at the pre-reload head. */
+            entities_added: number;
+            /**
+             * @description Entities present in both the payload and the pre-reload head (re-asserted;
+             *     this is a presence intersection, not a deep property diff).
+             */
+            entities_changed: number;
+            /**
+             * @description Entities present at the pre-reload head but absent from the payload — the
+             *     ones leaving current state.
+             */
+            entities_removed: number;
+            /**
+             * @description Parse errors for malformed payload lines (bounded; `error_count` is the
+             *     true total). Mirrors bulk import.
+             */
+            error_count: number;
+            errors?: components["schemas"]["GraphImportLineError"][];
+            /**
+             * @description True when the target graph did not exist and this reload bootstrapped it
+             *     (the pre-reload baseline was empty).
+             */
+            graph_created?: boolean;
+            /**
+             * @description The idempotency key that scopes this reload's single commit (the caller
+             *     key, or a server-minted one).
+             */
+            idempotency_key: string;
+            /**
+             * @description True when this request id was already applied (idempotent replay): the
+             *     diff counts are reported as zero because nothing new was written.
+             */
+            idempotent_replay?: boolean;
+            lines_read: number;
+            /**
+             * @description Commit sequence after cutover (real), or the proposed next sequence (dry
+             *     run).
+             */
+            new_commit_seq: components["schemas"]["CommitSeq"];
+            /** @description Snapshot token after cutover (real), or the proposed token (dry run). */
+            new_snapshot_token: string;
+            /**
+             * @description True when the desired state already matched the current state and no
+             *     commit was written (real mode only).
+             */
+            no_op?: boolean;
+            /**
+             * @description Commit sequence of the pre-reload head — the diff baseline and the
+             *     rollback anchor.
+             */
+            prior_commit_seq: components["schemas"]["CommitSeq"];
+            /**
+             * @description Snapshot token of the pre-reload head. Read it back with
+             *     `?as_of_commit_seq=<prior_commit_seq>` to see the old state — the rollback
+             *     hint.
+             */
+            prior_snapshot_token: string;
+            /**
+             * @description A bounded sample of the entities leaving current state, as `type/name`
+             *     display identities (external keys are one-way-hashed and unrecoverable) —
+             *     a sanity aid for confirming the reload drops what you expect.
+             */
+            removed_sample?: string[];
         };
         /**
          * @description Retract specific edges and/or every edge touching given entities. Graph facts
@@ -13698,6 +13839,150 @@ export interface operations {
             };
         };
     };
+    post_v1_graph_fork: {
+        parameters: {
+            query?: {
+                /** @description Graph name (default `main`) */
+                graph?: string;
+                /** @description Branch name (default `main`) */
+                branch?: string;
+                /** @description Source graph id to fork from */
+                src?: string;
+                /** @description Destination graph id to create (must not exist) */
+                dst?: string;
+                /** @description Must equal the destination graph id to authorize the fork */
+                confirm?: string;
+            };
+            header?: {
+                /** @description API contract version to pin. Use `2026-06-22` for this beta-breaking shape. */
+                "Lbb-Version"?: string;
+                /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
+                "Idempotency-Key"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GraphForkResponse"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Rate limit exceeded */
+            429: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Service unavailable */
+            503: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+        };
+    };
     get_v1_graph_groundability: {
         parameters: {
             query?: {
@@ -14448,6 +14733,152 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SparqlTextResponse"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Rate limit exceeded */
+            429: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Service unavailable */
+            503: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+        };
+    };
+    post_v1_graph_reload: {
+        parameters: {
+            query?: {
+                /** @description Graph name (default `main`) */
+                graph?: string;
+                /** @description Branch name (default `main`) */
+                branch?: string;
+                /** @description Must equal the target graph id (reload is semi-destructive) */
+                confirm?: string;
+                /** @description true = preview the delta; nothing durable changes */
+                dry_run?: string;
+                /** @description true = malformed payload lines fail the reload instead of being skipped and reported */
+                strict?: string;
+                /** @description Optional RFC3339 observation timestamp applied to the reload's writes */
+                observed_at?: string;
+            };
+            header?: {
+                /** @description API contract version to pin. Use `2026-06-22` for this beta-breaking shape. */
+                "Lbb-Version"?: string;
+                /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
+                "Idempotency-Key"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GraphReloadResponse"];
                 };
             };
             /** @description Bad request */
