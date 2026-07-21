@@ -7,10 +7,32 @@ import {
   type ImportLine,
   type ListResponse,
   parseSparqlResults,
+  type ReadConsistencyOptions,
   type RdfExportOptions,
   type RdfImportOptions,
   type Schemas,
 } from "./types.js";
+
+/** A5: fold read-consistency options into a request body's `consistency` /
+ * `min_indexed_seq` fields; a per-call value wins over the client default. */
+function withReadConsistency<B extends object>(
+  client: LbbClient,
+  body: B,
+  opts: ReadConsistencyOptions,
+): B {
+  const consistency = opts.consistency ?? client.defaultConsistency;
+  const merged = { ...body } as Record<string, unknown>;
+  if (consistency !== undefined && merged.consistency === undefined) {
+    merged.consistency = consistency;
+  }
+  if (
+    opts.minIndexedSeq !== undefined &&
+    merged.min_indexed_seq === undefined
+  ) {
+    merged.min_indexed_seq = opts.minIndexedSeq;
+  }
+  return merged as B;
+}
 
 function transportOptions(options: CallOptions): CallOptions {
   return {
@@ -27,6 +49,10 @@ export interface HybridSearchOptions extends CallOptions {
   topK?: number;
   source?: string;
   consistency?: string;
+  /** A5 read-your-writes floor (`min_indexed_seq`): the committed sequence a
+   * write returned; under eventual, an uncovered floor yields a retryable
+   * `read_your_writes_pending` 429. */
+  minIndexedSeq?: number;
   lexical?: boolean;
   bm25?: boolean;
   vector?: boolean;
@@ -309,10 +335,14 @@ export class SearchNamespace {
     opts: HybridSearchOptions = {},
   ): Promise<Schemas["SemanticGraphSearchResponse"]> {
     if (typeof input !== "string") {
+      const search = withReadConsistency(this.client, input.search ?? {}, {
+        consistency: opts.consistency as ReadConsistencyOptions["consistency"],
+        minIndexedSeq: opts.minIndexedSeq,
+      });
       return this.client.request("POST", "/v1/graph/search", {
         ...transportOptions(opts),
         retry: opts.retry ?? true,
-        body: input,
+        body: { ...input, search },
       });
     }
     return this.client.request("GET", "/v1/search", {
@@ -321,7 +351,8 @@ export class SearchNamespace {
         query: input,
         top_k: opts.topK,
         source: opts.source,
-        consistency: opts.consistency,
+        consistency: opts.consistency ?? this.client.defaultConsistency,
+        min_indexed_seq: opts.minIndexedSeq,
         lexical: opts.lexical,
         bm25: opts.bm25,
         vector: opts.vector,
@@ -369,23 +400,23 @@ export class SearchNamespace {
 
   fullText(
     body: Schemas["FullTextSearchRequest"],
-    opts: CallOptions = {},
+    opts: CallOptions & ReadConsistencyOptions = {},
   ): Promise<Schemas["FullTextSearchResponse"]> {
     return this.client.request("POST", "/v1/search/full-text", {
       ...opts,
       retry: opts.retry ?? true,
-      body,
+      body: withReadConsistency(this.client, body, opts),
     });
   }
 
   vector(
     body: Schemas["EmbeddingSearchRequest"],
-    opts: CallOptions = {},
+    opts: CallOptions & ReadConsistencyOptions = {},
   ): Promise<Schemas["EmbeddingSearchResponse"]> {
     return this.client.request("POST", "/v1/search/embedding", {
       ...opts,
       retry: opts.retry ?? true,
-      body,
+      body: withReadConsistency(this.client, body, opts),
     });
   }
 }
@@ -801,32 +832,48 @@ export class QueryNamespace {
 
   structured(
     body: Schemas["SparqlSelectRequest"],
-    opts: CallOptions = {},
+    opts: CallOptions & ReadConsistencyOptions = {},
   ): Promise<Schemas["SparqlSelectResponse"]> {
     return this.client.request("POST", "/v1/query/sparql", {
       ...opts,
       retry: opts.retry ?? true,
-      body,
+      body: withReadConsistency(this.client, body, opts),
     });
   }
 
-  async sparql(body: Schemas["SparqlTextRequest"], opts: CallOptions = {}) {
+  async sparql(
+    body: Schemas["SparqlTextRequest"],
+    opts: CallOptions & ReadConsistencyOptions = {},
+  ) {
+    // The text dialect carries consistency/floor on the URL, not the body.
     const response = await this.client.request<Schemas["SparqlTextResponse"]>(
       "POST",
       "/v1/query/sparql-text",
-      { ...opts, retry: opts.retry ?? true, body },
+      {
+        ...opts,
+        retry: opts.retry ?? true,
+        body,
+        query: {
+          consistency: opts.consistency ?? this.client.defaultConsistency,
+          min_indexed_seq: opts.minIndexedSeq,
+        },
+      },
     );
     return parseSparqlResults(response);
   }
 
   sparqlRaw(
     body: Schemas["SparqlTextRequest"],
-    opts: CallOptions = {},
+    opts: CallOptions & ReadConsistencyOptions = {},
   ): Promise<Schemas["SparqlTextResponse"]> {
     return this.client.request("POST", "/v1/query/sparql-text", {
       ...opts,
       retry: opts.retry ?? true,
       body,
+      query: {
+        consistency: opts.consistency ?? this.client.defaultConsistency,
+        min_indexed_seq: opts.minIndexedSeq,
+      },
     });
   }
 

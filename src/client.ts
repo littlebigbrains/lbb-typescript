@@ -7,9 +7,11 @@ import type {
   LbbRetryEvent,
   ListResponse,
   RawLbbResponse,
+  ReadConsistencyOptions,
   RdfExportOptions,
   RdfImportOptions,
   Schemas,
+  SearchConsistency,
   SparqlResults,
 } from "./types.js";
 import { parseSparqlResults } from "./types.js";
@@ -55,9 +57,11 @@ export type {
   LbbErrorPayload,
   ListResponse,
   RawLbbResponse,
+  ReadConsistencyOptions,
   RdfExportOptions,
   RdfImportOptions,
   Schemas,
+  SearchConsistency,
   SparqlResults,
   SparqlResultsJson,
   SparqlTerm,
@@ -125,6 +129,8 @@ export class LbbClient {
   private readonly onRequest?: (event: LbbRequestEvent) => void;
   private readonly onResponse?: (event: LbbResponseEvent) => void;
   private readonly onRetry?: (event: LbbRetryEvent) => void;
+  /** A5 default read consistency applied when a read omits its own value. */
+  readonly defaultConsistency?: SearchConsistency;
 
   readonly context: ContextNamespace;
   readonly search: SearchNamespace;
@@ -154,6 +160,7 @@ export class LbbClient {
     this.onRequest = options.onRequest;
     this.onResponse = options.onResponse;
     this.onRetry = options.onRetry;
+    this.defaultConsistency = options.defaultConsistency;
     if (!Number.isInteger(this.maxRetries) || this.maxRetries < 0) {
       throw new RangeError("maxRetries must be a non-negative integer");
     }
@@ -220,7 +227,47 @@ export class LbbClient {
       onRequest: this.onRequest,
       onResponse: this.onResponse,
       onRetry: this.onRetry,
+      defaultConsistency: this.defaultConsistency,
     });
+  }
+
+  /**
+   * A5: fold read-consistency options into a request body's own `consistency` /
+   * `min_indexed_seq` fields (the shape used by full-text, embedding, and
+   * structured-SPARQL bodies). A per-call value wins over the client
+   * `defaultConsistency`; an explicit body field wins over both.
+   */
+  resolveConsistency(
+    opts?: ReadConsistencyOptions,
+  ): SearchConsistency | undefined {
+    return opts?.consistency ?? this.defaultConsistency;
+  }
+
+  private mergeReadConsistency<B extends object>(
+    body: B,
+    opts?: ReadConsistencyOptions,
+  ): B {
+    const consistency = this.resolveConsistency(opts);
+    const merged = { ...body } as Record<string, unknown>;
+    if (consistency !== undefined && merged.consistency === undefined) {
+      merged.consistency = consistency;
+    }
+    if (
+      opts?.minIndexedSeq !== undefined &&
+      merged.min_indexed_seq === undefined
+    ) {
+      merged.min_indexed_seq = opts.minIndexedSeq;
+    }
+    return merged as B;
+  }
+
+  /** A5: read-consistency options rendered as URL query params, for the routes
+   * that carry consistency on the URL (SPARQL-text, graph summary). */
+  private readConsistencyQuery(opts?: ReadConsistencyOptions): Query {
+    return {
+      consistency: this.resolveConsistency(opts),
+      min_indexed_seq: opts?.minIndexedSeq,
+    };
   }
 
   private buildUrl(path: string, query?: Query): string {
@@ -434,15 +481,22 @@ export class LbbClient {
   // --- writes ---
 
   /** Commit triplets and optional entity embeddings. Prefer `client.graph("main").facts.create(...)`. */
-  commit(
+  async commit(
     body: Schemas["TripletCommitFile"],
     opts: { idempotencyKey?: string } = {},
-  ): Promise<Schemas["GraphCommitResponse"]> {
-    return this.request("POST", "/v1/graph/commit", {
-      body,
-      idempotencyKey:
-        opts.idempotencyKey ?? this.idempotencyKey("facts.create"),
-    });
+  ): Promise<Schemas["GraphCommitResponse"] & { commitSeq: number }> {
+    const response = await this.request<Schemas["GraphCommitResponse"]>(
+      "POST",
+      "/v1/graph/commit",
+      {
+        body,
+        idempotencyKey:
+          opts.idempotencyKey ?? this.idempotencyKey("facts.create"),
+      },
+    );
+    // A5: surface the committed sequence as `commitSeq` so the write→floor→read
+    // loop reads naturally: `const { commitSeq } = await client.commit(…)`.
+    return { ...response, commitSeq: response.commit_seq };
   }
 
   /**
@@ -475,7 +529,7 @@ export class LbbClient {
    * the throttle): import the whole dataset, index once. The response's `index`
    * object reports whether the build ran or was skipped.
    */
-  import(
+  async import(
     lines: ImportLine[] | string,
     opts: {
       batch?: number;
@@ -484,22 +538,29 @@ export class LbbClient {
       index?: boolean;
       idempotencyKey?: string;
     } = {},
-  ): Promise<Schemas["GraphImportResponse"]> {
+  ): Promise<Schemas["GraphImportResponse"] & { commitSeq: number | null }> {
     const ndjson =
       typeof lines === "string"
         ? lines
         : lines.map((line) => JSON.stringify(line)).join("\n");
-    return this.request("POST", "/v1/graph/import", {
-      rawBody: ndjson,
-      contentType: "application/x-ndjson",
-      query: {
-        batch: opts.batch,
-        strict: opts.strict,
-        observed_at: opts.observedAt,
-        index: opts.index,
+    const response = await this.request<Schemas["GraphImportResponse"]>(
+      "POST",
+      "/v1/graph/import",
+      {
+        rawBody: ndjson,
+        contentType: "application/x-ndjson",
+        query: {
+          batch: opts.batch,
+          strict: opts.strict,
+          observed_at: opts.observedAt,
+          index: opts.index,
+        },
+        idempotencyKey: opts.idempotencyKey ?? this.idempotencyKey("import"),
       },
-      idempotencyKey: opts.idempotencyKey ?? this.idempotencyKey("import"),
-    });
+    );
+    // A5: surface the last committed sequence (null for an empty import) so the
+    // write→floor→read loop reads naturally after a bulk load.
+    return { ...response, commitSeq: response.committed_commit_seq ?? null };
   }
 
   /**
@@ -1073,8 +1134,17 @@ export class LbbClient {
   /** Full semantic hybrid search from a request body (`POST /v1/graph/search`). */
   graphSearch(
     body: Schemas["SemanticGraphSearchRequest"],
+    opts?: ReadConsistencyOptions,
   ): Promise<Schemas["SemanticGraphSearchResponse"]> {
-    return this.request("POST", "/v1/graph/search", { body });
+    // Consistency for hybrid graph search lives on the nested `search` options.
+    const consistency = this.resolveConsistency(opts);
+    const search =
+      consistency !== undefined || opts?.minIndexedSeq !== undefined
+        ? this.mergeReadConsistency(body.search ?? {}, opts)
+        : body.search;
+    return this.request("POST", "/v1/graph/search", {
+      body: { ...body, search },
+    });
   }
 
   /** Reciprocal-rank-fusion across sub-queries. */
@@ -1161,15 +1231,21 @@ export class LbbClient {
   /** BM25 search. */
   fullTextSearch(
     body: Schemas["FullTextSearchRequest"],
+    opts?: ReadConsistencyOptions,
   ): Promise<Schemas["FullTextSearchResponse"]> {
-    return this.request("POST", "/v1/search/full-text", { body });
+    return this.request("POST", "/v1/search/full-text", {
+      body: this.mergeReadConsistency(body, opts),
+    });
   }
 
   /** ANN/vector search. */
   embeddingSearch(
     body: Schemas["EmbeddingSearchRequest"],
+    opts?: ReadConsistencyOptions,
   ): Promise<Schemas["EmbeddingSearchResponse"]> {
-    return this.request("POST", "/v1/search/embedding", { body });
+    return this.request("POST", "/v1/search/embedding", {
+      body: this.mergeReadConsistency(body, opts),
+    });
   }
 
   // --- traversal ---
@@ -1372,15 +1448,22 @@ export class LbbClient {
    */
   sparql(
     body: Schemas["SparqlSelectRequest"],
+    opts?: ReadConsistencyOptions,
   ): Promise<Schemas["SparqlSelectResponse"]> {
-    return this.request("POST", "/v1/query/sparql", { body });
+    return this.request("POST", "/v1/query/sparql", {
+      body: this.mergeReadConsistency(body, opts),
+    });
   }
 
-  /** SPARQL 1.1 query from text (SELECT/ASK) over the live graph; `results` is SPARQL 1.1 Query Results JSON. */
+  /** SPARQL 1.1 query from text (SELECT/ASK) over the live graph; `results` is SPARQL 1.1 Query Results JSON. The text dialect carries `consistency`/`min_indexed_seq` on the URL. */
   sparqlText(
     body: Schemas["SparqlTextRequest"],
+    opts?: ReadConsistencyOptions,
   ): Promise<Schemas["SparqlTextResponse"]> {
-    return this.request("POST", "/v1/query/sparql-text", { body });
+    return this.request("POST", "/v1/query/sparql-text", {
+      body,
+      query: this.readConsistencyQuery(opts),
+    });
   }
 
   /**
@@ -1390,8 +1473,11 @@ export class LbbClient {
    * `rows` is the bindings flattened to `{ variable: lexicalValue }`, `boolean`
    * is the ASK answer (or `null` for a SELECT).
    */
-  async sparqlRows(body: Schemas["SparqlTextRequest"]): Promise<SparqlResults> {
-    return parseSparqlResults(await this.sparqlText(body));
+  async sparqlRows(
+    body: Schemas["SparqlTextRequest"],
+    opts?: ReadConsistencyOptions,
+  ): Promise<SparqlResults> {
+    return parseSparqlResults(await this.sparqlText(body, opts));
   }
 
   /**
@@ -1682,9 +1768,13 @@ export class LbbClient {
     }
   }
 
-  /** Graph counts and type/relation buckets. */
-  summary(): Promise<Schemas["GraphSummaryResponse"]> {
-    return this.request("GET", "/v1/graph/summary");
+  /** Graph counts and type/relation buckets. Carries `consistency`/`min_indexed_seq` on the URL. */
+  summary(
+    opts?: ReadConsistencyOptions,
+  ): Promise<Schemas["GraphSummaryResponse"]> {
+    return this.request("GET", "/v1/graph/summary", {
+      query: this.readConsistencyQuery(opts),
+    });
   }
 
   /** List the graphs (and branches) under the scoped tenant. */

@@ -283,3 +283,67 @@ test("friendly named aliases describe the common generated types", () => {
   assert.equal(response.entities.length, 0);
   assert.equal(entity.name, "auth");
 });
+
+test("A5: the read-your-writes loop — commitSeq surfaces and minIndexedSeq threads", async () => {
+  const { fetch, urls, bodies } = queuedFetch([
+    { body: { commit_seq: 128, snapshot_token: "t", op_count: 1 } },
+    { body: { snapshot: {}, vars: [], solutions: [] } },
+    { body: { snapshot: {} } },
+  ]);
+  const lbb = new LbbClient({
+    baseUrl: "https://s--p.db.eu.littlebigbrain.com",
+    fetch,
+  });
+
+  // commit surfaces the committed sequence as `commitSeq`.
+  const { commitSeq } = await lbb.commit({ triplets: [] });
+  assert.equal(commitSeq, 128);
+
+  // The floor threads onto the structured-SPARQL body as `min_indexed_seq`.
+  await lbb.sparql({ patterns: [] }, { minIndexedSeq: commitSeq });
+  const sparqlBody = JSON.parse(bodies[1] ?? "{}");
+  assert.equal(sparqlBody.min_indexed_seq, 128);
+
+  // On the summary (URL) route the floor rides the query string.
+  await lbb.summary({ minIndexedSeq: commitSeq });
+  assert.ok(
+    urls[2].includes("min_indexed_seq=128"),
+    `summary URL should carry the floor: ${urls[2]}`,
+  );
+});
+
+test("A5: defaultConsistency applies when a call omits it, and a per-call value wins", async () => {
+  const { fetch, urls, bodies } = queuedFetch([
+    { body: { snapshot: {}, results: [] } },
+    { body: { snapshot: {}, results: [] } },
+    { body: { snapshot: {} } },
+  ]);
+  const lbb = new LbbClient({
+    baseUrl: "https://s--p.db.eu.littlebigbrain.com",
+    fetch,
+    defaultConsistency: "strong",
+  });
+
+  // Full-text body inherits the client default.
+  await lbb.fullTextSearch({
+    query: "x",
+    targets: [],
+    top_k: 5,
+    explain: false,
+  });
+  assert.equal(JSON.parse(bodies[0] ?? "{}").consistency, "strong");
+
+  // A per-call consistency wins over the client default.
+  await lbb.fullTextSearch(
+    { query: "x", targets: [], top_k: 5, explain: false },
+    { consistency: "eventual" },
+  );
+  assert.equal(JSON.parse(bodies[1] ?? "{}").consistency, "eventual");
+
+  // The default also reaches the URL routes (SPARQL-text / summary).
+  await lbb.summary();
+  assert.ok(
+    urls[2].includes("consistency=strong"),
+    `summary URL should carry the default: ${urls[2]}`,
+  );
+});
