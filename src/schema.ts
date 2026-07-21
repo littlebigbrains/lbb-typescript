@@ -7689,6 +7689,7 @@ export interface components {
              *     `GET /v1/graph/metadata` and on the entity read's metadata.
              */
             compacted_seq: components["schemas"]["CommitSeq"];
+            served_at_seq?: null | components["schemas"]["CommitSeq"];
             /**
              * @description F2 (roadmap 18.3): true when this snapshot was served from the in-memory
              *     cache while storage was degraded and the latest head could not be
@@ -7698,8 +7699,9 @@ export interface components {
              */
             stale?: boolean;
             /**
-             * @description The reason a read is `stale` (F2). `"storage_degraded"` today; omitted
-             *     when not stale.
+             * @description The reason a read is `stale`. `"storage_degraded"` (F2) or
+             *     `"eventual_consistency"` (A3: served from the last published index/dataset
+             *     state at [`Self::served_at_seq`], not head); omitted when not stale.
              */
             stale_reason?: string | null;
         };
@@ -7876,6 +7878,7 @@ export interface components {
              *     Projection, DISTINCT, and limit/offset are ignored.
              */
             ask?: boolean;
+            consistency?: null | components["schemas"]["SearchConsistency"];
             /** @description `SELECT DISTINCT`: drop duplicate projected rows. */
             distinct?: boolean;
             /**
@@ -8036,6 +8039,7 @@ export interface components {
             /** @description SPARQL 1.1 Query Results JSON, serialized. */
             results: string;
             row_page: components["schemas"]["RowPage"];
+            snapshot?: null | components["schemas"]["SnapshotView"];
         };
         /**
          * @description A literal constant operand in a FILTER. Scalars compare by typed value;
