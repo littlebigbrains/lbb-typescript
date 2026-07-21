@@ -263,6 +263,34 @@ export interface LbbClientOptions {
   onResponse?: (event: LbbResponseEvent) => void;
   /** Called before each backoff sleep, so absorbed retries are observable. Bodies and credentials are never included. */
   onRetry?: (event: LbbRetryEvent) => void;
+  /**
+   * A5 default read consistency, applied when a read call omits its own
+   * `consistency`. Since A5 the server default is `eventual`; set `"strong"`
+   * here to keep every read head-exact by default (carried across `withScope`).
+   * A per-call `consistency` always wins.
+   */
+  defaultConsistency?: SearchConsistency;
+}
+
+/** A5 read consistency level. Since A5 the server default is `eventual`. */
+export type SearchConsistency = "strong" | "eventual";
+
+/**
+ * A5 read-consistency options shared by the query / search / summary surfaces.
+ * Merged into the request as `consistency` / `min_indexed_seq`; a per-call value
+ * wins over the client's `defaultConsistency`.
+ */
+export interface ReadConsistencyOptions {
+  /** Read consistency. Omit to use the client's `defaultConsistency`, else the
+   * server default (`eventual`). */
+  consistency?: SearchConsistency;
+  /**
+   * Read-your-writes floor: require the read to be served from state whose
+   * watermark ≥ this `commit_seq` (the committed sequence a write returned).
+   * Under eventual, a floor not yet covered yields a retryable
+   * `read_your_writes_pending` `429` — poll until the write lands.
+   */
+  minIndexedSeq?: number;
 }
 
 export interface LbbRequestEvent {

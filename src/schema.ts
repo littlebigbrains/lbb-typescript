@@ -2970,6 +2970,7 @@ export interface components {
             facets?: components["schemas"]["FacetRequest"][] | null;
             filters?: null | components["schemas"]["SearchFilterExpr"];
             max_clusters?: number | null;
+            min_indexed_seq?: null | components["schemas"]["CommitSeq"];
             probe_count?: number | null;
             provider?: null | components["schemas"]["EmbeddingProviderConfig"];
             query: string;
@@ -3475,6 +3476,7 @@ export interface components {
             explain: boolean;
             facets?: components["schemas"]["FacetRequest"][] | null;
             filters?: null | components["schemas"]["SearchFilterExpr"];
+            min_indexed_seq?: null | components["schemas"]["CommitSeq"];
             /**
              * @description Number of leading results to skip after ordering, for stateless paging:
              *     `offset = page * top_k` walks pages deterministically. Defaults to 0.
@@ -6348,7 +6350,19 @@ export interface components {
             /** Format: float */
             weighted_score: number;
         };
-        /** @enum {string} */
+        /**
+         * @description Read consistency for a query surface (search, graph summary, SPARQL).
+         *
+         *     A5 (2026-07-21 product decision): `Eventual` is the **default**. It serves the
+         *     last published index/dataset state at its watermark with no in-memory fold of
+         *     the un-indexed tail — the lowest-latency mode and the availability floor
+         *     during any indexing backlog. The served watermark rides back on
+         *     `SnapshotView::served_at_seq`. `Strong` (fold the un-indexed tail up to the
+         *     query head) is now explicit opt-in; the precise read-your-writes contract
+         *     (`min_indexed_seq`) replaces most former uses of strong. See
+         *     `docs/architecture/segment-native-indexing.md` §6.
+         * @enum {string}
+         */
         SearchConsistency: "strong" | "eventual";
         SearchEngineOptions: {
             bm25?: boolean;
@@ -6361,6 +6375,7 @@ export interface components {
             graph_anchor?: null | components["schemas"]["GraphAnchor"];
             lexical?: boolean;
             max_clusters?: number | null;
+            min_indexed_seq?: null | components["schemas"]["CommitSeq"];
             probe_count?: number | null;
             profile?: null | components["schemas"]["RetrievalProfileId"];
             provider?: null | components["schemas"]["EmbeddingProviderConfig"];
@@ -7923,6 +7938,7 @@ export interface components {
              *     (see `AnalyticQueryRequest::max_solutions`).
              */
             max_solutions?: number | null;
+            min_indexed_seq?: null | components["schemas"]["CommitSeq"];
             /** @description Skip this many rows before `limit`. */
             offset?: number | null;
             /**

@@ -2,6 +2,46 @@
 
 All notable changes to the `@littlebigbrain/client` package are documented here.
 
+## 0.8.0
+
+Eventual-by-default read consistency and the read-your-writes floor.
+
+### ⚠️ Behavior change — default read consistency is now `eventual`
+
+The server's default read consistency flipped from `strong` to `eventual`
+(server-side change; this SDK forwards `consistency` unchanged). A read that
+does not specify `consistency` now serves the last **published** index/dataset
+state at its watermark (surfaced on `snapshot.served_at_seq` with
+`stale_reason: "eventual_consistency"`) rather than folding the un-indexed WAL
+tail up to head. **Code that relied on the implicit `strong` default for
+read-after-write must either pass `strong` explicitly or — preferably — use the
+new `minIndexedSeq` floor below.**
+
+### Read-your-writes floor (`minIndexedSeq`)
+
+- Read methods on the `search`, `query`, and summary surfaces accept
+  `consistency` and `minIndexedSeq` options (camelCase; forwarded as
+  `consistency` / `min_indexed_seq`). Take the committed sequence a write
+  returned and read with `minIndexedSeq` set to it:
+
+  ```ts
+  const { commitSeq } = await client.commit(triplets);
+  const rows = await client.query.sparql(
+    { query: "SELECT ?s ?p ?o WHERE { ?s ?p ?o }" },
+    { minIndexedSeq: commitSeq },
+  );
+  ```
+
+  Under the eventual default, a floor not yet covered by published state throws
+  a retryable `read_your_writes_pending` `429` (with `Retry-After`) so a sync
+  pipeline can poll for its own write instead of reading a stale answer.
+- **Committed-sequence surfacing.** `commit`, `commitDryRun`, `import`, and
+  `importRdf` results now carry a convenience `commitSeq` alongside the raw
+  response fields, so the write→floor→read loop reads naturally.
+- **Client-level default.** `new LbbClient({ …, defaultConsistency: "strong" })`
+  sets the consistency used when a call omits it (and is carried across
+  `withScope`); a per-call `consistency` still wins.
+
 ## 0.6.1
 
 Composite stack endpoints: hosted stacks are addressed by their own

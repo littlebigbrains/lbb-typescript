@@ -8,6 +8,8 @@ export type {
   LbbRequestEvent,
   LbbResponseEvent,
   FetchLike,
+  ReadConsistencyOptions,
+  SearchConsistency,
   Schemas,
   SparqlResults,
   SparqlResultsJson,
