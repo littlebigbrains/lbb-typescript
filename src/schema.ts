@@ -4003,6 +4003,7 @@ export interface components {
              */
             temporal_coverage_computed?: boolean;
             unindexed_tail_commits: number;
+            visibility_manifest?: null | components["schemas"]["IndexVisibilityManifest"];
             /** Format: int64 */
             wal_tail_bytes: number;
             wal_tail_commits: number;
@@ -4377,6 +4378,19 @@ export interface components {
             snapshot: components["schemas"]["SnapshotView"];
             to_commit_seq: components["schemas"]["CommitSeq"];
         };
+        /** @description Bounded, user-facing summary of one family in the unified visibility manifest. */
+        IndexFamilyVisibility: {
+            class: components["schemas"]["IndexVisibilityFamilyClass"];
+            covered_seq?: null | components["schemas"]["CommitSeq"];
+            family: components["schemas"]["IndexVisibilityFamily"];
+            l0_from_seq?: null | components["schemas"]["CommitSeq"];
+            l0_segment_count: number;
+            l0_to_seq?: null | components["schemas"]["CommitSeq"];
+            /** @description Distinguishes ANN model spaces without exposing object keys. */
+            model_hash?: string | null;
+            /** @description Distinguishes target-specific BM25/ANN families without exposing object keys. */
+            target_hash?: string | null;
+        };
         IndexGcJobProgress: {
             /** Format: int64 */
             deleted_bytes: number;
@@ -4477,6 +4491,24 @@ export interface components {
             objects: number;
             prefix: string;
             snapshot_commit_seq: components["schemas"]["CommitSeq"];
+        };
+        /**
+         * @description One of the index families published through the unified visibility manifest.
+         * @enum {string}
+         */
+        IndexVisibilityFamily: "base" | "rdf" | "bm25" | "ann" | "adjacency";
+        /**
+         * @description How a family participates in the unified visibility watermark.
+         * @enum {string}
+         */
+        IndexVisibilityFamilyClass: "lockstep" | "merged_only";
+        /** @description The unified, per-graph visibility view consumed by the console and status tools. */
+        IndexVisibilityManifest: {
+            /** Format: int64 */
+            epoch: number;
+            families: components["schemas"]["IndexFamilyVisibility"][];
+            /** @description Shared published watermark. Lockstep families define this value. */
+            visible_seq: components["schemas"]["CommitSeq"];
         };
         /**
          * @description A single inference rule (SHACL-AF `sh:TripleRule` shape): a BGP `body` (the
