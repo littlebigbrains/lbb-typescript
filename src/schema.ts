@@ -4595,6 +4595,15 @@ export interface components {
             graph: components["schemas"]["GraphKey"];
             idempotency_key: string;
             job_id: string;
+            /**
+             * @description True when the job failed terminally because the provider rejected it for
+             *     an account data-policy / configuration reason (a ZDR-ineligible model,
+             *     auth, model-not-found) rather than a transient error — a *parked* job that
+             *     will not retry. The console renders this as a "choose a different model"
+             *     block instead of a retry. It clears when the embedding config version
+             *     changes, which mints a fresh reconciliation job.
+             */
+            parked?: boolean;
             progress?: null | components["schemas"]["ManagedEmbeddingBackfillJobProgress"];
             result?: null | components["schemas"]["ManagedEmbeddingBackfillResponse"];
             status: string;
@@ -4667,6 +4676,14 @@ export interface components {
             id: string;
             input_modalities?: string[];
             name: string;
+            /**
+             * @description True when the model is eligible under the account's data policy — for the
+             *     hosted OpenRouter path, that it has a Zero-Data-Retention route. The
+             *     catalog only returns eligible models, so this is `true` for every entry
+             *     today; the console can trust it to gate selection if ineligible models are
+             *     ever surfaced alongside them.
+             */
+            policy_eligible?: boolean;
             /** @description Provider prompt price as a decimal USD/token string when advertised. */
             prompt_price?: string | null;
         };
