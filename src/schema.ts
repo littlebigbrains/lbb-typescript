@@ -2135,6 +2135,7 @@ export interface components {
              *     default) leaves the query a plain conjunctive BGP.
              */
             combinators?: components["schemas"]["AnalyticCombinator"][];
+            consistency?: null | components["schemas"]["SearchConsistency"];
             /** @description Cap the number of returned bindings. */
             limit?: number | null;
             /**
@@ -2156,6 +2157,7 @@ export interface components {
              *     which is a caller-requested cap on the final, complete result.
              */
             max_solutions?: number | null;
+            min_indexed_seq?: null | components["schemas"]["CommitSeq"];
             /** @description Skip this many bindings before `limit`. */
             offset?: number | null;
             patterns: components["schemas"]["AnalyticTriplePattern"][];
