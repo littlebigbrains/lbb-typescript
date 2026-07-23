@@ -7774,8 +7774,11 @@ export interface components {
             /**
              * @description The reason a read is `stale`. `"storage_degraded"` (F2),
              *     `"eventual_consistency"` (A3: served from the last published index/dataset
-             *     state), or `"adjacency_coverage"` (served from the newest published
-             *     ranged-adjacency snapshot); omitted when not stale.
+             *     state), `"adjacency_coverage"` (served from the newest published
+             *     ranged-adjacency snapshot), `"tail_budget_exceeded"` (the eventual RDF
+             *     WAL tail exceeded a per-read bound), `"merge_lag"` (the RDF L0 chain was
+             *     capped at a coherent prefix), or `"assembly_pool_exhausted"` (the shared
+             *     eventual-read byte pool was saturated); omitted when not stale.
              */
             stale_reason?: string | null;
         };
