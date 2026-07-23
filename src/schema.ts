@@ -12781,7 +12781,7 @@ export interface operations {
                 type?: string;
                 /** @description Max sampled rows (up to 128) */
                 limit?: string;
-                /** @description Accepted as strong or eventual; adjacency serves its published run plus the whole append-safe WAL prefix before the first unsafe commit in either mode */
+                /** @description Accepted as strong or eventual; adjacency serves its newest published base+delta coverage without inspecting the live WAL tail in either mode */
                 consistency?: string;
             };
             header?: {
