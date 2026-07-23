@@ -169,7 +169,7 @@ test("namespace facts.create injects auth, scope, version, and idempotency", asy
   assert.equal(call.init.method, "POST");
   assert.equal(call.init.headers?.authorization, "Bearer lbb_sk_test_client");
   assert.equal(call.init.headers?.["content-type"], "application/json");
-  assert.equal(call.init.headers?.["lbb-version"], "2026-06-22");
+  assert.equal(call.init.headers?.["lbb-version"], "2026-07-22");
   assert.equal(call.init.headers?.["idempotency-key"], "ik_test_1");
   assert.deepEqual(JSON.parse(call.init.body ?? ""), { triplets: [] });
 });
@@ -784,7 +784,7 @@ test("uses whole-graph, branch-delete, cancellable index, and durable GC routes"
 test("rawRequest returns request metadata", async () => {
   const { fetch } = recordingFetch({
     body: JSON.stringify({ ok: true }),
-    headers: { "x-request-id": "req_123", "lbb-version": "2026-06-22" },
+    headers: { "x-request-id": "req_123", "lbb-version": "2026-07-22" },
   });
   const client = new LbbClient({ baseUrl: "http://h", fetch });
   const response = await client.rawRequest<{ ok: boolean }>(
@@ -795,7 +795,7 @@ test("rawRequest returns request metadata", async () => {
   assert.deepEqual(response.data, { ok: true });
   assert.equal(response.status, 200);
   assert.equal(response.requestId, "req_123");
-  assert.equal(response.version, "2026-06-22");
+  assert.equal(response.version, "2026-07-22");
 });
 
 test("retries retryable failures", async () => {

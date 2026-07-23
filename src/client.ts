@@ -152,7 +152,7 @@ export class LbbClient {
     this.graphName = options.graph;
     this.branchName = options.branch;
     this.stack = options.stack;
-    this.apiVersion = options.apiVersion ?? "2026-06-22";
+    this.apiVersion = options.apiVersion ?? "2026-07-22";
     this.maxRetries = options.maxRetries ?? 6;
     this.retryDelayMs = options.retryDelayMs ?? 100;
     this.retryBudgetMs = options.retryBudgetMs ?? 60_000;

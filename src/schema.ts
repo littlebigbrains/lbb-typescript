@@ -4709,6 +4709,13 @@ export interface components {
             input_modalities?: string[];
             name: string;
             /**
+             * @description The model's output modalities (e.g. `["embeddings"]`). The catalog is
+             *     filtered to embedding models on this field, so every entry carries the
+             *     embeddings modality; it is surfaced so clients (and the deploy smoke) can
+             *     re-verify the catalog is embeddings-only.
+             */
+            output_modalities?: string[];
+            /**
              * @description True when the model is eligible under the account's data policy — for the
              *     hosted OpenRouter path, that it has a Zero-Data-Retention route. The
              *     catalog only returns eligible models, so this is `true` for every entry
@@ -7765,9 +7772,10 @@ export interface components {
              */
             stale?: boolean;
             /**
-             * @description The reason a read is `stale`. `"storage_degraded"` (F2) or
+             * @description The reason a read is `stale`. `"storage_degraded"` (F2),
              *     `"eventual_consistency"` (A3: served from the last published index/dataset
-             *     state at [`Self::served_at_seq`], not head); omitted when not stale.
+             *     state), or `"adjacency_coverage"` (served from the newest published
+             *     ranged-adjacency snapshot); omitted when not stale.
              */
             stale_reason?: string | null;
         };
@@ -8827,7 +8835,7 @@ export interface operations {
                 branch?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-06-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -8969,7 +8977,7 @@ export interface operations {
                 branch?: string;
             };
             header: {
-                /** @description API contract version to pin. Use `2026-06-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key": string;
@@ -9111,7 +9119,7 @@ export interface operations {
                 branch?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-06-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -9253,7 +9261,7 @@ export interface operations {
                 branch?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-06-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -9391,7 +9399,7 @@ export interface operations {
                 dataset?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-06-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -9533,7 +9541,7 @@ export interface operations {
                 build?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-06-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -9671,7 +9679,7 @@ export interface operations {
                 branch?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-06-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -9811,7 +9819,7 @@ export interface operations {
                 source?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-06-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -9949,7 +9957,7 @@ export interface operations {
                 branch?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-06-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -10093,7 +10101,7 @@ export interface operations {
                 confirm?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-06-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -10231,7 +10239,7 @@ export interface operations {
                 branch?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-06-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -10373,7 +10381,7 @@ export interface operations {
                 branch?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-06-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -10513,7 +10521,7 @@ export interface operations {
                 limit?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-06-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -10651,7 +10659,7 @@ export interface operations {
                 dry_run?: string;
             };
             header: {
-                /** @description API contract version to pin. Use `2026-06-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key": string;
@@ -10797,7 +10805,7 @@ export interface operations {
                 max_segments?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-06-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -10935,7 +10943,7 @@ export interface operations {
                 branch?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-06-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -11075,7 +11083,7 @@ export interface operations {
                 confirm?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-06-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -11221,7 +11229,7 @@ export interface operations {
                 cursor?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-06-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -11357,7 +11365,7 @@ export interface operations {
                 branch?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-06-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -11493,7 +11501,7 @@ export interface operations {
                 branch?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-06-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -11641,7 +11649,7 @@ export interface operations {
                 full?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-06-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -11785,7 +11793,7 @@ export interface operations {
                 job_id?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-06-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -11921,7 +11929,7 @@ export interface operations {
                 branch?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-06-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -12065,7 +12073,7 @@ export interface operations {
                 job_id?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-06-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -12203,7 +12211,7 @@ export interface operations {
                 branch?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-06-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -12343,7 +12351,7 @@ export interface operations {
                 allow_regression?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-06-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -12493,7 +12501,7 @@ export interface operations {
                 ids?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-06-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -12629,7 +12637,7 @@ export interface operations {
                 branch?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-06-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -12773,9 +12781,11 @@ export interface operations {
                 type?: string;
                 /** @description Max sampled rows (up to 128) */
                 limit?: string;
+                /** @description Accepted as strong or eventual; adjacency serves its published run plus the whole append-safe WAL prefix before the first unsafe commit in either mode */
+                consistency?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-06-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -12917,7 +12927,7 @@ export interface operations {
                 name?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-06-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -13061,7 +13071,7 @@ export interface operations {
                 as_of?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-06-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -13209,7 +13219,7 @@ export interface operations {
                 indexed?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-06-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -13351,7 +13361,7 @@ export interface operations {
                 as_of_commit_seq?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-06-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -13489,7 +13499,7 @@ export interface operations {
                 job_id?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-06-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -13627,7 +13637,7 @@ export interface operations {
                 as_of_commit_seq?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-06-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -13779,7 +13789,7 @@ export interface operations {
                 reason?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-06-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -13925,7 +13935,7 @@ export interface operations {
                 confirm?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-06-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -14065,7 +14075,7 @@ export interface operations {
                 sample?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-06-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -14207,7 +14217,7 @@ export interface operations {
                 observed_at?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-06-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -14363,7 +14373,7 @@ export interface operations {
                 resource_type?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-06-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -14501,7 +14511,7 @@ export interface operations {
                 branch?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-06-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -14643,7 +14653,7 @@ export interface operations {
                 cursor?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-06-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -14779,7 +14789,7 @@ export interface operations {
                 branch?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-06-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -14929,7 +14939,7 @@ export interface operations {
                 observed_at?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-06-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -15067,7 +15077,7 @@ export interface operations {
                 branch?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-06-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -15209,7 +15219,7 @@ export interface operations {
                 branch?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-06-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -15351,7 +15361,7 @@ export interface operations {
                 branch?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-06-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -15493,7 +15503,7 @@ export interface operations {
                 branch?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-06-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -15635,7 +15645,7 @@ export interface operations {
                 max_hops?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-06-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -15771,7 +15781,7 @@ export interface operations {
                 branch?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-06-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -15917,7 +15927,7 @@ export interface operations {
                 cursor?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-06-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -16055,7 +16065,7 @@ export interface operations {
                 source?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-06-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -16193,7 +16203,7 @@ export interface operations {
                 background?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-06-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -16335,7 +16345,7 @@ export interface operations {
                 branch?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-06-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -16479,7 +16489,7 @@ export interface operations {
                 dry_run?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-06-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -16619,7 +16629,7 @@ export interface operations {
                 job_id?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-06-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -16755,7 +16765,7 @@ export interface operations {
                 branch?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-06-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -16899,7 +16909,7 @@ export interface operations {
                 job_id?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-06-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -17039,7 +17049,7 @@ export interface operations {
                 job_id?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-06-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -17175,7 +17185,7 @@ export interface operations {
                 branch?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-06-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -17319,7 +17329,7 @@ export interface operations {
                 job_id?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-06-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -17459,7 +17469,7 @@ export interface operations {
                 background?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-06-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -17601,7 +17611,7 @@ export interface operations {
                 branch?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-06-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -17743,7 +17753,7 @@ export interface operations {
                 branch?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-06-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -17879,7 +17889,7 @@ export interface operations {
                 branch?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-06-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -18021,7 +18031,7 @@ export interface operations {
                 branch?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-06-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -18163,7 +18173,7 @@ export interface operations {
                 branch?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-06-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -18307,7 +18317,7 @@ export interface operations {
                 kind?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-06-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -18447,7 +18457,7 @@ export interface operations {
                 split_seq?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-06-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -18587,7 +18597,7 @@ export interface operations {
                 split_seq?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-06-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -18727,7 +18737,7 @@ export interface operations {
                 split_seq?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-06-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -18867,7 +18877,7 @@ export interface operations {
                 run?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-06-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -19009,7 +19019,7 @@ export interface operations {
                 allow_regression?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-06-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -19151,7 +19161,7 @@ export interface operations {
                 allow_regression?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-06-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -19289,7 +19299,7 @@ export interface operations {
                 branch?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-06-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -19433,7 +19443,7 @@ export interface operations {
                 kind?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-06-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -19573,7 +19583,7 @@ export interface operations {
                 keep?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-06-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -19711,7 +19721,7 @@ export interface operations {
                 branch?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-06-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -19857,7 +19867,7 @@ export interface operations {
                 run?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-06-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -19997,7 +20007,7 @@ export interface operations {
                 split_seq?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-06-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -20135,7 +20145,7 @@ export interface operations {
                 limit?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-06-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -20273,7 +20283,7 @@ export interface operations {
                 job_id?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-06-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -20409,7 +20419,7 @@ export interface operations {
                 branch?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-06-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -20551,7 +20561,7 @@ export interface operations {
                 branch?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-06-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -20693,7 +20703,7 @@ export interface operations {
                 branch?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-06-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -20829,7 +20839,7 @@ export interface operations {
                 branch?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-06-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -20971,7 +20981,7 @@ export interface operations {
                 branch?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-06-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -21107,7 +21117,7 @@ export interface operations {
                 branch?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-06-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -21243,7 +21253,7 @@ export interface operations {
                 branch?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-06-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -21387,7 +21397,7 @@ export interface operations {
                 draft_id?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-06-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -21523,7 +21533,7 @@ export interface operations {
                 branch?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-06-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -21667,7 +21677,7 @@ export interface operations {
                 draft_id?: string;
             };
             header: {
-                /** @description API contract version to pin. Use `2026-06-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key": string;
@@ -21809,7 +21819,7 @@ export interface operations {
                 reason?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-06-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -21949,7 +21959,7 @@ export interface operations {
                 draft_id?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-06-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -22089,7 +22099,7 @@ export interface operations {
                 dry_run?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-06-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -22231,7 +22241,7 @@ export interface operations {
                 branch?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-06-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -22373,7 +22383,7 @@ export interface operations {
                 branch?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-06-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -22515,7 +22525,7 @@ export interface operations {
                 branch?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-06-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -22657,7 +22667,7 @@ export interface operations {
                 branch?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-06-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -22799,7 +22809,7 @@ export interface operations {
                 branch?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-06-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -22941,7 +22951,7 @@ export interface operations {
                 branch?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-06-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -23083,7 +23093,7 @@ export interface operations {
                 branch?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-06-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -23225,7 +23235,7 @@ export interface operations {
                 branch?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-06-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -23367,7 +23377,7 @@ export interface operations {
                 branch?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-06-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -23509,7 +23519,7 @@ export interface operations {
                 branch?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-06-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -23651,7 +23661,7 @@ export interface operations {
                 branch?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-06-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -23793,7 +23803,7 @@ export interface operations {
                 branch?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-06-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -23937,7 +23947,7 @@ export interface operations {
                 audit?: boolean;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-06-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -24075,7 +24085,7 @@ export interface operations {
                 format?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-06-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -24215,7 +24225,7 @@ export interface operations {
                 branch?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-06-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -24357,7 +24367,7 @@ export interface operations {
                 branch?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-06-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -24507,7 +24517,7 @@ export interface operations {
                 consistency?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-06-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -24643,7 +24653,7 @@ export interface operations {
                 branch?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-06-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -24785,7 +24795,7 @@ export interface operations {
                 branch?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-06-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -24927,7 +24937,7 @@ export interface operations {
                 branch?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-06-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -25069,7 +25079,7 @@ export interface operations {
                 branch?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-06-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -25205,7 +25215,7 @@ export interface operations {
                 branch?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-06-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -25341,7 +25351,7 @@ export interface operations {
                 branch?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-06-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -25483,7 +25493,7 @@ export interface operations {
                 branch?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-06-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -25625,7 +25635,7 @@ export interface operations {
                 branch?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-06-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -25767,7 +25777,7 @@ export interface operations {
                 branch?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-06-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -25909,7 +25919,7 @@ export interface operations {
                 branch?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-06-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -26047,7 +26057,7 @@ export interface operations {
                 branch?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-06-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -26189,7 +26199,7 @@ export interface operations {
                 branch?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-06-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -26331,7 +26341,7 @@ export interface operations {
                 branch?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-06-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -26477,7 +26487,7 @@ export interface operations {
                 limit?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-06-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -26619,7 +26629,7 @@ export interface operations {
                 limit?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-06-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -26755,7 +26765,7 @@ export interface operations {
                 branch?: string;
             };
             header: {
-                /** @description API contract version to pin. Use `2026-06-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key": string;
@@ -26897,7 +26907,7 @@ export interface operations {
                 branch?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-06-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -27039,7 +27049,7 @@ export interface operations {
                 cursor?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-06-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
             };
             path?: never;
