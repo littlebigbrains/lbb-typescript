@@ -514,10 +514,10 @@ export class LbbClient {
    * streamed request without a single oversized commit. Pass `lines` as an array
    * (serialized to NDJSON here) or a pre-built NDJSON string.
    *
-   * Set `publish: true` to durably enqueue one complete published-generation
-   * build after the final batch. The import does not build index families or
-   * wait for visibility; the response's `published_generation` object carries
-   * the durable job and due sequence to observe.
+   * A successful import durably enqueues one complete published-generation
+   * build after the final batch. It does not build index families or wait for
+   * visibility; the response's `published_generation` object carries the
+   * durable job and due sequence to observe.
    */
   async import(
     lines: ImportLine[] | string,
@@ -525,7 +525,6 @@ export class LbbClient {
       batch?: number;
       strict?: boolean;
       observedAt?: string;
-      publish?: boolean;
       idempotencyKey?: string;
     } = {},
   ): Promise<Schemas["GraphImportResponse"] & { commitSeq: number | null }> {
@@ -543,7 +542,6 @@ export class LbbClient {
           batch: opts.batch,
           strict: opts.strict,
           observed_at: opts.observedAt,
-          publish: opts.publish,
         },
         idempotencyKey: opts.idempotencyKey ?? this.idempotencyKey("import"),
       },
@@ -582,7 +580,6 @@ export class LbbClient {
         blank_node_scope: opts.blankNodeScope,
         resource_type: opts.resourceType,
         edge_idempotency: opts.edgeIdempotency,
-        publish: opts.publish,
       },
       idempotencyKey: opts.idempotencyKey ?? this.idempotencyKey("import-rdf"),
     });

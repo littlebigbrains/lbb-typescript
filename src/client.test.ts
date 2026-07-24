@@ -1046,14 +1046,13 @@ test("facts.import serializes lines to NDJSON with batch/strict params", async (
         properties: { h_index: 52 },
       },
     ],
-    { batch: 500, strict: true, publish: true },
+    { batch: 500, strict: true },
   );
   assert.equal(result.triplets, 1);
   const call = calls[0];
   assert.match(call.input, /\/v1\/graph\/import\?/);
   assert.match(call.input, /batch=500/);
   assert.match(call.input, /strict=true/);
-  assert.match(call.input, /publish=true/);
   assert.equal(result.published_generation?.due_seq, 7);
   assert.equal(call.init.headers?.["content-type"], "application/x-ndjson");
   assert.match(call.init.headers?.["idempotency-key"] ?? "", /^import:/);
@@ -1096,7 +1095,6 @@ test("facts.importRdf posts N-Triples through the native RDF endpoint", async ()
     blankNodeScope: "document-42",
     resourceType: "RdfResource",
     edgeIdempotency: "append",
-    publish: true,
   });
   assert.equal(result.imported_triplets, 1);
   const call = calls[0];
@@ -1108,7 +1106,6 @@ test("facts.importRdf posts N-Triples through the native RDF endpoint", async ()
   assert.match(call.input, /resource_type=RdfResource/);
   assert.match(call.init.headers?.["idempotency-key"] ?? "", /^import-rdf:/);
   assert.match(call.input, /edge_idempotency=append/);
-  assert.match(call.input, /publish=true/);
   assert.equal(result.published_generation?.due_seq, 8);
   assert.equal(call.init.headers?.["content-type"], "application/n-triples");
   assert.equal(call.init.body, body);

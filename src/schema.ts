@@ -3205,7 +3205,7 @@ export interface components {
             message: string;
         };
         /**
-         * @description Durable publication accepted after `POST /v1/graph/import?publish=true`.
+         * @description Durable publication accepted after `POST /v1/graph/import`.
          *     The import request never constructs index families or waits for publication;
          *     clients can poll the returned job while continuing to observe the previously
          *     published generation.
@@ -3220,8 +3220,8 @@ export interface components {
          * @description Aggregate outcome of a bulk NDJSON import. `committed_commit_seq` is the
          *     sequence of the last internal batch commit (absent if nothing committed).
          *     `errors` is bounded; `error_count` is the true total even when the list is
-         *     truncated. `published_generation` is present only when the caller passed
-         *     `?publish=true` and at least one batch committed.
+         *     truncated. `published_generation` is present when at least one batch
+         *     committed; publication is automatic.
          */
         GraphImportResponse: {
             batches: number;
