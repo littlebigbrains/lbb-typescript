@@ -3809,15 +3809,16 @@ export interface components {
              */
             output_modalities?: string[];
             /**
-             * @description True when the model is eligible under the account's data policy — for the
-             *     hosted OpenRouter path, that it has a Zero-Data-Retention route. The
-             *     catalog only returns eligible models, so this is `true` for every entry
-             *     today; the console can trust it to gate selection if ineligible models are
-             *     ever surfaced alongside them.
+             * @description True when the model is present in the operator account's policy-filtered
+             *     catalog. Kept for generated-client compatibility; use `selectable` and
+             *     `unavailable_reason` for selection UI.
              */
             policy_eligible?: boolean;
             /** @description Provider prompt price as a decimal USD/token string when advertised. */
             prompt_price?: string | null;
+            /** @description Whether this deployment can currently select the model. */
+            selectable: boolean;
+            unavailable_reason?: null | components["schemas"]["ManagedEmbeddingUnavailableReason"];
         };
         /** @description Live embedding models available on this deployment. */
         ManagedEmbeddingModelsResponse: {
@@ -3852,6 +3853,11 @@ export interface components {
          * @enum {string}
          */
         ManagedEmbeddingSource: "stock" | "fine_tuned";
+        /**
+         * @description Why a managed embedding catalog entry cannot currently be selected.
+         * @enum {string}
+         */
+        ManagedEmbeddingUnavailableReason: "account_policy" | "zdr_required" | "price_ceiling";
         ModelArtifact: {
             blake3: string;
             /** Format: int64 */
