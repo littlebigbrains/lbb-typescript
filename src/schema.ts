@@ -4,40 +4,6 @@
  */
 
 export interface paths {
-    "/v1/ask": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Ground a question to real vocabulary, retrieve, and answer with citations */
-        post: operations["post_v1_ask"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/ask/feedback": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Verdict on an ask (accepted|rejected|corrected {plan}), joined to its ask_trace signal by ask_id — the planner fine-tune's explicit feedback capture */
-        post: operations["post_v1_ask_feedback"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/v1/decode": {
         parameters: {
             query?: never;
@@ -47,7 +13,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Narrow a relation to real vocabulary (type signatures) and decode it with the graph-native model */
+        /** Decode a relation using bounded published vocabulary and relation-signature artifacts */
         post: operations["post_v1_decode"];
         delete?: never;
         options?: never;
@@ -277,23 +243,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/graph/edges": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Browse current edges */
-        get: operations["get_v1_graph_edges"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/v1/graph/embedding": {
         parameters: {
             query?: never;
@@ -382,40 +331,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/graph/entities": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Browse entities */
-        get: operations["get_v1_graph_entities"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/graph/entities/filter": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Filter entities by typed properties in one loaded snapshot */
-        post: operations["post_v1_graph_entities_filter"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/v1/graph/entities/sample": {
         parameters: {
             query?: never;
@@ -484,23 +399,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/graph/export": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Stream a full-fidelity NDJSON export (inverse of /v1/graph/import): a kind-tagged meta header (with the source ontology), then entity and edge lines that reconstruct an equivalent graph on re-import. Paginated via meta.next_cursor echoed as ?cursor= */
-        get: operations["get_v1_graph_export"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/v1/graph/export/job": {
         parameters: {
             query?: never;
@@ -513,23 +411,6 @@ export interface paths {
         put?: never;
         /** Enqueue a background full-fidelity export for a large tenant; writes zstd NDJSON parts + a manifest under tenants/<tenant>/exports/<id>/. Returns the job id; poll with GET /v1/graph/export/job?job_id= */
         post: operations["post_v1_graph_export_job"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/graph/export/rdf": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Export the snapshot-visible RDF projection as Turtle, N-Triples, TriG, or N-Quads (hard 100,000-statement materialization ceiling) */
-        get: operations["get_v1_graph_export_rdf"];
-        put?: never;
-        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -560,7 +441,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Which completion mechanisms will carry on this graph */
+        /** Read the bounded published groundability artifact; returns typed unavailable until maintenance has published one */
         get: operations["get_v1_graph_groundability"];
         put?: never;
         post?: never;
@@ -621,23 +502,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/graph/observations": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Browse observations */
-        get: operations["get_v1_graph_observations"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/v1/graph/query": {
         parameters: {
             query?: never;
@@ -649,6 +513,23 @@ export interface paths {
         put?: never;
         /** Run a SPARQL query (text) against the graph — discoverable alias for /v1/query/sparql-text */
         post: operations["post_v1_graph_query"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/graph/read-snapshot": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Pinned published read root, same-epoch graph head, and query/conformance lag */
+        get: operations["get_v1_graph_read_snapshot"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -775,181 +656,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/index": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Inspect the embedding index */
-        get: operations["get_v1_index"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/index/build": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Build default ANN and BM25 indexes; optional body selects the embedding provider (e.g. stored BYO vectors) */
-        post: operations["post_v1_index_build"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/index/delta": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Append a BM25 delta segment for the unindexed WAL tail */
-        post: operations["post_v1_index_delta"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/index/gc": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Preview or delete superseded persisted index runs */
-        post: operations["post_v1_index_gc"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/index/gc-jobs": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Poll a graph-scoped index garbage-collection job */
-        get: operations["get_v1_index_gc_jobs"];
-        put?: never;
-        /** Idempotently enqueue durable index garbage collection with byte/object progress */
-        post: operations["post_v1_index_gc_jobs"];
-        /** Cancel a graph-scoped index garbage-collection job */
-        delete: operations["delete_v1_index_gc_jobs"];
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/index/jobs": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Poll a graph-scoped index job for progress, terminal error, and per-family coverage */
-        get: operations["get_v1_index_jobs"];
-        put?: never;
-        /** Idempotently enqueue a durable full-index job with typed per-family terminal status */
-        post: operations["post_v1_index_jobs"];
-        /** Cancel a graph-scoped durable full-index job */
-        delete: operations["delete_v1_index_jobs"];
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/index/run": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Build BM25, ANN/vector, and adjacency index families; optional body selects the embedding provider (e.g. stored BYO vectors) */
-        post: operations["post_v1_index_run"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/inference/retrieval-premises": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Stage G — derive edges from calibrated retrieval candidates (typed Retrieval provenance, snapshot-pinned confidence) */
-        post: operations["post_v1_inference_retrieval_premises"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/inference/rules": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Read the branch's stored inference rule set */
-        get: operations["get_v1_inference_rules"];
-        put?: never;
-        /** Define (replace) the branch's stored inference rule set */
-        post: operations["post_v1_inference_rules"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/inference/run": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Run inference rules to a bounded fixpoint; preview derived edges (never written) */
-        post: operations["post_v1_inference_run"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/v1/memory/observe": {
         parameters: {
             query?: never;
@@ -991,7 +697,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** The extractor fine-tune's training feed: EPISODE transcripts joined (via evidence observations) to the facts the observe pipeline committed from them, plus the serving prompt's ontology vocabulary */
+        /** Fetch the bounded published extractor training artifact */
         get: operations["get_v1_models_extractor_dataset"];
         put?: never;
         post?: never;
@@ -1008,7 +714,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** The planner fine-tune's training feed: accepted/corrected feedback joined to traces (signals ≤ the split pin), topped up with execution-verified synthetic plans */
+        /** Fetch the bounded published planner training artifact */
         get: operations["get_v1_models_planner_dataset"];
         put?: never;
         post?: never;
@@ -1025,7 +731,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** The DPO pass's training feed: preference pairs from corrected verdicts (decoded vs corrected plan), rejections paired with same-question accepted plans, and synthetic corrupted-slot pairs; unpaired rejections are counted */
+        /** Fetch the bounded published planner preference artifact */
         get: operations["get_v1_models_planner_preference_dataset"];
         put?: never;
         post?: never;
@@ -1078,7 +784,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Promote a finished planner_lora run: gate on held-out slot exactness (?allow_regression=true to override), record a WS9 kind=planner manifest with the adapter artifact, CAS-promote — /v1/ask then serves the adapter */
+        /** Promote a finished planner_lora run: gate on held-out slot exactness (?allow_regression=true to override), record a WS9 kind=planner manifest with the adapter artifact, then CAS-promote */
         post: operations["post_v1_models_promote_planner"];
         delete?: never;
         options?: never;
@@ -1146,7 +852,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Champion vs challenger retrieval over one pinned snapshot: per-arm hit-rate@k + latency + per-query overlap; returns evidence, never promotes */
+        /** Run a bounded champion/challenger evaluation on one published generation; returns typed unavailable until the generation-pinned evaluator artifact is enabled */
         post: operations["post_v1_models_shadow_eval"];
         delete?: never;
         options?: never;
@@ -1178,7 +884,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** The suggest-ranker trainer's probe feed: suggestion_adopted signals (typed prefix + adopted text) ≤ the split pin, topped up with execution-verified synthetic vocabulary pairs */
+        /** Fetch the bounded published suggestion-ranker training artifact */
         get: operations["get_v1_models_suggest_dataset"];
         put?: never;
         post?: never;
@@ -1282,7 +988,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Audit the current snapshot against the ontology's implied SHACL constraints (capped cardinality -> sh:maxCount), derived on the fly; whole-snapshot, never blocks a write, independent of any published shape bundle */
+        /** Read the durable ontology-conformance report referenced by the published snapshot, including its validation watermark and ontology/shapes provenance */
         get: operations["get_v1_ontology_conformance"];
         put?: never;
         post?: never;
@@ -1497,23 +1203,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/query/shacl": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** SHACL-style shape query */
-        post: operations["post_v1_query_shacl"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/v1/query/sparql": {
         parameters: {
             query?: never;
@@ -1606,44 +1295,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Read the active graph schema bundle (ontology plus activated SHACL shapes) */
+        /** Read active ontology and SHACL shapes metadata without running validation */
         get: operations["get_v1_schema"];
         put?: never;
         post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/schema/audit": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Audit current graph data against the active SHACL schema bundle; JSON by default, or a standard RDF sh:ValidationReport as Turtle/N-Triples */
-        post: operations["post_v1_schema_audit"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/schema/preview": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Preview a proposed graph schema bundle and audit it against current data */
-        post: operations["post_v1_schema_preview"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1659,7 +1314,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Activate a previewed SHACL schema bundle for the graph branch */
+        /** Atomically activate a SHACL shapes bundle and enqueue durable conformance validation */
         post: operations["post_v1_schema_publish"];
         delete?: never;
         options?: never;
@@ -1829,7 +1484,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Snap free text to the nearest real vocabulary item */
+        /** Snap free text to vocabulary from the pinned published read root */
         post: operations["post_v1_search_resolve_term"];
         delete?: never;
         options?: never;
@@ -2121,15 +1776,6 @@ export interface components {
          */
         AnalyticQueryRequest: {
             /**
-             * Format: int64
-             * @description Snapshot pin: evaluate the query as of this `commit_seq`, hiding any event
-             *     committed later. Errors if it exceeds the head. Forces the snapshot reduce
-             *     path — the head-fresh permutation view and the count fast paths are
-             *     declined, since they cannot reconstruct an earlier snapshot.
-             */
-            as_of_commit_seq?: number | null;
-            as_of_valid_time?: string | null;
-            /**
              * @description Group-graph-pattern combinators (UNION / OPTIONAL / MINUS / EXISTS /
              *     NOT EXISTS) folded over the base `patterns`, left-to-right. Empty (the
              *     default) leaves the query a plain conjunctive BGP.
@@ -2199,68 +1845,6 @@ export interface components {
         };
         /** @enum {string} */
         AnnTargetKind: "ontology_concept" | "ontology_term" | "entity" | "relation_type" | "edge_event" | "assertion" | "observation" | "neighborhood" | "path";
-        AskCitation: {
-            /** @description Entity id or edge-event id, as a string. */
-            id: string;
-            kind: components["schemas"]["AskCitationKind"];
-            /** @description Human-readable label (entity name, or "src —relation→ dst"). */
-            label: string;
-            /** Format: float */
-            score: number;
-        };
-        /** @enum {string} */
-        AskCitationKind: "entity" | "assertion";
-        /**
-         * @description Per-request instrumentation of the `/v1/ask` pipeline: what each stage cost,
-         *     how much the DB narrowed the world before the model saw it, and the embedding
-         *     model that did the grounding.
-         */
-        AskExplain: {
-            /**
-             * @description The embedding model that grounded + retrieved — its id, or `lexical` for
-             *     the hash/lexical fallback when the graph has no managed embedding model.
-             */
-            embedding: string;
-            /**
-             * @description How much the DB narrowed: the vocabulary the question snapped to and the
-             *     size of the retrieved evidence set the answer rests on.
-             */
-            narrowing: components["schemas"]["AskNarrowing"];
-            /** @description Wall-clock latency of each stage of the one call, in milliseconds. */
-            timings: components["schemas"]["AskTimings"];
-        };
-        AskFeedbackRequest: {
-            /** @description The `ask_id` the ask response carried. */
-            ask_id: string;
-            corrected_plan?: null | components["schemas"]["AskStructuredPlanV2"];
-            /** @description Optional free-text note (bounded server-side). */
-            note?: string | null;
-            verdict: components["schemas"]["AskFeedbackVerdict"];
-        };
-        AskFeedbackResponse: {
-            /**
-             * @description True when the verdict was captured. False when signal capture is off
-             *     on this deployment — the request contract is identical either way, so
-             *     clients never break when the flag flips.
-             */
-            accepted: boolean;
-            accepted_count: number;
-            event_id: string;
-            excluded_count: number;
-            exclusions?: {
-                [key: string]: number;
-            };
-            receipt_id: string;
-            replayed: boolean;
-            trainable_count: number;
-        };
-        /**
-         * @description A user verdict on one ask (`POST /v1/ask/feedback`) — the planner's
-         *     explicit feedback capture. Joined to the ask's `ask_trace` signal by
-         *     `ask_id`.
-         * @enum {string}
-         */
-        AskFeedbackVerdict: "accepted" | "rejected" | "corrected";
         /** @enum {string} */
         AskFilterOperatorV2: "eq" | "ne" | "in" | "contains" | "gt" | "gte" | "lt" | "lte";
         /** @enum {string} */
@@ -2269,130 +1853,13 @@ export interface components {
             behavior: components["schemas"]["AskGraphAnchorBehaviorV2"];
             entity: string;
         };
-        AskGrounding: {
-            /**
-             * @description Real vocabulary the question snapped to (classes/relations/properties/
-             *     terms) — a subset of the graph's vocabulary by construction.
-             */
-            candidates: components["schemas"]["ResolvedTerm"][];
-            /**
-             * @description True when identifier slots were hard-constrained during decode. Always
-             *     false in `grounding_only` (no decode); true under the resident planner.
-             */
-            constrained: boolean;
-            /**
-             * @description True when the grounding forced a single relation via a type signature
-             *     (WS10). Always false in `grounding_only` v1; set by the resident planner.
-             */
-            signature_forced?: boolean;
-        };
-        /** @enum {string} */
-        AskMode: "grounding_only" | "resident_planner";
-        /**
-         * @description How much the database narrowed the world before the model — the core
-         *     context-substrate quantity, exposed per request.
-         */
-        AskNarrowing: {
-            /** @description Assertions (edges) retrieved as evidence. */
-            assertions: number;
-            /** @description Entities retrieved as evidence. */
-            entities: number;
-            /**
-             * @description Vocabulary terms the question snapped to (classes/relations/properties) —
-             *     the narrowed candidate set, a subset of real vocabulary by construction.
-             */
-            vocab_candidates: number;
-        };
         /** @enum {string} */
         AskPlanExecutionModeV2: "entity_search" | "path_search" | "hybrid";
-        AskPlanFailure: {
-            code: components["schemas"]["AskPlanFailureCode"];
-            /** @description True when retrying after the planner recovers can produce a plan. */
-            retryable: boolean;
-            stage: components["schemas"]["AskPlanFailureStage"];
-        };
-        /** @enum {string} */
-        AskPlanFailureCode: "planner_disabled" | "planner_unavailable" | "no_class_candidates" | "generation_failed" | "validation_failed";
-        /** @enum {string} */
-        AskPlanFailureStage: "configuration" | "target_type" | "relation" | "anchor";
-        AskQuery: {
-            plan_failure?: null | components["schemas"]["AskPlanFailure"];
-            /** @description The retrieval query text that was executed. */
-            query: string;
-            structured?: null | components["schemas"]["AskStructuredQuery"];
-            structured_v2?: null | components["schemas"]["AskStructuredPlanV2"];
-            top_k: number;
-        };
         /** @enum {string} */
         AskRelationDirectionV2: "outgoing" | "incoming" | "either";
         AskRelationStepV2: {
             direction: components["schemas"]["AskRelationDirectionV2"];
             relation: string;
-        };
-        AskRequest: {
-            /**
-             * Format: int64
-             * @description Snapshot pin (transaction-time ceiling): retrieval and citations
-             *     reproduce the graph as of this commit sequence; the response
-             *     `snapshot.as_of_commit_seq` echoes the pin. Omitted means head.
-             */
-            as_of_commit_seq?: number | null;
-            /**
-             * @description Valid-time cursor (RFC 3339): retrieval reflects facts true at this
-             *     instant. Omitted means the latest valid time.
-             */
-            as_of_valid_time?: string | null;
-            /**
-             * @description Run retrieval and return citations (default true). When false, only the
-             *     grounding is computed — the caller drives its own retrieval/model.
-             */
-            execute?: boolean | null;
-            /** @description Entity attributes retained as evidence on the internal execution trace. */
-            fields?: string[];
-            filters?: null | components["schemas"]["SearchFilterExpr"];
-            /** @description The natural-language question. */
-            question: string;
-            /**
-             * @description Opaque alternative to `as_of_commit_seq`. Exactly one pin spelling may
-             *     be supplied; grounding, validation, execution, trace, and citations all
-             *     use the resolved commit.
-             */
-            snapshot_token?: string | null;
-            /** @description Max citations to return (default 8, clamped to 25). */
-            top_k?: number | null;
-        };
-        AskResponse: {
-            /**
-             * @description A synthesized answer when a model produced one; in `grounding_only` this
-             *     is a templated evidence summary (the retrieved matches), not model prose.
-             */
-            answer?: string | null;
-            /**
-             * @description Server-stamped id for this ask. Reference it in
-             *     `POST /v1/ask/feedback` to attach a verdict; when signal capture is on
-             *     it is also the `request_id` joining the emitted `ask_trace` signal to
-             *     its `ask_feedback` — the planner fine-tune's training join key.
-             */
-            ask_id?: string | null;
-            /** @description Evidence: the graph items the answer rests on. */
-            citations: components["schemas"]["AskCitation"][];
-            /**
-             * Format: float
-             * @description Confidence in [0, 1], from the top retrieved score.
-             */
-            confidence: number;
-            /**
-             * @description Instrumentation for the one call: per-stage latency, how much the DB
-             *     narrowed, and which embedding model grounded the question. Makes the
-             *     "DB narrows, cheap model decodes" pipeline observable per request.
-             */
-            explain: components["schemas"]["AskExplain"];
-            /** @description How the question was mapped onto real vocabulary. */
-            grounding: components["schemas"]["AskGrounding"];
-            /** @description Which pipeline produced this answer. */
-            mode: components["schemas"]["AskMode"];
-            query?: null | components["schemas"]["AskQuery"];
-            snapshot: components["schemas"]["SnapshotView"];
         };
         AskStructuredPlanV2: {
             execution_mode: components["schemas"]["AskPlanExecutionModeV2"];
@@ -2436,35 +1903,6 @@ export interface components {
              *     execution).
              */
             target_type: string;
-        };
-        /** @description Per-stage wall-clock latency for one `/v1/ask` call, in milliseconds. */
-        AskTimings: {
-            /**
-             * Format: double
-             * @description Shortlist-constrained structured-query decode on the resident model;
-             *     absent when the constrained leg did not run.
-             */
-            decode_ms?: number | null;
-            /**
-             * Format: double
-             * @description Grounding the question to real vocabulary (WS11 resolve).
-             */
-            ground_ms: number;
-            /**
-             * Format: double
-             * @description Hybrid retrieval against the pinned snapshot. Zero when `execute` is false.
-             */
-            retrieve_ms: number;
-            /**
-             * Format: double
-             * @description Resident-model synthesis; absent when no planner ran (`grounding_only`).
-             */
-            synth_ms?: number | null;
-            /**
-             * Format: double
-             * @description End-to-end latency of the whole call.
-             */
-            total_ms: number;
         };
         AskTypedFilterV2: {
             field: string;
@@ -2607,7 +2045,6 @@ export interface components {
             edge_event_ids: components["schemas"]["EdgeEventId"][];
             entity_ids: components["schemas"]["EntityId"][];
             idempotent_replay: boolean;
-            indexed: boolean;
             no_op?: boolean;
             observation_ids: components["schemas"]["ObservationId"][];
             schema_validation?: null | components["schemas"]["SchemaAuditReport"];
@@ -2774,29 +2211,6 @@ export interface components {
             /** @description `enforced` | `advisory` | `reserved`. */
             status: string;
         };
-        /** @description One derived edge (a fact that follows from the rules but is not asserted). */
-        DerivedEdgeView: {
-            /**
-             * Format: float
-             * @description Confidence inherited from the supporting facts: the **max** over
-             *     derivations of the **min** over each derivation's premises (so a fact is
-             *     as strong as its weakest premise, and the best derivation wins).
-             */
-            confidence: number;
-            /**
-             * @description The provenance trail this fact transitively rests on — typed leaves so an
-             *     asserted edge (`Asserted`) and a calibrated retrieval match (`Retrieval`)
-             *     stay distinguishable and a retrieval match can never masquerade as an
-             *     asserted fact (FAL-PROV-NOT-LAUNDERED). Pure rule derivation resolves to
-             *     `Asserted` leaves only.
-             */
-            depends_on?: components["schemas"]["ProvenanceLeafView"][];
-            object: components["schemas"]["EntityView"];
-            predicate: string;
-            /** @description The rule that first derived this edge. */
-            rule: string;
-            subject: components["schemas"]["EntityView"];
-        };
         EdgeEventId: string;
         EdgeEventRow: {
             /** Format: int64 */
@@ -2815,51 +2229,6 @@ export interface components {
         };
         /** @enum {string} */
         EdgeIdempotencyMode: "append" | "skip_unchanged";
-        EmbeddingIndexBuildRequest: {
-            /** Format: int32 */
-            dim?: number | null;
-            include_clusters: boolean;
-            /**
-             * @description Append a raw-f32 region per cluster so persisted vector search can opt
-             *     into exact rerank (`rerank` on the search request). Larger objects at
-             *     rest; default off keeps runs compact and 4-bit-only.
-             */
-            include_raw_rerank?: boolean;
-            max_clusters?: number | null;
-            provider?: null | components["schemas"]["EmbeddingProviderConfig"];
-            /**
-             * @description Quantizer codec for the persisted cluster blocks. Absent / `None` uses
-             *     the default `tq-hadamard` (4-bit). Set `exrabitq` (with `quantizer_bits`,
-             *     2..=8) for the higher-bit Extended RaBitQ codec that can reach
-             *     rerank-grade recall without the raw-f32 region (P30/R9). The scheme is
-             *     self-describing in the persisted index meta, so reads dispatch
-             *     automatically; this only changes how new runs are built.
-             */
-            quantizer?: string | null;
-            /**
-             * Format: int32
-             * @description Bits per dimension for the `exrabitq` scheme (2..=8). Ignored by
-             *     `tq-hadamard` (fixed 4-bit); defaults to 4 when `quantizer` is set
-             *     without bits.
-             */
-            quantizer_bits?: number | null;
-            targets: components["schemas"]["AnnTargetKind"][];
-        };
-        EmbeddingIndexBuildResponse: {
-            manifest_etag: string;
-            manifest_key: string;
-            provider: components["schemas"]["EmbeddingProviderSpec"];
-            snapshot: components["schemas"]["SnapshotView"];
-            spaces: components["schemas"]["EmbeddingIndexBuildSpaceView"][];
-        };
-        EmbeddingIndexBuildSpaceView: {
-            cluster_count: number;
-            clusters: components["schemas"]["EmbeddingIndexClusterView"][];
-            entry_count: number;
-            object_etag: string;
-            object_key: string;
-            space: components["schemas"]["EmbeddingSpaceKey"];
-        };
         EmbeddingIndexClusterView: {
             cluster_id: number;
             entry_count: number;
@@ -2871,18 +2240,14 @@ export interface components {
             include_clusters: boolean;
             max_clusters?: number | null;
             provider?: null | components["schemas"]["EmbeddingProviderConfig"];
-            source?: null | components["schemas"]["EmbeddingIndexSource"];
             targets: components["schemas"]["AnnTargetKind"][];
         };
         EmbeddingIndexInspectResponse: {
             manifest_key?: string | null;
             provider: components["schemas"]["EmbeddingProviderSpec"];
             snapshot: components["schemas"]["SnapshotView"];
-            source: components["schemas"]["EmbeddingIndexSource"];
             spaces: components["schemas"]["EmbeddingIndexSpaceView"][];
         };
-        /** @enum {string} */
-        EmbeddingIndexSource: "ephemeral" | "persisted" | "persisted_only";
         EmbeddingIndexSpaceView: {
             cluster_count: number;
             clusters: components["schemas"]["EmbeddingIndexClusterView"][];
@@ -2937,34 +2302,19 @@ export interface components {
             manifest_key?: string | null;
             metric: string;
             model_id: string;
-            overlay_candidates: number;
             probe_count: number;
+            /** @description Commit distance from the graph head to the pinned published generation. */
+            published_lag_commits: number;
             ranged?: null | components["schemas"]["RangedReadStats"];
             /**
              * @description Number of candidates re-scored with exact raw-f32 distances. Zero when
              *     `rerank` was not requested or the run has no raw region.
              */
             reranked_candidates?: number;
-            source: components["schemas"]["EmbeddingIndexSource"];
             spaces_searched: number;
             temporal_coverage?: null | components["schemas"]["SearchTemporalCoverage"];
-            unindexed_tail_commits: number;
         };
         EmbeddingSearchRequest: {
-            /**
-             * Format: int64
-             * @description Snapshot pin (transaction-time ceiling): results hide every event
-             *     committed after this sequence, reproducing that past snapshot. The ANN
-             *     run is selected as the newest run at or below the pin and the pin bounds
-             *     the forward overlay; candidate generation is never the correctness layer.
-             *     Omitted means the current head.
-             */
-            as_of_commit_seq?: number | null;
-            /**
-             * @description Valid-time cursor (RFC 3339): results reflect facts true at this
-             *     instant. Omitted means the latest valid time.
-             */
-            as_of_valid_time?: string | null;
             consistency?: null | components["schemas"]["SearchConsistency"];
             /** Format: int32 */
             dim?: number | null;
@@ -2995,7 +2345,6 @@ export interface components {
              *     unset; ignored unless `rerank` is set.
              */
             rerank_top_k?: number | null;
-            source?: null | components["schemas"]["EmbeddingIndexSource"];
             targets: components["schemas"]["AnnTargetKind"][];
             top_k: number;
         };
@@ -3143,9 +2492,10 @@ export interface components {
             /**
              * Format: int64
              * @description Snapshot pin: reproduce the neighborhood as of this `commit_seq`, hiding
-             *     any event committed later. Errors if it exceeds the current head, and
-             *     forces the snapshot scan (the ranged adjacency fast path declines a
-             *     pinned read). Omit for the latest snapshot.
+             *     any event committed later. Public serving reduces the entity's bounded
+             *     incident domains from the Base family in the one pinned published
+             *     generation; it never discovers or assembles another snapshot. Omit for
+             *     the latest snapshot.
              */
             as_of_commit_seq?: number | null;
             as_of_valid_time?: string | null;
@@ -3153,18 +2503,19 @@ export interface components {
             relations?: string[] | null;
         };
         /**
-         * @description Result of an entity point lookup: the entity plus its current out/in
-         *     neighborhood. Served from the ranged adjacency run's per-entity slices when
-         *     one exists (cost is the entity's degree, not the whole graph), otherwise
-         *     from the snapshot overlay.
+         * @description Result of an entity point lookup: the entity plus its out/in neighborhood.
+         *     Public reads use adjacency for the published watermark and the same
+         *     generation's Base family for historical pins; both paths cost the entity's
+         *     degree rather than the whole graph.
          */
         EntityNeighborhoodResponse: {
             entity: components["schemas"]["EntityView"];
             incoming: components["schemas"]["NeighborhoodEdge"][];
             outgoing: components["schemas"]["NeighborhoodEdge"][];
             /**
-             * @description True when served from the persisted ranged adjacency run (the
-             *     point-lookup fast path); false when computed from the snapshot overlay.
+             * @description True when served directly from the persisted adjacency family. False
+             *     when an exact historical pin was reduced from the same published
+             *     generation's Base family.
              */
             served_from_ranged: boolean;
             snapshot: components["schemas"]["SnapshotView"];
@@ -3410,25 +2761,8 @@ export interface components {
             field: string;
             missing: number;
         };
-        FullTextIndexBuildRequest: {
-            include_terms: boolean;
-            targets: components["schemas"]["AnnTargetKind"][];
-            tokenizer?: null | components["schemas"]["FullTextTokenizerConfig"];
-        };
-        FullTextIndexBuildResponse: {
-            /** Format: float */
-            average_document_len: number;
-            document_count: number;
-            manifest_etag: string;
-            manifest_key: string;
-            object_etag: string;
-            object_key: string;
-            snapshot: components["schemas"]["SnapshotView"];
-            term_count: number;
-        };
         FullTextIndexInspectRequest: {
             include_terms: boolean;
-            source?: null | components["schemas"]["FullTextIndexSource"];
             targets: components["schemas"]["AnnTargetKind"][];
         };
         FullTextIndexInspectResponse: {
@@ -3437,13 +2771,10 @@ export interface components {
             document_count: number;
             manifest_key?: string | null;
             snapshot: components["schemas"]["SnapshotView"];
-            source: components["schemas"]["FullTextIndexSource"];
             term_count: number;
             terms: components["schemas"]["FullTextTermView"][];
             tokenizer: components["schemas"]["FullTextTokenizerConfig"];
         };
-        /** @enum {string} */
-        FullTextIndexSource: "ephemeral" | "persisted" | "persisted_only";
         FullTextSearchExplain: {
             candidates: number;
             document_count: number;
@@ -3452,28 +2783,13 @@ export interface components {
             filtered_candidates: number;
             indexed_commit_seq?: null | components["schemas"]["CommitSeq"];
             manifest_key?: string | null;
-            overlay_candidates: number;
+            /** @description Commit distance from the graph head to the pinned published generation. */
+            published_lag_commits: number;
             ranged?: null | components["schemas"]["RangedReadStats"];
-            source: components["schemas"]["FullTextIndexSource"];
             temporal_coverage?: null | components["schemas"]["SearchTemporalCoverage"];
             term_count: number;
-            unindexed_tail_commits: number;
         };
         FullTextSearchRequest: {
-            /**
-             * Format: int64
-             * @description Snapshot pin (transaction-time ceiling): results hide every event
-             *     committed after this sequence, reproducing that past snapshot. The BM25
-             *     run is selected as the newest run at or below the pin and the pin bounds
-             *     the forward overlay; candidate generation is never the correctness layer.
-             *     Omitted means the current head.
-             */
-            as_of_commit_seq?: number | null;
-            /**
-             * @description Valid-time cursor (RFC 3339): results reflect facts true at this
-             *     instant. Omitted means the latest valid time.
-             */
-            as_of_valid_time?: string | null;
             consistency?: null | components["schemas"]["SearchConsistency"];
             explain: boolean;
             facets?: components["schemas"]["FacetRequest"][] | null;
@@ -3502,7 +2818,6 @@ export interface components {
              */
             order_by?: components["schemas"]["SearchOrderBy"];
             query: string;
-            source?: null | components["schemas"]["FullTextIndexSource"];
             targets: components["schemas"]["AnnTargetKind"][];
             tokenizer?: null | components["schemas"]["FullTextTokenizerConfig"];
             top_k: number;
@@ -3554,8 +2869,6 @@ export interface components {
          *     required filter and is evaluated before any grouping or value collection.
          */
         GovernedConflictAggregationRequest: {
-            /** Format: int64 */
-            as_of_commit_seq?: number | null;
             entity_type: string;
             key_fields: string[];
             limit?: number;
@@ -3873,21 +3186,6 @@ export interface components {
         };
         GraphId: string;
         /**
-         * @description Outcome of the optional one-shot index build a bulk import runs at the end
-         *     when `?index=true` is passed — the "bulk load, queryable on return"
-         *     primitive. `built` is whether the full build completed, so the imported data
-         *     is served from the persisted runs (not just the ephemeral snapshot fallback)
-         *     by the time the request returns. `skipped_reason` is present only when
-         *     `built` is false: `"index_busy"` (the node's build-admission gate was busy —
-         *     the data is committed and queryable, retry the build later) or
-         *     `"index_error"` (the build failed; detail is logged server-side, not
-         *     surfaced, to avoid leaking internal paths).
-         */
-        GraphImportIndexOutcome: {
-            built: boolean;
-            skipped_reason?: string | null;
-        };
-        /**
          * @description One line of an NDJSON bulk-import stream (`POST /v1/graph/import`). Each line
          *     is a single JSON object that is either a triplet (carries `relation`) or an
          *     entity-properties record (carries `properties`); the two shapes are disjoint,
@@ -3907,10 +3205,23 @@ export interface components {
             message: string;
         };
         /**
+         * @description Durable publication accepted after `POST /v1/graph/import?publish=true`.
+         *     The import request never constructs index families or waits for publication;
+         *     clients can poll the returned job while continuing to observe the previously
+         *     published generation.
+         */
+        GraphImportPublishedGenerationOutcome: {
+            disposition: components["schemas"]["PublishedGenerationEnqueueDisposition"];
+            due_seq: components["schemas"]["CommitSeq"];
+            job_id: string;
+            status: string;
+        };
+        /**
          * @description Aggregate outcome of a bulk NDJSON import. `committed_commit_seq` is the
          *     sequence of the last internal batch commit (absent if nothing committed).
          *     `errors` is bounded; `error_count` is the true total even when the list is
-         *     truncated. `index` is present only when the caller passed `?index=true`.
+         *     truncated. `published_generation` is present only when the caller passed
+         *     `?publish=true` and at least one batch committed.
          */
         GraphImportResponse: {
             batches: number;
@@ -3925,8 +3236,6 @@ export interface components {
              *     receipt for this idempotency key.
              */
             idempotent_replay: boolean;
-            index?: null | components["schemas"]["GraphImportIndexOutcome"];
-            indexed: boolean;
             lines_read: number;
             /**
              * @description Stable identity for the whole multi-batch mutation. Replays return this
@@ -3936,6 +3245,7 @@ export interface components {
             /** @description Exact observation records imported from a full-fidelity export. */
             observations?: number;
             properties: number;
+            published_generation?: null | components["schemas"]["GraphImportPublishedGenerationOutcome"];
             triplets: number;
         };
         GraphKey: {
@@ -3954,7 +3264,6 @@ export interface components {
             /** Format: int32 */
             dim?: number | null;
             include_indexes?: boolean;
-            include_objects?: boolean;
             max_clusters?: number | null;
             provider?: null | components["schemas"]["EmbeddingProviderConfig"];
             targets: components["schemas"]["AnnTargetKind"][];
@@ -3967,43 +3276,25 @@ export interface components {
             /** Format: int64 */
             head_generation: number;
             /**
-             * @description One-shot "has the persisted index caught up to head?" signal, so a
+             * @description One-shot "has the published generation caught up to head?" signal, so a
              *     bulk-import caller does not hand-assemble the three-field predicate.
              *     `Some(true)` iff both the BM25 and ANN persisted runs are current to the
-             *     head commit (no un-indexed tail); `Some(false)` when a build is still
+             *     head commit; `Some(false)` when publication is still
              *     pending or absent; `None` when indexes were not inspected
-             *     (`include_indexes=false`). Note (Strong consistency): committed data is
-             *     queryable via the per-query overlay *before* this turns true — this marks
-             *     the persisted fast path being current, not queryability.
+             *     (`include_indexes=false`).
              */
             index_caught_up?: boolean | null;
             index_lineage?: null | components["schemas"]["IndexLineage"];
             /** Format: int64 */
-            object_bytes: number;
-            object_count: number;
-            /** Format: int64 */
             ontology_version: number;
             parent?: null | components["schemas"]["BranchParentView"];
+            /** @description Commit distance from the graph head to the pinned published generation. */
+            published_lag_commits: number;
             /** Format: int64 */
             segment_bytes?: number;
             /** @description Compacted snapshot segments referenced by the graph manifest. */
             segment_count?: number;
             snapshot: components["schemas"]["SnapshotView"];
-            /**
-             * @description Temporal coverage of this snapshot — what kinds of as-of query the data
-             *     can actually answer. Lets a caller tell *before* querying whether
-             *     point-in-time / daily views are possible, instead of discovering that
-             *     every as-of returns the same picture.
-             */
-            temporal_coverage?: components["schemas"]["TemporalCoverage"];
-            /**
-             * @description Whether `temporal_coverage` was computed from the full snapshot. The
-             *     bounded HTTP metadata path is head-only by default; callers that need
-             *     exact event-time coverage opt in explicitly.
-             */
-            temporal_coverage_computed?: boolean;
-            unindexed_tail_commits: number;
-            visibility_manifest?: null | components["schemas"]["IndexVisibilityManifest"];
             /** Format: int64 */
             wal_tail_bytes: number;
             wal_tail_commits: number;
@@ -4021,15 +3312,11 @@ export interface components {
          *     `uri` is the original RDF predicate IRI. `relation` is the fixed
          *     `RDF_TRIPLE` relation used for committed edges, while `lbb_predicate_iri`
          *     remains the source predicate IRI that the RDF/SPARQL projection emits.
-         *     `property` and `lbb_property_iri` are retained as nullable compatibility
-         *     fields for older clients and are not populated by the fixed-schema importer.
          */
         GraphRdfImportPredicate: {
             lbb_predicate_iri: string;
-            lbb_property_iri?: string | null;
             lbb_relation_iri: string;
             literal_triples: number;
-            property?: string | null;
             relation: string;
             resource_triples: number;
             triples: number;
@@ -4050,11 +3337,11 @@ export interface components {
             errors?: components["schemas"]["GraphRdfImportError"][];
             graph_created: boolean;
             imported_triplets: number;
-            indexed: boolean;
             lines_read: number;
             literal_triples: number;
             predicate_count: number;
             predicates?: components["schemas"]["GraphRdfImportPredicate"][];
+            published_generation?: null | components["schemas"]["GraphImportPublishedGenerationOutcome"];
             resource_triples: number;
             triples_read: number;
         };
@@ -4324,150 +3611,6 @@ export interface components {
             /** Format: float */
             weight?: number | null;
         };
-        /**
-         * @description Optional JSON body for the data-plane index-build routes (`/v1/index/run`
-         *     and `/v1/index/build`). Every field is optional: an empty body resolves the
-         *     ANN space the way the search path does — a managed embedding config selects
-         *     its `stored` space (its dim winning), otherwise the server's hash default —
-         *     so a bare reindex always rebuilds the space queries actually look up.
-         *     Supplying `provider` overrides that resolution, e.g. to persist a build over
-         *     committed BYO vectors with an explicit `stored`/`external_vectors` space.
-         */
-        IndexBuildOptions: {
-            /**
-             * @description Build the object-storage-native permutation view (PSO). Off by default.
-             * @default false
-             */
-            build_permutation: boolean;
-            /**
-             * Format: int32
-             * @description Embedding dimension when no `provider.dim` is given. Defaults to the
-             *     server's configured dim. Must match the committed vectors' dimension.
-             * @default null
-             */
-            dim: number | null;
-            /**
-             * @description Append a raw-f32 rerank region to the embedding run. Off by default.
-             * @default false
-             */
-            include_raw_rerank: boolean;
-            /**
-             * @description ANN clusters per space. Defaults to the server's configured value.
-             * @default null
-             */
-            max_clusters: number | null;
-            /** @default null */
-            provider: null | components["schemas"]["EmbeddingProviderConfig"];
-        };
-        /**
-         * @description Outcome of an incremental index-run delta build (`index delta`, or the
-         *     commit-path auto-delta trigger). `built` is true when a delta segment was
-         *     appended; `folded` is true when the chain was instead rebuilt into a fresh
-         *     base (chain too long, or freshness fold). `skipped_reason` explains a no-op
-         *     (no base run, nothing un-indexed).
-         */
-        IndexDeltaResponse: {
-            built: boolean;
-            delta_document_count: number;
-            family: string;
-            folded: boolean;
-            from_commit_seq: components["schemas"]["CommitSeq"];
-            indexed_seq: components["schemas"]["CommitSeq"];
-            segments: number;
-            skipped_reason?: string | null;
-            snapshot: components["schemas"]["SnapshotView"];
-            to_commit_seq: components["schemas"]["CommitSeq"];
-        };
-        /** @description Bounded, user-facing summary of one family in the unified visibility manifest. */
-        IndexFamilyVisibility: {
-            class: components["schemas"]["IndexVisibilityFamilyClass"];
-            covered_seq?: null | components["schemas"]["CommitSeq"];
-            family: components["schemas"]["IndexVisibilityFamily"];
-            l0_from_seq?: null | components["schemas"]["CommitSeq"];
-            l0_segment_count: number;
-            l0_to_seq?: null | components["schemas"]["CommitSeq"];
-            /** @description Distinguishes ANN model spaces without exposing object keys. */
-            model_hash?: string | null;
-            /** @description Distinguishes target-specific BM25/ANN families without exposing object keys. */
-            target_hash?: string | null;
-        };
-        IndexGcJobProgress: {
-            /** Format: int64 */
-            deleted_bytes: number;
-            deleted_objects: number;
-            /** Format: int64 */
-            heartbeat_micros?: number;
-            /** Format: int64 */
-            reclaimable_bytes: number;
-            reclaimable_objects: number;
-            reclaimable_runs: number;
-            /** Format: int64 */
-            scanned_bytes: number;
-            scanned_objects: number;
-            scanned_runs: number;
-            stage: string;
-            worker?: string | null;
-        };
-        IndexGcJobStatusResponse: {
-            /** Format: int32 */
-            attempts: number;
-            /** Format: int64 */
-            enqueued_at_micros: number;
-            graph: components["schemas"]["GraphKey"];
-            job_id: string;
-            progress?: null | components["schemas"]["IndexGcJobProgress"];
-            request: components["schemas"]["IndexGcRequest"];
-            result?: null | components["schemas"]["IndexGcResponse"];
-            status: string;
-            terminal_error?: string | null;
-            /** Format: int64 */
-            updated_at_micros: number;
-        };
-        IndexGcRequest: {
-            /** @description Report what would be deleted without deleting anything. */
-            dry_run?: boolean;
-            /**
-             * @description Delete runs even when other branches exist in the graph. Child
-             *     branches fall back to parent-branch index runs until they build their
-             *     own, so deleting shared parent runs can force child rebuilds.
-             */
-            include_branch_shared?: boolean;
-            /**
-             * @description Keep this many newest index runs per family (bm25/ann grouping key).
-             *     The newest run is always kept regardless of this value.
-             */
-            keep_runs?: number;
-            /**
-             * Format: int64
-             * @description Reader grace: retain any run whose snapshot is within this many commits
-             *     of the current head, even when it exceeds `keep_runs`. A search that
-             *     already resolved a now-superseded run keeps reading its objects, so
-             *     collecting a recently-passed run out from under an in-flight reader
-             *     surfaces as a NotFound/500. The grace window protects those runs until
-             *     the head has advanced far enough that no in-flight search can still be
-             *     holding them. Set to 0 to disable the grace and collect purely by
-             *     `keep_runs` ordering.
-             */
-            reader_grace_commits?: number;
-        };
-        IndexGcResponse: {
-            /** Format: int64 */
-            deleted_bytes: number;
-            deleted_objects: number;
-            deleted_runs: number;
-            dry_run: boolean;
-            kept_runs: number;
-            runs: components["schemas"]["IndexRunView"][];
-            /** Format: int64 */
-            scanned_bytes: number;
-            scanned_objects: number;
-            /**
-             * @description Set when deletion was skipped because other branches may share this
-             *     branch's index runs and `include_branch_shared` was false.
-             */
-            skipped_branch_shared: boolean;
-            snapshot: components["schemas"]["SnapshotView"];
-        };
         /** @description Typed convergence view over the persisted serving families. */
         IndexLineage: {
             adjacency_indexed_commit_seq?: null | components["schemas"]["CommitSeq"];
@@ -4483,33 +3626,11 @@ export interface components {
             /** Format: int64 */
             observed_at_micros: number;
         };
-        IndexRunView: {
-            /** Format: int64 */
-            bytes: number;
-            family: string;
-            kept: boolean;
-            objects: number;
-            prefix: string;
-            snapshot_commit_seq: components["schemas"]["CommitSeq"];
-        };
         /**
-         * @description One of the index families published through the unified visibility manifest.
+         * @description One of the index families referenced by an atomic published read root.
          * @enum {string}
          */
         IndexVisibilityFamily: "base" | "rdf" | "bm25" | "ann" | "adjacency";
-        /**
-         * @description How a family participates in the unified visibility watermark.
-         * @enum {string}
-         */
-        IndexVisibilityFamilyClass: "lockstep" | "merged_only";
-        /** @description The unified, per-graph visibility view consumed by the console and status tools. */
-        IndexVisibilityManifest: {
-            /** Format: int64 */
-            epoch: number;
-            families: components["schemas"]["IndexFamilyVisibility"][];
-            /** @description Shared published watermark. Lockstep families define this value. */
-            visible_seq: components["schemas"]["CommitSeq"];
-        };
         /**
          * @description A single inference rule (SHACL-AF `sh:TripleRule` shape): a BGP `body` (the
          *     condition / `WHERE`) and a `head` triple template instantiated once per
@@ -4548,39 +3669,6 @@ export interface components {
              *     order-independent.
              */
             order?: number;
-        };
-        /**
-         * @description Run a set of inference rules to a bounded fixpoint and return the derived
-         *     edges as a **preview**. Derived facts are never written: the write gate
-         *     refuses `origin=Derived`, so this surfaces "what follows" without mutating
-         *     the graph. Stratified persistence (`derived/v1`) is a separate path.
-         */
-        InferenceRunRequest: {
-            /**
-             * Format: int64
-             * @description Snapshot pin: run inference over the graph as of this `commit_seq`, hiding
-             *     later commits. Errors if it exceeds the head.
-             */
-            as_of_commit_seq?: number | null;
-            as_of_valid_time?: string | null;
-            /** @description Fail-closed ceiling on total derived edges (clamped server-side). */
-            max_derived?: number | null;
-            /** @description Fail-closed ceiling on fixpoint rounds (clamped server-side). */
-            max_rounds?: number | null;
-            /** @description Per-rule ceiling on the `body` join's solution set (clamped server-side). */
-            max_solutions?: number | null;
-            rules: components["schemas"]["InferenceRule"][];
-        };
-        InferenceRunResponse: {
-            derived: components["schemas"]["DerivedEdgeView"][];
-            /** @description Number of fixpoint rounds executed. */
-            rounds: number;
-            snapshot: components["schemas"]["SnapshotView"];
-            /**
-             * @description True if a bound (rounds / derived edges / per-rule solutions) was hit, so
-             *     the derived set may be incomplete.
-             */
-            truncated: boolean;
         };
         LbbErrorBody: {
             /** @example missing_idempotency_key */
@@ -4643,7 +3731,12 @@ export interface components {
             /** Format: int64 */
             updated_at_micros: number;
         };
-        /** @description Outcome of embedding the corpus and rebuilding its Stored ANN index. */
+        /**
+         * @description Outcome of embedding the corpus and scheduling a complete published
+         *     generation. `indexed_commit_seq` remains zero until publication;
+         *     `final_index_job_id` identifies the durable generation build when one was
+         *     enqueued. ANN is never cut over independently.
+         */
         ManagedEmbeddingBackfillResponse: {
             batches: number;
             continuation?: string | null;
@@ -5689,8 +4782,8 @@ export interface components {
         };
         /**
          * @description Planner serving default derived from a promoted `planner` run: the LoRA
-         *     adapter (a path on the model-serving volume) `/v1/ask` passes to the
-         *     resident planner endpoint per generate call.
+         *     adapter (a path on the model-serving volume) planner-backed workflows pass
+         *     to the resident model per generate call.
          */
         PlannerServingDefaults: {
             /** @description Adapter path on the serving volume (the run manifest's artifact key). */
@@ -5756,28 +4849,85 @@ export interface components {
             i64_set: number[];
         };
         /**
-         * @description One leaf of a derived edge's provenance trail. A tagged union so a calibrated
-         *     retrieval match can never be mistaken for an asserted fact
-         *     (FAL-PROV-NOT-LAUNDERED): the two variants are distinct on the wire, and only
-         *     the rule engine emits `Asserted` while only the retrieval-premise producer
-         *     emits `Retrieval`.
+         * @description Whether an import's deterministic published-generation job was newly
+         *     queued or coalesced with equivalent pending work.
+         * @enum {string}
          */
-        ProvenanceLeafView: {
-            edge_event_id: string;
-            /** @enum {string} */
-            kind: "asserted";
-        } | {
+        PublishedGenerationEnqueueDisposition: "queued" | "coalesced";
+        /**
+         * @description Published conformance provenance. `validated_at_seq` may trail the common
+         *     query watermark while the next durable validation is running.
+         */
+        PublishedReadConformanceView: {
+            /** Format: int32 */
+            artifact_format_version: number;
+            /** Format: int64 */
+            ontology_version: number;
+            /** Format: int64 */
+            shapes_version?: number | null;
+            validated_at_seq: components["schemas"]["CommitSeq"];
+        };
+        /**
+         * @description One family present in an atomic published root. Object keys and ETags stay
+         *     internal; this is the bounded operational/API projection.
+         */
+        PublishedReadFamilyView: {
+            family: components["schemas"]["IndexVisibilityFamily"];
+            model_hash?: string | null;
             /**
-             * Format: float
-             * @description Calibrated `P(relevant)` used as the premise confidence.
+             * Format: int32
+             * @description That family's persisted root-codec version.
              */
-            calibrated_score: number;
-            /** @enum {string} */
-            kind: "retrieval";
-            /** @description Matched entity id (hex). */
-            matched: string;
-            model_id: string;
-            target_kind: components["schemas"]["AnnTargetKind"];
+            root_format_version: number;
+            target_hash?: string | null;
+        };
+        /**
+         * @description Bounded introspection view of an immutable published generation. It exposes
+         *     snapshot lineage and freshness without leaking object-store keys.
+         */
+        PublishedReadSnapshotView: {
+            conformance?: null | components["schemas"]["PublishedReadConformanceView"];
+            /** Format: int64 */
+            epoch: number;
+            families: components["schemas"]["PublishedReadFamilyView"][];
+            /** Format: int32 */
+            format_version: number;
+            /** Format: int64 */
+            generation?: number | null;
+            graph: components["schemas"]["GraphKey"];
+            /** Format: int64 */
+            predecessor_generation?: number | null;
+            /** Format: int32 */
+            projection_version?: number | null;
+            served_at_seq: components["schemas"]["CommitSeq"];
+            /**
+             * Format: int64
+             * @description Graph-head generation whose metadata/configuration this root reflects.
+             *     This can trail the current head even when `served_at_seq` is unchanged.
+             */
+            source_head_generation: number;
+            summary_available: boolean;
+        };
+        /**
+         * @description One coherent operational view of the graph head and the immutable read root
+         *     pinned while resolving it. Lag values are derived from this `head_seq`, not
+         *     from a separately-polled status response.
+         */
+        PublishedReadStatusResponse: {
+            /** Format: int64 */
+            conformance_lag_commits?: number | null;
+            /**
+             * Format: int64
+             * @description Head-generation distance, including same-sequence ontology, shapes, or
+             *     index-configuration changes that commit-sequence lag cannot expose.
+             */
+            generation_lag: number;
+            /** Format: int64 */
+            head_generation: number;
+            head_seq: components["schemas"]["CommitSeq"];
+            /** Format: int64 */
+            query_lag_commits: number;
+            snapshot: components["schemas"]["PublishedReadSnapshotView"];
         };
         /**
          * @description Read accounting for ranged (block-level) persisted index runs. Reported
@@ -5850,30 +5000,11 @@ export interface components {
             payload_slices_fetched?: number;
             /** Format: int64 */
             shard_cache_hits: number;
-            /**
-             * @description Commits past the indexed run that were merged from the WAL tail
-             *     (append-safe edges only; anything else falls back to the snapshot
-             *     scan).
-             */
-            tail_commits_merged?: number;
             /** Format: int64 */
             topology_slices_fetched?: number;
             truncated_by_block_budget: boolean;
             truncated_by_block_byte_budget: boolean;
             truncated_by_fetched_byte_budget?: boolean;
-        };
-        /** @description JSON envelope returned by `GET /v1/graph/export/rdf?truncate=true`. */
-        RdfExportPreviewResponse: {
-            /**
-             * @description RDF serialization (Turtle, N-Triples, TriG, or N-Quads) encoded as a JSON
-             *     string so the preview metadata stays in one typed response.
-             */
-            data: string;
-            format: string;
-            returned_triples: number;
-            snapshot: components["schemas"]["SnapshotView"];
-            total_triples: number;
-            truncated: boolean;
         };
         /**
          * @description A page-region provenance anchor on a fact's evidence (region provenance
@@ -6024,8 +5155,6 @@ export interface components {
          *     by construction — the resolver never fabricates a term.
          */
         ResolveTermRequest: {
-            /** Format: int64 */
-            as_of_commit_seq?: number | null;
             /**
              * @description Restrict resolution to this explicit candidate set (the narrowed
              *     shortlist — e.g. relations WS10 admitted for a type pair). Each candidate
@@ -6038,7 +5167,6 @@ export interface components {
              *     `candidates` is supplied (the candidate list is the search space).
              */
             kinds?: components["schemas"]["SuggestKind"][];
-            snapshot_token?: string | null;
             /** @description The free text to snap to real vocabulary (1..=256 chars). */
             text: string;
             /** @description Max matches to return (default 3, clamped to 25). */
@@ -6090,76 +5218,6 @@ export interface components {
             target: components["schemas"]["NamedEntityInput"];
         };
         /**
-         * @description Stage G — turn calibrated retrieval candidates into derived edges. Every
-         *     candidate scored `P >= threshold` becomes a derived edge `(anchor, relation,
-         *     matched)` with `confidence = P` and a single `Retrieval` provenance leaf
-         *     (never `Asserted` — FAL-PROV-NOT-LAUNDERED). Candidates come from any
-         *     retrieval channel; the server re-verifies each against the served snapshot.
-         */
-        RetrievalPremiseRequest: {
-            /** @description Subject of every derived edge. */
-            anchor: components["schemas"]["EntitySelector"];
-            calibration?: null | components["schemas"]["PlattCalibration"];
-            /**
-             * @description Explicit candidates (client ran retrieval). Exactly one of `candidates` or
-             *     `query` must be supplied.
-             */
-            candidates?: components["schemas"]["ScoredCandidateInput"][];
-            /**
-             * @description Persist the derived premises as an immutable `derived/v1` object (separate
-             *     from the asserted graph) and return its key in `materialized_key`. Default
-             *     false — a plain preview that writes nothing.
-             */
-            materialize?: boolean | null;
-            /** @description Fail-closed ceiling on emitted premises. */
-            max_premises: number;
-            /** @description The embedding model the scores came from (names the `Retrieval` leaf). */
-            model_id: string;
-            /**
-             * @description Query-driven mode: when set, the server runs BM25 entity retrieval for this
-             *     text against the served snapshot and uses the matches (with their raw BM25
-             *     scores) as candidates — so a caller can hand a query instead of pre-scoring.
-             */
-            query?: string | null;
-            /** @description Candidate-pool size for `query` mode (defaults to 50). */
-            query_top_k?: number | null;
-            /** @description Predicate of every derived edge; must resolve in the ontology. */
-            relation: string;
-            /** @description The retrieval target the scores ranked. */
-            target_kind: components["schemas"]["AnnTargetKind"];
-            /**
-             * Format: double
-             * @description Minimum calibrated `P` for a candidate to become a premise (in `[0,1]`).
-             */
-            threshold: number;
-        };
-        /** @description The derived edges plus the bound / candidate-not-final instrumentation. */
-        RetrievalPremiseResponse: {
-            /**
-             * Format: int64
-             * @description The promoted `calibration` run whose scaler priced these premises;
-             *     absent when the request carried an inline `calibration`.
-             */
-            calibration_run?: number | null;
-            /** @description Candidates examined (`max_premises` may stop the scan early). */
-            considered: number;
-            derived: components["schemas"]["DerivedEdgeView"][];
-            /** @description Candidates whose calibrated `P` was below `threshold`. */
-            dropped_below_threshold: number;
-            /** @description Candidates dropped because they were not visible in the served snapshot. */
-            dropped_not_visible: number;
-            /** @description Premises emitted (`<= max_premises`). */
-            emitted: number;
-            /**
-             * @description Object key of the persisted `derived/v1` run when `materialize` was set;
-             *     `None` for a plain preview.
-             */
-            materialized_key?: string | null;
-            snapshot: components["schemas"]["SnapshotView"];
-            /** @description True if the `max_premises` bound stopped emission early. */
-            truncated: boolean;
-        };
-        /**
          * @description Named retrieval profile selecting the fusion knobs (BM25 normalization,
          *     channel weights, score floor, degree-boost mode, ontology class-intent +
          *     expansion de-noise). A closed enum — the only profile identifier that may
@@ -6195,39 +5253,28 @@ export interface components {
             returned: number;
             total: number;
         };
-        /**
-         * @description A versioned, immutable set of inference rules stored with a graph branch
-         *     (Track B). Pinned from `GraphHead.rules_ref`; used by `infer` and SHACL
-         *     `include_derived` when the request carries no inline rules.
-         */
-        RuleSet: {
-            rules: components["schemas"]["InferenceRule"][];
-            /**
-             * Format: int64
-             * @description Monotonically increasing; bumped on each define.
-             */
-            version: number;
-        };
-        /** @description Define (replace) the stored rule set for a graph branch. */
-        RuleSetDefineRequest: {
-            rules: components["schemas"]["InferenceRule"][];
-        };
-        RuleSetDefineResponse: {
-            rule_count: number;
-            /** Format: int64 */
-            rules_version: number;
-        };
         SchemaAuditReport: {
             conforms: boolean;
             messages?: string[];
+            /**
+             * Format: int64
+             * @description Ontology identity the durable report validated.
+             */
+            ontology_version?: number | null;
             result_count: number;
             results?: components["schemas"]["SchemaAuditResult"][];
+            /**
+             * Format: int64
+             * @description Shapes identity the durable report validated.
+             */
+            shapes_version?: number | null;
             /**
              * @description True when `result_count` is exact but `results` contains only the
              *     caller-requested leading window. Whole-graph audits can produce one row
              *     per offending focus node, so HTTP responses are bounded by default.
              */
             truncated?: boolean;
+            validated_at_seq?: null | components["schemas"]["CommitSeq"];
         };
         SchemaAuditResult: {
             component: string;
@@ -6295,44 +5342,15 @@ export interface components {
         };
         /** @enum {string} */
         SchemaEnforceMode: "off" | "warn" | "reject";
-        SchemaPreviewRequest: {
-            /** Format: int64 */
-            base_ontology_version?: number | null;
-            /** Format: int64 */
-            base_shapes_version?: number | null;
-            desired_mode?: components["schemas"]["SchemaEnforceMode"];
-            ontology?: null | components["schemas"]["SchemaSource"];
-            shapes?: null | components["schemas"]["SchemaSource"];
-        };
-        SchemaPreviewResponse: {
-            audit: components["schemas"]["SchemaAuditReport"];
-            /** Format: int64 */
-            base_ontology_version: number;
-            /** Format: int64 */
-            base_shapes_version?: number | null;
-            can_publish: boolean;
-            desired_mode: components["schemas"]["SchemaEnforceMode"];
-            diff: components["schemas"]["SchemaDiffEntry"][];
-            graph: components["schemas"]["GraphKey"];
-            messages: string[];
-            preview_digest: string;
-            /** Format: int64 */
-            proposed_ontology_version: number;
-            /** Format: int64 */
-            proposed_shapes_version?: number | null;
-            publish_mode_allowed: components["schemas"]["SchemaEnforceMode"][];
-            verdict: components["schemas"]["SchemaCompatibilityVerdict"];
-        };
         SchemaPublishRequest: {
             confirm_restrictive?: boolean;
             desired_mode?: components["schemas"]["SchemaEnforceMode"];
             ontology?: null | components["schemas"]["SchemaSource"];
-            preview_digest: string;
             shapes?: null | components["schemas"]["SchemaSource"];
         };
         SchemaPublishResponse: {
             activated: boolean;
-            audit: components["schemas"]["SchemaAuditReport"];
+            audit?: null | components["schemas"]["SchemaAuditReport"];
             enforce_mode: components["schemas"]["SchemaEnforceMode"];
             graph: components["schemas"]["GraphKey"];
             messages: string[];
@@ -6412,19 +5430,18 @@ export interface components {
          * @description Read consistency for a query surface (search, graph summary, SPARQL).
          *
          *     A5 (2026-07-21 product decision): `Eventual` is the **default**. It serves the
-         *     last published index/dataset state at its watermark with no in-memory fold of
-         *     the un-indexed tail — the lowest-latency mode and the availability floor
-         *     during any indexing backlog. The served watermark rides back on
-         *     `SnapshotView::served_at_seq`. `Strong` (fold the un-indexed tail up to the
-         *     query head) is now explicit opt-in; the precise read-your-writes contract
-         *     (`min_indexed_seq`) replaces most former uses of strong. See
+         *     pinned published generation at its watermark with no request-time graph
+         *     assembly — the lowest-latency mode and the availability floor during any
+         *     publication backlog. The served watermark rides back on
+         *     `SnapshotView::served_at_seq`. `Strong` requires the immutable published
+         *     generation itself to cover the query head and is explicit opt-in; the precise
+         *     read-your-writes contract (`min_indexed_seq`) replaces most former uses of strong. See
          *     `docs/architecture/segment-native-indexing.md` §6.
          * @enum {string}
          */
         SearchConsistency: "strong" | "eventual";
         SearchEngineOptions: {
             bm25?: boolean;
-            bm25_source?: null | components["schemas"]["FullTextIndexSource"];
             consistency?: null | components["schemas"]["SearchConsistency"];
             /** Format: int32 */
             dim?: number | null;
@@ -6457,7 +5474,6 @@ export interface components {
             rerank_top_k?: number | null;
             tokenizer?: null | components["schemas"]["FullTextTokenizerConfig"];
             vector?: boolean;
-            vector_source?: null | components["schemas"]["EmbeddingIndexSource"];
             weights?: null | components["schemas"]["SearchSignalWeights"];
         };
         SearchExplanation: {
@@ -6778,67 +5794,6 @@ export interface components {
             vector_indexed_commit_seq?: null | components["schemas"]["CommitSeq"];
             vector_manifest_key?: string | null;
         };
-        SearchIndexFamilyRun: {
-            family: string;
-            indexed_commit_seq_after: components["schemas"]["CommitSeq"];
-            indexed_commit_seq_before?: null | components["schemas"]["CommitSeq"];
-            manifest_key?: string | null;
-            objects_written: number;
-            skipped: boolean;
-        };
-        /** @description Durable background full-index job status with per-family terminal result. */
-        SearchIndexJobStatusResponse: {
-            /** Format: int32 */
-            attempts: number;
-            /** Format: int64 */
-            enqueued_at_micros: number;
-            graph: components["schemas"]["GraphKey"];
-            job_id: string;
-            result?: null | components["schemas"]["SearchIndexRunResponse"];
-            stage?: string | null;
-            /** @description `pending` | `running` | `succeeded` | `failed` | `cancelled`. */
-            status: string;
-            terminal_error?: string | null;
-            /** Format: int64 */
-            updated_at_micros: number;
-        };
-        SearchIndexRunRequest: {
-            /** @description Build the ranged adjacency run for traversal. Off by default. */
-            build_adjacency?: boolean;
-            build_embeddings?: boolean;
-            build_full_text?: boolean;
-            /**
-             * @description Build the object-storage-native permutation view (PSO) for native SHACL
-             *     target/path evaluation and analytic graph queries. Off by default.
-             */
-            build_permutation?: boolean;
-            /** Format: int32 */
-            dim?: number | null;
-            include_clusters: boolean;
-            /**
-             * @description Append a raw-f32 region to the embedding run so vector search can opt
-             *     into exact rerank. Off by default (compact 4-bit-only runs).
-             */
-            include_raw_rerank?: boolean;
-            include_terms: boolean;
-            max_clusters?: number | null;
-            provider?: null | components["schemas"]["EmbeddingProviderConfig"];
-            targets: components["schemas"]["AnnTargetKind"][];
-            tokenizer?: null | components["schemas"]["FullTextTokenizerConfig"];
-        };
-        SearchIndexRunResponse: {
-            adjacency?: null | components["schemas"]["SearchIndexFamilyRun"];
-            embeddings?: null | components["schemas"]["SearchIndexFamilyRun"];
-            full_text?: null | components["schemas"]["SearchIndexFamilyRun"];
-            /**
-             * @description One coherent observation of every serving index family after this run.
-             *     Unlike the per-family build outcomes, this also includes families the
-             *     request did not rebuild and is therefore the convergence contract.
-             */
-            index_lineage: components["schemas"]["IndexLineage"];
-            permutation?: null | components["schemas"]["SearchIndexFamilyRun"];
-            snapshot: components["schemas"]["SnapshotView"];
-        };
         /**
          * @description Sort direction for a query's `order_by` key. `Desc` is the default for the
          *     implicit relevance ordering (highest score first); `Asc` is most useful when
@@ -6861,20 +5816,12 @@ export interface components {
             field: string;
         };
         /**
-         * @description `POST /v1/search/session/commit` — execute the search against the session's
-         *     pinned snapshot. The warmed cache makes it read warm; the results are exactly
-         *     what the same request would return without any prior `prefix` frames.
+         * @description `POST /v1/search/session/commit` — execute the search against the current
+         *     published snapshot. The warmed cache makes it read warm; the results are
+         *     exactly what the same request would return without any prior `prefix`
+         *     frames.
          */
         SearchSessionCommitRequest: {
-            /**
-             * @description Enforce the session's snapshot pin: the search runs with
-             *     `as_of_commit_seq` set to the commit the session opened at, so a write
-             *     that landed mid-session cannot change what this commit returns
-             *     (reproducible runs / retry determinism). An explicit conflicting
-             *     `request.as_of_commit_seq` is an `invalid_input`. Default false — the
-             *     commit reads the current head, exactly like `POST /v1/graph/search`.
-             */
-            pin?: boolean;
             request: components["schemas"]["SemanticGraphSearchRequest"];
             session_id: string;
         };
@@ -6967,12 +5914,6 @@ export interface components {
          *     completions are strings that provably exist in the graph at this snapshot.
          */
         SearchSuggestRequest: {
-            /**
-             * Format: int64
-             * @description Transaction-time vocabulary pin. Mutually exclusive with
-             *     `snapshot_token`.
-             */
-            as_of_commit_seq?: number | null;
             context?: null | components["schemas"]["SuggestContext"];
             /** @description Restrict `attribute_value` suggestions to one attribute field. */
             field?: string | null;
@@ -6982,11 +5923,6 @@ export interface components {
             limit?: number | null;
             prefix: string;
             ranker?: null | components["schemas"]["SuggestRankerWeights"];
-            /**
-             * @description Opaque graph snapshot identity previously returned by LBB. Mutually
-             *     exclusive with `as_of_commit_seq`.
-             */
-            snapshot_token?: string | null;
             vocabulary_filter?: null | components["schemas"]["VocabularyFilter"];
         };
         SearchSuggestResponse: {
@@ -7028,39 +5964,20 @@ export interface components {
             text: string;
         };
         /**
-         * @description How a temporally-pinned (or head) search resolved run selection: the
-         *     effective `as_of` ceiling, the base snapshot of the selected persisted
-         *     run(s), and the highest commit each leg's run+segments actually covered
-         *     (the forward WAL overlay covers `(covered_through, ceiling]`). Distinct from
-         *     the ontology-inspect `TemporalCoverage` type. Per-leg fields are `None` when
-         *     that leg served from an ephemeral rebuild (no persisted run at the ceiling).
+         * @description Provenance for the immutable family roots selected from one pinned published
+         *     generation. `ceiling_commit_seq` is that generation's common query
+         *     watermark; per-leg fields are `None` only when the corresponding leg was
+         *     disabled.
          */
         SearchTemporalCoverage: {
             bm25_covered_through?: null | components["schemas"]["CommitSeq"];
             bm25_run_snapshot_commit_seq?: null | components["schemas"]["CommitSeq"];
-            /**
-             * @description Resolved transaction-time ceiling: the `as_of_commit_seq` pin, or the
-             *     head commit_seq when the query was unpinned.
-             */
+            /** @description Common query watermark of the pinned published generation. */
             ceiling_commit_seq: components["schemas"]["CommitSeq"];
             vector_covered_through?: null | components["schemas"]["CommitSeq"];
             vector_run_snapshot_commit_seq?: null | components["schemas"]["CommitSeq"];
         };
         SemanticGraphSearchRequest: {
-            /**
-             * Format: int64
-             * @description Snapshot pin (transaction-time ceiling): results hide every event
-             *     committed after this sequence, reproducing that past snapshot. BM25/ANN
-             *     indexes still generate candidates from the head; the pin is enforced
-             *     where results are verified against the snapshot, never by candidate
-             *     generation. Omitted means the current head.
-             */
-            as_of_commit_seq?: number | null;
-            /**
-             * @description Valid-time cursor (RFC 3339): results reflect facts true at this
-             *     instant. Omitted means the latest valid time.
-             */
-            as_of_valid_time?: string | null;
             explain?: boolean;
             /**
              * @description Entity attributes to project onto each entity hit from the same graph
@@ -7113,21 +6030,11 @@ export interface components {
         };
         SemanticSearchExplain: {
             bm25_candidates: number;
-            /**
-             * @description True when a **persisted** BM25 index was requested but none matched the
-             *     query's resolved target set, so the search silently fell back to a full
-             *     ephemeral rebuild (much slower). A common cause is building the index for
-             *     a narrower target set than the query resolves to (e.g. `[Entity]` vs the
-             *     `{Entity, Neighborhood}` that `Entities` resolves to). Also bumps the
-             *     `lbb_search_degraded_total{family="bm25"}` metric.
-             */
-            bm25_degraded_to_ephemeral?: boolean;
             bm25_documents: number;
             bm25_indexed_commit_seq?: null | components["schemas"]["CommitSeq"];
             bm25_manifest_key?: string | null;
             /** Format: int64 */
             bm25_ms?: number;
-            bm25_overlay_candidates: number;
             bm25_ranged?: null | components["schemas"]["RangedReadStats"];
             /**
              * Format: int64
@@ -7153,6 +6060,8 @@ export interface components {
             /** Format: int64 */
             ontology_ms?: number;
             paths_considered: number;
+            /** @description Commit distance from the graph head to the pinned published generation. */
+            published_lag_commits: number;
             retrieval_profile?: null | components["schemas"]["RetrievalProfileId"];
             search_mode: string;
             /** Format: int64 */
@@ -7177,18 +6086,7 @@ export interface components {
              *     "profile defaults" honestly.
              */
             trained_fusion_run?: number | null;
-            unindexed_tail_commits: number;
             vector_candidates: number;
-            /**
-             * @description True when latest-head hybrid search requested the persisted vector/ANN
-             *     channel but no matching run existed, so the optional vector channel was
-             *     skipped instead of silently rebuilding an O(corpus) ephemeral ANN on the
-             *     request path. Explicit ephemeral and historical pinned searches retain
-             *     their existing behavior.
-             */
-            vector_channel_skipped?: boolean;
-            /** @description As `bm25_degraded_to_ephemeral`, for the persisted vector/ANN index. */
-            vector_degraded_to_ephemeral?: boolean;
             vector_indexed_commit_seq?: null | components["schemas"]["CommitSeq"];
             vector_manifest_key?: string | null;
             /**
@@ -7201,7 +6099,6 @@ export interface components {
             vector_model_id?: string | null;
             /** Format: int64 */
             vector_ms?: number;
-            vector_overlay_candidates: number;
             vector_ranged?: null | components["schemas"]["RangedReadStats"];
             vector_spaces_searched: number;
         };
@@ -7218,15 +6115,6 @@ export interface components {
             vector_candidates: number;
         };
         SemanticTraverseRequest: {
-            /**
-             * Format: int64
-             * @description Snapshot pin (transaction-time ceiling): seeds and expansion reproduce
-             *     the graph as of this commit sequence. Any as-of (valid time or pin)
-             *     routes traversal through the snapshot scan — the persisted-vector
-             *     ranged fast path serves head reads only. Omitted means head.
-             */
-            as_of_commit_seq?: number | null;
-            as_of_valid_time?: string | null;
             direction: components["schemas"]["ExpansionDirection"];
             explain: boolean;
             /**
@@ -7602,11 +6490,6 @@ export interface components {
          *     on this evidence — the endpoint never promotes.
          */
         ShadowEvalRequest: {
-            /**
-             * Format: int64
-             * @description Pin both arms to one snapshot for reproducibility.
-             */
-            as_of_commit_seq?: number | null;
             challenger: components["schemas"]["SearchEngineOptions"];
             champion?: null | components["schemas"]["SearchEngineOptions"];
             queries: components["schemas"]["ShadowQuery"][];
@@ -7698,11 +6581,9 @@ export interface components {
          * @description The closed set of signal kinds (v1). Extending this is a deliberate format
          *     change, not an open string.
          *
-         *     v1.1 (2026-07-07, planner-feedback capture): adds `ask_trace`
-         *     (server-emitted per `/v1/ask`: the question, the decoded plan + its
-         *     shortlists, verification flags, retrieval outcome) and `ask_feedback`
-         *     (client verdict on an ask, joined to its trace by `request_id`) — the raw
-         *     material the planner fine-tune trains on.
+         *     v1.1 (2026-07-07, planner-feedback capture): adds the legacy
+         *     `ask_trace`/`ask_feedback` supervision records. They remain decodable for
+         *     durable training data, but no public Ask endpoint emits them.
          * @enum {string}
          */
         SignalKind: "suggestion_shown" | "suggestion_adopted" | "zero_result" | "atom_cited" | "branch_merge_accepted" | "branch_merge_rejected" | "tool_error" | "speculation_summary" | "ask_trace" | "ask_feedback" | "external_planner_trace";
@@ -7750,16 +6631,11 @@ export interface components {
             as_of_commit_seq?: null | components["schemas"]["CommitSeq"];
             commit_seq: components["schemas"]["CommitSeq"];
             /**
-             * @description Highest commit folded into the **compacted graph snapshot base** (the
-             *     materialized segment base). Commits in `(compacted_seq, commit_seq]` live in
-             *     the WAL tail and are replayed on read — so `compacted_seq: 0` is the normal
-             *     state of a small or freshly-created graph (no base built yet) and does
-             *     **not** mean the data is unreadable: every read replays the full tail.
-             *
-             *     This is *not* search-index coverage. Whether BM25/vector search indexes
-             *     are built — what `/v1/index/run` advances — is reported separately as
-             *     `bm25_indexed_commit_seq` / `ann_indexed_commit_seq` on
-             *     `GET /v1/graph/metadata` and on the entity read's metadata.
+             * @description Highest durable graph-truth commit folded by background compaction.
+             *     This is maintenance provenance, not the query-serving watermark.
+             *     Published reads expose their one common `served_at_seq` through the
+             *     response and `/v1/graph/read-snapshot`; handlers never fold the WAL tail
+             *     or assemble derived indexes to satisfy a request.
              */
             compacted_seq: components["schemas"]["CommitSeq"];
             served_at_seq?: null | components["schemas"]["CommitSeq"];
@@ -7773,12 +6649,9 @@ export interface components {
             stale?: boolean;
             /**
              * @description The reason a read is `stale`. `"storage_degraded"` (F2),
-             *     `"eventual_consistency"` (A3: served from the last published index/dataset
-             *     state), `"adjacency_coverage"` (served from the newest published
-             *     ranged-adjacency snapshot), `"tail_budget_exceeded"` (the eventual RDF
-             *     WAL tail exceeded a per-read bound), `"merge_lag"` (the RDF L0 chain was
-             *     capped at a coherent prefix), or `"assembly_pool_exhausted"` (the shared
-             *     eventual-read byte pool was saturated); omitted when not stale.
+             *     `"eventual_consistency"` (served from the immutable published
+             *     generation) or `"adjacency_coverage"` (served from that generation's
+             *     bounded ranged-adjacency snapshot); omitted when not stale.
              */
             stale_reason?: string | null;
         };
@@ -7944,13 +6817,6 @@ export interface components {
              */
             aggregates?: components["schemas"]["SparqlAggregate"][];
             /**
-             * Format: int64
-             * @description Snapshot pin: evaluate as of this `commit_seq`, hiding later commits.
-             *     Errors if it exceeds the head; forces the snapshot reduce path.
-             */
-            as_of_commit_seq?: number | null;
-            as_of_valid_time?: string | null;
-            /**
              * @description `ASK` form: return only `boolean` (whether the pattern has any solution).
              *     Projection, DISTINCT, and limit/offset are ignored.
              */
@@ -8011,11 +6877,11 @@ export interface components {
             /** @description WHERE: the conjunctive basic graph pattern (shares the analytic engine). */
             patterns: components["schemas"]["AnalyticTriplePattern"][];
             /**
-             * @description Reason over the graph's stored inference rules: fold the rule-derived
-             *     facts into the snapshot the query sees, so a pattern matches asserted **and**
-             *     derived edges in one shot. Off by default (asserted-only). Forces the
-             *     overlay reduce path (the prebuilt index holds no derived facts), and is a
-             *     no-op when the branch has no stored rules.
+             * @description Reason over the graph's stored inference rules so a pattern matches
+             *     asserted **and** derived edges in one shot. Off by default
+             *     (asserted-only). Public serving requires a compatible reasoned
+             *     projection in the pinned published generation and fails closed when it
+             *     is absent; it never forces an overlay reduce.
              */
             reason?: boolean;
             /**
@@ -8077,16 +6943,9 @@ export interface components {
          */
         SparqlTextRequest: {
             /**
-             * Format: int64
-             * @description Snapshot pin: project the graph as of this `commit_seq` before running the
-             *     conformant engine, hiding later commits. Errors if it exceeds the head.
-             */
-            as_of_commit_seq?: number | null;
-            /** @description RFC3339 valid-time; query the graph as of that instant. `None` = now. */
-            as_of_valid_time?: string | null;
-            /**
-             * @description RDFS entailment regime. `Subclass` (default) makes a query for a class
-             *     match instances of its subtypes; `None` matches only the declared type.
+             * @description RDFS entailment regime. `None` (default) reads the asserted published
+             *     projection. `Subclass` requires a compatible reasoned projection and
+             *     fails closed while one is unavailable.
              */
             entailment?: components["schemas"]["SparqlEntailment"];
             /**
@@ -8102,8 +6961,9 @@ export interface components {
              * @description Reason over the branch's stored inference rules: project the rule-derived
              *     facts into the dataset the conformant engine runs over, so a query reasons
              *     over asserted **and** derived edges. Off by default; a no-op when the branch
-             *     has no stored rules. Combine with `entailment: subclass` (the default) for
-             *     full reasoning — rule-derived facts plus `rdfs:subClassOf` type closure.
+             *     has no stored rules. Combine with `entailment: subclass` for full
+             *     reasoning—rule-derived facts plus `rdfs:subClassOf` type closure—once
+             *     maintenance publishes a compatible reasoned projection.
              */
             reason?: boolean;
         };
@@ -8270,72 +7130,6 @@ export interface components {
             pairs: components["schemas"]["ShadowQuery"][];
             snapshot: components["schemas"]["SnapshotView"];
             truncated: boolean;
-        };
-        /**
-         * @description A self-describing summary of a snapshot's two temporal axes, so an agent can
-         *     decide up front which temporal queries are meaningful on this graph.
-         *
-         *     The product motivation: a graph backfilled in one batch with no per-fact
-         *     `valid_time` looks fully populated but cannot be bisected by date — every
-         *     `as_of` returns the same snapshot. The two `*_degenerate` flags say so
-         *     explicitly rather than letting a caller render N identical daily panels.
-         */
-        TemporalCoverage: {
-            /**
-             * @description True when no event carries a `valid_time` bound: an `as_of_valid_time`
-             *     query returns all-or-nothing, never a daily progression.
-             */
-            as_of_valid_time_degenerate: boolean;
-            /**
-             * Format: int64
-             * @description Distinct `commit_seq` values among the events: how many commits the data
-             *     arrived in. `1` means a single bulk backfill, so `as_of_commit_seq` can
-             *     only distinguish "before" vs "after" that one batch.
-             */
-            distinct_commit_count: number;
-            /**
-             * Format: int64
-             * @description Transaction-time span (when facts were recorded), in epoch micros.
-             */
-            earliest_commit_time_micros?: number | null;
-            /**
-             * Format: int64
-             * @description World-time span over events that carry a `valid_time` bound, in micros.
-             */
-            earliest_valid_time_micros?: number | null;
-            /**
-             * Format: int64
-             * @description Total append-only edge events in the snapshot overlay.
-             */
-            edge_event_count: number;
-            /**
-             * Format: int64
-             * @description Events whose `valid_time` carries a bounded start and/or end.
-             */
-            edges_with_valid_time: number;
-            /**
-             * Format: int64
-             * @description Head `commit_seq` — the largest snapshot pin (`as_of_commit_seq`) a read
-             *     can request right now.
-             */
-            head_commit_seq: number;
-            /** Format: int64 */
-            latest_commit_time_micros?: number | null;
-            /** Format: int64 */
-            latest_valid_time_micros?: number | null;
-            /**
-             * @description True when every event arrived in a single commit (a one-shot backfill):
-             *     there is only one snapshot to pin to, and `as_of` by wall-clock date
-             *     cannot bisect the history. For multi-commit graphs, inspect the
-             *     `*_commit_time_micros` span to judge whether daily bisection is possible.
-             */
-            single_commit: boolean;
-            /**
-             * Format: float
-             * @description `edges_with_valid_time / edge_event_count`, in `[0,1]`. Near zero means
-             *     an `as_of_valid_time` query cannot bisect this graph by world-time.
-             */
-            valid_time_coverage: number;
         };
         TenantId: string;
         /** @enum {string} */
@@ -8541,9 +7335,11 @@ export interface components {
             /**
              * Format: int64
              * @description Snapshot pin: reproduce the graph state as of this `commit_seq`, hiding
-             *     any event committed later. Errors if it exceeds the current head, and
-             *     forces the snapshot scan (the ranged adjacency fast path declines a
-             *     pinned read). Omit for the latest snapshot.
+             *     any event committed later. Public serving reduces the bounded edge
+             *     domains from the Base family in the one pinned published generation;
+             *     it never discovers or assembles another snapshot. Historical entity
+             *     filters/field projection fail explicitly because Base does not carry a
+             *     point-indexed entity-mutation history. Omit for the latest snapshot.
              */
             as_of_commit_seq?: number | null;
             as_of_valid_time?: string | null;
@@ -8558,12 +7354,13 @@ export interface components {
              * Format: int64
              * @description Decoded adjacency-block working-set byte budget for the ranged path.
              *     Defaults to the server/store budget. A request may lower the budget,
-             *     but not raise it. Ignored on the snapshot path.
+             *     but not raise it. Ignored on the bounded Base-family reducer path.
              */
             max_block_bytes?: number | null;
             /**
              * @description Object-read budget for the ranged adjacency path; defaults to a value
-             *     derived from `max_frontier_entities`. Ignored on the snapshot path.
+             *     derived from `max_frontier_entities`. Ignored on the bounded Base-family
+             *     reducer path.
              */
             max_block_reads?: number | null;
             max_frontier_entities: number;
@@ -8829,290 +7626,6 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
-    post_v1_ask: {
-        parameters: {
-            query?: {
-                /** @description Graph name (default `main`) */
-                graph?: string;
-                /** @description Branch name (default `main`) */
-                branch?: string;
-            };
-            header?: {
-                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
-                "Lbb-Version"?: string;
-                /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
-                "Idempotency-Key"?: string;
-            };
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["AskRequest"];
-            };
-        };
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["AskResponse"];
-                };
-            };
-            /** @description Bad request */
-            400: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Forbidden */
-            403: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Not found */
-            404: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Conflict */
-            409: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Rate limit exceeded */
-            429: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Internal server error */
-            500: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Service unavailable */
-            503: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-        };
-    };
-    post_v1_ask_feedback: {
-        parameters: {
-            query?: {
-                /** @description Graph name (default `main`) */
-                graph?: string;
-                /** @description Branch name (default `main`) */
-                branch?: string;
-            };
-            header: {
-                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
-                "Lbb-Version"?: string;
-                /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
-                "Idempotency-Key": string;
-            };
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["AskFeedbackRequest"];
-            };
-        };
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["AskFeedbackResponse"];
-                };
-            };
-            /** @description Bad request */
-            400: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Forbidden */
-            403: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Not found */
-            404: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Conflict */
-            409: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Rate limit exceeded */
-            429: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Internal server error */
-            500: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Service unavailable */
-            503: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-        };
-    };
     post_v1_decode: {
         parameters: {
             query?: {
@@ -9122,7 +7635,7 @@ export interface operations {
                 branch?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -9264,7 +7777,7 @@ export interface operations {
                 branch?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -9402,7 +7915,7 @@ export interface operations {
                 dataset?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -9544,7 +8057,7 @@ export interface operations {
                 build?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -9682,7 +8195,7 @@ export interface operations {
                 branch?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -9818,11 +8331,9 @@ export interface operations {
                 branch?: string;
                 /** @description Dataset id */
                 dataset?: string;
-                /** @description Index source: persisted or ephemeral */
-                source?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -9960,7 +8471,7 @@ export interface operations {
                 branch?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -10104,7 +8615,7 @@ export interface operations {
                 confirm?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -10242,7 +8753,7 @@ export interface operations {
                 branch?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -10384,7 +8895,7 @@ export interface operations {
                 branch?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -10524,7 +9035,7 @@ export interface operations {
                 limit?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -10662,7 +9173,7 @@ export interface operations {
                 dry_run?: string;
             };
             header: {
-                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key": string;
@@ -10808,7 +9319,7 @@ export interface operations {
                 max_segments?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -10946,7 +9457,7 @@ export interface operations {
                 branch?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -11086,7 +9597,7 @@ export interface operations {
                 confirm?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -11215,150 +9726,6 @@ export interface operations {
             };
         };
     };
-    get_v1_graph_edges: {
-        parameters: {
-            query?: {
-                /** @description Graph name (default `main`) */
-                graph?: string;
-                /** @description Branch name (default `main`) */
-                branch?: string;
-                /** @description Search text */
-                q?: string;
-                /** @description Relation filter */
-                relation?: string;
-                /** @description Max rows */
-                limit?: string;
-                /** @description Opaque cursor from the previous page (legacy `offset` also accepted) */
-                cursor?: string;
-            };
-            header?: {
-                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
-                "Lbb-Version"?: string;
-            };
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": Record<string, never>;
-                };
-            };
-            /** @description Bad request */
-            400: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Forbidden */
-            403: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Not found */
-            404: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Conflict */
-            409: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Rate limit exceeded */
-            429: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Internal server error */
-            500: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Service unavailable */
-            503: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-        };
-    };
     get_v1_graph_embedding: {
         parameters: {
             query?: {
@@ -11368,7 +9735,7 @@ export interface operations {
                 branch?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -11504,7 +9871,7 @@ export interface operations {
                 branch?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -11652,7 +10019,7 @@ export interface operations {
                 full?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -11796,7 +10163,7 @@ export interface operations {
                 job_id?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -11932,7 +10299,7 @@ export interface operations {
                 branch?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -12076,7 +10443,7 @@ export interface operations {
                 job_id?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -12214,7 +10581,7 @@ export interface operations {
                 branch?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -12354,7 +10721,7 @@ export interface operations {
                 allow_regression?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -12483,296 +10850,6 @@ export interface operations {
             };
         };
     };
-    get_v1_graph_entities: {
-        parameters: {
-            query?: {
-                /** @description Graph name (default `main`) */
-                graph?: string;
-                /** @description Branch name (default `main`) */
-                branch?: string;
-                /** @description Search text */
-                q?: string;
-                /** @description Entity type filter */
-                type?: string;
-                /** @description Max rows */
-                limit?: string;
-                /** @description Opaque cursor from the previous page */
-                cursor?: string;
-                /** @description Comma-separated property names to inline on each row (typed, native JSON); `*` for all. Omit for the lean default row. */
-                fields?: string;
-                /** @description Comma-separated entity ids to fetch in one call (bulk lookup); bypasses the q/type browse filters. */
-                ids?: string;
-            };
-            header?: {
-                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
-                "Lbb-Version"?: string;
-            };
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": Record<string, never>;
-                };
-            };
-            /** @description Bad request */
-            400: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Forbidden */
-            403: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Not found */
-            404: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Conflict */
-            409: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Rate limit exceeded */
-            429: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Internal server error */
-            500: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Service unavailable */
-            503: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-        };
-    };
-    post_v1_graph_entities_filter: {
-        parameters: {
-            query?: {
-                /** @description Graph name (default `main`) */
-                graph?: string;
-                /** @description Branch name (default `main`) */
-                branch?: string;
-            };
-            header?: {
-                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
-                "Lbb-Version"?: string;
-                /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
-                "Idempotency-Key"?: string;
-            };
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["EntityFilterRequest"];
-            };
-        };
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["EntityFilterResponse"];
-                };
-            };
-            /** @description Bad request */
-            400: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Forbidden */
-            403: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Not found */
-            404: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Conflict */
-            409: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Rate limit exceeded */
-            429: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Internal server error */
-            500: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Service unavailable */
-            503: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-        };
-    };
     get_v1_graph_entities_sample: {
         parameters: {
             query?: {
@@ -12784,11 +10861,11 @@ export interface operations {
                 type?: string;
                 /** @description Max sampled rows (up to 128) */
                 limit?: string;
-                /** @description Accepted as strong or eventual; adjacency serves its newest published base+delta coverage without inspecting the live WAL tail in either mode */
+                /** @description Accepted as strong or eventual; adjacency serves the exact immutable base pinned by the published generation without inspecting the live WAL in either mode */
                 consistency?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -12930,7 +11007,7 @@ export interface operations {
                 name?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -13074,7 +11151,7 @@ export interface operations {
                 as_of?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -13218,11 +11295,9 @@ export interface operations {
                 relations?: string;
                 /** @description RFC3339 as-of timestamp */
                 as_of?: string;
-                /** @description When true, require ranged adjacency and never fall back to a whole-snapshot scan */
-                indexed?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -13349,148 +11424,6 @@ export interface operations {
             };
         };
     };
-    get_v1_graph_export: {
-        parameters: {
-            query?: {
-                /** @description Graph name (default `main`) */
-                graph?: string;
-                /** @description Branch name (default `main`) */
-                branch?: string;
-                /** @description Records (entity+edge lines) per page (default 1000, clamped 1-50000) */
-                limit?: string;
-                /** @description Opaque page cursor from a prior page's meta.next_cursor; pins the snapshot across pages */
-                cursor?: string;
-                /** @description Pin the export to a past snapshot commit_seq (first page only) */
-                as_of_commit_seq?: string;
-            };
-            header?: {
-                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
-                "Lbb-Version"?: string;
-            };
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": Record<string, never>;
-                };
-            };
-            /** @description Bad request */
-            400: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Forbidden */
-            403: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Not found */
-            404: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Conflict */
-            409: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Rate limit exceeded */
-            429: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Internal server error */
-            500: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Service unavailable */
-            503: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-        };
-    };
     get_v1_graph_export_job: {
         parameters: {
             query?: {
@@ -13502,7 +11435,7 @@ export interface operations {
                 job_id?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -13640,7 +11573,7 @@ export interface operations {
                 as_of_commit_seq?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -13769,160 +11702,6 @@ export interface operations {
             };
         };
     };
-    get_v1_graph_export_rdf: {
-        parameters: {
-            query?: {
-                /** @description Graph name (default `main`) */
-                graph?: string;
-                /** @description Branch name (default `main`) */
-                branch?: string;
-                /** @description RDF format: turtle (default), nt/ntriples, trig, or nq/nquads */
-                format?: string;
-                /** @description Output ceiling; rejects the full export, or bounds the JSON preview when truncate=true */
-                max_triples?: string;
-                /** @description Return a deterministic bounded JSON preview instead of rejecting when the graph is larger than max_triples */
-                truncate?: string;
-                /** @description RFC3339 valid-time snapshot pin */
-                as_of_valid_time?: string;
-                /** @description Commit-sequence snapshot pin */
-                as_of_commit_seq?: string;
-                /** @description subclass (default) or none */
-                entailment?: string;
-                /** @description Include stored rule-derived facts when true */
-                reason?: string;
-            };
-            header?: {
-                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
-                "Lbb-Version"?: string;
-            };
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description RDF graph */
-            200: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["RdfExportPreviewResponse"];
-                    "application/n-quads": string;
-                    "application/n-triples": string;
-                    "application/trig": string;
-                    "text/turtle": string;
-                };
-            };
-            /** @description Bad request */
-            400: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Forbidden */
-            403: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Not found */
-            404: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Conflict */
-            409: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Rate limit exceeded */
-            429: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Internal server error */
-            500: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Service unavailable */
-            503: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-        };
-    };
     post_v1_graph_fork: {
         parameters: {
             query?: {
@@ -13938,7 +11717,7 @@ export interface operations {
                 confirm?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -14074,11 +11853,11 @@ export interface operations {
                 graph?: string;
                 /** @description Branch name (default `main`) */
                 branch?: string;
-                /** @description Entities to sample for name/recall probes (default 50, max 200) */
+                /** @description Requested published sample window (default 50, max 200) */
                 sample?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -14218,9 +11997,11 @@ export interface operations {
                 strict?: string;
                 /** @description RFC3339 backfill instant stamped on every batch */
                 observed_at?: string;
+                /** @description Durably enqueue one atomic published-generation build after the final batch */
+                publish?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -14374,9 +12155,11 @@ export interface operations {
                 blank_node_scope?: string;
                 /** @description Entity type name for imported RDF resources (default Resource) */
                 resource_type?: string;
+                /** @description Durably enqueue one atomic published-generation build after the final batch */
+                publish?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -14514,7 +12297,7 @@ export interface operations {
                 branch?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -14641,148 +12424,6 @@ export interface operations {
             };
         };
     };
-    get_v1_graph_observations: {
-        parameters: {
-            query?: {
-                /** @description Graph name (default `main`) */
-                graph?: string;
-                /** @description Branch name (default `main`) */
-                branch?: string;
-                /** @description Search text */
-                q?: string;
-                /** @description Max rows */
-                limit?: string;
-                /** @description Opaque cursor from the previous page */
-                cursor?: string;
-            };
-            header?: {
-                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
-                "Lbb-Version"?: string;
-            };
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": Record<string, never>;
-                };
-            };
-            /** @description Bad request */
-            400: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Forbidden */
-            403: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Not found */
-            404: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Conflict */
-            409: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Rate limit exceeded */
-            429: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Internal server error */
-            500: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Service unavailable */
-            503: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-        };
-    };
     post_v1_graph_query: {
         parameters: {
             query?: {
@@ -14792,7 +12433,7 @@ export interface operations {
                 branch?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -14925,6 +12566,142 @@ export interface operations {
             };
         };
     };
+    get_v1_graph_read_snapshot: {
+        parameters: {
+            query?: {
+                /** @description Graph name (default `main`) */
+                graph?: string;
+                /** @description Branch name (default `main`) */
+                branch?: string;
+            };
+            header?: {
+                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                "Lbb-Version"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublishedReadStatusResponse"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Rate limit exceeded */
+            429: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Service unavailable */
+            503: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+        };
+    };
     post_v1_graph_reload: {
         parameters: {
             query?: {
@@ -14942,7 +12719,7 @@ export interface operations {
                 observed_at?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -15080,7 +12857,7 @@ export interface operations {
                 branch?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -15222,7 +12999,7 @@ export interface operations {
                 branch?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -15364,7 +13141,7 @@ export interface operations {
                 branch?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -15506,7 +13283,7 @@ export interface operations {
                 branch?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -15648,7 +13425,7 @@ export interface operations {
                 max_hops?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -15784,7 +13561,7 @@ export interface operations {
                 branch?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -15930,7 +13707,7 @@ export interface operations {
                 cursor?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -16057,2116 +13834,6 @@ export interface operations {
             };
         };
     };
-    get_v1_index: {
-        parameters: {
-            query?: {
-                /** @description Graph name (default `main`) */
-                graph?: string;
-                /** @description Branch name (default `main`) */
-                branch?: string;
-                /** @description Index source: persisted or ephemeral */
-                source?: string;
-            };
-            header?: {
-                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
-                "Lbb-Version"?: string;
-            };
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["EmbeddingIndexInspectResponse"];
-                };
-            };
-            /** @description Bad request */
-            400: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Forbidden */
-            403: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Not found */
-            404: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Conflict */
-            409: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Rate limit exceeded */
-            429: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Internal server error */
-            500: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Service unavailable */
-            503: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-        };
-    };
-    post_v1_index_build: {
-        parameters: {
-            query?: {
-                /** @description Graph name (default `main`) */
-                graph?: string;
-                /** @description Branch name (default `main`) */
-                branch?: string;
-                /** @description Run the build detached and return immediately; poll /v1/graph/metadata for completion */
-                background?: string;
-            };
-            header?: {
-                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
-                "Lbb-Version"?: string;
-                /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
-                "Idempotency-Key"?: string;
-            };
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["IndexBuildOptions"];
-            };
-        };
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": Record<string, never>;
-                };
-            };
-            /** @description Bad request */
-            400: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Forbidden */
-            403: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Not found */
-            404: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Conflict */
-            409: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Rate limit exceeded */
-            429: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Internal server error */
-            500: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Service unavailable */
-            503: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-        };
-    };
-    post_v1_index_delta: {
-        parameters: {
-            query?: {
-                /** @description Graph name (default `main`) */
-                graph?: string;
-                /** @description Branch name (default `main`) */
-                branch?: string;
-            };
-            header?: {
-                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
-                "Lbb-Version"?: string;
-                /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
-                "Idempotency-Key"?: string;
-            };
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["IndexDeltaResponse"];
-                };
-            };
-            /** @description Bad request */
-            400: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Forbidden */
-            403: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Not found */
-            404: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Conflict */
-            409: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Rate limit exceeded */
-            429: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Internal server error */
-            500: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Service unavailable */
-            503: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-        };
-    };
-    post_v1_index_gc: {
-        parameters: {
-            query?: {
-                /** @description Graph name (default `main`) */
-                graph?: string;
-                /** @description Branch name (default `main`) */
-                branch?: string;
-                /** @description Number of newest runs to keep */
-                keep_runs?: string;
-                /** @description Retain runs within this many commits of head so in-flight searches are not collected mid-read */
-                reader_grace_commits?: string;
-                /** @description Report without deleting */
-                dry_run?: string;
-            };
-            header?: {
-                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
-                "Lbb-Version"?: string;
-                /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
-                "Idempotency-Key"?: string;
-            };
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["IndexGcResponse"];
-                };
-            };
-            /** @description Bad request */
-            400: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Forbidden */
-            403: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Not found */
-            404: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Conflict */
-            409: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Rate limit exceeded */
-            429: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Internal server error */
-            500: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Service unavailable */
-            503: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-        };
-    };
-    get_v1_index_gc_jobs: {
-        parameters: {
-            query?: {
-                /** @description Graph name (default `main`) */
-                graph?: string;
-                /** @description Branch name (default `main`) */
-                branch?: string;
-                /** @description Stable id returned by the submit call */
-                job_id?: string;
-            };
-            header?: {
-                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
-                "Lbb-Version"?: string;
-            };
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["IndexGcJobStatusResponse"];
-                };
-            };
-            /** @description Bad request */
-            400: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Forbidden */
-            403: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Not found */
-            404: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Conflict */
-            409: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Rate limit exceeded */
-            429: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Internal server error */
-            500: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Service unavailable */
-            503: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-        };
-    };
-    post_v1_index_gc_jobs: {
-        parameters: {
-            query?: {
-                /** @description Graph name (default `main`) */
-                graph?: string;
-                /** @description Branch name (default `main`) */
-                branch?: string;
-            };
-            header?: {
-                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
-                "Lbb-Version"?: string;
-                /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
-                "Idempotency-Key"?: string;
-            };
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["IndexGcRequest"];
-            };
-        };
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["IndexGcJobStatusResponse"];
-                };
-            };
-            /** @description Bad request */
-            400: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Forbidden */
-            403: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Not found */
-            404: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Conflict */
-            409: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Rate limit exceeded */
-            429: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Internal server error */
-            500: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Service unavailable */
-            503: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-        };
-    };
-    delete_v1_index_gc_jobs: {
-        parameters: {
-            query?: {
-                /** @description Graph name (default `main`) */
-                graph?: string;
-                /** @description Branch name (default `main`) */
-                branch?: string;
-                /** @description Stable id returned by the submit call */
-                job_id?: string;
-            };
-            header?: {
-                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
-                "Lbb-Version"?: string;
-                /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
-                "Idempotency-Key"?: string;
-            };
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["IndexGcJobStatusResponse"];
-                };
-            };
-            /** @description Bad request */
-            400: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Forbidden */
-            403: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Not found */
-            404: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Conflict */
-            409: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Rate limit exceeded */
-            429: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Internal server error */
-            500: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Service unavailable */
-            503: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-        };
-    };
-    get_v1_index_jobs: {
-        parameters: {
-            query?: {
-                /** @description Graph name (default `main`) */
-                graph?: string;
-                /** @description Branch name (default `main`) */
-                branch?: string;
-                /** @description Stable id returned by the submit call */
-                job_id?: string;
-            };
-            header?: {
-                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
-                "Lbb-Version"?: string;
-            };
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["SearchIndexJobStatusResponse"];
-                };
-            };
-            /** @description Bad request */
-            400: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Forbidden */
-            403: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Not found */
-            404: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Conflict */
-            409: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Rate limit exceeded */
-            429: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Internal server error */
-            500: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Service unavailable */
-            503: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-        };
-    };
-    post_v1_index_jobs: {
-        parameters: {
-            query?: {
-                /** @description Graph name (default `main`) */
-                graph?: string;
-                /** @description Branch name (default `main`) */
-                branch?: string;
-            };
-            header?: {
-                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
-                "Lbb-Version"?: string;
-                /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
-                "Idempotency-Key"?: string;
-            };
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["IndexBuildOptions"];
-            };
-        };
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["SearchIndexJobStatusResponse"];
-                };
-            };
-            /** @description Bad request */
-            400: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Forbidden */
-            403: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Not found */
-            404: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Conflict */
-            409: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Rate limit exceeded */
-            429: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Internal server error */
-            500: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Service unavailable */
-            503: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-        };
-    };
-    delete_v1_index_jobs: {
-        parameters: {
-            query?: {
-                /** @description Graph name (default `main`) */
-                graph?: string;
-                /** @description Branch name (default `main`) */
-                branch?: string;
-                /** @description Stable id returned by the submit call */
-                job_id?: string;
-            };
-            header?: {
-                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
-                "Lbb-Version"?: string;
-                /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
-                "Idempotency-Key"?: string;
-            };
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["SearchIndexJobStatusResponse"];
-                };
-            };
-            /** @description Bad request */
-            400: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Forbidden */
-            403: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Not found */
-            404: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Conflict */
-            409: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Rate limit exceeded */
-            429: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Internal server error */
-            500: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Service unavailable */
-            503: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-        };
-    };
-    post_v1_index_run: {
-        parameters: {
-            query?: {
-                /** @description Graph name (default `main`) */
-                graph?: string;
-                /** @description Branch name (default `main`) */
-                branch?: string;
-                /** @description Run the build detached and return immediately; poll /v1/graph/metadata for completion */
-                background?: string;
-            };
-            header?: {
-                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
-                "Lbb-Version"?: string;
-                /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
-                "Idempotency-Key"?: string;
-            };
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["IndexBuildOptions"];
-            };
-        };
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["SearchIndexRunResponse"];
-                };
-            };
-            /** @description Bad request */
-            400: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Forbidden */
-            403: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Not found */
-            404: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Conflict */
-            409: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Rate limit exceeded */
-            429: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Internal server error */
-            500: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Service unavailable */
-            503: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-        };
-    };
-    post_v1_inference_retrieval_premises: {
-        parameters: {
-            query?: {
-                /** @description Graph name (default `main`) */
-                graph?: string;
-                /** @description Branch name (default `main`) */
-                branch?: string;
-            };
-            header?: {
-                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
-                "Lbb-Version"?: string;
-                /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
-                "Idempotency-Key"?: string;
-            };
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["RetrievalPremiseRequest"];
-            };
-        };
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["RetrievalPremiseResponse"];
-                };
-            };
-            /** @description Bad request */
-            400: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Forbidden */
-            403: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Not found */
-            404: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Conflict */
-            409: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Rate limit exceeded */
-            429: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Internal server error */
-            500: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Service unavailable */
-            503: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-        };
-    };
-    get_v1_inference_rules: {
-        parameters: {
-            query?: {
-                /** @description Graph name (default `main`) */
-                graph?: string;
-                /** @description Branch name (default `main`) */
-                branch?: string;
-            };
-            header?: {
-                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
-                "Lbb-Version"?: string;
-            };
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["RuleSet"];
-                };
-            };
-            /** @description Bad request */
-            400: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Forbidden */
-            403: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Not found */
-            404: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Conflict */
-            409: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Rate limit exceeded */
-            429: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Internal server error */
-            500: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Service unavailable */
-            503: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-        };
-    };
-    post_v1_inference_rules: {
-        parameters: {
-            query?: {
-                /** @description Graph name (default `main`) */
-                graph?: string;
-                /** @description Branch name (default `main`) */
-                branch?: string;
-            };
-            header?: {
-                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
-                "Lbb-Version"?: string;
-                /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
-                "Idempotency-Key"?: string;
-            };
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["RuleSetDefineRequest"];
-            };
-        };
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["RuleSetDefineResponse"];
-                };
-            };
-            /** @description Bad request */
-            400: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Forbidden */
-            403: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Not found */
-            404: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Conflict */
-            409: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Rate limit exceeded */
-            429: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Internal server error */
-            500: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Service unavailable */
-            503: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-        };
-    };
-    post_v1_inference_run: {
-        parameters: {
-            query?: {
-                /** @description Graph name (default `main`) */
-                graph?: string;
-                /** @description Branch name (default `main`) */
-                branch?: string;
-            };
-            header?: {
-                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
-                "Lbb-Version"?: string;
-                /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
-                "Idempotency-Key"?: string;
-            };
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["InferenceRunRequest"];
-            };
-        };
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["InferenceRunResponse"];
-                };
-            };
-            /** @description Bad request */
-            400: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Forbidden */
-            403: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Not found */
-            404: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Conflict */
-            409: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Rate limit exceeded */
-            429: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Internal server error */
-            500: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Service unavailable */
-            503: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-        };
-    };
     post_v1_memory_observe: {
         parameters: {
             query?: {
@@ -18176,7 +13843,7 @@ export interface operations {
                 branch?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -18320,7 +13987,7 @@ export interface operations {
                 kind?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -18456,11 +14123,11 @@ export interface operations {
                 branch?: string;
                 /** @description Max episodes (default 200, cap 500) */
                 limit?: string;
-                /** @description Consume facts committed ≤ this seq (default: head) */
+                /** @description Maximum fact sequence included */
                 split_seq?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -18596,11 +14263,11 @@ export interface operations {
                 branch?: string;
                 /** @description Max examples (default 500, cap 2000) */
                 limit?: string;
-                /** @description Consume signals ≤ this seq (default: head — recorded for the split audit) */
+                /** @description Maximum signal sequence included */
                 split_seq?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -18736,11 +14403,11 @@ export interface operations {
                 branch?: string;
                 /** @description Max pairs (default 500, cap 2000) */
                 limit?: string;
-                /** @description Consume signals ≤ this seq (default: head — recorded for the split audit) */
+                /** @description Maximum signal sequence included */
                 split_seq?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -18880,7 +14547,7 @@ export interface operations {
                 run?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -19022,7 +14689,7 @@ export interface operations {
                 allow_regression?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -19164,7 +14831,7 @@ export interface operations {
                 allow_regression?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -19302,7 +14969,7 @@ export interface operations {
                 branch?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -19446,7 +15113,7 @@ export interface operations {
                 kind?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -19586,7 +15253,7 @@ export interface operations {
                 keep?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -19724,7 +15391,7 @@ export interface operations {
                 branch?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -19870,7 +15537,7 @@ export interface operations {
                 run?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -20006,11 +15673,11 @@ export interface operations {
                 branch?: string;
                 /** @description Max probes (default 100, cap 200) */
                 limit?: string;
-                /** @description Consume signals ≤ this seq (default: head — recorded for the split audit) */
+                /** @description Maximum signal sequence included */
                 split_seq?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -20148,7 +15815,7 @@ export interface operations {
                 limit?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -20286,7 +15953,7 @@ export interface operations {
                 job_id?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -20422,7 +16089,7 @@ export interface operations {
                 branch?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -20564,7 +16231,7 @@ export interface operations {
                 branch?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -20706,7 +16373,7 @@ export interface operations {
                 branch?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -20842,7 +16509,7 @@ export interface operations {
                 branch?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -20984,7 +16651,7 @@ export interface operations {
                 branch?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -21118,9 +16785,13 @@ export interface operations {
                 graph?: string;
                 /** @description Branch name (default `main`) */
                 branch?: string;
+                /** @description eventual (default) serves the referenced durable report; strong requires validation at current head with current ontology/shapes */
+                consistency?: string;
+                /** @description Maximum returned result rows; result_count remains exact */
+                limit?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -21256,7 +16927,7 @@ export interface operations {
                 branch?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -21400,7 +17071,7 @@ export interface operations {
                 draft_id?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -21536,7 +17207,7 @@ export interface operations {
                 branch?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -21680,7 +17351,7 @@ export interface operations {
                 draft_id?: string;
             };
             header: {
-                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key": string;
@@ -21822,7 +17493,7 @@ export interface operations {
                 reason?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -21962,7 +17633,7 @@ export interface operations {
                 draft_id?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -22102,7 +17773,7 @@ export interface operations {
                 dry_run?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -22244,7 +17915,7 @@ export interface operations {
                 branch?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -22386,7 +18057,7 @@ export interface operations {
                 branch?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -22528,7 +18199,7 @@ export interface operations {
                 branch?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -22670,7 +18341,7 @@ export interface operations {
                 branch?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -22812,7 +18483,7 @@ export interface operations {
                 branch?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -22954,7 +18625,7 @@ export interface operations {
                 branch?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -23087,148 +18758,6 @@ export interface operations {
             };
         };
     };
-    post_v1_query_shacl: {
-        parameters: {
-            query?: {
-                /** @description Graph name (default `main`) */
-                graph?: string;
-                /** @description Branch name (default `main`) */
-                branch?: string;
-            };
-            header?: {
-                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
-                "Lbb-Version"?: string;
-                /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
-                "Idempotency-Key"?: string;
-            };
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["ShaclQueryRequest"];
-            };
-        };
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ShaclQueryResponse"];
-                };
-            };
-            /** @description Bad request */
-            400: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Forbidden */
-            403: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Not found */
-            404: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Conflict */
-            409: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Rate limit exceeded */
-            429: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Internal server error */
-            500: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Service unavailable */
-            503: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-        };
-    };
     post_v1_query_sparql: {
         parameters: {
             query?: {
@@ -23238,7 +18767,7 @@ export interface operations {
                 branch?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -23380,7 +18909,7 @@ export interface operations {
                 branch?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -23522,7 +19051,7 @@ export interface operations {
                 branch?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -23664,7 +19193,7 @@ export interface operations {
                 branch?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -23806,7 +19335,7 @@ export interface operations {
                 branch?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -23946,11 +19475,9 @@ export interface operations {
                 graph?: string;
                 /** @description Branch name (default `main`) */
                 branch?: string;
-                /** @description Run the live SHACL audit and include `audit_summary`. Default false keeps schema reads metadata-only. */
-                audit?: boolean;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -24077,290 +19604,6 @@ export interface operations {
             };
         };
     };
-    post_v1_schema_audit: {
-        parameters: {
-            query?: {
-                /** @description Graph name (default `main`) */
-                graph?: string;
-                /** @description Branch name (default `main`) */
-                branch?: string;
-                /** @description Response format: json (default), turtle, or nt/ntriples */
-                format?: string;
-            };
-            header?: {
-                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
-                "Lbb-Version"?: string;
-                /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
-                "Idempotency-Key"?: string;
-            };
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description SHACL validation report */
-            200: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["SchemaAuditReport"];
-                    "application/n-triples": string;
-                    "text/turtle": string;
-                };
-            };
-            /** @description Bad request */
-            400: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Forbidden */
-            403: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Not found */
-            404: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Conflict */
-            409: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Rate limit exceeded */
-            429: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Internal server error */
-            500: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Service unavailable */
-            503: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-        };
-    };
-    post_v1_schema_preview: {
-        parameters: {
-            query?: {
-                /** @description Graph name (default `main`) */
-                graph?: string;
-                /** @description Branch name (default `main`) */
-                branch?: string;
-            };
-            header?: {
-                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
-                "Lbb-Version"?: string;
-                /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
-                "Idempotency-Key"?: string;
-            };
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["SchemaPreviewRequest"];
-            };
-        };
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["SchemaPreviewResponse"];
-                };
-            };
-            /** @description Bad request */
-            400: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Forbidden */
-            403: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Not found */
-            404: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Conflict */
-            409: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Rate limit exceeded */
-            429: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Internal server error */
-            500: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Service unavailable */
-            503: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-        };
-    };
     post_v1_schema_publish: {
         parameters: {
             query?: {
@@ -24370,7 +19613,7 @@ export interface operations {
                 branch?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -24514,13 +19757,11 @@ export interface operations {
                 query?: string;
                 /** @description Number of results */
                 top_k?: string;
-                /** @description Index source */
-                source?: string;
                 /** @description strong or eventual */
                 consistency?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -24656,7 +19897,7 @@ export interface operations {
                 branch?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -24798,7 +20039,7 @@ export interface operations {
                 branch?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -24940,7 +20181,7 @@ export interface operations {
                 branch?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -25082,7 +20323,7 @@ export interface operations {
                 branch?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -25218,7 +20459,7 @@ export interface operations {
                 branch?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -25354,7 +20595,7 @@ export interface operations {
                 branch?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -25496,7 +20737,7 @@ export interface operations {
                 branch?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -25638,7 +20879,7 @@ export interface operations {
                 branch?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -25780,7 +21021,7 @@ export interface operations {
                 branch?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -25922,7 +21163,7 @@ export interface operations {
                 branch?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -26060,7 +21301,7 @@ export interface operations {
                 branch?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -26202,7 +21443,7 @@ export interface operations {
                 branch?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -26344,7 +21585,7 @@ export interface operations {
                 branch?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -26490,7 +21731,7 @@ export interface operations {
                 limit?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -26632,7 +21873,7 @@ export interface operations {
                 limit?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -26768,7 +22009,7 @@ export interface operations {
                 branch?: string;
             };
             header: {
-                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key": string;
@@ -26910,7 +22151,7 @@ export interface operations {
                 branch?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -27052,7 +22293,7 @@ export interface operations {
                 cursor?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-22` for this beta-breaking shape. */
+                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
             };
             path?: never;

@@ -20,15 +20,10 @@ export type GraphMetadata = Schemas["GraphMetadataResponse"];
 export type Snapshot = Schemas["SnapshotView"];
 export type CommitRequest = Schemas["TripletCommitFile"];
 export type CommitResponse = Schemas["GraphCommitResponse"];
-export type AskRequest = Schemas["AskRequest"];
-export type AskResponse = Schemas["AskResponse"];
 export type SchemaView = Schemas["SchemaBundleView"];
 
 /**
- * The unified list-response envelope returned by every collection read
- * (`/v1/graph/entities`, `/v1/graph/edges`, `/v1/graph/observations`): the rows
- * in `data`, plus `next_cursor` (echo back as `cursor` for the next page) and
- * the pre-page `total_count`. Walk pages with {@link LbbClient.listAll}.
+ * Cursor-based list envelope used by bounded collection reads.
  */
 export interface ListResponse<T> {
   object: "list";
@@ -63,23 +58,16 @@ export interface RdfImportOptions {
   format?: "ntriples" | "turtle" | "nquads" | "trig";
   baseIri?: string;
   graphUri?: string;
-  /** Stable document scope for blank labels across chunks; omit for legacy stable labels. */
+  /** Stable document scope for blank labels across chunks. */
   blankNodeScope?: string;
   batch?: number;
   strict?: boolean;
   observedAt?: string;
   resourceType?: string;
   edgeIdempotency?: "append" | "skip_unchanged";
+  /** Enqueue one complete published-generation build after the final batch. */
+  publish?: boolean;
   idempotencyKey?: string;
-}
-
-export interface RdfExportOptions {
-  format?: "turtle" | "ntriples" | "trig" | "nquads";
-  maxTriples?: number;
-  asOfValidTime?: string;
-  asOfCommitSeq?: number;
-  entailment?: "subclass" | "none";
-  reason?: boolean;
 }
 
 export type AttributeFilterOp = "eq" | "ne" | "lt" | "le" | "gt" | "ge";
@@ -111,8 +99,6 @@ export interface EntityAttributeFilterOptions {
   select?: string[];
   limit?: number;
   offset?: number;
-  asOfValidTime?: string;
-  asOfCommitSeq?: number;
   orderBy?: Schemas["SparqlOrderBy"][];
   reason?: boolean;
   maxSolutions?: number;

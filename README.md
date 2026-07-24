@@ -1,6 +1,6 @@
 # @littlebigbrain/client
 
-The typed TypeScript client for [Little Big Brain](https://littlebigbrain.com) — write graph facts, build indexes, and run hybrid search over one snapshot. Request and response types are generated from the API contract, so every call is fully typed. Runs anywhere there's a global `fetch`: Node 18+, browsers, and edge workers.
+The typed TypeScript client for [Little Big Brain](https://littlebigbrain.com) — write graph facts and query one immutable published snapshot. Request and response types are generated from the API contract, so every call is fully typed. Runs anywhere there's a global `fetch`: Node 18+, browsers, and edge workers.
 
 ```sh
 npm install @littlebigbrain/client
@@ -32,13 +32,14 @@ await graph.facts.create(
   { idempotencyKey: "policy-42-v1" },
 );
 
-// 2. Build persisted BM25 + vector + adjacency indexes and wait.
-await graph.indexes.run({ wait: true });
+// 2. Publication is automatic. Inspect one coherent watermark when needed.
+const published = await lbb.readSnapshot();
+console.log(published.snapshot.served_at_seq, published.query_lag_commits);
 
 // 3. Hybrid search over the snapshot.
 const results = await graph.search.hybrid(
   "How long are customer records retained?",
-  { topK: 10, source: "persisted", consistency: "strong" },
+  { topK: 10, consistency: "eventual" },
 );
 ```
 
@@ -97,7 +98,12 @@ Methods return parsed JSON and throw `LbbError` (with `status`, `code`, `message
 
 ## More
 
-The `graph(...)` scope exposes `facts`, `search`, `entities`, `indexes`, `ontology`, `query`, `schema`, and `context` namespaces — covering managed embeddings, multi-query fusion, traversal, temporal state and history, SHACL, ontology evolution, and durable index jobs. Every generated shape is available as `Schemas["TypeName"]`.
+The `graph(...)` scope exposes `facts`, `search`, `entities`, `ontology`,
+`query`, `schema`, and `context` namespaces. `context` includes vocabulary
+suggestion, term resolution, relation decoding, and groundability inspection; `schema`
+reads or atomically publishes the active ontology/shapes bundle. Writes enqueue
+published-generation maintenance automatically. Every generated shape is
+available as `Schemas["TypeName"]`.
 
 Full reference and guides: [docs.littlebigbrain.com/sdks/typescript](https://docs.littlebigbrain.com/sdks/typescript/).
 
