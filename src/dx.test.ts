@@ -49,30 +49,27 @@ function queuedFetch(
 
 test("preferred namespaces make context, ontology, and query operations discoverable", async () => {
   const { fetch, urls } = queuedFetch([
-    { body: { answer: "grounded" } },
+    { body: { suggestions: [] } },
     { body: { classes: [] } },
     { body: { snapshot: {}, vars: [], solutions: [] } },
   ]);
   const client = new LbbClient({ baseUrl: "http://h", fetch });
 
-  await client.context.ask({ question: "what changed?" });
+  await client.context.suggest({ prefix: "what" });
   await client.ontology.view({ counts: true });
   await client.query.structured({ patterns: [], select: [] });
 
   assert.deepEqual(urls, [
-    "http://h/v1/ask",
+    "http://h/v1/search/suggest",
     "http://h/v1/ontology?counts=true",
     "http://h/v1/query/sparql",
   ]);
 });
 
 test("context namespace covers completion, resolution, decoding, and groundability", async () => {
-  const { fetch, urls } = queuedFetch([
-    { body: {} },
-    { body: {} },
-    { body: {} },
-    { body: {} },
-  ]);
+  const { fetch, urls } = queuedFetch(
+    Array.from({ length: 4 }, () => ({ body: {} })),
+  );
   const client = new LbbClient({ baseUrl: "http://h", fetch });
 
   await client.context.suggest({ prefix: "wri" });
@@ -149,16 +146,13 @@ test("graph namespace covers managed embedding lifecycle routes", async () => {
   });
 });
 
-test("query namespace covers parsed, raw, analytical, SHACL, and inference reads", async () => {
+test("query namespace covers parsed, raw, and analytical reads", async () => {
   const sparqlEnvelope = {
     results: JSON.stringify({ head: { vars: [] }, results: { bindings: [] } }),
   };
   const { fetch, urls } = queuedFetch([
     { body: sparqlEnvelope },
     { body: sparqlEnvelope },
-    { body: {} },
-    { body: {} },
-    { body: {} },
     { body: {} },
   ]);
   const client = new LbbClient({ baseUrl: "http://h", fetch });
@@ -168,18 +162,12 @@ test("query namespace covers parsed, raw, analytical, SHACL, and inference reads
   });
   await client.query.sparqlRaw({ query: "ASK { ?s ?p ?o }" });
   await client.query.analytics({} as never);
-  await client.query.shacl({} as never);
-  await client.query.infer({} as never);
-  await client.query.premises({} as never);
 
   assert.deepEqual(parsed.rows, []);
   assert.deepEqual(urls, [
     "http://h/v1/query/sparql-text",
     "http://h/v1/query/sparql-text",
     "http://h/v1/query/analytics",
-    "http://h/v1/query/shacl",
-    "http://h/v1/inference/run",
-    "http://h/v1/inference/retrieval-premises",
   ]);
 });
 
@@ -217,29 +205,6 @@ test("graph scope carries the preferred namespaces", async () => {
     urls[0],
     "http://h/v1/search?graph=support&branch=review&query=refund%20policy",
   );
-});
-
-test("entity iteration follows cursors and yields rows instead of envelopes", async () => {
-  const page = (id: string, hasMore: boolean, nextCursor: string | null) => ({
-    object: "list",
-    data: [{ id, entity_type: "SERVICE", name: id }],
-    has_more: hasMore,
-    next_cursor: nextCursor,
-    snapshot: { commit_seq: 7, indexed_seq: 7 },
-    total_count: 2,
-  });
-  const { fetch, urls } = queuedFetch([
-    { body: page("a", true, "cursor-2") },
-    { body: page("b", false, null) },
-  ]);
-  const client = new LbbClient({ baseUrl: "http://h", fetch });
-
-  const names: string[] = [];
-  for await (const entity of client.entities.iterate({ limit: 1 }))
-    names.push(entity.name);
-
-  assert.deepEqual(names, ["a", "b"]);
-  assert.equal(urls[1], "http://h/v1/graph/entities?limit=1&cursor=cursor-2");
 });
 
 test("request hooks and raw metadata expose retries without exposing bodies", async () => {
@@ -317,6 +282,7 @@ test("A5: defaultConsistency applies when a call omits it, and a per-call value 
     { body: { snapshot: {}, results: [] } },
     { body: { snapshot: {}, results: [] } },
     { body: { snapshot: {} } },
+    { body: { conforms: true, result_count: 0 } },
   ]);
   const lbb = new LbbClient({
     baseUrl: "https://s--p.db.eu.littlebigbrain.com",
@@ -340,10 +306,15 @@ test("A5: defaultConsistency applies when a call omits it, and a per-call value 
   );
   assert.equal(JSON.parse(bodies[1] ?? "{}").consistency, "eventual");
 
-  // The default also reaches the URL routes (SPARQL-text / summary).
+  // The default also reaches artifact-backed URL routes.
   await lbb.summary();
   assert.ok(
     urls[2].includes("consistency=strong"),
     `summary URL should carry the default: ${urls[2]}`,
+  );
+  await lbb.ontologyConformance();
+  assert.ok(
+    urls[3].includes("consistency=strong"),
+    `conformance URL should carry the default: ${urls[3]}`,
   );
 });

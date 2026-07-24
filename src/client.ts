@@ -8,7 +8,6 @@ import type {
   ListResponse,
   RawLbbResponse,
   ReadConsistencyOptions,
-  RdfExportOptions,
   RdfImportOptions,
   Schemas,
   SearchConsistency,
@@ -33,7 +32,6 @@ import {
   ContextNamespace,
   EntityNamespace,
   GraphNamespace,
-  IndexNamespace,
   OntologyNamespace,
   QueryNamespace,
   SchemaNamespace,
@@ -58,15 +56,12 @@ export type {
   ListResponse,
   RawLbbResponse,
   ReadConsistencyOptions,
-  RdfExportOptions,
   RdfImportOptions,
   Schemas,
   SearchConsistency,
   SparqlResults,
   SparqlResultsJson,
   SparqlTerm,
-  AskRequest,
-  AskResponse,
   CommitRequest,
   CommitResponse,
   Entity,
@@ -86,13 +81,12 @@ export type {
   QueryValue,
   RequestOptions,
 } from "./transport.js";
-export type { EntityListOptions, HybridSearchOptions } from "./namespaces.js";
+export type { HybridSearchOptions } from "./namespaces.js";
 export {
   ContextNamespace,
   EntityNamespace,
   FactsNamespace,
   GraphNamespace,
-  IndexNamespace,
   OntologyNamespace,
   QueryNamespace,
   SchemaNamespace,
@@ -134,7 +128,6 @@ export class LbbClient {
 
   readonly context: ContextNamespace;
   readonly search: SearchNamespace;
-  readonly indexes: IndexNamespace;
   readonly entities: EntityNamespace;
   readonly schema: SchemaNamespace;
   readonly ontology: OntologyNamespace;
@@ -152,7 +145,7 @@ export class LbbClient {
     this.graphName = options.graph;
     this.branchName = options.branch;
     this.stack = options.stack;
-    this.apiVersion = options.apiVersion ?? "2026-07-22";
+    this.apiVersion = options.apiVersion ?? "2026-07-23";
     this.maxRetries = options.maxRetries ?? 6;
     this.retryDelayMs = options.retryDelayMs ?? 100;
     this.retryBudgetMs = options.retryBudgetMs ?? 60_000;
@@ -182,7 +175,6 @@ export class LbbClient {
     this.fetchImpl = chosen;
     this.context = new ContextNamespace(this);
     this.search = new SearchNamespace(this);
-    this.indexes = new IndexNamespace(this);
     this.entities = new EntityNamespace(this);
     this.schema = new SchemaNamespace(this);
     this.ontology = new OntologyNamespace(this);
@@ -522,12 +514,10 @@ export class LbbClient {
    * streamed request without a single oversized commit. Pass `lines` as an array
    * (serialized to NDJSON here) or a pre-built NDJSON string.
    *
-   * Set `index: true` to run one full index build after the last batch, so the
-   * data is served from the persisted runs (not just the ephemeral snapshot
-   * fallback) by the time the call returns — the "bulk load, queryable on return"
-   * path. Prefer this over indexing per batch (which serializes builds and races
-   * the throttle): import the whole dataset, index once. The response's `index`
-   * object reports whether the build ran or was skipped.
+   * Set `publish: true` to durably enqueue one complete published-generation
+   * build after the final batch. The import does not build index families or
+   * wait for visibility; the response's `published_generation` object carries
+   * the durable job and due sequence to observe.
    */
   async import(
     lines: ImportLine[] | string,
@@ -535,7 +525,7 @@ export class LbbClient {
       batch?: number;
       strict?: boolean;
       observedAt?: string;
-      index?: boolean;
+      publish?: boolean;
       idempotencyKey?: string;
     } = {},
   ): Promise<Schemas["GraphImportResponse"] & { commitSeq: number | null }> {
@@ -553,7 +543,7 @@ export class LbbClient {
           batch: opts.batch,
           strict: opts.strict,
           observed_at: opts.observedAt,
-          index: opts.index,
+          publish: opts.publish,
         },
         idempotencyKey: opts.idempotencyKey ?? this.idempotencyKey("import"),
       },
@@ -592,22 +582,9 @@ export class LbbClient {
         blank_node_scope: opts.blankNodeScope,
         resource_type: opts.resourceType,
         edge_idempotency: opts.edgeIdempotency,
+        publish: opts.publish,
       },
       idempotencyKey: opts.idempotencyKey ?? this.idempotencyKey("import-rdf"),
-    });
-  }
-
-  /** Export the snapshot-visible RDF projection as Turtle, N-Triples, TriG, or N-Quads. */
-  exportRdf(opts: RdfExportOptions = {}): Promise<string> {
-    return this.request<string>("GET", "/v1/graph/export/rdf", {
-      query: {
-        format: opts.format === "ntriples" ? "nt" : opts.format,
-        max_triples: opts.maxTriples,
-        as_of_valid_time: opts.asOfValidTime,
-        as_of_commit_seq: opts.asOfCommitSeq,
-        entailment: opts.entailment,
-        reason: opts.reason,
-      },
     });
   }
 
@@ -927,27 +904,23 @@ export class LbbClient {
     });
   }
 
-  /**
-   * Champion vs challenger retrieval over one pinned snapshot. Returns
-   * promotion evidence (hit-rate@k, latency, overlap); never promotes.
-   */
-  shadowEval(
-    body: Schemas["ShadowEvalRequest"],
-  ): Promise<Schemas["ShadowEvalResponse"]> {
-    return this.request("POST", "/v1/models/shadow-eval", { body });
-  }
-
-  /**
-   * Execution-verified QA probes generated from the graph's current edges —
-   * labels are the executed projections, so they are verified by construction.
-   * Feeds `shadowEval` directly.
-   */
+  /** Execution-verified QA probes generated from the graph's current edges. */
   syntheticEval(
     opts: { limit?: number } = {},
   ): Promise<Schemas["SyntheticEvalResponse"]> {
     return this.request("GET", "/v1/models/synthetic-eval", {
       query: { limit: opts.limit },
     });
+  }
+
+  /**
+   * Compare champion and challenger retrieval over one pinned published
+   * snapshot. The endpoint returns promotion evidence but never promotes.
+   */
+  shadowEval(
+    body: Schemas["ShadowEvalRequest"],
+  ): Promise<Schemas["ShadowEvalResponse"]> {
+    return this.request("POST", "/v1/models/shadow-eval", { body });
   }
 
   /** The doubling retrain policy: is a retrain due for this model kind? */
@@ -983,23 +956,6 @@ export class LbbClient {
     body: Schemas["ModelTrainingConfig"],
   ): Promise<Schemas["ModelTrainingConfig"]> {
     return this.request("POST", "/v1/models/training-config", { body });
-  }
-
-  /**
-   * Verdict on an ask (`accepted` | `rejected` | `corrected` + the right
-   * plan), joined to the ask's trace by `ask_id` — the planner fine-tune's
-   * explicit feedback capture. `accepted: false` in the response means
-   * signal capture is off on this deployment (the contract is identical).
-   */
-  askFeedback(
-    body: Schemas["AskFeedbackRequest"],
-    opts: { idempotencyKey?: string } = {},
-  ): Promise<Schemas["AskFeedbackResponse"]> {
-    return this.request("POST", "/v1/ask/feedback", {
-      body,
-      idempotencyKey:
-        opts.idempotencyKey ?? this.idempotencyKey("ask-feedback"),
-    });
   }
 
   ingestSignals(
@@ -1051,11 +1007,7 @@ export class LbbClient {
     );
   }
 
-  /**
-   * The planner fine-tune's training feed: accepted/corrected feedback
-   * joined to its traces (signals ≤ the split pin), topped up with
-   * execution-verified synthetic plans.
-   */
+  /** Planner training examples at or before an optional signal split. */
   plannerDataset(
     opts: { limit?: number; splitSeq?: number } = {},
   ): Promise<Schemas["PlannerDatasetResponse"]> {
@@ -1064,10 +1016,7 @@ export class LbbClient {
     });
   }
 
-  /**
-   * The DPO pass's training feed: preference pairs from corrected verdicts,
-   * paired rejections, and synthetic corrupted-slot pairs.
-   */
+  /** Planner preference pairs at or before an optional signal split. */
   plannerPreferenceDataset(
     opts: { limit?: number; splitSeq?: number } = {},
   ): Promise<Schemas["PlannerPreferenceDatasetResponse"]> {
@@ -1076,11 +1025,7 @@ export class LbbClient {
     });
   }
 
-  /**
-   * The suggest-ranker trainer's probe feed: `suggestion_adopted` signals
-   * (typed prefix + adopted text) ≤ the split pin, topped up with
-   * execution-verified synthetic vocabulary pairs.
-   */
+  /** Suggest-ranker examples at or before an optional signal split. */
   suggestDataset(
     opts: { limit?: number; splitSeq?: number } = {},
   ): Promise<Schemas["SuggestDatasetResponse"]> {
@@ -1089,10 +1034,7 @@ export class LbbClient {
     });
   }
 
-  /**
-   * The extractor fine-tune's training feed: EPISODE transcripts joined to
-   * the facts the observe pipeline committed from them.
-   */
+  /** Extractor examples at or before an optional signal split. */
   extractorDataset(
     opts: { limit?: number; splitSeq?: number } = {},
   ): Promise<Schemas["ExtractorDatasetResponse"]> {
@@ -1117,8 +1059,7 @@ export class LbbClient {
 
   /**
    * Promote a finished `planner_lora` training run: gated on held-out slot
-   * exactness, recorded as a `kind=planner` training run whose adapter `/v1/ask`
-   * then serves.
+   * exactness and recorded as a `kind=planner` training run.
    */
   promotePlanner(opts: {
     runId: string;
@@ -1165,44 +1106,24 @@ export class LbbClient {
     return this.request("POST", "/v1/search/suggest", { body });
   }
 
-  /**
-   * Snap free text to the nearest real vocabulary item. Embedding cosine
-   * on a managed graph, else lexical; never fabricates a term.
-   */
+  /** Snap free text to the nearest term in the pinned published vocabulary. */
   resolveTerm(
     body: Schemas["ResolveTermRequest"],
   ): Promise<Schemas["ResolveTermResponse"]> {
     return this.request("POST", "/v1/search/resolve-term", { body });
   }
 
-  /**
-   * Ground a natural-language question to the graph's real vocabulary, retrieve
-   * against the pinned snapshot, and answer with citations (`/v1/ask`).
-   */
-  ask(body: Schemas["AskRequest"]): Promise<Schemas["AskResponse"]> {
-    return this.request("POST", "/v1/ask", { body });
-  }
-
-  /**
-   * Name the relation between two entities (`/v1/decode`): the DB narrows the
-   * candidates to the type pair's admissible relations, answers alone
-   * when the pair forces a single relation, and otherwise decodes it with the
-   * graph-native fine-tuned model — the "DB narrows, cheap model decodes" call.
-   */
+  /** Decode a relation from the graph's admissible published vocabulary. */
   decode(body: Schemas["DecodeRequest"]): Promise<Schemas["DecodeResponse"]> {
     return this.request("POST", "/v1/decode", { body });
   }
 
-  /**
-   * Report which completion mechanisms will carry on this graph:
-   * signature sparsity, name semantics, sampled narrowing recall, and a
-   * narrow / narrow+finetune / lexical-first recommendation.
-   */
+  /** Report completion strategy fitness for the pinned published graph. */
   groundability(
     opts: { sample?: number } = {},
   ): Promise<Schemas["GroundabilityReport"]> {
     return this.request("GET", "/v1/graph/groundability", {
-      query: opts.sample != null ? { sample: String(opts.sample) } : undefined,
+      query: opts.sample == null ? undefined : { sample: opts.sample },
     });
   }
 
@@ -1271,8 +1192,6 @@ export class LbbClient {
     name?: string;
     relations?: string[];
     asOf?: string;
-    /** Require the bounded ranged-adjacency path; returns `index_busy` while unavailable. */
-    indexed?: boolean;
   }): Promise<Schemas["EntityNeighborhoodResponse"]> {
     return this.request("GET", "/v1/graph/entity/neighborhood", {
       query: {
@@ -1281,7 +1200,6 @@ export class LbbClient {
         name: opts.name,
         relations: opts.relations?.join(","),
         as_of: opts.asOf,
-        indexed: opts.indexed,
       },
     });
   }
@@ -1339,55 +1257,10 @@ export class LbbClient {
   }
 
   /**
-   * Paged edge listing. Scope to one node with `id` (or `type`+`name`) and a
-   * `direction` (`out`/`in`/`both`) to walk **every** edge of a high-degree node
-   * — `entityDetail` returns the full set but is awkward to page; this carries
-   * `offset`/`limit` and reports `total_count`. Optional `relation`/`q` filters
-   * and an `asOf`/`asOfCommitSeq` snapshot pin. Each row carries `valid_time`, so
-   * the page is enough to reconstruct a per-edge timeline.
-   */
-  graphEdges(
-    opts: {
-      id?: string;
-      type?: string;
-      name?: string;
-      direction?: "out" | "in" | "both";
-      relation?: string;
-      q?: string;
-      limit?: number;
-      /** Opaque cursor from a previous page's `next_cursor`. */
-      cursor?: string | number;
-      /** @deprecated Legacy alias for `cursor` (still accepted by the server). */
-      offset?: number;
-      asOf?: string;
-      asOfCommitSeq?: number;
-    } = {},
-  ): Promise<ListResponse<Schemas["GraphEdgeRow"]>> {
-    return this.request("GET", "/v1/graph/edges", {
-      query: {
-        id: opts.id,
-        type: opts.type,
-        name: opts.name,
-        direction: opts.direction,
-        relation: opts.relation,
-        q: opts.q,
-        limit: opts.limit,
-        cursor: opts.cursor,
-        offset: opts.offset,
-        as_of: opts.asOf,
-        as_of_commit_seq: opts.asOfCommitSeq,
-      },
-    });
-  }
-
-  /**
    * Page through every row of a list endpoint, following `next_cursor` until
    * exhausted. Pass a fetcher that takes a cursor and returns a
    * {@link ListResponse}:
-   * ```ts
-   * for await (const e of client.listAll((cursor) =>
-   *   client.entities.list({ cursor, fields: "title" }))) { … }
-   * ```
+   * The caller supplies a bounded collection endpoint and its cursor.
    */
   async *listAll<T>(
     fetchPage: (cursor?: string) => Promise<ListResponse<T>>,
@@ -1427,13 +1300,6 @@ export class LbbClient {
   /** Lineage and evidence for a single edge. */
   why(body: Schemas["WhyRequest"]): Promise<Schemas["WhyResponse"]> {
     return this.request("POST", "/v1/query/why", { body });
-  }
-
-  /** SHACL-style shape/pattern query. */
-  shacl(
-    body: Schemas["ShaclQueryRequest"],
-  ): Promise<Schemas["ShaclQueryResponse"]> {
-    return this.request("POST", "/v1/query/shacl", { body });
   }
 
   /**
@@ -1493,46 +1359,6 @@ export class LbbClient {
     return this.request("POST", "/v1/query/analytics", { body });
   }
 
-  /**
-   * Run inference rules (SHACL-AF `sh:TripleRule` shape) to a bounded fixpoint
-   * and return the derived edges as a **preview** — derived facts are never
-   * written to the asserted graph. Each rule is a BGP `body`/`where` plus a
-   * `head` triple template instantiated per binding.
-   */
-  infer(
-    body: Schemas["InferenceRunRequest"],
-  ): Promise<Schemas["InferenceRunResponse"]> {
-    return this.request("POST", "/v1/inference/run", { body });
-  }
-
-  /**
-   * Define (replace) the versioned rule set stored on the scoped graph branch.
-   * The stored set is what SHACL `include_derived` and `infer` use when a
-   * request carries no inline rules. Returns the new `rules_version`.
-   */
-  defineRules(
-    body: Schemas["RuleSetDefineRequest"],
-  ): Promise<Schemas["RuleSetDefineResponse"]> {
-    return this.request("POST", "/v1/inference/rules", { body });
-  }
-
-  /** The rule set stored on the scoped graph branch (version + rules). */
-  graphRules(): Promise<Schemas["RuleSet"]> {
-    return this.request("GET", "/v1/inference/rules");
-  }
-
-  /**
-   * Derive edges from calibrated retrieval matches (preview): each
-   * candidate scored `P >= threshold` becomes a derived edge `(anchor, relation,
-   * matched)` with a typed `Retrieval` provenance leaf. Pass either explicit
-   * `candidates` or a `query` the server runs as BM25 entity retrieval.
-   */
-  retrievalPremises(
-    body: Schemas["RetrievalPremiseRequest"],
-  ): Promise<Schemas["RetrievalPremiseResponse"]> {
-    return this.request("POST", "/v1/inference/retrieval-premises", { body });
-  }
-
   // --- ontology ---
 
   /**
@@ -1553,12 +1379,15 @@ export class LbbClient {
    * Audit the current snapshot against the ontology's *implied* constraints —
    * capped `cardinality` derived as `sh:maxCount` — returning a SHACL-shaped
    * report. Whole-snapshot and never blocks a write. Unlike
-   * {@link SchemaNamespace.audit}, this needs no published shape bundle: the
-   * shapes come from the ontology itself. See the `decoration_status` catalog on
-   * {@link ontologyView} for which decorations are enforced.
+   * The report is referenced by the pinned published read root and carries its
+   * own validation watermark and ontology/shapes provenance.
    */
-  ontologyConformance(): Promise<Schemas["SchemaAuditReport"]> {
-    return this.request("GET", "/v1/ontology/conformance");
+  ontologyConformance(
+    opts?: Pick<ReadConsistencyOptions, "consistency">,
+  ): Promise<Schemas["SchemaAuditReport"]> {
+    return this.request("GET", "/v1/ontology/conformance", {
+      query: { consistency: this.resolveConsistency(opts) },
+    });
   }
 
   /** Discover ontology concepts, terms, and relations. */
@@ -1601,98 +1430,6 @@ export class LbbClient {
     return this.request("POST", "/v1/ontology/induce", { body, retry: true });
   }
 
-  // --- index lifecycle ---
-
-  /**
-   * Build default ANN + BM25 indexes. With `{ background: true }` the build
-   * runs detached on the server and the call returns immediately — use it for
-   * large corpora whose synchronous build would exceed a fronting gateway's
-   * timeout (a 504), then poll `metadata()` for completion.
-   */
-  indexBuild(opts: { background?: boolean } = {}): Promise<unknown> {
-    return this.request("POST", "/v1/index/build", {
-      query: { background: opts.background || undefined },
-    });
-  }
-
-  /**
-   * Build BM25, ANN/vector, and adjacency index families. With
-   * `{ background: true }` the build runs detached on the server and the call
-   * returns immediately — use it for large corpora whose synchronous build would
-   * exceed a fronting gateway's timeout, then poll `metadata()` for completion.
-   */
-  indexRun(opts: { background?: boolean } = {}): Promise<unknown> {
-    return this.request("POST", "/v1/index/run", {
-      query: { background: opts.background || undefined },
-    });
-  }
-
-  /** Submit a durable full-index build. Requires a reconnect-safe idempotency key. */
-  indexSubmit(
-    body: Partial<Schemas["IndexBuildOptions"]> = {},
-    opts: { idempotencyKey: string },
-  ): Promise<Schemas["SearchIndexJobStatusResponse"]> {
-    return this.request("POST", "/v1/index/jobs", {
-      body,
-      idempotencyKey: opts.idempotencyKey,
-    });
-  }
-
-  /** Poll a durable full-index build. */
-  indexJob(jobId: string): Promise<Schemas["SearchIndexJobStatusResponse"]> {
-    return this.request("GET", "/v1/index/jobs", { query: { job_id: jobId } });
-  }
-
-  /** Cancel a durable full-index build. Repeated cancellation returns its current terminal status. */
-  cancelIndexJob(
-    jobId: string,
-  ): Promise<Schemas["SearchIndexJobStatusResponse"]> {
-    return this.request("DELETE", "/v1/index/jobs", {
-      query: { job_id: jobId },
-    });
-  }
-
-  /** Append a BM25 delta segment for the unindexed WAL tail. */
-  indexDelta(): Promise<Schemas["IndexDeltaResponse"]> {
-    return this.request("POST", "/v1/index/delta");
-  }
-
-  /** Preview or delete superseded persisted index runs. */
-  indexGc(
-    opts: { keepRuns?: number; dryRun?: boolean } = {},
-  ): Promise<Schemas["IndexGcResponse"]> {
-    return this.request("POST", "/v1/index/gc", {
-      query: { keep_runs: opts.keepRuns, dry_run: opts.dryRun },
-    });
-  }
-
-  /** Submit durable, cancellable index garbage collection. */
-  indexGcSubmit(
-    body: Schemas["IndexGcRequest"] = {},
-    opts: { idempotencyKey: string },
-  ): Promise<Schemas["IndexGcJobStatusResponse"]> {
-    return this.request("POST", "/v1/index/gc-jobs", {
-      body,
-      idempotencyKey: opts.idempotencyKey,
-    });
-  }
-
-  /** Poll exact planning/deletion progress for durable index garbage collection. */
-  indexGcJob(jobId: string): Promise<Schemas["IndexGcJobStatusResponse"]> {
-    return this.request("GET", "/v1/index/gc-jobs", {
-      query: { job_id: jobId },
-    });
-  }
-
-  /** Cancel durable index garbage collection. */
-  cancelIndexGcJob(
-    jobId: string,
-  ): Promise<Schemas["IndexGcJobStatusResponse"]> {
-    return this.request("DELETE", "/v1/index/gc-jobs", {
-      query: { job_id: jobId },
-    });
-  }
-
   /** Fold the WAL tail into snapshot segments. */
   compact(
     opts: { minTailCommits?: number; maxSegments?: number } = {},
@@ -1712,19 +1449,15 @@ export class LbbClient {
     return this.request("GET", "/v1/status");
   }
 
-  /** Graph footprint, WAL tail, and index coverage. Exact object inventory is opt-in. */
+  /** Graph footprint, WAL tail, and published-index coverage. */
   metadata(
     opts: {
-      includeObjects?: boolean;
       includeIndexes?: boolean;
-      includeTemporalCoverage?: boolean;
     } = {},
   ): Promise<Schemas["GraphMetadataResponse"]> {
     return this.request("GET", "/v1/graph/metadata", {
       query: {
-        include_objects: opts.includeObjects,
         include_indexes: opts.includeIndexes,
-        include_temporal_coverage: opts.includeTemporalCoverage,
       },
     });
   }
@@ -1775,6 +1508,11 @@ export class LbbClient {
     return this.request("GET", "/v1/graph/summary", {
       query: this.readConsistencyQuery(opts),
     });
+  }
+
+  /** Pinned published read root and its query/conformance lag against one coherent head. */
+  readSnapshot(): Promise<Schemas["PublishedReadStatusResponse"]> {
+    return this.request("GET", "/v1/graph/read-snapshot");
   }
 
   /** List the graphs (and branches) under the scoped tenant. */

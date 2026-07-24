@@ -5,10 +5,8 @@ import {
   firstPatternVariable,
   type EntityAttributeFilterOptions,
   type ImportLine,
-  type ListResponse,
   parseSparqlResults,
   type ReadConsistencyOptions,
-  type RdfExportOptions,
   type RdfImportOptions,
   type Schemas,
 } from "./types.js";
@@ -47,7 +45,6 @@ function transportOptions(options: CallOptions): CallOptions {
 
 export interface HybridSearchOptions extends CallOptions {
   topK?: number;
-  source?: string;
   consistency?: string;
   /** A5 read-your-writes floor (`min_indexed_seq`): the committed sequence a
    * write returned; under eventual, an uncovered floor yields a retryable
@@ -58,10 +55,6 @@ export interface HybridSearchOptions extends CallOptions {
   vector?: boolean;
   targets?: string[];
   profile?: string;
-  /** Valid-time cursor (RFC 3339): results reflect facts true at this instant. */
-  asOf?: string;
-  /** Snapshot pin: results reproduce the graph as of this commit sequence. */
-  asOfCommitSeq?: number;
   /** Opt-in impression logging for later relevance feedback. */
   logImpression?: boolean;
 }
@@ -70,7 +63,6 @@ export class GraphNamespace {
   readonly facts: FactsNamespace;
   readonly context: ContextNamespace;
   readonly entities: EntityNamespace;
-  readonly indexes: IndexNamespace;
   readonly ontology: OntologyNamespace;
   readonly query: QueryNamespace;
   readonly schema: SchemaNamespace;
@@ -80,7 +72,6 @@ export class GraphNamespace {
     this.facts = new FactsNamespace(client);
     this.context = client.context;
     this.entities = client.entities;
-    this.indexes = client.indexes;
     this.ontology = client.ontology;
     this.query = client.query;
     this.schema = client.schema;
@@ -223,11 +214,6 @@ export class GraphNamespace {
       body,
     });
   }
-
-  /** Export this graph's current snapshot as Turtle, N-Triples, TriG, or N-Quads. */
-  exportRdf(opts: RdfExportOptions = {}): Promise<string> {
-    return this.client.exportRdf(opts);
-  }
 }
 
 export class FactsNamespace {
@@ -252,11 +238,11 @@ export class FactsNamespace {
       batch?: number;
       strict?: boolean;
       observedAt?: string;
-      index?: boolean;
+      publish?: boolean;
       idempotencyKey?: string;
     } = {},
   ): Promise<Schemas["GraphImportResponse"]> {
-    const { batch, strict, observedAt, index, ...request } = opts;
+    const { batch, strict, observedAt, publish, ...request } = opts;
     const ndjson =
       typeof lines === "string"
         ? lines
@@ -267,7 +253,7 @@ export class FactsNamespace {
         request.idempotencyKey ?? this.client.idempotencyKey("import"),
       rawBody: ndjson,
       contentType: "application/x-ndjson",
-      query: { batch, strict, observed_at: observedAt, index },
+      query: { batch, strict, observed_at: observedAt, publish },
     });
   }
 
@@ -291,6 +277,7 @@ export class FactsNamespace {
       observedAt,
       resourceType,
       edgeIdempotency,
+      publish,
       ...request
     } = opts;
     return this.client.request("POST", "/v1/graph/import/rdf", {
@@ -314,6 +301,7 @@ export class FactsNamespace {
         blank_node_scope: blankNodeScope,
         resource_type: resourceType,
         edge_idempotency: edgeIdempotency,
+        publish,
       },
     });
   }
@@ -350,7 +338,6 @@ export class SearchNamespace {
       query: {
         query: input,
         top_k: opts.topK,
-        source: opts.source,
         consistency: opts.consistency ?? this.client.defaultConsistency,
         min_indexed_seq: opts.minIndexedSeq,
         lexical: opts.lexical,
@@ -358,8 +345,6 @@ export class SearchNamespace {
         vector: opts.vector,
         targets: opts.targets?.join(","),
         profile: opts.profile,
-        as_of: opts.asOf,
-        as_of_commit_seq: opts.asOfCommitSeq,
         log_impression: opts.logImpression,
       },
     });
@@ -421,217 +406,18 @@ export class SearchNamespace {
   }
 }
 
-export class SchemaNamespace {
-  constructor(private readonly client: LbbClient) {}
-
-  /** Active graph schema bundle: ontology plus activated SHACL shapes. */
-  view(
-    opts: { audit?: boolean } & CallOptions = {},
-  ): Promise<Schemas["SchemaBundleView"]> {
-    const { audit, ...request } = opts;
-    return this.client.request("GET", "/v1/schema", {
-      ...request,
-      query: { audit: audit || undefined },
-    });
-  }
-
-  /** Preview a proposed RDF/SHACL schema bundle and audit current data. */
-  preview(
-    body: Schemas["SchemaPreviewRequest"],
-    opts: CallOptions = {},
-  ): Promise<Schemas["SchemaPreviewResponse"]> {
-    return this.client.request("POST", "/v1/schema/preview", {
-      ...opts,
-      retry: opts.retry ?? true,
-      body,
-    });
-  }
-
-  /** Activate a previewed SHACL schema bundle for this graph branch. */
-  publish(
-    body: Schemas["SchemaPublishRequest"],
-    opts: CallOptions = {},
-  ): Promise<Schemas["SchemaPublishResponse"]> {
-    return this.client.request("POST", "/v1/schema/publish", { ...opts, body });
-  }
-
-  /** Audit current data against the active SHACL schema bundle. */
-  audit(opts: CallOptions = {}): Promise<Schemas["SchemaAuditReport"]> {
-    return this.client.request("POST", "/v1/schema/audit", {
-      ...opts,
-      retry: opts.retry ?? true,
-    });
-  }
-}
-
-export class IndexNamespace {
-  constructor(private readonly client: LbbClient) {}
-
-  run(
-    opts: {
-      wait?: boolean;
-      background?: boolean;
-      body?: unknown;
-    } & CallOptions = {},
-  ): Promise<unknown> {
-    const { wait, background: requestedBackground, body, ...request } = opts;
-    const background =
-      requestedBackground ?? (wait === false ? true : undefined);
-    return this.client.request("POST", "/v1/index/run", {
-      ...request,
-      query: { background },
-      body,
-    });
-  }
-
-  build(opts: { background?: boolean } & CallOptions = {}): Promise<unknown> {
-    const { background, ...request } = opts;
-    return this.client.request("POST", "/v1/index/build", {
-      ...request,
-      query: { background: background || undefined },
-    });
-  }
-
-  delta(opts: CallOptions = {}): Promise<Schemas["IndexDeltaResponse"]> {
-    return this.client.request("POST", "/v1/index/delta", opts);
-  }
-
-  submit(
-    body: Partial<Schemas["IndexBuildOptions"]> = {},
-    opts: CallOptions & { idempotencyKey: string },
-  ): Promise<Schemas["SearchIndexJobStatusResponse"]> {
-    return this.client.request("POST", "/v1/index/jobs", { ...opts, body });
-  }
-
-  job(
-    jobId: string,
-    opts: CallOptions = {},
-  ): Promise<Schemas["SearchIndexJobStatusResponse"]> {
-    return this.client.request("GET", "/v1/index/jobs", {
-      ...opts,
-      query: { job_id: jobId },
-    });
-  }
-
-  cancel(
-    jobId: string,
-    opts: CallOptions = {},
-  ): Promise<Schemas["SearchIndexJobStatusResponse"]> {
-    return this.client.request("DELETE", "/v1/index/jobs", {
-      ...opts,
-      query: { job_id: jobId },
-    });
-  }
-
-  gc(
-    opts: { keepRuns?: number; dryRun?: boolean } & CallOptions = {},
-  ): Promise<Schemas["IndexGcResponse"]> {
-    const { keepRuns, dryRun, ...request } = opts;
-    return this.client.request("POST", "/v1/index/gc", {
-      ...request,
-      query: { keep_runs: keepRuns, dry_run: dryRun },
-    });
-  }
-
-  submitGc(
-    body: Schemas["IndexGcRequest"] = {},
-    opts: CallOptions & { idempotencyKey: string },
-  ): Promise<Schemas["IndexGcJobStatusResponse"]> {
-    return this.client.request("POST", "/v1/index/gc-jobs", { ...opts, body });
-  }
-
-  gcJob(
-    jobId: string,
-    opts: CallOptions = {},
-  ): Promise<Schemas["IndexGcJobStatusResponse"]> {
-    return this.client.request("GET", "/v1/index/gc-jobs", {
-      ...opts,
-      query: { job_id: jobId },
-    });
-  }
-
-  cancelGc(
-    jobId: string,
-    opts: CallOptions = {},
-  ): Promise<Schemas["IndexGcJobStatusResponse"]> {
-    return this.client.request("DELETE", "/v1/index/gc-jobs", {
-      ...opts,
-      query: { job_id: jobId },
-    });
-  }
-}
-
 export class EntityNamespace {
   constructor(private readonly client: LbbClient) {}
 
   /**
    * Return the exact type cardinality and a bounded deterministic sample from
-   * the ranged adjacency index. The server returns `index_busy` rather than
-   * falling back to an exhaustive snapshot scan when the index is unavailable.
+   * the ranged adjacency family pinned by the published generation. A missing
+   * family fails closed rather than falling back to an exhaustive scan.
    */
   sample(
     opts: { type: string; limit?: number } & CallOptions,
   ): Promise<Schemas["EntityTypeSampleResponse"]> {
     return this.client.entityTypeSample(opts);
-  }
-
-  /**
-   * Browse entities as the unified list envelope. Pass `fields` (names or `*`)
-   * to inline each row's typed attributes as native JSON (under `attributes`) —
-   * "list entities and their titles" in one call instead of a list plus N point
-   * lookups — or `ids`
-   * to fetch a specific set. Page with `cursor` from the previous `next_cursor`.
-   */
-  list(
-    opts: EntityListOptions = {},
-  ): Promise<ListResponse<Schemas["EntityExplorerRow"]>> {
-    const csv = (v: string | string[] | undefined) =>
-      Array.isArray(v) ? v.join(",") : v;
-    return this.client.request("GET", "/v1/graph/entities", {
-      ...transportOptions(opts),
-      query: {
-        type: opts.type,
-        limit: opts.limit,
-        cursor: opts.cursor,
-        offset: opts.offset,
-        q: opts.query,
-        fields: csv(opts.fields),
-        ids: csv(opts.ids),
-      },
-    });
-  }
-
-  /** Yield list envelopes while following `next_cursor` until exhaustion. */
-  async *pages(
-    opts: EntityListOptions = {},
-  ): AsyncGenerator<ListResponse<Schemas["EntityExplorerRow"]>> {
-    let cursor = opts.cursor;
-    const seen = new Set<string>();
-    do {
-      const page = await this.list({
-        ...opts,
-        cursor,
-        offset: cursor === undefined ? opts.offset : undefined,
-      });
-      yield page;
-      if (!page.has_more || page.next_cursor === null) return;
-      if (seen.has(page.next_cursor)) {
-        throw new Error(
-          `entity pagination cursor repeated: ${page.next_cursor}`,
-        );
-      }
-      seen.add(page.next_cursor);
-      cursor = page.next_cursor;
-    } while (true);
-  }
-
-  /** Yield entities directly while following the server's stable cursor. */
-  async *iterate(
-    opts: EntityListOptions = {},
-  ): AsyncGenerator<Schemas["EntityExplorerRow"]> {
-    for await (const page of this.pages(opts)) {
-      for (const entity of page.data) yield entity;
-    }
   }
 
   get(opts: {
@@ -671,8 +457,6 @@ export class EntityNamespace {
       select: opts.select,
       limit: opts.limit,
       offset: opts.offset,
-      as_of_valid_time: opts.asOfValidTime,
-      as_of_commit_seq: opts.asOfCommitSeq,
       order_by: opts.orderBy,
       reason: opts.reason,
       max_solutions: opts.maxSolutions,
@@ -682,33 +466,9 @@ export class EntityNamespace {
   }
 }
 
-export interface EntityListOptions extends CallOptions {
-  type?: string;
-  limit?: number;
-  cursor?: string | number;
-  /** @deprecated Legacy alias for `cursor`. */
-  offset?: number;
-  query?: string;
-  /** Property names to inline per row (or `"*"` / `["*"]` for all). */
-  fields?: string | string[];
-  /** Specific entity ids to fetch in one call (bulk lookup). */
-  ids?: string | string[];
-}
-
-/** Grounding and answer operations over the graph's real vocabulary. */
+/** Grounding operations over one pinned published vocabulary. */
 export class ContextNamespace {
   constructor(private readonly client: LbbClient) {}
-
-  ask(
-    body: Schemas["AskRequest"],
-    opts: CallOptions = {},
-  ): Promise<Schemas["AskResponse"]> {
-    return this.client.request("POST", "/v1/ask", {
-      ...opts,
-      retry: opts.retry ?? true,
-      body,
-    });
-  }
 
   suggest(
     body: Schemas["SearchSuggestRequest"],
@@ -754,6 +514,29 @@ export class ContextNamespace {
   }
 }
 
+/** Active ontology/SHACL bundle metadata and atomic publication. */
+export class SchemaNamespace {
+  constructor(private readonly client: LbbClient) {}
+
+  /** Read active metadata without running request-time validation. */
+  view(opts: CallOptions = {}): Promise<Schemas["SchemaBundleView"]> {
+    return this.client.request("GET", "/v1/schema", opts);
+  }
+
+  /** Atomically publish a bundle; conformance is produced asynchronously. */
+  publish(
+    body: Schemas["SchemaPublishRequest"],
+    opts: CallOptions = {},
+  ): Promise<Schemas["SchemaPublishResponse"]> {
+    return this.client.request("POST", "/v1/schema/publish", {
+      ...opts,
+      idempotencyKey:
+        opts.idempotencyKey ?? this.client.idempotencyKey("schema-publish"),
+      body,
+    });
+  }
+}
+
 /** Ontology discovery and lifecycle operations. */
 export class OntologyNamespace {
   constructor(private readonly client: LbbClient) {}
@@ -768,8 +551,15 @@ export class OntologyNamespace {
     });
   }
 
-  conformance(opts: CallOptions = {}): Promise<Schemas["SchemaAuditReport"]> {
-    return this.client.request("GET", "/v1/ontology/conformance", opts);
+  conformance(
+    opts: CallOptions & Pick<ReadConsistencyOptions, "consistency"> = {},
+  ): Promise<Schemas["SchemaAuditReport"]> {
+    return this.client.request("GET", "/v1/ontology/conformance", {
+      ...opts,
+      query: {
+        consistency: opts.consistency ?? this.client.defaultConsistency,
+      },
+    });
   }
 
   search(
@@ -826,7 +616,7 @@ export class OntologyNamespace {
   }
 }
 
-/** Structured, SPARQL-text, reasoning, and analytical query operations. */
+/** Structured, SPARQL-text, and analytical query operations. */
 export class QueryNamespace {
   constructor(private readonly client: LbbClient) {}
 
@@ -882,39 +672,6 @@ export class QueryNamespace {
     opts: CallOptions = {},
   ): Promise<Schemas["AnalyticQueryResponse"]> {
     return this.client.request("POST", "/v1/query/analytics", {
-      ...opts,
-      retry: opts.retry ?? true,
-      body,
-    });
-  }
-
-  shacl(
-    body: Schemas["ShaclQueryRequest"],
-    opts: CallOptions = {},
-  ): Promise<Schemas["ShaclQueryResponse"]> {
-    return this.client.request("POST", "/v1/query/shacl", {
-      ...opts,
-      retry: opts.retry ?? true,
-      body,
-    });
-  }
-
-  infer(
-    body: Schemas["InferenceRunRequest"],
-    opts: CallOptions = {},
-  ): Promise<Schemas["InferenceRunResponse"]> {
-    return this.client.request("POST", "/v1/inference/run", {
-      ...opts,
-      retry: opts.retry ?? true,
-      body,
-    });
-  }
-
-  premises(
-    body: Schemas["RetrievalPremiseRequest"],
-    opts: CallOptions = {},
-  ): Promise<Schemas["RetrievalPremiseResponse"]> {
-    return this.client.request("POST", "/v1/inference/retrieval-premises", {
       ...opts,
       retry: opts.retry ?? true,
       body,

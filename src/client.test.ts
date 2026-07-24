@@ -71,7 +71,7 @@ function recordingFetch(
   return { fetch, calls };
 }
 
-test("metadata keeps recursive object inventory opt-in", async () => {
+test("metadata exposes only the bounded index detail option", async () => {
   const { fetch, calls } = recordingFetch();
   const client = new LbbClient({ baseUrl: "http://h", fetch });
 
@@ -79,14 +79,14 @@ test("metadata keeps recursive object inventory opt-in", async () => {
   assert.equal(calls[0].input, "http://h/v1/graph/metadata");
 
   await client.metadata({
-    includeObjects: true,
     includeIndexes: false,
-    includeTemporalCoverage: true,
   });
   assert.match(calls[1].input, /^http:\/\/h\/v1\/graph\/metadata\?/);
-  assert.match(calls[1].input, /include_objects=true/);
   assert.match(calls[1].input, /include_indexes=false/);
-  assert.match(calls[1].input, /include_temporal_coverage=true/);
+  assert.equal(
+    /include_objects|include_temporal_coverage/.test(calls[1].input),
+    false,
+  );
 });
 
 test("waitForIndexLineage retains the satisfying build and replica headers", async () => {
@@ -109,12 +109,9 @@ test("waitForIndexLineage retains the satisfying build and replica headers", asy
       wal_tail_bytes: 0,
       segment_count: 0,
       segment_bytes: 0,
-      object_count: 0,
-      object_bytes: 0,
       adjacency_indexed_commit_seq: 7,
-      unindexed_tail_commits: 0,
+      published_lag_commits: 0,
       index_lineage: lineage,
-      temporal_coverage: {},
     }),
     headers: {
       "lbb-build-commit": "deadbeef",
@@ -169,7 +166,7 @@ test("namespace facts.create injects auth, scope, version, and idempotency", asy
   assert.equal(call.init.method, "POST");
   assert.equal(call.init.headers?.authorization, "Bearer lbb_sk_test_client");
   assert.equal(call.init.headers?.["content-type"], "application/json");
-  assert.equal(call.init.headers?.["lbb-version"], "2026-07-22");
+  assert.equal(call.init.headers?.["lbb-version"], "2026-07-23");
   assert.equal(call.init.headers?.["idempotency-key"], "ik_test_1");
   assert.deepEqual(JSON.parse(call.init.body ?? ""), { triplets: [] });
 });
@@ -210,39 +207,6 @@ test("sparqlText sends row paging fields and exposes row_page", async () => {
   assert.equal(result.row_page.next_offset, 150);
 });
 
-test("graphEdges scopes and pages an entity's edges", async () => {
-  const { fetch, calls } = recordingFetch({
-    body: JSON.stringify({
-      object: "list",
-      data: [],
-      has_more: true,
-      next_cursor: "300",
-      snapshot: {},
-      total_count: 782,
-    }),
-  });
-  const client = new LbbClient({ baseUrl: "http://h", graph: "main", fetch });
-
-  const result = await client.graphEdges({
-    type: "PERSON",
-    name: "ada",
-    direction: "out",
-    limit: 150,
-    cursor: 150,
-    asOfCommitSeq: 42,
-  });
-
-  const input = calls[0].input;
-  assert.match(input, /^http:\/\/h\/v1\/graph\/edges\?/);
-  assert.match(input, /type=PERSON/);
-  assert.match(input, /name=ada/);
-  assert.match(input, /direction=out/);
-  assert.match(input, /cursor=150/);
-  assert.match(input, /as_of_commit_seq=42/);
-  assert.equal(result.total_count, 782);
-  assert.equal(result.next_cursor, "300");
-});
-
 test("commitDryRun sends dry_run=true and no idempotency key", async () => {
   const { fetch, calls } = recordingFetch({
     body: JSON.stringify({
@@ -265,29 +229,6 @@ test("commitDryRun sends dry_run=true and no idempotency key", async () => {
   assert.equal(result.op_count, 2);
 });
 
-test("entities.list projects fields and bulk-fetches ids in one call", async () => {
-  const { fetch, calls } = recordingFetch({
-    body: JSON.stringify({
-      object: "list",
-      data: [{ name: "ada", attributes: { title: "VP" } }],
-      has_more: false,
-      next_cursor: null,
-      snapshot: {},
-      total_count: 1,
-    }),
-  });
-  const client = new LbbClient({ baseUrl: "http://h", graph: "main", fetch });
-
-  const page = await client.entities.list({
-    fields: ["title", "status"],
-    ids: ["abc", "def"],
-  });
-
-  assert.match(calls[0].input, /fields=title%2Cstatus/);
-  assert.match(calls[0].input, /ids=abc%2Cdef/);
-  assert.equal(page.total_count, 1);
-});
-
 test("entities.sample uses the bounded adjacency sample route", async () => {
   const { fetch, calls } = recordingFetch({
     body: JSON.stringify({
@@ -308,7 +249,7 @@ test("entities.sample uses the bounded adjacency sample route", async () => {
   assert.equal(sample.total_count, 59150);
 });
 
-test("entityNeighborhood can require the ranged indexed path", async () => {
+test("entityNeighborhood always uses the published ranged path", async () => {
   const { fetch, calls } = recordingFetch({
     body: JSON.stringify({
       center: { id: "abc", entity_type: "SERVICE", name: "api" },
@@ -320,9 +261,9 @@ test("entityNeighborhood can require the ranged indexed path", async () => {
   });
   const client = new LbbClient({ baseUrl: "http://h", graph: "main", fetch });
 
-  await client.entityNeighborhood({ id: "abc", indexed: true });
+  await client.entityNeighborhood({ id: "abc" });
 
-  assert.match(calls[0].input, /indexed=true/);
+  assert.equal(/indexed=/.test(calls[0].input), false);
 });
 
 test("entities.filterByAttributes builds structured SPARQL property filters", async () => {
@@ -457,7 +398,6 @@ test("search.hybrid encodes the v1 GET search route", async () => {
   const client = new LbbClient({ baseUrl: "http://h", fetch });
   await client.search.hybrid("customer identity", {
     topK: 5,
-    source: "persisted",
     consistency: "strong",
     lexical: false,
     bm25: true,
@@ -468,24 +408,12 @@ test("search.hybrid encodes the v1 GET search route", async () => {
   assert.match(input, /^http:\/\/h\/v1\/search\?/);
   assert.match(input, /query=customer%20identity/);
   assert.match(input, /top_k=5/);
-  assert.match(input, /source=persisted/);
+  assert.equal(/[?&]source=/.test(input), false);
   assert.match(input, /consistency=strong/);
   assert.match(input, /lexical=false/);
   assert.match(input, /bm25=true/);
   assert.match(input, /vector=true/);
   assert.match(input, /targets=concepts%2Centities/);
-});
-
-test("search.hybrid rides the bitemporal cursor as query params", async () => {
-  const { fetch, calls } = recordingFetch();
-  const client = new LbbClient({ baseUrl: "http://h", fetch });
-  await client.search.hybrid("customer identity", {
-    asOf: "2026-01-15T00:00:00Z",
-    asOfCommitSeq: 42,
-  });
-  const input = calls[0].input;
-  assert.match(input, /as_of=2026-01-15T00%3A00%3A00Z/);
-  assert.match(input, /as_of_commit_seq=42/);
 });
 
 test("search.feedback posts labels with idempotency", async () => {
@@ -623,27 +551,6 @@ test("search.feedbackSummary reads scoped feedback administration counts", async
   assert.equal(calls[0].init.method, "GET");
 });
 
-test("entities namespace encodes list filters", async () => {
-  const { fetch, calls } = recordingFetch({
-    body: JSON.stringify({ entities: [] }),
-  });
-  const client = new LbbClient({
-    baseUrl: "http://h",
-    graph: "main",
-    branch: "b",
-    fetch,
-  });
-  await client.entities.list({ type: "SERVICE", limit: 10, query: "billing" });
-
-  const input = calls[0].input;
-  assert.match(input, /^http:\/\/h\/v1\/graph\/entities\?/);
-  assert.match(input, /graph=main/);
-  assert.match(input, /branch=b/);
-  assert.match(input, /type=SERVICE/);
-  assert.match(input, /limit=10/);
-  assert.match(input, /q=billing/);
-});
-
 test("entities namespace encodes detail lookups", async () => {
   const entity = { id: "01", type: "SERVICE", name: "billing-api" };
   const snapshot = { commit_seq: 3, indexed_seq: 0 };
@@ -687,30 +594,57 @@ test("entities namespace encodes detail lookups", async () => {
   assert.equal(detail.attributes?.status, "synced");
 });
 
-test("schema namespace uses v1 schema routes", async () => {
+test("schema namespace reads metadata and publishes without request-time audit", async () => {
   const { fetch, calls } = recordingFetch({
-    body: JSON.stringify({ conforms: true }),
+    body: JSON.stringify({ activated: true }),
   });
   const client = new LbbClient({ baseUrl: "http://h", graph: "main", fetch });
 
   await client.schema.view();
-  await client.schema.view({ audit: true });
-  await client.schema.preview({ desired_mode: "warn" });
   await client.schema.publish({
-    preview_digest: "sha256:test",
     desired_mode: "warn",
+    shapes: { source: "@prefix sh: <http://www.w3.org/ns/shacl#> ." },
   });
-  await client.schema.audit();
 
   assert.equal(calls[0].input, "http://h/v1/schema?graph=main");
-  assert.equal(calls[1].input, "http://h/v1/schema?graph=main&audit=true");
-  assert.equal(calls[2].input, "http://h/v1/schema/preview?graph=main");
-  assert.equal(calls[2].init.method, "POST");
-  assert.deepEqual(JSON.parse(calls[2].init.body ?? ""), {
+  assert.equal(calls[0].init.method, "GET");
+  assert.equal(calls[1].input, "http://h/v1/schema/publish?graph=main");
+  assert.equal(calls[1].init.method, "POST");
+  assert.deepEqual(JSON.parse(calls[1].init.body ?? ""), {
     desired_mode: "warn",
+    shapes: { source: "@prefix sh: <http://www.w3.org/ns/shacl#> ." },
   });
-  assert.equal(calls[3].input, "http://h/v1/schema/publish?graph=main");
-  assert.equal(calls[4].input, "http://h/v1/schema/audit?graph=main");
+});
+
+test("published grounding and model dataset routes remain public", async () => {
+  const { fetch, calls } = recordingFetch({ body: "{}" });
+  const client = new LbbClient({ baseUrl: "http://h", graph: "main", fetch });
+
+  await client.decode({
+    source: { name: "auth" },
+    target: { name: "database" },
+  });
+  await client.resolveTerm({ text: "writes" });
+  await client.groundability({ sample: 25 });
+  await client.shadowEval({ queries: [], challenger: {} });
+  await client.plannerDataset({ limit: 10, splitSeq: 7 });
+  await client.plannerPreferenceDataset({ limit: 11, splitSeq: 8 });
+  await client.suggestDataset({ limit: 12, splitSeq: 9 });
+  await client.extractorDataset({ limit: 13, splitSeq: 10 });
+
+  assert.deepEqual(
+    calls.map((call) => call.input),
+    [
+      "http://h/v1/decode?graph=main",
+      "http://h/v1/search/resolve-term?graph=main",
+      "http://h/v1/graph/groundability?graph=main&sample=25",
+      "http://h/v1/models/shadow-eval?graph=main",
+      "http://h/v1/models/planner-dataset?graph=main&limit=10&split_seq=7",
+      "http://h/v1/models/planner-preference-dataset?graph=main&limit=11&split_seq=8",
+      "http://h/v1/models/suggest-dataset?graph=main&limit=12&split_seq=9",
+      "http://h/v1/models/extractor-dataset?graph=main&limit=13&split_seq=10",
+    ],
+  );
 });
 
 test("creates graph and forks branch with scoped v1 URLs", async () => {
@@ -739,7 +673,7 @@ test("creates graph and forks branch with scoped v1 URLs", async () => {
   });
 });
 
-test("uses whole-graph, branch-delete, cancellable index, and durable GC routes", async () => {
+test("uses whole-graph and branch-delete routes", async () => {
   const { fetch, calls } = recordingFetch({ body: "{}" });
   const client = new LbbClient({
     baseUrl: "http://h",
@@ -750,12 +684,6 @@ test("uses whole-graph, branch-delete, cancellable index, and durable GC routes"
 
   await client.deleteGraph({ confirm: "research" });
   await client.deleteBranch({ confirm: "review" });
-  await client.indexSubmit({}, { idempotencyKey: "index-1" });
-  await client.indexJob("index_run:abc");
-  await client.cancelIndexJob("index_run:abc");
-  await client.indexGcSubmit({ dry_run: false }, { idempotencyKey: "gc-1" });
-  await client.indexGcJob("index_gc:abc");
-  await client.cancelIndexGcJob("index_gc:abc");
 
   assert.equal(
     calls[0].input,
@@ -767,24 +695,12 @@ test("uses whole-graph, branch-delete, cancellable index, and durable GC routes"
     "http://h/v1/graph/branch?graph=research&branch=review&confirm=review",
   );
   assert.equal(calls[1].init.method, "DELETE");
-  assert.equal(calls[2].init.headers?.["idempotency-key"], "index-1");
-  assert.equal(
-    calls[3].input,
-    "http://h/v1/index/jobs?graph=research&branch=review&job_id=index_run%3Aabc",
-  );
-  assert.equal(calls[4].init.method, "DELETE");
-  assert.equal(calls[5].init.headers?.["idempotency-key"], "gc-1");
-  assert.equal(
-    calls[6].input,
-    "http://h/v1/index/gc-jobs?graph=research&branch=review&job_id=index_gc%3Aabc",
-  );
-  assert.equal(calls[7].init.method, "DELETE");
 });
 
 test("rawRequest returns request metadata", async () => {
   const { fetch } = recordingFetch({
     body: JSON.stringify({ ok: true }),
-    headers: { "x-request-id": "req_123", "lbb-version": "2026-07-22" },
+    headers: { "x-request-id": "req_123", "lbb-version": "2026-07-23" },
   });
   const client = new LbbClient({ baseUrl: "http://h", fetch });
   const response = await client.rawRequest<{ ok: boolean }>(
@@ -795,7 +711,7 @@ test("rawRequest returns request metadata", async () => {
   assert.deepEqual(response.data, { ok: true });
   assert.equal(response.status, 200);
   assert.equal(response.requestId, "req_123");
-  assert.equal(response.version, "2026-07-22");
+  assert.equal(response.version, "2026-07-23");
 });
 
 test("retries retryable failures", async () => {
@@ -1106,8 +1022,13 @@ test("facts.import serializes lines to NDJSON with batch/strict params", async (
       triplets: 1,
       properties: 1,
       batches: 1,
-      indexed: false,
       error_count: 0,
+      published_generation: {
+        job_id: "job-publish-1",
+        disposition: "queued",
+        status: "pending",
+        due_seq: 7,
+      },
     }),
   });
   const client = new LbbClient({ baseUrl: "http://h", graph: "main", fetch });
@@ -1125,13 +1046,15 @@ test("facts.import serializes lines to NDJSON with batch/strict params", async (
         properties: { h_index: 52 },
       },
     ],
-    { batch: 500, strict: true },
+    { batch: 500, strict: true, publish: true },
   );
   assert.equal(result.triplets, 1);
   const call = calls[0];
   assert.match(call.input, /\/v1\/graph\/import\?/);
   assert.match(call.input, /batch=500/);
   assert.match(call.input, /strict=true/);
+  assert.match(call.input, /publish=true/);
+  assert.equal(result.published_generation?.due_seq, 7);
   assert.equal(call.init.headers?.["content-type"], "application/x-ndjson");
   assert.match(call.init.headers?.["idempotency-key"] ?? "", /^import:/);
   // Body is newline-delimited JSON, one object per line.
@@ -1154,10 +1077,15 @@ test("facts.importRdf posts N-Triples through the native RDF endpoint", async ()
       duplicate_literal_triples: 0,
       imported_triplets: 1,
       batches: 1,
-      indexed: false,
       predicate_count: 1,
       predicates: [],
       error_count: 0,
+      published_generation: {
+        job_id: "job-publish-rdf-1",
+        disposition: "coalesced",
+        status: "pending",
+        due_seq: 8,
+      },
     }),
   });
   const client = new LbbClient({ baseUrl: "http://h", graph: "main", fetch });
@@ -1168,6 +1096,7 @@ test("facts.importRdf posts N-Triples through the native RDF endpoint", async ()
     blankNodeScope: "document-42",
     resourceType: "RdfResource",
     edgeIdempotency: "append",
+    publish: true,
   });
   assert.equal(result.imported_triplets, 1);
   const call = calls[0];
@@ -1179,6 +1108,8 @@ test("facts.importRdf posts N-Triples through the native RDF endpoint", async ()
   assert.match(call.input, /resource_type=RdfResource/);
   assert.match(call.init.headers?.["idempotency-key"] ?? "", /^import-rdf:/);
   assert.match(call.input, /edge_idempotency=append/);
+  assert.match(call.input, /publish=true/);
+  assert.equal(result.published_generation?.due_seq, 8);
   assert.equal(call.init.headers?.["content-type"], "application/n-triples");
   assert.equal(call.init.body, body);
 });
@@ -1202,29 +1133,6 @@ test("facts.importRdf selects Turtle and forwards its base IRI", async () => {
   assert.match(call.input, /graph_uri=http%3A%2F%2Fex%2Fgraph/);
   assert.equal(call.init.headers?.["content-type"], "text/turtle");
   assert.equal(call.init.body, body);
-});
-
-test("graph.exportRdf returns RDF dataset text instead of JSON parsing it", async () => {
-  const turtle = "<http://ex/s> <http://ex/p> <http://ex/o> <http://ex/g> .\n";
-  const { fetch, calls } = recordingFetch({
-    status: 200,
-    body: turtle,
-    headers: { "content-type": "application/n-quads; charset=utf-8" },
-  });
-  const client = new LbbClient({ baseUrl: "http://h", fetch });
-  const result = await client.graph("research", { branch: "draft" }).exportRdf({
-    format: "nquads",
-    maxTriples: 500,
-    asOfCommitSeq: 7,
-  });
-  assert.equal(result, turtle);
-  const call = calls[0];
-  assert.match(call.input, /\/v1\/graph\/export\/rdf\?/);
-  assert.match(call.input, /graph=research/);
-  assert.match(call.input, /branch=draft/);
-  assert.match(call.input, /max_triples=500/);
-  assert.match(call.input, /as_of_commit_seq=7/);
-  assert.match(call.input, /format=nquads/);
 });
 
 test("graph.retract posts edge/entity retractions", async () => {
