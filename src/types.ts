@@ -65,8 +65,6 @@ export interface RdfImportOptions {
   observedAt?: string;
   resourceType?: string;
   edgeIdempotency?: "append" | "skip_unchanged";
-  /** Enqueue one complete published-generation build after the final batch. */
-  publish?: boolean;
   idempotencyKey?: string;
 }
 

@@ -238,11 +238,10 @@ export class FactsNamespace {
       batch?: number;
       strict?: boolean;
       observedAt?: string;
-      publish?: boolean;
       idempotencyKey?: string;
     } = {},
   ): Promise<Schemas["GraphImportResponse"]> {
-    const { batch, strict, observedAt, publish, ...request } = opts;
+    const { batch, strict, observedAt, ...request } = opts;
     const ndjson =
       typeof lines === "string"
         ? lines
@@ -253,7 +252,7 @@ export class FactsNamespace {
         request.idempotencyKey ?? this.client.idempotencyKey("import"),
       rawBody: ndjson,
       contentType: "application/x-ndjson",
-      query: { batch, strict, observed_at: observedAt, publish },
+      query: { batch, strict, observed_at: observedAt },
     });
   }
 
@@ -277,7 +276,6 @@ export class FactsNamespace {
       observedAt,
       resourceType,
       edgeIdempotency,
-      publish,
       ...request
     } = opts;
     return this.client.request("POST", "/v1/graph/import/rdf", {
@@ -301,7 +299,6 @@ export class FactsNamespace {
         blank_node_scope: blankNodeScope,
         resource_type: resourceType,
         edge_idempotency: edgeIdempotency,
-        publish,
       },
     });
   }
