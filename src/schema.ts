@@ -4099,7 +4099,7 @@ export interface components {
          * @description Remove entity types from a relation's domain and/or range (a subtractive
          *     change). Conflicts when current edges of the relation already use a
          *     removed source/target type — those edges stay (append-only) but begin to
-         *     warn. Blocked unless `allow_data_conflicts` is set on the request.
+         *     warn. Blocked until those edges are migrated or retracted.
          */
         NarrowRelationOp: {
             /**
@@ -4257,10 +4257,13 @@ export interface components {
             affected: number;
             /**
              * @description `entities_of_removed_type` | `edges_of_removed_relation` |
-             *     `edges_outside_narrowed_domain` | `edges_outside_narrowed_range`.
+             *     `edges_outside_narrowed_domain` | `edges_outside_narrowed_range` |
+             *     `property_values_outside_constraint` | `relation_cardinality`.
              */
             kind: string;
             message: string;
+            /** @description Bounded deterministic examples. `affected` remains the exact count. */
+            samples?: string[];
             /** @description `class:<stable_id>` or `relation:<stable_id>` the conflict is about. */
             subject: string;
         };
@@ -4377,11 +4380,9 @@ export interface components {
          */
         OntologyEvolveRequest: {
             /**
-             * @description Allow subtractive ops (narrow/remove) to apply even when current data
-             *     conflicts. The affected records are never rewritten or dropped — they stay
-             *     readable and simply begin to warn. With this false (the default), a
-             *     conflicting subtractive request is rejected without writing and the
-             *     conflicts are reported instead.
+             * @description Deprecated compatibility field. Conflicting subtractive changes are
+             *     always rejected with structured conflicts until affected data is
+             *     migrated or retracted; setting this field no longer bypasses that gate.
              */
             allow_data_conflicts?: boolean;
             ops: components["schemas"]["OntologyEvolveOp"][];
@@ -4420,8 +4421,8 @@ export interface components {
              */
             ontology_version: number;
             /**
-             * @description Whether the exact request can be published. False for a data-conflicting
-             *     subtractive preview unless `allow_data_conflicts` was explicitly set.
+             * @description Whether the exact request can be published. False for every
+             *     data-conflicting subtractive preview.
              */
             publishable: boolean;
         };
@@ -5074,8 +5075,8 @@ export interface components {
         /**
          * @description Tombstone an entity type: existing records of the type stay readable
          *     (the def is retained, so they still resolve), but it is rejected for new
-         *     commits. Conflicts when current entities of the type exist; blocked unless
-         *     `allow_data_conflicts` is set.
+         *     commits. Conflicts when current entities of the type exist; blocked until
+         *     those entities are migrated or retracted.
          */
         RemoveEntityTypeOp: {
             name: string;
@@ -5087,8 +5088,8 @@ export interface components {
         };
         /**
          * @description Tombstone a relation: existing edges stay readable but it is rejected for
-         *     new commits. Conflicts when current edges use it; blocked unless
-         *     `allow_data_conflicts` is set.
+         *     new commits. Conflicts when current edges use it; blocked until those
+         *     edges are migrated or retracted.
          */
         RemoveRelationOp: {
             name: string;
@@ -6190,9 +6191,9 @@ export interface components {
         };
         /**
          * @description Change a relation's cardinality (`one_to_one` | `one_to_many` |
-         *     `many_to_one` | `many_to_many`). Advisory metadata (it informs ranking and
-         *     query shaping, and is not enforced against stored edges), so it never
-         *     conflicts with existing data.
+         *     `many_to_one` | `many_to_many`). A narrowing transition is checked
+         *     against the exact current reduced edge projection before publication.
+         *     Once accepted, the declared cardinality is enforced on future commits.
          */
         SetRelationCardinalityOp: {
             cardinality: string;
