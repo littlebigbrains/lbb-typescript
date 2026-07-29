@@ -78,6 +78,20 @@ await graph.facts.import(
 );
 ```
 
+For large or long-running loads, stream records to a durable job instead:
+
+```ts
+const accepted = await lbb.submitImport(records(), {
+  idempotencyKey: "hubspot:portal-42:run-2026-07-29",
+});
+const completed = await lbb.waitForImportJob(accepted.job_id);
+console.log(completed.state, completed.committed_commit_seq);
+```
+
+`records()` may be an iterable or async iterable. Success means every grouped
+commit is durable and final publication was enqueued; it does not mean indexes
+have already reached `committed_commit_seq`.
+
 **Time-travel read.** Pin any search to a past instant — results reflect the graph as it was then:
 
 ```ts

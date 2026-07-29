@@ -1,4 +1,6 @@
 import type {
+  DurableImportLine,
+  DurableImportSource,
   FetchLike,
   ImportLine,
   LbbClientOptions,
@@ -28,6 +30,7 @@ import {
   type Query,
   type RequestOptions,
 } from "./transport.js";
+import { LbbCapabilityError } from "./transport.js";
 import {
   ContextNamespace,
   EntityNamespace,
@@ -45,6 +48,8 @@ export type {
   AttributeFilterValue,
   EntityAttributeFilterOptions,
   EntityPropertiesLine,
+  DurableImportLine,
+  DurableImportSource,
   FetchLike,
   FlatProperties,
   ImportLine,
@@ -74,7 +79,7 @@ export type {
   SearchResult,
   Snapshot,
 } from "./types.js";
-export { LbbError } from "./transport.js";
+export { LbbCapabilityError, LbbError } from "./transport.js";
 export type {
   CallOptions,
   Query,
@@ -103,6 +108,85 @@ export interface IndexLineageObservation {
   elapsedMs: number;
 }
 
+type ImportStreamController = {
+  enqueue(chunk: Uint8Array): void;
+  close(): void;
+  error(reason: unknown): void;
+};
+
+type ImportReadableStreamConstructor = new (source: {
+  pull(controller: ImportStreamController): Promise<void>;
+  cancel(reason?: unknown): Promise<void>;
+}) => unknown;
+
+function durableImportBytes(line: DurableImportLine): Uint8Array {
+  if (line instanceof Uint8Array) return line;
+  const encoded = typeof line === "string" ? line : JSON.stringify(line);
+  return new TextEncoder().encode(
+    encoded.endsWith("\n") ? encoded : `${encoded}\n`,
+  );
+}
+
+function durableImportIterator(
+  source: DurableImportSource,
+): AsyncIterator<DurableImportLine> {
+  if (typeof source === "string") {
+    return (async function* () {
+      yield source;
+    })();
+  }
+  if (Symbol.asyncIterator in Object(source)) {
+    return (source as AsyncIterable<DurableImportLine>)[Symbol.asyncIterator]();
+  }
+  const iterator = (source as Iterable<DurableImportLine>)[Symbol.iterator]();
+  return {
+    next: async () => iterator.next(),
+    return: async () => {
+      iterator.return?.();
+      return { done: true, value: undefined };
+    },
+  };
+}
+
+function durableImportBody(source: DurableImportSource): unknown {
+  const iterator = durableImportIterator(source);
+  const Stream = (
+    globalThis as { ReadableStream?: ImportReadableStreamConstructor }
+  ).ReadableStream;
+  if (Stream) {
+    return new Stream({
+      async pull(controller) {
+        try {
+          const item = await iterator.next();
+          if (item.done) {
+            controller.close();
+          } else {
+            controller.enqueue(durableImportBytes(item.value));
+          }
+        } catch (error) {
+          controller.error(error);
+        }
+      },
+      async cancel() {
+        await iterator.return?.();
+      },
+    });
+  }
+  return {
+    async *[Symbol.asyncIterator]() {
+      try {
+        for (;;) {
+          const item = await iterator.next();
+          if (item.done) return;
+          yield durableImportBytes(item.value);
+        }
+      } finally {
+        await iterator.return?.();
+      }
+    },
+  };
+}
+
 /**
  * A typed HTTP client for a little big brain graph server. One instance is scoped to a
  * single graph/branch; construct another for a different scope. All methods
@@ -123,6 +207,7 @@ export class LbbClient {
   private readonly onRequest?: (event: LbbRequestEvent) => void;
   private readonly onResponse?: (event: LbbResponseEvent) => void;
   private readonly onRetry?: (event: LbbRetryEvent) => void;
+  private capabilities?: Promise<ReadonlySet<string>>;
   /** A5 default read consistency applied when a read omits its own value. */
   readonly defaultConsistency?: SearchConsistency;
 
@@ -303,6 +388,7 @@ export class LbbClient {
       method,
       headers,
       body,
+      ...(opts.duplex ? { duplex: opts.duplex } : {}),
     };
     const timeoutMs = opts.timeoutMs ?? this.timeoutMs;
     const maxRetries = opts.maxRetries ?? this.maxRetries;
@@ -340,10 +426,19 @@ export class LbbClient {
           maxAttempts: maxRetries + 1,
           idempotencyKey: opts.idempotencyKey,
         });
-        response = await this.fetchImpl(url, {
+        const requestInit = {
           ...init,
           signal: controller?.signal ?? opts.signal,
-        });
+        };
+        // Keep FetchLike's long-standing string-body test-double contract while
+        // allowing this one endpoint to pass a native streaming body to fetch.
+        // Native browser/Node fetch implementations accept the extended shape;
+        // custom transports that need durable imports can inspect it at runtime.
+        const streamingFetch = this.fetchImpl as unknown as (
+          input: string,
+          init: typeof requestInit,
+        ) => ReturnType<FetchLike>;
+        response = await streamingFetch(url, requestInit);
         text = await response.text();
       } catch (error) {
         const callerAborted = opts.signal?.aborted === true;
@@ -470,6 +565,16 @@ export class LbbClient {
     return this.mutationKey(prefix);
   }
 
+  private async requireCapability(capability: string): Promise<void> {
+    this.capabilities ??= this.request<Schemas["VersionResponse"]>(
+      "GET",
+      "/version",
+    ).then((version) => new Set(version.capabilities));
+    if (!(await this.capabilities).has(capability)) {
+      throw new LbbCapabilityError(capability);
+    }
+  }
+
   // --- writes ---
 
   /** Commit triplets and optional entity embeddings. Prefer `client.graph("main").facts.create(...)`. */
@@ -549,6 +654,96 @@ export class LbbClient {
     // A5: surface the last committed sequence (null for an empty import) so the
     // write→floor→read loop reads naturally after a bulk load.
     return { ...response, commitSeq: response.committed_commit_seq ?? null };
+  }
+
+  /**
+   * Stream NDJSON into immutable storage and enqueue a durable import job.
+   *
+   * The idempotency key is mandatory and binds the key to the uploaded content.
+   * Streaming uploads are attempted once: a one-shot async iterator cannot be
+   * replayed safely by an automatic HTTP retry. Call this method again with a
+   * fresh iterable and the same key to perform an explicit idempotent replay.
+   */
+  async submitImport(
+    lines: DurableImportSource,
+    opts: {
+      idempotencyKey: string;
+      batch?: number;
+      strict?: boolean;
+      observedAt?: string;
+      signal?: AbortSignal;
+    },
+  ): Promise<Schemas["GraphImportJobAccepted"]> {
+    if (!opts?.idempotencyKey?.trim()) {
+      throw new TypeError("submitImport requires a non-empty idempotencyKey");
+    }
+    await this.requireCapability("durable_import_jobs_v1");
+    return this.request("POST", "/v1/graph/import-jobs", {
+      rawBody: durableImportBody(lines),
+      contentType: "application/x-ndjson",
+      duplex: "half",
+      query: {
+        batch: opts.batch,
+        strict: opts.strict,
+        observed_at: opts.observedAt,
+      },
+      idempotencyKey: opts.idempotencyKey,
+      maxRetries: 0,
+      retry: false,
+      signal: opts.signal,
+    });
+  }
+
+  async getImportJob(jobId: string): Promise<Schemas["GraphImportJobStatus"]> {
+    await this.requireCapability("durable_import_jobs_v1");
+    return this.request("GET", "/v1/graph/import-jobs", {
+      query: { job_id: jobId },
+    });
+  }
+
+  async cancelImportJob(
+    jobId: string,
+  ): Promise<Schemas["GraphImportJobCancelResponse"]> {
+    await this.requireCapability("durable_import_jobs_v1");
+    return this.request("DELETE", "/v1/graph/import-jobs", {
+      query: { job_id: jobId },
+    });
+  }
+
+  async waitForImportJob(
+    jobId: string,
+    opts: {
+      pollIntervalMs?: number;
+      timeoutMs?: number;
+      signal?: AbortSignal;
+    } = {},
+  ): Promise<Schemas["GraphImportJobStatus"]> {
+    const pollIntervalMs = opts.pollIntervalMs ?? 1_000;
+    const timeoutMs = opts.timeoutMs ?? 0;
+    if (!Number.isFinite(pollIntervalMs) || pollIntervalMs < 0) {
+      throw new RangeError("pollIntervalMs must be a non-negative number");
+    }
+    if (!Number.isFinite(timeoutMs) || timeoutMs < 0) {
+      throw new RangeError("timeoutMs must be a non-negative number");
+    }
+    const deadline = timeoutMs > 0 ? Date.now() + timeoutMs : undefined;
+    for (;;) {
+      if (opts.signal?.aborted) {
+        throw opts.signal.reason ?? new Error("request aborted");
+      }
+      const status = await this.getImportJob(jobId);
+      if (
+        status.state === "succeeded" ||
+        status.state === "failed" ||
+        status.state === "cancelled"
+      ) {
+        return status;
+      }
+      if (deadline !== undefined && Date.now() >= deadline) {
+        throw new Error(`timed out waiting for durable import job ${jobId}`);
+      }
+      await sleep(pollIntervalMs);
+    }
   }
 
   /**

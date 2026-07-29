@@ -2,6 +2,17 @@
 
 All notable changes to the `@littlebigbrain/client` package are documented here.
 
+## 0.9.0
+
+Durable, asynchronous NDJSON imports.
+
+- `submitImport` streams sync or async iterable input without constructing one
+  complete body and requires an explicit idempotency key.
+- `getImportJob`, `cancelImportJob`, and `waitForImportJob` expose durable
+  grouped-commit progress and terminal state.
+- Durable methods require the server's `durable_import_jobs_v1` capability and
+  never silently fall back to the synchronous import route.
+
 ## 0.8.1
 
 Adjacency-backed Explorer reads now report the coherent adjacency coverage

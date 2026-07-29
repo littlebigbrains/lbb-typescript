@@ -1,5 +1,12 @@
-export { LbbClient, LbbError, parseSparqlResults } from "./client.js";
+export {
+  LbbCapabilityError,
+  LbbClient,
+  LbbError,
+  parseSparqlResults,
+} from "./client.js";
 export type {
+  DurableImportLine,
+  DurableImportSource,
   LbbClientOptions,
   CallOptions,
   RequestOptions,
