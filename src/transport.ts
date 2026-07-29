@@ -19,10 +19,12 @@ export interface CallOptions {
 export interface RequestOptions extends CallOptions {
   query?: Query;
   body?: unknown;
-  /** Pre-serialized request body (e.g. NDJSON). Takes precedence over `body`. */
-  rawBody?: string;
+  /** Pre-serialized or streaming request body (e.g. NDJSON). Takes precedence over `body`. */
+  rawBody?: unknown;
   /** Overrides the default `application/json` content type (used with `rawBody`). */
   contentType?: string;
+  /** Set for streaming request bodies so Node's fetch accepts them. */
+  duplex?: "half";
 }
 
 /** Thrown when the server responds with a non-2xx status. */
@@ -52,6 +54,16 @@ export class LbbError extends Error {
     this.retryable = error?.retryable;
     this.retryAfterSeconds = error?.retry_after_seconds;
     this.endpointHint = endpointMigrationHint(this.code);
+  }
+}
+
+/** Thrown before upload when a server does not advertise a required additive capability. */
+export class LbbCapabilityError extends Error {
+  constructor(readonly capability: string) {
+    super(
+      `Little Big Brain server does not advertise ${capability}; upgrade the server before using this SDK method`,
+    );
+    this.name = "LbbCapabilityError";
   }
 }
 

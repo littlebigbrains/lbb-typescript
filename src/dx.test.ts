@@ -26,7 +26,7 @@ function queuedFetch(
   const fetch: FetchLike = async (url, init) => {
     urls.push(url);
     headers.push(init?.headers ?? {});
-    bodies.push(init?.body);
+    bodies.push(typeof init?.body === "string" ? init.body : undefined);
     const next = payloads.shift() ?? { body: {} };
     const responseHeaders = new Map(
       Object.entries(next.headers ?? {}).map(([key, value]) => [

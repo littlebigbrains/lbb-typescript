@@ -54,6 +54,13 @@ export type EntityPropertiesLine = {
 /** One bulk-import line: a triplet, or an entity-properties record. */
 export type ImportLine = Schemas["TripletInput"] | EntityPropertiesLine;
 
+/** One streamed durable-import item. Strings are treated as complete NDJSON lines. */
+export type DurableImportLine = ImportLine | string | Uint8Array;
+
+/** Sync or async source consumed one record/chunk at a time by `submitImport`. */
+export type DurableImportSource =
+  string | Iterable<DurableImportLine> | AsyncIterable<DurableImportLine>;
+
 export interface RdfImportOptions {
   format?: "ntriples" | "turtle" | "nquads" | "trig";
   baseIri?: string;

@@ -4,6 +4,7 @@ import * as sdk from "./index.js";
 
 test("the runtime entrypoint exposes only the supported public values", () => {
   assert.deepEqual(Object.keys(sdk).sort(), [
+    "LbbCapabilityError",
     "LbbClient",
     "LbbError",
     "parseSparqlResults",

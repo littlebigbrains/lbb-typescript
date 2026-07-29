@@ -2,6 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   LbbClient,
+  LbbCapabilityError,
   LbbError,
   parseSparqlResults,
   type FetchLike,
@@ -30,7 +31,8 @@ type FetchCall = {
   init: {
     method?: string;
     headers?: Record<string, string>;
-    body?: string;
+    body?: unknown;
+    duplex?: "half";
     signal?: AbortSignal;
   };
 };
@@ -70,6 +72,150 @@ function recordingFetch(
   };
   return { fetch, calls };
 }
+
+function stringBody(body: unknown): string {
+  if (typeof body !== "string") {
+    assert.fail("expected a string request body");
+  }
+  return body;
+}
+
+async function streamedBody(body: unknown): Promise<string> {
+  const chunks: Uint8Array[] = [];
+  const stream = body as {
+    getReader?: () => {
+      read(): Promise<{ done: boolean; value?: Uint8Array }>;
+    };
+    [Symbol.asyncIterator]?: () => AsyncIterator<Uint8Array>;
+  };
+  if (stream.getReader) {
+    const reader = stream.getReader();
+    for (;;) {
+      const next = await reader.read();
+      if (next.done) break;
+      if (next.value) chunks.push(next.value);
+    }
+  } else if (stream[Symbol.asyncIterator]) {
+    for await (const chunk of stream as AsyncIterable<Uint8Array>) {
+      chunks.push(chunk);
+    }
+  } else {
+    assert.fail("expected a streaming request body");
+  }
+  const size = chunks.reduce((total, chunk) => total + chunk.byteLength, 0);
+  const joined = new Uint8Array(size);
+  let offset = 0;
+  for (const chunk of chunks) {
+    joined.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return new TextDecoder().decode(joined);
+}
+
+function importJobStatus(
+  state: Schemas["GraphImportJobState"],
+): Schemas["GraphImportJobStatus"] {
+  return {
+    job_id: "import:job-1",
+    state,
+    progress: {
+      upload_bytes: 42,
+      bytes_processed: state === "succeeded" ? 42 : 20,
+      lines_read: state === "succeeded" ? 2 : 1,
+      triplets: state === "succeeded" ? 2 : 1,
+      properties: 0,
+      observations: 0,
+      groups_committed: state === "succeeded" ? 1 : 0,
+      error_count: 0,
+    },
+    enqueued_at_micros: 1,
+    updated_at_micros: 2,
+  };
+}
+
+test("submitImport capability-gates and streams NDJSON without concatenation", async () => {
+  const { fetch, calls } = recordingFetch([
+    {
+      body: JSON.stringify({ capabilities: ["durable_import_jobs_v1"] }),
+    },
+    {
+      status: 202,
+      body: JSON.stringify({
+        job_id: "import:job-1",
+        state: "queued",
+        idempotent_replay: false,
+        upload_bytes: 42,
+      }),
+    },
+  ]);
+  const client = new LbbClient({ baseUrl: "http://h", graph: "main", fetch });
+  let produced = 0;
+  async function* records() {
+    produced += 1;
+    yield {
+      source: { type: "Service", key: "api", name: "api" },
+      relation: "CALLS",
+      target: { type: "Service", key: "db", name: "db" },
+    };
+    produced += 1;
+    yield '{"type":"Service","name":"api","properties":{}}';
+  }
+
+  const accepted = await client.submitImport(records(), {
+    idempotencyKey: "source-run:42",
+  });
+
+  assert.equal(accepted.job_id, "import:job-1");
+  assert.equal(calls[0].input, "http://h/version?graph=main");
+  assert.equal(calls[1].init.duplex, "half");
+  assert.equal(calls[1].init.headers?.["idempotency-key"], "source-run:42");
+  assert.equal(calls[1].init.headers?.["content-type"], "application/x-ndjson");
+  assert.ok(
+    produced <= 1,
+    "the stream may prefetch one record but must not concatenate the source",
+  );
+  const body = await streamedBody(calls[1].init.body);
+  assert.equal(produced, 2);
+  assert.equal(body.split("\n").filter(Boolean).length, 2);
+});
+
+test("submitImport never falls back when the capability is absent", async () => {
+  const { fetch, calls } = recordingFetch({
+    body: JSON.stringify({ capabilities: [] }),
+  });
+  const client = new LbbClient({ baseUrl: "http://h", fetch });
+
+  await assert.rejects(
+    client.submitImport([], { idempotencyKey: "source-run:43" }),
+    (error: unknown) =>
+      error instanceof LbbCapabilityError &&
+      error.capability === "durable_import_jobs_v1",
+  );
+  assert.equal(calls.length, 1);
+  assert.equal(
+    calls.some((call) => call.input.includes("/v1/graph/import")),
+    false,
+  );
+});
+
+test("waitForImportJob polls until committed ingestion succeeds", async () => {
+  const { fetch, calls } = recordingFetch([
+    {
+      body: JSON.stringify({ capabilities: ["durable_import_jobs_v1"] }),
+    },
+    { body: JSON.stringify(importJobStatus("running")) },
+    { body: JSON.stringify(importJobStatus("succeeded")) },
+  ]);
+  const client = new LbbClient({ baseUrl: "http://h", fetch });
+
+  const status = await client.waitForImportJob("import:job-1", {
+    pollIntervalMs: 0,
+  });
+
+  assert.equal(status.state, "succeeded");
+  assert.equal(calls.length, 3);
+  assert.match(calls[1].input, /job_id=import%3Ajob-1/);
+});
 
 test("metadata exposes only the bounded index detail option", async () => {
   const { fetch, calls } = recordingFetch();
@@ -168,7 +314,7 @@ test("namespace facts.create injects auth, scope, version, and idempotency", asy
   assert.equal(call.init.headers?.["content-type"], "application/json");
   assert.equal(call.init.headers?.["lbb-version"], "2026-07-23");
   assert.equal(call.init.headers?.["idempotency-key"], "ik_test_1");
-  assert.deepEqual(JSON.parse(call.init.body ?? ""), { triplets: [] });
+  assert.deepEqual(JSON.parse(stringBody(call.init.body)), { triplets: [] });
 });
 
 test("sparqlText sends row paging fields and exposes row_page", async () => {
@@ -197,7 +343,7 @@ test("sparqlText sends row paging fields and exposes row_page", async () => {
   });
 
   assert.equal(calls[0].input, "http://h/v1/query/sparql-text?graph=main");
-  assert.deepEqual(JSON.parse(calls[0].init.body ?? ""), {
+  assert.deepEqual(JSON.parse(stringBody(calls[0].init.body)), {
     query: "SELECT ?s WHERE { ?s ?p ?o }",
     limit: 50,
     offset: 100,
@@ -301,7 +447,7 @@ test("entities.filterByAttributes builds structured SPARQL property filters", as
   });
 
   assert.equal(calls[0].input, "http://h/v1/query/sparql?graph=main");
-  assert.deepEqual(JSON.parse(calls[0].init.body ?? ""), {
+  assert.deepEqual(JSON.parse(stringBody(calls[0].init.body)), {
     patterns: [
       {
         subject: { var: "svc" },
@@ -456,7 +602,7 @@ test("search.feedback posts labels with idempotency", async () => {
   assert.equal(call.input, "http://h/v1/search/feedback?graph=crm&branch=main");
   assert.equal(call.init.method, "POST");
   assert.equal(call.init.headers?.["idempotency-key"], "fb_1");
-  assert.deepEqual(JSON.parse(call.init.body ?? ""), {
+  assert.deepEqual(JSON.parse(stringBody(call.init.body)), {
     query: "identity records",
     labels: [
       {
@@ -610,7 +756,7 @@ test("schema namespace reads metadata and publishes without request-time audit",
   assert.equal(calls[0].init.method, "GET");
   assert.equal(calls[1].input, "http://h/v1/schema/publish?graph=main");
   assert.equal(calls[1].init.method, "POST");
-  assert.deepEqual(JSON.parse(calls[1].init.body ?? ""), {
+  assert.deepEqual(JSON.parse(stringBody(calls[1].init.body)), {
     desired_mode: "warn",
     shapes: { source: "@prefix sh: <http://www.w3.org/ns/shacl#> ." },
   });
@@ -668,7 +814,7 @@ test("creates graph and forks branch with scoped v1 URLs", async () => {
     "http://h/v1/graph/branch?graph=research&branch=analysis",
   );
   assert.equal(calls[1].init.method, "POST");
-  assert.deepEqual(JSON.parse(calls[1].init.body ?? ""), {
+  assert.deepEqual(JSON.parse(stringBody(calls[1].init.body)), {
     from_branch: "main",
   });
 });
@@ -1057,7 +1203,7 @@ test("facts.import serializes lines to NDJSON with batch/strict params", async (
   assert.equal(call.init.headers?.["content-type"], "application/x-ndjson");
   assert.match(call.init.headers?.["idempotency-key"] ?? "", /^import:/);
   // Body is newline-delimited JSON, one object per line.
-  const lines = (call.init.body ?? "").split("\n");
+  const lines = stringBody(call.init.body).split("\n");
   assert.equal(lines.length, 2);
   assert.equal(JSON.parse(lines[0]).relation, "AFFILIATED_WITH");
   assert.equal(JSON.parse(lines[1]).properties.h_index, 52);
@@ -1247,7 +1393,7 @@ test("reload posts NDJSON with confirm/dry_run and a rollback anchor", async () 
   assert.match(call.input, /observed_at=2026-07-20T00%3A00%3A00Z/);
   assert.equal(call.init.headers?.["content-type"], "application/x-ndjson");
   assert.match(call.init.headers?.["idempotency-key"] ?? "", /^reload:/);
-  const lines = (call.init.body ?? "").split("\n");
+  const lines = stringBody(call.init.body).split("\n");
   assert.equal(lines.length, 2);
   assert.equal(JSON.parse(lines[0]).relation, "AFFILIATED_WITH");
   assert.equal(JSON.parse(lines[1]).properties.h_index, 52);
