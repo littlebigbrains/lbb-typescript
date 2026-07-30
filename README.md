@@ -90,7 +90,8 @@ console.log(completed.state, completed.committed_commit_seq);
 
 `records()` may be an iterable or async iterable. Success means every grouped
 commit is durable and final publication was enqueued; it does not mean indexes
-have already reached `committed_commit_seq`.
+have already reached `committed_commit_seq`. An empty iterable is rejected
+locally before an import POST is sent.
 
 **Time-travel read.** Pin any search to a past instant — results reflect the graph as it was then:
 

@@ -148,8 +148,25 @@ function durableImportIterator(
   };
 }
 
-function durableImportBody(source: DurableImportSource): unknown {
+async function durableImportBody(
+  source: DurableImportSource,
+): Promise<unknown> {
   const iterator = durableImportIterator(source);
+  const first = await iterator.next();
+  if (first.done) {
+    await iterator.return?.();
+    throw new TypeError(
+      "submitImport requires at least one NDJSON record or byte chunk",
+    );
+  }
+  let firstPending = true;
+  const next = async (): Promise<IteratorResult<DurableImportLine>> => {
+    if (firstPending) {
+      firstPending = false;
+      return { done: false, value: first.value };
+    }
+    return iterator.next();
+  };
   const Stream = (
     globalThis as { ReadableStream?: ImportReadableStreamConstructor }
   ).ReadableStream;
@@ -157,7 +174,7 @@ function durableImportBody(source: DurableImportSource): unknown {
     return new Stream({
       async pull(controller) {
         try {
-          const item = await iterator.next();
+          const item = await next();
           if (item.done) {
             controller.close();
           } else {
@@ -176,7 +193,7 @@ function durableImportBody(source: DurableImportSource): unknown {
     async *[Symbol.asyncIterator]() {
       try {
         for (;;) {
-          const item = await iterator.next();
+          const item = await next();
           if (item.done) return;
           yield durableImportBytes(item.value);
         }
@@ -678,8 +695,9 @@ export class LbbClient {
       throw new TypeError("submitImport requires a non-empty idempotencyKey");
     }
     await this.requireCapability("durable_import_jobs_v1");
+    const rawBody = await durableImportBody(lines);
     return this.request("POST", "/v1/graph/import-jobs", {
-      rawBody: durableImportBody(lines),
+      rawBody,
       contentType: "application/x-ndjson",
       duplex: "half",
       query: {

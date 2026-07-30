@@ -2,6 +2,12 @@
 
 All notable changes to the `@littlebigbrain/client` package are documented here.
 
+## 0.9.1
+
+- `submitImport` now rejects an empty iterable before issuing the import POST,
+  so a producer bug cannot create an opaque empty-upload server failure.
+- The one-record preflight preserves streaming and one-shot iterator semantics.
+
 ## 0.9.0
 
 Durable, asynchronous NDJSON imports.
