@@ -3251,6 +3251,12 @@ export interface components {
         /** @description Bounded progress persisted by an import worker after every grouped commit. */
         GraphImportJobProgress: {
             /** Format: int64 */
+            active_group_bytes?: number;
+            /** Format: int64 */
+            active_group_index?: number | null;
+            /** Format: int64 */
+            active_group_records?: number;
+            /** Format: int64 */
             bytes_processed: number;
             committed_commit_seq?: null | components["schemas"]["CommitSeq"];
             /** Format: int64 */
@@ -3264,11 +3270,17 @@ export interface components {
             observations: number;
             /** Format: int64 */
             properties: number;
+            stage?: components["schemas"]["GraphImportJobStage"];
             /** Format: int64 */
             triplets: number;
             /** Format: int64 */
             upload_bytes: number;
         };
+        /**
+         * @description Low-cardinality execution stage exposed while a durable import is active.
+         * @enum {string}
+         */
+        GraphImportJobStage: "queued" | "reading_payload" | "committing_group" | "persisting_checkpoint" | "enqueueing_publication" | "completed";
         /**
          * @description Lifecycle of a durable NDJSON import submitted through
          *     `POST /v1/graph/import-jobs`.
