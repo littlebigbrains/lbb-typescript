@@ -3244,9 +3244,21 @@ export interface components {
          *     structured server logs.
          */
         GraphImportJobFailure: {
+            /**
+             * Format: int32
+             * @description Delivery attempts consumed when the job became terminal.
+             */
+            attempts: number;
             code: string;
+            /**
+             * @description Stable opaque correlation id for server-side logs. It is intentionally
+             *     not an object key, worker id, or graph identity.
+             */
+            diagnostic_id: string;
             message: string;
             retryable: boolean;
+            /** @description Last durable low-cardinality stage reached by the worker. */
+            stage: components["schemas"]["GraphImportJobStage"];
         };
         /** @description Bounded progress persisted by an import worker after every grouped commit. */
         GraphImportJobProgress: {
