@@ -198,6 +198,22 @@ test("submitImport never falls back when the capability is absent", async () => 
   );
 });
 
+test("submitImport rejects an empty source before posting a job", async () => {
+  const { fetch, calls } = recordingFetch({
+    body: JSON.stringify({ capabilities: ["durable_import_jobs_v1"] }),
+  });
+  const client = new LbbClient({ baseUrl: "http://h", fetch });
+
+  await assert.rejects(
+    client.submitImport([], { idempotencyKey: "source-run:empty" }),
+    /requires at least one NDJSON record or byte chunk/,
+  );
+  assert.deepEqual(
+    calls.map((call) => call.input),
+    ["http://h/version"],
+  );
+});
+
 test("waitForImportJob polls until committed ingestion succeeds", async () => {
   const { fetch, calls } = recordingFetch([
     {
