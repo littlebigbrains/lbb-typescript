@@ -2431,6 +2431,22 @@ export interface components {
             observations: components["schemas"]["ObservationRow"][];
             outgoing: components["schemas"]["GraphEdgeRow"][];
             snapshot: components["schemas"]["SnapshotView"];
+            truncation?: null | components["schemas"]["EntityDetailTruncation"];
+        };
+        /**
+         * @description Which of an entity read's degree-proportional collections were cut, and by
+         *     how much. Only the cut collections appear.
+         */
+        EntityDetailTruncation: {
+            edges?: null | components["schemas"]["TruncatedCollection"];
+            history?: null | components["schemas"]["TruncatedCollection"];
+            observations?: null | components["schemas"]["TruncatedCollection"];
+            /**
+             * @description True when the request's object-read budget stopped the read before its
+             *     row caps did, so the counts below are floors for a different reason:
+             *     the read gave up rather than the collection being full.
+             */
+            truncated_by_read_budget?: boolean;
         };
         EntityEmbeddingInput: {
             /**
@@ -7580,6 +7596,17 @@ export interface components {
             source: components["schemas"]["EntityView"];
             target: components["schemas"]["EntityView"];
             valid_time: components["schemas"]["ValidTime"];
+        };
+        /** @description One capped collection: how many rows came back out of how many the read saw. */
+        TruncatedCollection: {
+            /** @description Rows present in this response. */
+            returned: number;
+            /**
+             * @description Rows the bounded read observed. This is a **lower bound**: establishing
+             *     the true total means walking the entity's whole degree, which is the
+             *     cost the cap exists to avoid. Render it as "returned of at least total".
+             */
+            total_observed: number;
         };
         TypedAskFeedbackV1: {
             ask_id: string;
