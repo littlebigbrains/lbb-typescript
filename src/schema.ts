@@ -2552,6 +2552,19 @@ export interface components {
             as_of_commit_seq?: number | null;
             as_of_valid_time?: string | null;
             entity: components["schemas"]["EntitySelector"];
+            /**
+             * @description Maximum edges returned **per direction**, clamped by the engine to
+             *     [`MAX_NEIGHBORHOOD_EDGES_PER_DIRECTION`] and defaulting to
+             *     [`DEFAULT_NEIGHBORHOOD_EDGES_PER_DIRECTION`]. Both read paths are scoped
+             *     to the entity's degree, but a supernode's degree is itself unbounded, so
+             *     this is the backstop that keeps one hub read from costing a serving node
+             *     its whole request budget.
+             *
+             *     The budget is per-direction rather than shared: a shared one is spent
+             *     entirely on whichever direction is walked first, so a hub's out-edges
+             *     consume it and the read reports no incoming edges at all.
+             */
+            max_edges_per_direction?: number | null;
             relations?: string[] | null;
         };
         /**
@@ -2571,6 +2584,16 @@ export interface components {
              */
             served_from_ranged: boolean;
             snapshot: components["schemas"]["SnapshotView"];
+            truncation?: null | components["schemas"]["EntityNeighborhoodTruncation"];
+        };
+        /**
+         * @description Which directions of a neighborhood listing were cut, and by how much. Only
+         *     the cut directions appear. The two directions are reported separately
+         *     because they are budgeted separately.
+         */
+        EntityNeighborhoodTruncation: {
+            incoming?: null | components["schemas"]["TruncatedCollection"];
+            outgoing?: null | components["schemas"]["TruncatedCollection"];
         };
         /**
          * @description Literal property values to attach to one entity (matched by type + name).
@@ -11473,6 +11496,8 @@ export interface operations {
                 relations?: string;
                 /** @description RFC3339 as-of timestamp */
                 as_of?: string;
+                /** @description Maximum edges per direction (default 1000, maximum 10000) */
+                edges?: string;
             };
             header?: {
                 /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
