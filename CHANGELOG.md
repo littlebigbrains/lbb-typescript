@@ -2,6 +2,15 @@
 
 All notable changes to the `@littlebigbrain/client` package are documented here.
 
+## Unreleased
+
+Breaking removal of the standalone graph-traversal surface.
+
+- Remove `traverse`, `semanticTraverse`, and their request/response models.
+- Entity neighborhoods and class samples now read the published Base family.
+- Use SPARQL 1.1 property paths for exact multi-hop graph queries; semantic
+  search continues to expose bounded graph-path evidence internally.
+
 ## 0.9.1
 
 - `submitImport` now rejects an empty iterable before issuing the import POST,

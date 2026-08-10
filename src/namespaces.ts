@@ -408,8 +408,7 @@ export class EntityNamespace {
 
   /**
    * Return the exact type cardinality and a bounded deterministic sample from
-   * the ranged adjacency family pinned by the published generation. A missing
-   * family fails closed rather than falling back to an exhaustive scan.
+   * the Base family pinned by the published generation.
    */
   sample(
     opts: { type: string; limit?: number } & CallOptions,

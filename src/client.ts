@@ -1379,22 +1379,6 @@ export class LbbClient {
     });
   }
 
-  // --- traversal ---
-
-  /** Bounded k-hop graph traversal. */
-  traverse(
-    body: Schemas["TraverseRequest"],
-  ): Promise<Schemas["TraverseResponse"]> {
-    return this.request("POST", "/v1/graph/traverse", { body });
-  }
-
-  /** Resolve a query to seed entities, then return bounded paths. */
-  semanticTraverse(
-    body: Schemas["SemanticTraverseRequest"],
-  ): Promise<Schemas["SemanticTraverseResponse"]> {
-    return this.request("POST", "/v1/graph/semantic-traverse", { body });
-  }
-
   /**
    * Ranked incoming/outgoing neighborhood for a graph entity.
    *
@@ -1422,7 +1406,7 @@ export class LbbClient {
     });
   }
 
-  /** Exact type cardinality plus a bounded deterministic sample from ranged adjacency. */
+  /** Exact type cardinality plus a bounded deterministic sample from Base. */
   entityTypeSample(
     opts: { type: string; limit?: number } & CallOptions,
   ): Promise<Schemas["EntityTypeSampleResponse"]> {
@@ -1694,9 +1678,7 @@ export class LbbClient {
         lineage.bm25_indexed_commit_seq != null &&
         lineage.bm25_indexed_commit_seq >= targetSeq &&
         lineage.ann_indexed_commit_seq != null &&
-        lineage.ann_indexed_commit_seq >= targetSeq &&
-        lineage.adjacency_indexed_commit_seq != null &&
-        lineage.adjacency_indexed_commit_seq >= targetSeq
+        lineage.ann_indexed_commit_seq >= targetSeq
       ) {
         return {
           metadata: last.data,

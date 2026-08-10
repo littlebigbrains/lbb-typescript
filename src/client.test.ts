@@ -256,7 +256,6 @@ test("waitForIndexLineage retains the satisfying build and replica headers", asy
     head_commit_seq: 7,
     bm25_indexed_commit_seq: 7,
     ann_indexed_commit_seq: 7,
-    adjacency_indexed_commit_seq: 7,
     caught_up: true,
     manifest_view_token: "index-view:abc",
     observed_at_micros: 1,
@@ -271,7 +270,6 @@ test("waitForIndexLineage retains the satisfying build and replica headers", asy
       wal_tail_bytes: 0,
       segment_count: 0,
       segment_bytes: 0,
-      adjacency_indexed_commit_seq: 7,
       published_lag_commits: 0,
       index_lineage: lineage,
     }),
@@ -391,7 +389,7 @@ test("commitDryRun sends dry_run=true and no idempotency key", async () => {
   assert.equal(result.op_count, 2);
 });
 
-test("entities.sample uses the bounded adjacency sample route", async () => {
+test("entities.sample uses the bounded Base sample route", async () => {
   const { fetch, calls } = recordingFetch({
     body: JSON.stringify({
       entity_type: "SERVICE",
