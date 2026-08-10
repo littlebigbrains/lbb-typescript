@@ -338,7 +338,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Bounded class sample from the ranged adjacency index */
+        /** Bounded class sample from the published Base family */
         get: operations["get_v1_graph_entities_sample"];
         put?: never;
         post?: never;
@@ -606,23 +606,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/graph/semantic-traverse": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Resolve a query to seeds, then return bounded paths */
-        post: operations["post_v1_graph_semantic_traverse"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/v1/graph/summary": {
         parameters: {
             query?: never;
@@ -634,24 +617,6 @@ export interface paths {
         get: operations["get_v1_graph_summary"];
         put?: never;
         post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/graph/traverse": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Bounded graph traversal (query-string convenience) */
-        get: operations["get_v1_graph_traverse"];
-        put?: never;
-        /** Bounded graph traversal */
-        post: operations["post_v1_graph_traverse"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1180,7 +1145,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Basic-graph-pattern (BGP) analytic query over the permutation view */
+        /** Basic-graph-pattern (BGP) analytic query over the published RDF dataset */
         post: operations["post_v1_query_analytics"];
         delete?: never;
         options?: never;
@@ -1808,7 +1773,7 @@ export interface components {
         /**
          * @description A basic-graph-pattern query: a conjunction of triple patterns evaluated over
          *     the graph's current edges (joined on shared variables), served from the
-         *     object-storage permutation view.
+         *     conformant published RDF dataset.
          */
         AnalyticQueryRequest: {
             /**
@@ -2529,7 +2494,6 @@ export interface components {
         };
         EntityId: string;
         EntityMetadataResponse: {
-            adjacency_indexed_commit_seq?: null | components["schemas"]["CommitSeq"];
             ann_indexed_commit_seq?: null | components["schemas"]["CommitSeq"];
             bm25_indexed_commit_seq?: null | components["schemas"]["CommitSeq"];
             entity: components["schemas"]["EntityView"];
@@ -2569,19 +2533,14 @@ export interface components {
         };
         /**
          * @description Result of an entity point lookup: the entity plus its out/in neighborhood.
-         *     Public reads use adjacency for the published watermark and the same
-         *     generation's Base family for historical pins; both paths cost the entity's
-         *     degree rather than the whole graph.
+         *     Public reads use the generation's Base family and cost the entity's degree
+         *     rather than the whole graph.
          */
         EntityNeighborhoodResponse: {
             entity: components["schemas"]["EntityView"];
             incoming: components["schemas"]["NeighborhoodEdge"][];
             outgoing: components["schemas"]["NeighborhoodEdge"][];
-            /**
-             * @description True when served directly from the persisted adjacency family. False
-             *     when an exact historical pin was reduced from the same published
-             *     generation's Base family.
-             */
+            /** @description True when served through immutable ranged Base blocks. */
             served_from_ranged: boolean;
             snapshot: components["schemas"]["SnapshotView"];
             truncation?: null | components["schemas"]["EntityNeighborhoodTruncation"];
@@ -2678,8 +2637,7 @@ export interface components {
         };
         /**
          * @description Exact class cardinality plus a bounded deterministic sample served from the
-         *     ranged adjacency meta. `indexed_commit_seq` makes index lag explicit while
-         *     `snapshot.commit_seq` reports the current graph head.
+         *     published Base family. `indexed_commit_seq` makes publication lag explicit.
          */
         EntityTypeSampleResponse: {
             entities: components["schemas"]["EntityTypeSampleRow"][];
@@ -2689,10 +2647,9 @@ export interface components {
             total_count: number;
         };
         /**
-         * @description One bounded, index-backed class member for interactive graph exploration.
-         *     Unlike [`EntityExplorerRow`], this deliberately carries only fields the
-         *     adjacency build already knows; exhaustive attributes and observation counts
-         *     remain on the full entity/browse reads.
+         * @description One bounded class member for interactive graph exploration. Unlike
+         *     [`EntityExplorerRow`], this deliberately carries only identity and degree;
+         *     exhaustive attributes and observation counts remain on full entity reads.
          */
         EntityTypeSampleRow: {
             entity: components["schemas"]["EntityView"];
@@ -2721,8 +2678,6 @@ export interface components {
             /** Format: float */
             weight: number;
         };
-        /** @enum {string} */
-        ExpansionDirection: "out" | "in" | "both";
         ExportObservationView: {
             created_at_commit: components["schemas"]["CommitSeq"];
             id: components["schemas"]["ObservationId"];
@@ -2975,8 +2930,8 @@ export interface components {
          *     is the engine-native form of the query-conditional channel routing validated
          *     in the Stage-G ablation (quality-ledger R17) — "documents about X AND in the
          *     same group as Y" becomes one snapshot-consistent search rather than a blind
-         *     list fusion. The neighborhood is computed by a bounded, snapshot-reduced
-         *     traversal; final candidates are still re-verified against snapshot visibility.
+         *     list fusion. The neighborhood is computed from the snapshot-reduced Base
+         *     family; final candidates are still re-verified against snapshot visibility.
          */
         GraphAnchor: {
             /** @description The anchor entity to expand from. */
@@ -3439,7 +3394,6 @@ export interface components {
             targets: components["schemas"]["AnnTargetKind"][];
         };
         GraphMetadataResponse: {
-            adjacency_indexed_commit_seq?: null | components["schemas"]["CommitSeq"];
             ann_indexed_commit_seq?: null | components["schemas"]["CommitSeq"];
             bm25_indexed_commit_seq?: null | components["schemas"]["CommitSeq"];
             graph: components["schemas"]["GraphKey"];
@@ -3447,7 +3401,7 @@ export interface components {
             head_generation: number;
             /**
              * @description One-shot "has the published generation caught up to head?" signal, so a
-             *     bulk-import caller does not hand-assemble the three-field predicate.
+             *     bulk-import caller does not hand-assemble the predicate.
              *     `Some(true)` iff both the BM25 and ANN persisted runs are current to the
              *     head commit; `Some(false)` when publication is still
              *     pending or absent; `None` when indexes were not inspected
@@ -3783,13 +3737,12 @@ export interface components {
         };
         /** @description Typed convergence view over the persisted serving families. */
         IndexLineage: {
-            adjacency_indexed_commit_seq?: null | components["schemas"]["CommitSeq"];
             ann_indexed_commit_seq?: null | components["schemas"]["CommitSeq"];
             bm25_indexed_commit_seq?: null | components["schemas"]["CommitSeq"];
             caught_up: boolean;
             head_commit_seq: components["schemas"]["CommitSeq"];
             /**
-             * @description Content identity of the head generation plus the exact three manifest
+             * @description Content identity of the head generation plus the exact manifest
              *     views observed while constructing this response.
              */
             manifest_view_token: string;
@@ -3800,7 +3753,7 @@ export interface components {
          * @description One of the index families referenced by an atomic published read root.
          * @enum {string}
          */
-        IndexVisibilityFamily: "base" | "rdf" | "bm25" | "ann" | "adjacency";
+        IndexVisibilityFamily: "base" | "rdf" | "bm25" | "ann";
         /**
          * @description A single inference rule (SHACL-AF `sh:TripleRule` shape): a BGP `body` (the
          *     condition / `WHERE`) and a `head` triple template instantiated once per
@@ -4077,15 +4030,6 @@ export interface components {
             /** @enum {string} */
             kind: "temporal_state";
             relation: string;
-        } | {
-            from: components["schemas"]["EntitySelector"];
-            /** @enum {string} */
-            kind: "path";
-            /** Format: int32 */
-            max_hops: number;
-            relations?: string[] | null;
-            should_exist: boolean;
-            to: components["schemas"]["EntitySelector"];
         };
         ModelDataLineage: {
             /** Format: int64 */
@@ -4297,11 +4241,9 @@ export interface components {
             snapshot: components["schemas"]["SnapshotView"];
         };
         /**
-         * @description One current-edge projection touching the queried entity, materialized from
-         *     the entity's own adjacency slice (peer stub + relation + valid time). Unlike
+         * @description One current-edge projection touching the queried entity. Unlike
          *     `StateEntry`/`TripletView` it carries no `previous`/`evidence`/single
-         *     `edge_event_id`, because the ranged adjacency run does not store them — so
-         *     the ranged and snapshot code paths produce identical edges.
+         *     `edge_event_id`, keeping the point-read representation compact.
          */
         NeighborhoodEdge: {
             /** Format: float */
@@ -4858,12 +4800,6 @@ export interface components {
             /** @description Count of surface terms (labels/synonyms) in the semantic layer. */
             term_count?: number;
         };
-        PathResult: {
-            edges: components["schemas"]["EdgeEventId"][];
-            nodes: components["schemas"]["EntityView"][];
-            /** Format: float */
-            score: number;
-        };
         /**
          * @description `GET /v1/models/planner-dataset` — the planner fine-tune's training feed:
          *     accepted/corrected ask feedback joined to its traces (signals ≤ the split
@@ -5147,43 +5083,6 @@ export interface components {
              *     a raw region.
              */
             rerank_raw_bytes_fetched?: number;
-        };
-        RangedTraverseStats: {
-            /** Format: int64 */
-            block_byte_budget: number;
-            /** Format: int64 */
-            block_bytes_fetched: number;
-            block_read_budget: number;
-            /** Format: int64 */
-            blocks_fetched: number;
-            /**
-             * Format: int64
-             * @description Backend ranged GETs saved by P27 coalescing: each value is one ranged
-             *     read that pre-warmed several byte-contiguous slices at once.
-             */
-            coalesced_range_gets?: number;
-            /** Format: int64 */
-            decoded_block_bytes_retained: number;
-            /** Format: int64 */
-            directory_blocks_fetched?: number;
-            /**
-             * Format: int64
-             * @description Cumulative-fetched-bytes budget (P27); 0 = disabled. Distinct from
-             *     `block_byte_budget`, which caps *resident* decoded bytes.
-             */
-            fetched_byte_budget?: number;
-            manifest_key: string;
-            /** Format: int64 */
-            meta_bytes_fetched: number;
-            /** Format: int64 */
-            payload_slices_fetched?: number;
-            /** Format: int64 */
-            shard_cache_hits: number;
-            /** Format: int64 */
-            topology_slices_fetched?: number;
-            truncated_by_block_budget: boolean;
-            truncated_by_block_byte_budget: boolean;
-            truncated_by_fetched_byte_budget?: boolean;
         };
         /**
          * @description A page-region provenance anchor on a fact's evidence (region provenance
@@ -5950,7 +5849,6 @@ export interface components {
         };
         SearchFilterValue: null | boolean | number | string;
         SearchHitContributions: {
-            adjacency_indexed_commit_seq?: null | components["schemas"]["CommitSeq"];
             bm25: components["schemas"]["SearchChannelContribution"];
             bm25_indexed_commit_seq?: null | components["schemas"]["CommitSeq"];
             bm25_manifest_key?: string | null;
@@ -6283,64 +6181,6 @@ export interface components {
         };
         /** @enum {string} */
         SemanticSearchTarget: "concepts" | "entities" | "assertions" | "paths" | "observations" | "subgraph";
-        SemanticTraverseExplain: {
-            bm25_candidates: number;
-            /** Format: int32 */
-            graph_hops: number;
-            paths_returned: number;
-            search_mode: string;
-            seeds_considered: number;
-            seeds_selected: number;
-            vector_candidates: number;
-        };
-        SemanticTraverseRequest: {
-            direction: components["schemas"]["ExpansionDirection"];
-            explain: boolean;
-            /**
-             * @description Entity properties to project for every returned seed and path node.
-             *     Projections are reduced from the same snapshot used for authorization
-             *     and traversal. Requesting fields routes the operation through the exact
-             *     snapshot path rather than ranged adjacency.
-             */
-            fields?: string[];
-            /**
-             * Format: int64
-             * @description Decoded adjacency-block working-set byte budget for persisted-vector
-             *     ranged expansion. Defaults to the server/store budget. A request may
-             *     lower the budget, but not raise it.
-             */
-            max_block_bytes?: number | null;
-            max_frontier_entities: number;
-            /** Format: int32 */
-            max_hops: number;
-            max_paths: number;
-            /** Format: float */
-            min_confidence?: number | null;
-            /** Format: float */
-            min_seed_score?: number | null;
-            ontology?: null | components["schemas"]["OntologySearchOptions"];
-            ontology_constraints?: null | components["schemas"]["OntologySearchConstraints"];
-            query: string;
-            relations?: string[] | null;
-            search?: null | components["schemas"]["SearchEngineOptions"];
-            seed_top_k: number;
-        };
-        SemanticTraverseResponse: {
-            explain?: null | components["schemas"]["SemanticTraverseExplain"];
-            paths: components["schemas"]["PathResult"][];
-            /**
-             * @description Requested properties keyed by entity id for every returned seed and
-             *     path node. Empty when `fields` was omitted.
-             */
-            projected_nodes?: {
-                [key: string]: {
-                    [key: string]: unknown;
-                };
-            };
-            ranged?: null | components["schemas"]["RangedTraverseStats"];
-            seeds: components["schemas"]["ScoredEntityView"][];
-            snapshot: components["schemas"]["SnapshotView"];
-        };
         /**
          * @description Set (or clear) the enforced allowed-value set on an **existing** property
          *     field — the tightening path for a field already in use (e.g. constrain
@@ -6378,7 +6218,7 @@ export interface components {
         };
         /**
          * @description Set (or replace) a relation's inverse-relation display name, enabling
-         *     one-hop reverse traversal (e.g. `PHASE_OF` for `HAS_PHASE`). Metadata
+         *     one-hop reverse lookup (e.g. `PHASE_OF` for `HAS_PHASE`). Metadata
          *     only — never touches stored edges.
          */
         SetRelationInverseOp: {
@@ -6456,7 +6296,7 @@ export interface components {
             unique?: components["schemas"]["ShaclUnique"][];
         };
         /**
-         * @description A SHACL property path expression, evaluated as a bounded graph traversal from
+         * @description A SHACL property path expression, evaluated by the bounded RDF path engine from
          *     the focus node to a set of value-node entities. Mirrors SHACL's path grammar:
          *     a single predicate, an inverse, a sequence, an alternative, and the
          *     `*`/`+`/`?` closures.
@@ -6829,8 +6669,7 @@ export interface components {
             /**
              * @description The reason a read is `stale`. `"storage_degraded"` (F2),
              *     `"eventual_consistency"` (served from the immutable published
-             *     generation) or `"adjacency_coverage"` (served from that generation's
-             *     bounded ranged-adjacency snapshot); omitted when not stale.
+             *     generation); omitted when not stale.
              */
             stale_reason?: string | null;
         };
@@ -6984,7 +6823,7 @@ export interface components {
         } | "null";
         /**
          * @description A SPARQL-subset SELECT/ASK query: a conjunctive basic graph pattern (the
-         *     WHERE) evaluated over the object-storage permutation view, with variable
+         *     WHERE) evaluated over the conformant published RDF dataset, with variable
          *     projection, DISTINCT, and LIMIT/OFFSET. Structured-request-first — the SPARQL
          *     text syntax is a later addition behind a dialect field, and FILTER plus
          *     aggregation arrive in later milestones.
@@ -7509,62 +7348,6 @@ export interface components {
             edge_event_id: components["schemas"]["EdgeEventId"];
             target: components["schemas"]["EntityView"];
             valid_time: components["schemas"]["ValidTime"];
-        };
-        TraverseRequest: {
-            /**
-             * Format: int64
-             * @description Snapshot pin: reproduce the graph state as of this `commit_seq`, hiding
-             *     any event committed later. Public serving reduces the bounded edge
-             *     domains from the Base family in the one pinned published generation;
-             *     it never discovers or assembles another snapshot. Historical entity
-             *     filters/field projection fail explicitly because Base does not carry a
-             *     point-indexed entity-mutation history. Omit for the latest snapshot.
-             */
-            as_of_commit_seq?: number | null;
-            as_of_valid_time?: string | null;
-            direction: components["schemas"]["ExpansionDirection"];
-            /**
-             * @description Entity fields projected for every seed/intermediate/terminal node in
-             *     `TraverseResponse.projected_nodes`.
-             */
-            fields?: string[];
-            filter?: null | components["schemas"]["SearchFilterExpr"];
-            /**
-             * Format: int64
-             * @description Decoded adjacency-block working-set byte budget for the ranged path.
-             *     Defaults to the server/store budget. A request may lower the budget,
-             *     but not raise it. Ignored on the bounded Base-family reducer path.
-             */
-            max_block_bytes?: number | null;
-            /**
-             * @description Object-read budget for the ranged adjacency path; defaults to a value
-             *     derived from `max_frontier_entities`. Ignored on the bounded Base-family
-             *     reducer path.
-             */
-            max_block_reads?: number | null;
-            max_frontier_entities: number;
-            /** Format: int32 */
-            max_hops: number;
-            max_paths: number;
-            /** Format: float */
-            min_confidence?: number | null;
-            relations?: string[] | null;
-            start: components["schemas"]["EntitySelector"];
-        };
-        TraverseResponse: {
-            paths: components["schemas"]["PathResult"][];
-            /**
-             * @description Same-snapshot field evidence for every node appearing in `paths`, keyed
-             *     by stable entity-id hex. Present as an empty map when no fields were
-             *     requested.
-             */
-            projected_nodes?: {
-                [key: string]: {
-                    [key: string]: unknown;
-                };
-            };
-            ranged?: null | components["schemas"]["RangedTraverseStats"];
-            snapshot: components["schemas"]["SnapshotView"];
         };
         TripletCommitFile: {
             edge_idempotency?: null | components["schemas"]["EdgeIdempotencyMode"];
@@ -11064,7 +10847,7 @@ export interface operations {
                 type?: string;
                 /** @description Max sampled rows (up to 128) */
                 limit?: string;
-                /** @description Accepted as strong or eventual; adjacency serves the exact immutable base pinned by the published generation without inspecting the live WAL in either mode */
+                /** @description Accepted as strong or eventual; Base serves the immutable generation without inspecting the live WAL */
                 consistency?: string;
             };
             header?: {
@@ -13777,148 +13560,6 @@ export interface operations {
             };
         };
     };
-    post_v1_graph_semantic_traverse: {
-        parameters: {
-            query?: {
-                /** @description Graph name (default `main`) */
-                graph?: string;
-                /** @description Branch name (default `main`) */
-                branch?: string;
-            };
-            header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
-                "Lbb-Version"?: string;
-                /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
-                "Idempotency-Key"?: string;
-            };
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["SemanticTraverseRequest"];
-            };
-        };
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["SemanticTraverseResponse"];
-                };
-            };
-            /** @description Bad request */
-            400: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Forbidden */
-            403: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Not found */
-            404: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Conflict */
-            409: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Rate limit exceeded */
-            429: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Internal server error */
-            500: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Service unavailable */
-            503: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-        };
-    };
     get_v1_graph_summary: {
         parameters: {
             query?: {
@@ -13947,290 +13588,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["GraphSummaryResponse"];
-                };
-            };
-            /** @description Bad request */
-            400: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Forbidden */
-            403: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Not found */
-            404: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Conflict */
-            409: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Rate limit exceeded */
-            429: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Internal server error */
-            500: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Service unavailable */
-            503: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-        };
-    };
-    get_v1_graph_traverse: {
-        parameters: {
-            query?: {
-                /** @description Graph name (default `main`) */
-                graph?: string;
-                /** @description Branch name (default `main`) */
-                branch?: string;
-                /** @description Start entity id */
-                id?: string;
-                /** @description out, in, or both */
-                direction?: string;
-                /** @description Hop budget */
-                max_hops?: string;
-            };
-            header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
-                "Lbb-Version"?: string;
-            };
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["TraverseResponse"];
-                };
-            };
-            /** @description Bad request */
-            400: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Forbidden */
-            403: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Not found */
-            404: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Conflict */
-            409: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Rate limit exceeded */
-            429: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Internal server error */
-            500: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Service unavailable */
-            503: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-        };
-    };
-    post_v1_graph_traverse: {
-        parameters: {
-            query?: {
-                /** @description Graph name (default `main`) */
-                graph?: string;
-                /** @description Branch name (default `main`) */
-                branch?: string;
-            };
-            header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
-                "Lbb-Version"?: string;
-                /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
-                "Idempotency-Key"?: string;
-            };
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["TraverseRequest"];
-            };
-        };
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["TraverseResponse"];
                 };
             };
             /** @description Bad request */
