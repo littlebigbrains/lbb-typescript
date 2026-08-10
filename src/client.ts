@@ -1395,13 +1395,20 @@ export class LbbClient {
     return this.request("POST", "/v1/graph/semantic-traverse", { body });
   }
 
-  /** Ranked incoming/outgoing neighborhood for a graph entity. */
+  /**
+   * Ranked incoming/outgoing neighborhood for a graph entity.
+   *
+   * `edges` caps the edges returned per direction (default 1000, maximum
+   * 10000). When a cap cuts a direction the response carries a `truncation`
+   * block; an uncut response omits it entirely.
+   */
   entityNeighborhood(opts: {
     id?: string;
     type?: string;
     name?: string;
     relations?: string[];
     asOf?: string;
+    edges?: number;
   }): Promise<Schemas["EntityNeighborhoodResponse"]> {
     return this.request("GET", "/v1/graph/entity/neighborhood", {
       query: {
@@ -1410,6 +1417,7 @@ export class LbbClient {
         name: opts.name,
         relations: opts.relations?.join(","),
         as_of: opts.asOf,
+        edges: opts.edges,
       },
     });
   }
