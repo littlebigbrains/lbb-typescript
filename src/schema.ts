@@ -3402,10 +3402,15 @@ export interface components {
             /**
              * @description One-shot "has the published generation caught up to head?" signal, so a
              *     bulk-import caller does not hand-assemble the predicate.
-             *     `Some(true)` iff both the BM25 and ANN persisted runs are current to the
-             *     head commit; `Some(false)` when publication is still
-             *     pending or absent; `None` when indexes were not inspected
-             *     (`include_indexes=false`).
+             *     `Some(true)` iff the published generation is served at the head commit;
+             *     `Some(false)` when publication is still pending or absent; `None` when
+             *     indexes were not inspected (`include_indexes=false`).
+             *
+             *     This is a **publication lag** signal, not a statement about index
+             *     content. A generation whose BM25/ANN families are published as empty
+             *     roots — the steady state when the deployment runs without the search
+             *     stack — is caught up while holding no documents. Read
+             *     `index_lineage.bm25_empty` / `ann_empty` to tell the two apart.
              */
             index_caught_up?: boolean | null;
             index_lineage?: null | components["schemas"]["IndexLineage"];
@@ -3737,8 +3742,27 @@ export interface components {
         };
         /** @description Typed convergence view over the persisted serving families. */
         IndexLineage: {
+            /**
+             * @description True when the published ANN family is an empty root. Same meaning as
+             *     `bm25_empty`.
+             */
+            ann_empty?: boolean;
             ann_indexed_commit_seq?: null | components["schemas"]["CommitSeq"];
+            /**
+             * @description True when the published BM25 family is an empty root — the deployment
+             *     runs without the search stack
+             *     (`LBB_PUBLISH_EMPTY_INDEX_FAMILIES`), or the corpus genuinely has no
+             *     indexable documents at this watermark. Either way the family is current
+             *     *and* contains nothing, so a health check must not read `caught_up`
+             *     alone as "search is serving results".
+             */
+            bm25_empty?: boolean;
             bm25_indexed_commit_seq?: null | components["schemas"]["CommitSeq"];
+            /**
+             * @description Both families are published at the head commit. This is a *publication
+             *     lag* signal — it says the derived families have caught up with graph
+             *     truth, not that they hold data. An empty family is caught up.
+             */
             caught_up: boolean;
             head_commit_seq: components["schemas"]["CommitSeq"];
             /**
