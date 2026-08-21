@@ -10,7 +10,6 @@ export type {
   LbbClientOptions,
   CallOptions,
   RequestOptions,
-  HybridSearchOptions,
   LbbRequestEvent,
   LbbResponseEvent,
   FetchLike,
@@ -27,9 +26,6 @@ export type {
   GraphMetadata,
   GraphSummary,
   SchemaView,
-  SearchRequest,
-  SearchResponse,
-  SearchResult,
   Snapshot,
 } from "./client.js";
 export type { components, paths, operations } from "./schema.js";

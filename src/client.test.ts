@@ -553,29 +553,6 @@ test("parseSparqlResults surfaces the ASK boolean", () => {
   assert.deepEqual(parsed.rows, []);
 });
 
-test("search.hybrid encodes the v1 GET search route", async () => {
-  const { fetch, calls } = recordingFetch();
-  const client = new LbbClient({ baseUrl: "http://h", fetch });
-  await client.search.hybrid("customer identity", {
-    topK: 5,
-    consistency: "strong",
-    lexical: false,
-    bm25: true,
-    vector: true,
-    targets: ["concepts", "entities"],
-  });
-  const input = calls[0].input;
-  assert.match(input, /^http:\/\/h\/v1\/search\?/);
-  assert.match(input, /query=customer%20identity/);
-  assert.match(input, /top_k=5/);
-  assert.equal(/[?&]source=/.test(input), false);
-  assert.match(input, /consistency=strong/);
-  assert.match(input, /lexical=false/);
-  assert.match(input, /bm25=true/);
-  assert.match(input, /vector=true/);
-  assert.match(input, /targets=concepts%2Centities/);
-});
-
 test("search.feedback posts labels with idempotency", async () => {
   const { fetch, calls } = recordingFetch({
     body: JSON.stringify({
@@ -776,16 +753,10 @@ test("schema namespace reads metadata and publishes without request-time audit",
   });
 });
 
-test("published grounding and model dataset routes remain public", async () => {
+test("model dataset routes remain public", async () => {
   const { fetch, calls } = recordingFetch({ body: "{}" });
   const client = new LbbClient({ baseUrl: "http://h", graph: "main", fetch });
 
-  await client.decode({
-    source: { name: "auth" },
-    target: { name: "database" },
-  });
-  await client.resolveTerm({ text: "writes" });
-  await client.groundability({ sample: 25 });
   await client.shadowEval({ queries: [], challenger: {} });
   await client.plannerDataset({ limit: 10, splitSeq: 7 });
   await client.plannerPreferenceDataset({ limit: 11, splitSeq: 8 });
@@ -795,9 +766,6 @@ test("published grounding and model dataset routes remain public", async () => {
   assert.deepEqual(
     calls.map((call) => call.input),
     [
-      "http://h/v1/decode?graph=main",
-      "http://h/v1/search/resolve-term?graph=main",
-      "http://h/v1/graph/groundability?graph=main&sample=25",
       "http://h/v1/models/shadow-eval?graph=main",
       "http://h/v1/models/planner-dataset?graph=main&limit=10&split_seq=7",
       "http://h/v1/models/planner-preference-dataset?graph=main&limit=11&split_seq=8",

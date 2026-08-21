@@ -11,6 +11,9 @@ import {
   type Schemas,
 } from "./types.js";
 
+// SPARQL is the only query surface. The search, embedding, decode,
+// groundability, and analytics operations were removed with their routes.
+
 /** A5: fold read-consistency options into a request body's `consistency` /
  * `min_indexed_seq` fields; a per-call value wins over the client default. */
 function withReadConsistency<B extends object>(
@@ -32,36 +35,8 @@ function withReadConsistency<B extends object>(
   return merged as B;
 }
 
-function transportOptions(options: CallOptions): CallOptions {
-  return {
-    idempotencyKey: options.idempotencyKey,
-    timeoutMs: options.timeoutMs,
-    maxRetries: options.maxRetries,
-    retry: options.retry,
-    signal: options.signal,
-    headers: options.headers,
-  };
-}
-
-export interface HybridSearchOptions extends CallOptions {
-  topK?: number;
-  consistency?: string;
-  /** A5 read-your-writes floor (`min_indexed_seq`): the committed sequence a
-   * write returned; under eventual, an uncovered floor yields a retryable
-   * `read_your_writes_pending` 429. */
-  minIndexedSeq?: number;
-  lexical?: boolean;
-  bm25?: boolean;
-  vector?: boolean;
-  targets?: string[];
-  profile?: string;
-  /** Opt-in impression logging for later relevance feedback. */
-  logImpression?: boolean;
-}
-
 export class GraphNamespace {
   readonly facts: FactsNamespace;
-  readonly context: ContextNamespace;
   readonly entities: EntityNamespace;
   readonly ontology: OntologyNamespace;
   readonly query: QueryNamespace;
@@ -70,7 +45,6 @@ export class GraphNamespace {
 
   constructor(private readonly client: LbbClient) {
     this.facts = new FactsNamespace(client);
-    this.context = client.context;
     this.entities = client.entities;
     this.ontology = client.ontology;
     this.query = client.query;
@@ -104,101 +78,6 @@ export class GraphNamespace {
     return this.client.request("DELETE", "/v1/graph/branch", {
       ...request,
       query: { confirm },
-    });
-  }
-
-  embeddingConfig(
-    opts: CallOptions = {},
-  ): Promise<Schemas["ManagedEmbeddingConfigResponse"]> {
-    return this.client.request("GET", "/v1/graph/embedding", opts);
-  }
-
-  /** List the embedding models available on this deployment. */
-  embeddingModels(
-    opts: CallOptions = {},
-  ): Promise<Schemas["ManagedEmbeddingModelsResponse"]> {
-    return this.client.request("GET", "/v1/graph/embedding/models", opts);
-  }
-
-  /** Choose the model used automatically for writes and vector queries. */
-  setEmbeddingModel(
-    modelId: string,
-    options: CallOptions & { autoEmbedQuery?: boolean } = {},
-  ): Promise<Schemas["ManagedEmbeddingConfigResponse"]> {
-    const { autoEmbedQuery, ...request } = options;
-    return this.client.request("POST", "/v1/graph/embedding", {
-      ...request,
-      body: {
-        model_id: modelId,
-        service: "open_router",
-        auto_embed_query: autoEmbedQuery ?? true,
-      },
-    });
-  }
-
-  /** Advanced configuration escape hatch. Prefer `setEmbeddingModel`. */
-  setEmbeddingConfig(
-    body: Schemas["ManagedEmbeddingConfigRequest"],
-    opts: CallOptions = {},
-  ): Promise<Schemas["ManagedEmbeddingConfigResponse"]> {
-    return this.client.request("POST", "/v1/graph/embedding", {
-      ...opts,
-      body,
-    });
-  }
-
-  backfillEmbeddings(
-    options: CallOptions & {
-      batchSize?: number;
-      limit?: number;
-      full?: boolean;
-      pollIntervalMs?: number;
-    } = {},
-  ): Promise<Schemas["ManagedEmbeddingBackfillResponse"]> {
-    return this.client.backfillEmbeddings({
-      batchSize: options.batchSize,
-      limit: options.limit,
-      full: options.full,
-      idempotencyKey: options.idempotencyKey,
-      timeoutMs: options.timeoutMs,
-      pollIntervalMs: options.pollIntervalMs,
-    });
-  }
-
-  submitEmbeddingBackfill(
-    options: CallOptions & {
-      batchSize?: number;
-      limit?: number;
-      full?: boolean;
-    } = {},
-  ): Promise<Schemas["ManagedEmbeddingBackfillJobStatusResponse"]> {
-    return this.client.submitEmbeddingBackfill({
-      batchSize: options.batchSize,
-      limit: options.limit,
-      full: options.full,
-      idempotencyKey: options.idempotencyKey,
-    });
-  }
-
-  embeddingBackfillJob(
-    jobId: string,
-  ): Promise<Schemas["ManagedEmbeddingBackfillJobStatusResponse"]> {
-    return this.client.embeddingBackfillJob(jobId);
-  }
-
-  cancelEmbeddingBackfill(
-    jobId: string,
-  ): Promise<Schemas["ManagedEmbeddingBackfillJobStatusResponse"]> {
-    return this.client.cancelEmbeddingBackfill(jobId);
-  }
-
-  promoteEmbedding(
-    options: CallOptions & { runId: string; allowRegression?: boolean },
-  ): Promise<Schemas["ManagedEmbeddingPromoteResponse"]> {
-    const { runId, allowRegression, ...request } = options;
-    return this.client.request("POST", "/v1/graph/embedding/promote", {
-      ...request,
-      query: { run_id: runId, allow_regression: allowRegression },
     });
   }
 
@@ -306,59 +185,12 @@ export class FactsNamespace {
   }
 }
 
+/**
+ * Relevance-label storage. The query surfaces this namespace once fronted were
+ * removed with their routes; SPARQL is the only query path now.
+ */
 export class SearchNamespace {
   constructor(private readonly client: LbbClient) {}
-
-  hybrid(
-    query: string,
-    opts?: HybridSearchOptions,
-  ): Promise<Schemas["SemanticGraphSearchResponse"]>;
-  hybrid(
-    body: Schemas["SemanticGraphSearchRequest"],
-    opts?: CallOptions,
-  ): Promise<Schemas["SemanticGraphSearchResponse"]>;
-  hybrid(
-    input: string | Schemas["SemanticGraphSearchRequest"],
-    opts: HybridSearchOptions = {},
-  ): Promise<Schemas["SemanticGraphSearchResponse"]> {
-    if (typeof input !== "string") {
-      const search = withReadConsistency(this.client, input.search ?? {}, {
-        consistency: opts.consistency as ReadConsistencyOptions["consistency"],
-        minIndexedSeq: opts.minIndexedSeq,
-      });
-      return this.client.request("POST", "/v1/graph/search", {
-        ...transportOptions(opts),
-        retry: opts.retry ?? true,
-        body: { ...input, search },
-      });
-    }
-    return this.client.request("GET", "/v1/search", {
-      ...transportOptions(opts),
-      query: {
-        query: input,
-        top_k: opts.topK,
-        consistency: opts.consistency ?? this.client.defaultConsistency,
-        min_indexed_seq: opts.minIndexedSeq,
-        lexical: opts.lexical,
-        bm25: opts.bm25,
-        vector: opts.vector,
-        targets: opts.targets?.join(","),
-        profile: opts.profile,
-        log_impression: opts.logImpression,
-      },
-    });
-  }
-
-  multi(
-    body: Schemas["HybridMultiSearchRequest"],
-    opts: CallOptions = {},
-  ): Promise<Schemas["HybridMultiSearchResponse"]> {
-    return this.client.request("POST", "/v1/search/multi", {
-      ...opts,
-      retry: opts.retry ?? true,
-      body,
-    });
-  }
 
   feedback(
     body: Schemas["SearchFeedbackRequest"],
@@ -380,28 +212,6 @@ export class SearchNamespace {
     opts: CallOptions = {},
   ): Promise<Schemas["SearchFeedbackSummaryResponse"]> {
     return this.client.request("GET", "/v1/search/feedback/summary", opts);
-  }
-
-  fullText(
-    body: Schemas["FullTextSearchRequest"],
-    opts: CallOptions & ReadConsistencyOptions = {},
-  ): Promise<Schemas["FullTextSearchResponse"]> {
-    return this.client.request("POST", "/v1/search/full-text", {
-      ...opts,
-      retry: opts.retry ?? true,
-      body: withReadConsistency(this.client, body, opts),
-    });
-  }
-
-  vector(
-    body: Schemas["EmbeddingSearchRequest"],
-    opts: CallOptions & ReadConsistencyOptions = {},
-  ): Promise<Schemas["EmbeddingSearchResponse"]> {
-    return this.client.request("POST", "/v1/search/embedding", {
-      ...opts,
-      retry: opts.retry ?? true,
-      body: withReadConsistency(this.client, body, opts),
-    });
   }
 }
 
@@ -460,54 +270,6 @@ export class EntityNamespace {
       max_solutions: opts.maxSolutions,
       max_object_reads: opts.maxObjectReads,
       max_fetched_bytes: opts.maxFetchedBytes,
-    });
-  }
-}
-
-/** Grounding operations over one pinned published vocabulary. */
-export class ContextNamespace {
-  constructor(private readonly client: LbbClient) {}
-
-  suggest(
-    body: Schemas["SearchSuggestRequest"],
-    opts: CallOptions = {},
-  ): Promise<Schemas["SearchSuggestResponse"]> {
-    return this.client.request("POST", "/v1/search/suggest", {
-      ...opts,
-      retry: opts.retry ?? true,
-      body,
-    });
-  }
-
-  resolve(
-    body: Schemas["ResolveTermRequest"],
-    opts: CallOptions = {},
-  ): Promise<Schemas["ResolveTermResponse"]> {
-    return this.client.request("POST", "/v1/search/resolve-term", {
-      ...opts,
-      retry: opts.retry ?? true,
-      body,
-    });
-  }
-
-  decode(
-    body: Schemas["DecodeRequest"],
-    opts: CallOptions = {},
-  ): Promise<Schemas["DecodeResponse"]> {
-    return this.client.request("POST", "/v1/decode", {
-      ...opts,
-      retry: opts.retry ?? true,
-      body,
-    });
-  }
-
-  groundability(
-    options: { sample?: number } & CallOptions = {},
-  ): Promise<Schemas["GroundabilityReport"]> {
-    const { sample, ...request } = options;
-    return this.client.request("GET", "/v1/graph/groundability", {
-      ...request,
-      query: sample === undefined ? undefined : { sample },
     });
   }
 }
@@ -614,7 +376,7 @@ export class OntologyNamespace {
   }
 }
 
-/** Structured, SPARQL-text, and analytical query operations. */
+/** Structured and SPARQL-text query operations. */
 export class QueryNamespace {
   constructor(private readonly client: LbbClient) {}
 
@@ -662,17 +424,6 @@ export class QueryNamespace {
         consistency: opts.consistency ?? this.client.defaultConsistency,
         min_indexed_seq: opts.minIndexedSeq,
       },
-    });
-  }
-
-  analytics(
-    body: Schemas["AnalyticQueryRequest"],
-    opts: CallOptions = {},
-  ): Promise<Schemas["AnalyticQueryResponse"]> {
-    return this.client.request("POST", "/v1/query/analytics", {
-      ...opts,
-      retry: opts.retry ?? true,
-      body,
     });
   }
 }

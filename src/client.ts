@@ -32,7 +32,6 @@ import {
 } from "./transport.js";
 import { LbbCapabilityError } from "./transport.js";
 import {
-  ContextNamespace,
   EntityNamespace,
   GraphNamespace,
   OntologyNamespace,
@@ -74,9 +73,6 @@ export type {
   GraphMetadata,
   GraphSummary,
   SchemaView,
-  SearchRequest,
-  SearchResponse,
-  SearchResult,
   Snapshot,
 } from "./types.js";
 export { LbbCapabilityError, LbbError } from "./transport.js";
@@ -86,9 +82,7 @@ export type {
   QueryValue,
   RequestOptions,
 } from "./transport.js";
-export type { HybridSearchOptions } from "./namespaces.js";
 export {
-  ContextNamespace,
   EntityNamespace,
   FactsNamespace,
   GraphNamespace,
@@ -228,7 +222,6 @@ export class LbbClient {
   /** A5 default read consistency applied when a read omits its own value. */
   readonly defaultConsistency?: SearchConsistency;
 
-  readonly context: ContextNamespace;
   readonly search: SearchNamespace;
   readonly entities: EntityNamespace;
   readonly schema: SchemaNamespace;
@@ -275,7 +268,6 @@ export class LbbClient {
       throw new Error("no fetch implementation available; pass options.fetch");
     }
     this.fetchImpl = chosen;
-    this.context = new ContextNamespace(this);
     this.search = new SearchNamespace(this);
     this.entities = new EntityNamespace(this);
     this.schema = new SchemaNamespace(this);
@@ -940,123 +932,7 @@ export class LbbClient {
     });
   }
 
-  embeddingConfig(): Promise<Schemas["ManagedEmbeddingConfigResponse"]> {
-    return this.request("GET", "/v1/graph/embedding");
-  }
-
-  /** List the embedding models available on this deployment. */
-  embeddingModels(): Promise<Schemas["ManagedEmbeddingModelsResponse"]> {
-    return this.request("GET", "/v1/graph/embedding/models");
-  }
-
-  /**
-   * Choose the model used automatically for writes and vector queries.
-   * Provider credentials and native dimension discovery stay server-side.
-   */
-  setEmbeddingModel(
-    modelId: string,
-    opts: { autoEmbedQuery?: boolean } = {},
-  ): Promise<Schemas["ManagedEmbeddingConfigResponse"]> {
-    return this.setEmbeddingConfig({
-      model_id: modelId,
-      service: "open_router",
-      auto_embed_query: opts.autoEmbedQuery ?? true,
-    });
-  }
-
-  /** Advanced configuration escape hatch. Prefer `setEmbeddingModel`. */
-  setEmbeddingConfig(
-    body: Schemas["ManagedEmbeddingConfigRequest"],
-  ): Promise<Schemas["ManagedEmbeddingConfigResponse"]> {
-    return this.request("POST", "/v1/graph/embedding", { body });
-  }
-
-  submitEmbeddingBackfill(
-    opts: {
-      batchSize?: number;
-      limit?: number;
-      full?: boolean;
-      idempotencyKey?: string;
-    } = {},
-  ): Promise<Schemas["ManagedEmbeddingBackfillJobStatusResponse"]> {
-    return this.request("POST", "/v1/graph/embedding/backfill-jobs", {
-      body: {
-        batch_size: opts.batchSize,
-        limit: opts.limit,
-        full: opts.full ?? false,
-      },
-      idempotencyKey:
-        opts.idempotencyKey ?? this.idempotencyKey("embedding-backfill"),
-    });
-  }
-
-  embeddingBackfillJob(
-    jobId: string,
-  ): Promise<Schemas["ManagedEmbeddingBackfillJobStatusResponse"]> {
-    return this.request("GET", "/v1/graph/embedding/backfill-jobs", {
-      query: { job_id: jobId },
-    });
-  }
-
-  cancelEmbeddingBackfill(
-    jobId: string,
-  ): Promise<Schemas["ManagedEmbeddingBackfillJobStatusResponse"]> {
-    return this.request("DELETE", "/v1/graph/embedding/backfill-jobs", {
-      query: { job_id: jobId },
-    });
-  }
-
-  async backfillEmbeddings(
-    opts: {
-      batchSize?: number;
-      limit?: number;
-      full?: boolean;
-      idempotencyKey?: string;
-      timeoutMs?: number;
-      pollIntervalMs?: number;
-    } = {},
-  ): Promise<Schemas["ManagedEmbeddingBackfillResponse"]> {
-    let status = await this.submitEmbeddingBackfill(opts);
-    const deadline = Date.now() + (opts.timeoutMs ?? 30 * 60_000);
-    while (status.status === "pending" || status.status === "running") {
-      if (Date.now() >= deadline)
-        throw new Error(
-          `embedding backfill ${status.job_id} did not finish before timeout`,
-        );
-      await sleep(opts.pollIntervalMs ?? 2_000);
-      status = await this.embeddingBackfillJob(status.job_id);
-    }
-    if (status.status !== "succeeded" || status.result == null)
-      throw new Error(
-        status.terminal_error ??
-          `embedding backfill ${status.job_id} ended ${status.status}`,
-      );
-    return status.result;
-  }
-
-  promoteEmbedding(opts: {
-    runId: string;
-    allowRegression?: boolean;
-  }): Promise<Schemas["ManagedEmbeddingPromoteResponse"]> {
-    return this.request("POST", "/v1/graph/embedding/promote", {
-      query: { run_id: opts.runId, allow_regression: opts.allowRegression },
-    });
-  }
-
   // --- models as runs (training-run registry + eval machinery) ---
-
-  /**
-   * The graph's grounding vocabulary as byte-sorted, deduped string sections —
-   * the canonical input for a decoder-side automaton (FST/trie) and the
-   * vocabulary half of an export bundle.
-   */
-  vocabExport(
-    opts: { sections?: string[]; limit?: number } = {},
-  ): Promise<Schemas["VocabExportResponse"]> {
-    return this.request("GET", "/v1/search/vocab", {
-      query: { sections: opts.sections?.join(","), limit: opts.limit },
-    });
-  }
 
   /**
    * Captured signals by flush-seq range, oldest first — the model-training
@@ -1281,68 +1157,13 @@ export class LbbClient {
     });
   }
 
-  // --- search ---
-
-  /** Full semantic hybrid search from a request body (`POST /v1/graph/search`). */
-  graphSearch(
-    body: Schemas["SemanticGraphSearchRequest"],
-    opts?: ReadConsistencyOptions,
-  ): Promise<Schemas["SemanticGraphSearchResponse"]> {
-    // Consistency for hybrid graph search lives on the nested `search` options.
-    const consistency = this.resolveConsistency(opts);
-    const search =
-      consistency !== undefined || opts?.minIndexedSeq !== undefined
-        ? this.mergeReadConsistency(body.search ?? {}, opts)
-        : body.search;
-    return this.request("POST", "/v1/graph/search", {
-      body: { ...body, search },
-    });
-  }
-
-  /** Reciprocal-rank-fusion across sub-queries. */
-  multiSearch(
-    body: Schemas["HybridMultiSearchRequest"],
-  ): Promise<Schemas["HybridMultiSearchResponse"]> {
-    return this.request("POST", "/v1/search/multi", { body });
-  }
+  // --- relevance feedback ---
 
   /**
-   * Grounded prefix completion from the index vocabulary + ontology. Optionally
-   * narrow relation completions by a type-signature `context` — a type
-   * pair that admits a single relation flags `signature_forced`.
-   */
-  suggest(
-    body: Schemas["SearchSuggestRequest"],
-  ): Promise<Schemas["SearchSuggestResponse"]> {
-    return this.request("POST", "/v1/search/suggest", { body });
-  }
-
-  /** Snap free text to the nearest term in the pinned published vocabulary. */
-  resolveTerm(
-    body: Schemas["ResolveTermRequest"],
-  ): Promise<Schemas["ResolveTermResponse"]> {
-    return this.request("POST", "/v1/search/resolve-term", { body });
-  }
-
-  /** Decode a relation from the graph's admissible published vocabulary. */
-  decode(body: Schemas["DecodeRequest"]): Promise<Schemas["DecodeResponse"]> {
-    return this.request("POST", "/v1/decode", { body });
-  }
-
-  /** Report completion strategy fitness for the pinned published graph. */
-  groundability(
-    opts: { sample?: number } = {},
-  ): Promise<Schemas["GroundabilityReport"]> {
-    return this.request("GET", "/v1/graph/groundability", {
-      query: opts.sample == null ? undefined : { sample: opts.sample },
-    });
-  }
-
-  /**
-   * Append relevance labels for a set of search results — how little big brain
+   * Append relevance labels for a set of ranked results — how little big brain
    * gathers customer-specific qrels. Grade results (3 ideal/good, 1 partial,
-   * 0 bad), referencing the search response's `search_id` so labels tie back to
-   * that ranking. Stored apart from customer facts and exported via
+   * 0 bad), referencing the ranking's `search_id` so labels tie back to it.
+   * Stored apart from customer facts and exported via
    * {@link searchFeedbackExport} as training/eval data for embedding fine-tuning.
    */
   searchFeedback(
@@ -1358,26 +1179,6 @@ export class LbbClient {
   /** Export the stored relevance labels as qrels-style rows for training. */
   searchFeedbackExport(): Promise<Schemas["SearchFeedbackExportResponse"]> {
     return this.request("GET", "/v1/search/feedback/export");
-  }
-
-  /** BM25 search. */
-  fullTextSearch(
-    body: Schemas["FullTextSearchRequest"],
-    opts?: ReadConsistencyOptions,
-  ): Promise<Schemas["FullTextSearchResponse"]> {
-    return this.request("POST", "/v1/search/full-text", {
-      body: this.mergeReadConsistency(body, opts),
-    });
-  }
-
-  /** ANN/vector search. */
-  embeddingSearch(
-    body: Schemas["EmbeddingSearchRequest"],
-    opts?: ReadConsistencyOptions,
-  ): Promise<Schemas["EmbeddingSearchResponse"]> {
-    return this.request("POST", "/v1/search/embedding", {
-      body: this.mergeReadConsistency(body, opts),
-    });
   }
 
   /**
@@ -1547,19 +1348,6 @@ export class LbbClient {
     opts?: ReadConsistencyOptions,
   ): Promise<SparqlResults> {
     return parseSparqlResults(await this.sparqlText(body, opts));
-  }
-
-  /**
-   * Basic-graph-pattern query with group-graph-pattern combinators
-   * (UNION / OPTIONAL / MINUS / EXISTS / NOT EXISTS) folded over the base
-   * patterns. The complement to {@link sparql}: this route carries the
-   * combinators (but not FILTER/aggregation), so use it when a query needs an
-   * optional/union/negated leg rather than a grouped aggregate.
-   */
-  analytics(
-    body: Schemas["AnalyticQueryRequest"],
-  ): Promise<Schemas["AnalyticQueryResponse"]> {
-    return this.request("POST", "/v1/query/analytics", { body });
   }
 
   // --- ontology ---

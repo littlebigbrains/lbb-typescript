@@ -36,11 +36,10 @@ await graph.facts.create(
 const published = await lbb.readSnapshot();
 console.log(published.snapshot.served_at_seq, published.query_lag_commits);
 
-// 3. Hybrid search over the snapshot.
-const results = await graph.search.hybrid(
-  "How long are customer records retained?",
-  { topK: 10, consistency: "eventual" },
-);
+// 3. Query the snapshot with SPARQL.
+const rows = await lbb.sparqlRows({
+  query: "SELECT ?s ?o WHERE { ?s <policy:retention> ?o } LIMIT 10",
+});
 ```
 
 For hosted use, `baseUrl` is required and must be the exact `endpoint_url`
@@ -48,23 +47,6 @@ shown on the stack's Connect page. Graph and branch remain client scope
 parameters; they are not encoded in the hostname.
 
 ## Examples
-
-**Search with filters.** Pass the request body to filter before ranking — here, only facts an ACL principal may see:
-
-```ts
-const results = await graph.search.hybrid({
-  query: "incident response runbook",
-  targets: ["entities"],
-  search: {
-    filters: {
-      op: "overlaps",
-      field: "acl",
-      values: ["user:rino@example.com", "group:engineering"],
-    },
-  },
-  top_k: 20,
-});
-```
 
 **Bulk import.** Load an array of records (or an NDJSON string) in one call:
 
@@ -93,10 +75,13 @@ commit is durable and final publication was enqueued; it does not mean indexes
 have already reached `committed_commit_seq`. An empty iterable is rejected
 locally before an import POST is sent.
 
-**Time-travel read.** Pin any search to a past instant — results reflect the graph as it was then:
+**Time-travel read.** Pin a SPARQL read to a past instant — results reflect the graph as it was then:
 
 ```ts
-const asOf = await graph.search.hybrid("retention policy", { asOf: "2026-01-01T00:00:00Z" });
+const asOf = await lbb.sparqlRows({
+  query: "SELECT ?s ?o WHERE { ?s <policy:retention> ?o }",
+  as_of_valid_time: "2026-01-01T00:00:00Z",
+});
 ```
 
 **SPARQL.** `sparqlRows` runs a SPARQL 1.1 SELECT/ASK and returns parsed rows:
@@ -113,9 +98,9 @@ Methods return parsed JSON and throw `LbbError` (with `status`, `code`, `message
 
 ## More
 
-The `graph(...)` scope exposes `facts`, `search`, `entities`, `ontology`,
-`query`, `schema`, and `context` namespaces. `context` includes vocabulary
-suggestion, term resolution, relation decoding, and groundability inspection; `schema`
+The `graph(...)` scope exposes `facts`, `entities`, `ontology`, `query`,
+`search` (feedback surfaces), and `schema` namespaces. `query` runs SPARQL,
+the one query language on the API; `schema`
 reads or atomically publishes the active ontology/shapes bundle. Writes enqueue
 published-generation maintenance automatically. Every generated shape is
 available as `Schemas["TypeName"]`.

@@ -1,12 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import {
-  LbbClient,
-  type Entity,
-  type FetchLike,
-  type SearchRequest,
-  type SearchResponse,
-} from "./index.js";
+import { LbbClient, type Entity, type FetchLike } from "./index.js";
 
 function queuedFetch(
   payloads: Array<{
@@ -47,44 +41,22 @@ function queuedFetch(
   return { fetch, urls, headers, bodies };
 }
 
-test("preferred namespaces make context, ontology, and query operations discoverable", async () => {
+test("preferred namespaces make entity, ontology, and query operations discoverable", async () => {
   const { fetch, urls } = queuedFetch([
-    { body: { suggestions: [] } },
+    { body: { snapshot: {} } },
     { body: { classes: [] } },
     { body: { snapshot: {}, vars: [], solutions: [] } },
   ]);
   const client = new LbbClient({ baseUrl: "http://h", fetch });
 
-  await client.context.suggest({ prefix: "what" });
+  await client.entities.get({ type: "SERVICE", name: "auth" });
   await client.ontology.view({ counts: true });
   await client.query.structured({ patterns: [], select: [] });
 
   assert.deepEqual(urls, [
-    "http://h/v1/search/suggest",
+    "http://h/v1/graph/entity/metadata?type=SERVICE&name=auth",
     "http://h/v1/ontology?counts=true",
     "http://h/v1/query/sparql",
-  ]);
-});
-
-test("context namespace covers completion, resolution, decoding, and groundability", async () => {
-  const { fetch, urls } = queuedFetch(
-    Array.from({ length: 4 }, () => ({ body: {} })),
-  );
-  const client = new LbbClient({ baseUrl: "http://h", fetch });
-
-  await client.context.suggest({ prefix: "wri" });
-  await client.context.resolve({ text: "writes" });
-  await client.context.decode({
-    source: { name: "auth" },
-    target: { name: "db" },
-  });
-  await client.context.groundability({ sample: 25 });
-
-  assert.deepEqual(urls, [
-    "http://h/v1/search/suggest",
-    "http://h/v1/search/resolve-term",
-    "http://h/v1/decode",
-    "http://h/v1/graph/groundability?sample=25",
   ]);
 });
 
@@ -113,47 +85,14 @@ test("ontology namespace covers its complete read and lifecycle family", async (
   ]);
 });
 
-test("graph namespace covers managed embedding lifecycle routes", async () => {
-  const { fetch, urls, bodies } = queuedFetch([
-    { body: {} },
-    { body: {} },
-    { body: {} },
-    { body: { service: "open_router", configured: true, models: [] } },
-    { body: { job_id: "job-1", status: "succeeded", result: {} } },
-    { body: {} },
-  ]);
-  const graph = new LbbClient({ baseUrl: "http://h", fetch }).graph("main");
-
-  await graph.embeddingConfig();
-  await graph.setEmbeddingConfig({ model_id: "m", dim: 384 });
-  await graph.setEmbeddingModel("openai/text-embedding-3-small");
-  await graph.embeddingModels();
-  await graph.backfillEmbeddings({ batchSize: 64, limit: 1000, full: true });
-  await graph.promoteEmbedding({ runId: "run-1", allowRegression: true });
-
-  assert.deepEqual(urls, [
-    "http://h/v1/graph/embedding?graph=main",
-    "http://h/v1/graph/embedding?graph=main",
-    "http://h/v1/graph/embedding?graph=main",
-    "http://h/v1/graph/embedding/models?graph=main",
-    "http://h/v1/graph/embedding/backfill-jobs?graph=main",
-    "http://h/v1/graph/embedding/promote?graph=main&run_id=run-1&allow_regression=true",
-  ]);
-  assert.deepEqual(JSON.parse(bodies[2] ?? "{}"), {
-    model_id: "openai/text-embedding-3-small",
-    service: "open_router",
-    auto_embed_query: true,
-  });
-});
-
-test("query namespace covers parsed, raw, and analytical reads", async () => {
+test("query namespace covers the parsed and raw SPARQL reads", async () => {
   const sparqlEnvelope = {
     results: JSON.stringify({ head: { vars: [] }, results: { bindings: [] } }),
   };
   const { fetch, urls } = queuedFetch([
     { body: sparqlEnvelope },
     { body: sparqlEnvelope },
-    { body: {} },
+    { body: { snapshot: {}, vars: [], solutions: [] } },
   ]);
   const client = new LbbClient({ baseUrl: "http://h", fetch });
 
@@ -161,13 +100,13 @@ test("query namespace covers parsed, raw, and analytical reads", async () => {
     query: "SELECT * WHERE { ?s ?p ?o }",
   });
   await client.query.sparqlRaw({ query: "ASK { ?s ?p ?o }" });
-  await client.query.analytics({} as never);
+  await client.query.structured({ patterns: [], select: [] });
 
   assert.deepEqual(parsed.rows, []);
   assert.deepEqual(urls, [
     "http://h/v1/query/sparql-text",
     "http://h/v1/query/sparql-text",
-    "http://h/v1/query/analytics",
+    "http://h/v1/query/sparql",
   ]);
 });
 
@@ -183,28 +122,25 @@ test("read-only POST namespaces retry safely without an idempotency key", async 
     retryDelayMs: 0,
   });
 
-  await client.context.suggest({ prefix: "wri" });
+  await client.ontology.search({} as never);
 
   assert.deepEqual(urls, [
-    "http://h/v1/search/suggest",
-    "http://h/v1/search/suggest",
+    "http://h/v1/ontology/search",
+    "http://h/v1/ontology/search",
   ]);
 });
 
 test("graph scope carries the preferred namespaces", async () => {
   const { fetch, urls } = queuedFetch([
-    { body: { entities: [], assertions: [] } },
+    { body: { snapshot: {}, vars: [], solutions: [] } },
   ]);
   const client = new LbbClient({ baseUrl: "http://h", fetch });
 
   await client
     .graph("support", { branch: "review" })
-    .search.hybrid("refund policy");
+    .query.structured({ patterns: [], select: [] });
 
-  assert.equal(
-    urls[0],
-    "http://h/v1/search?graph=support&branch=review&query=refund%20policy",
-  );
+  assert.equal(urls[0], "http://h/v1/query/sparql?graph=support&branch=review");
 });
 
 test("request hooks and raw metadata expose retries without exposing bodies", async () => {
@@ -237,15 +173,8 @@ test("request hooks and raw metadata expose retries without exposing bodies", as
 });
 
 test("friendly named aliases describe the common generated types", () => {
-  const request: SearchRequest = { query: "identity" };
-  const response = {
-    entities: [],
-    assertions: [],
-  } as unknown as SearchResponse;
   const entity = { id: "e1", entity_type: "SERVICE", name: "auth" } as Entity;
 
-  assert.equal(request.query, "identity");
-  assert.equal(response.entities.length, 0);
   assert.equal(entity.name, "auth");
 });
 
@@ -279,8 +208,8 @@ test("A5: the read-your-writes loop — commitSeq surfaces and minIndexedSeq thr
 
 test("A5: defaultConsistency applies when a call omits it, and a per-call value wins", async () => {
   const { fetch, urls, bodies } = queuedFetch([
-    { body: { snapshot: {}, results: [] } },
-    { body: { snapshot: {}, results: [] } },
+    { body: { snapshot: {}, vars: [], solutions: [] } },
+    { body: { snapshot: {}, vars: [], solutions: [] } },
     { body: { snapshot: {} } },
     { body: { conforms: true, result_count: 0 } },
   ]);
@@ -290,20 +219,12 @@ test("A5: defaultConsistency applies when a call omits it, and a per-call value 
     defaultConsistency: "strong",
   });
 
-  // Full-text body inherits the client default.
-  await lbb.fullTextSearch({
-    query: "x",
-    targets: [],
-    top_k: 5,
-    explain: false,
-  });
+  // The structured-SPARQL body inherits the client default.
+  await lbb.sparql({ patterns: [] });
   assert.equal(JSON.parse(bodies[0] ?? "{}").consistency, "strong");
 
   // A per-call consistency wins over the client default.
-  await lbb.fullTextSearch(
-    { query: "x", targets: [], top_k: 5, explain: false },
-    { consistency: "eventual" },
-  );
+  await lbb.sparql({ patterns: [] }, { consistency: "eventual" });
   assert.equal(JSON.parse(bodies[1] ?? "{}").consistency, "eventual");
 
   // The default also reaches artifact-backed URL routes.
