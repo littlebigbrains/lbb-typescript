@@ -12009,8 +12009,6 @@ export interface operations {
                 strict?: string;
                 /** @description RFC3339 backfill instant stamped on every batch */
                 observed_at?: string;
-                /** @description Durably enqueue one atomic published-generation build after the final batch */
-                publish?: string;
             };
             header?: {
                 /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
@@ -12589,7 +12587,7 @@ export interface operations {
                 graph?: string;
                 /** @description Branch name (default `main`) */
                 branch?: string;
-                /** @description RDF statements per internal commit (default 1000, clamped 1-1000000) */
+                /** @description RDF statements per internal commit (default 1000000, the cap: one commit per fully-buffered request; clamped 1-1000000) */
                 batch?: string;
                 /** @description Abort on the first malformed RDF parse error instead of reporting it */
                 strict?: string;
@@ -12607,8 +12605,8 @@ export interface operations {
                 blank_node_scope?: string;
                 /** @description Entity type name for imported RDF resources (default Resource) */
                 resource_type?: string;
-                /** @description Durably enqueue one atomic published-generation build after the final batch */
-                publish?: string;
+                /** @description Set false to defer the published-generation enqueue; send build=false on every chunk except the last of a chunked bulk stream. Default true. */
+                build?: string;
             };
             header?: {
                 /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */

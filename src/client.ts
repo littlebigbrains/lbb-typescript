@@ -793,6 +793,7 @@ export class LbbClient {
         blank_node_scope: opts.blankNodeScope,
         resource_type: opts.resourceType,
         edge_idempotency: opts.edgeIdempotency,
+        build: opts.build,
       },
       idempotencyKey: opts.idempotencyKey ?? this.idempotencyKey("import-rdf"),
     });
