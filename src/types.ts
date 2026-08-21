@@ -5,14 +5,6 @@ export type Schemas = components["schemas"];
 
 // Friendly aliases for the types developers reach for most often. The complete
 // generated contract remains available through `Schemas` for less common APIs.
-export type SearchRequest = Schemas["SemanticGraphSearchRequest"];
-export type SearchResponse = Schemas["SemanticGraphSearchResponse"];
-export type SearchResult =
-  | SearchResponse["entities"][number]
-  | SearchResponse["assertions"][number]
-  | SearchResponse["concepts"][number]
-  | SearchResponse["observations"][number]
-  | SearchResponse["paths"][number];
 export type Entity = Schemas["EntityExplorerRow"];
 export type EntitySelector = Schemas["EntitySelector"];
 export type GraphSummary = Schemas["GraphSummaryResponse"];

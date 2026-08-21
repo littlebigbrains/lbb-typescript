@@ -2,6 +2,28 @@
 
 All notable changes to the `@littlebigbrain/client` package are documented here.
 
+## 0.11.0 (2026-08-21)
+
+Breaking removal of every non-SPARQL query surface. The server now serves
+SPARQL as its only query surface, so the client keeps only the SPARQL methods.
+
+- Remove the search family: `search.hybrid`, `search.multi`, `search.fullText`,
+  `search.vector`, `graphSearch`, `multiSearch`, `fullTextSearch`,
+  `embeddingSearch`, `suggest`, `resolveTerm`, and `vocabExport`.
+- Remove the managed embedding family from both `LbbClient` and
+  `graph(...)`: `embeddingConfig`, `embeddingModels`, `setEmbeddingModel`,
+  `setEmbeddingConfig`, `submitEmbeddingBackfill`, `embeddingBackfillJob`,
+  `cancelEmbeddingBackfill`, `backfillEmbeddings`, and `promoteEmbedding`.
+- Remove `decode`, `groundability`, `analytics`, and `query.analytics`.
+- Remove the whole `context` namespace (`suggest`, `resolve`, `decode`,
+  `groundability`) and the exported `ContextNamespace` class.
+- Remove the `HybridSearchOptions` option type and the `SearchRequest`,
+  `SearchResponse`, and `SearchResult` type aliases.
+- Keep `query.structured`, `query.sparql`, `query.sparqlRaw`, `sparql`,
+  `sparqlText`, and `sparqlRows`. Keep the temporal reads (`currentState`,
+  `history`, `transitions`, `why`), the entity reads, relevance feedback, and
+  every write, ontology, schema, branch, and operations surface.
+
 ## 0.10.0 (2026-08-21)
 
 Breaking removal of the standalone graph-traversal surface.
