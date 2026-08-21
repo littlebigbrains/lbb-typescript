@@ -276,6 +276,7 @@ export class FactsNamespace {
       observedAt,
       resourceType,
       edgeIdempotency,
+      build,
       ...request
     } = opts;
     return this.client.request("POST", "/v1/graph/import/rdf", {
@@ -299,6 +300,7 @@ export class FactsNamespace {
         blank_node_scope: blankNodeScope,
         resource_type: resourceType,
         edge_idempotency: edgeIdempotency,
+        build,
       },
     });
   }

@@ -72,6 +72,12 @@ export interface RdfImportOptions {
   observedAt?: string;
   resourceType?: string;
   edgeIdempotency?: "append" | "skip_unchanged";
+  /**
+   * Set `false` to defer the published-generation enqueue. Send `build: false`
+   * on every chunk except the last of a chunked bulk stream, so derived
+   * families build once at the final head. Defaults to `true`.
+   */
+  build?: boolean;
   idempotencyKey?: string;
 }
 
