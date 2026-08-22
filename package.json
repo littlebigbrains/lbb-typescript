@@ -53,5 +53,13 @@
     "openapi-typescript": "^7",
     "publint": "^0.3.21",
     "typescript": "^5.6"
+  },
+  "overrides": {
+    "@redocly/openapi-core": {
+      "js-yaml": "^4.3.1"
+    },
+    "minimatch": {
+      "brace-expansion": "^2.1.2"
+    }
   }
 }
