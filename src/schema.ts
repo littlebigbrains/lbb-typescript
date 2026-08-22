@@ -3787,10 +3787,15 @@ export interface components {
             subject: string;
         };
         /**
-         * @description Define a custom ontology for the scoped graph before its first commit.
-         *     Imports `source` (any [`crate`]-supported format), optionally merges the
-         *     built-in default so the standard entity types/relations stay available, and
-         *     creates the graph head with the result. Fails if the graph already exists.
+         * @description Define the scoped graph's ontology. Imports `source` (any
+         *     [`crate`]-supported format), optionally merges the built-in default so the
+         *     standard entity types/relations stay available, and creates the graph head
+         *     with the result.
+         *
+         *     The call is re-runnable on a graph that already exists. An unchanged
+         *     ontology is a no-op; an additive difference is applied, including a widened
+         *     relation domain or range and a new property field; a narrowing or removing
+         *     difference is refused with a typed error naming the route that applies it.
          */
         OntologyDefineRequest: {
             /** @description Import format hint. `auto` (the default) sniffs the content. */
@@ -3807,9 +3812,31 @@ export interface components {
             source: string;
         };
         OntologyDefineResponse: {
+            /**
+             * @description True when this call wrote a new ontology version, either by creating the
+             *     graph or by applying an additive difference. False when the proposed
+             *     ontology already matched the active one, which is what makes re-running
+             *     the same bootstrap request a no-op.
+             *
+             *     This tracks what was written, so it never reports `false` for a call
+             *     that changed the ontology: a widened relation domain or range and a new
+             *     property field both set it, even though neither appears in the
+             *     class-and-relation schema diff.
+             */
+            changed?: boolean;
+            /**
+             * @description The additive changes this call applied to an existing graph's ontology.
+             *     Empty when the graph was created and when nothing changed.
+             */
+            changes?: components["schemas"]["SchemaDiffEntry"][];
             entity_types: components["schemas"]["OntologyTermView"][];
             format: string;
             graph: components["schemas"]["GraphKey"];
+            /**
+             * @description True when this call created the graph head. False when the graph already
+             *     existed, whether the ontology then changed or not. This is the `created`
+             *     signal for the define route.
+             */
             graph_created: boolean;
             merged_default: boolean;
             /** Format: int64 */
