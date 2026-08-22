@@ -807,7 +807,11 @@ export class LbbClient {
     });
   }
 
-  /** Create the scoped graph/branch. Construct the client with the desired graph/branch first. */
+  /**
+   * Create the scoped graph/branch with an empty ontology. Construct the client
+   * with the desired graph/branch first, then call `ontology.define` before
+   * writing typed data.
+   */
   createGraph(): Promise<Schemas["CreateGraphResponse"]> {
     return this.request("POST", "/v1/graph/create");
   }
