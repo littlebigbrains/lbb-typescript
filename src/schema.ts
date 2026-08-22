@@ -184,7 +184,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Create the scoped graph and branch */
+        /** Create the scoped graph and branch with an empty ontology */
         post: operations["post_v1_graph_create"];
         delete?: never;
         options?: never;
