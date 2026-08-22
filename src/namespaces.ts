@@ -344,6 +344,10 @@ export class OntologyNamespace {
     });
   }
 
+  /**
+   * Put the scoped graph on an imported ontology, creating the graph when it
+   * does not exist yet. Safe to repeat. See {@link LbbClient.ontologyDefine}.
+   */
   define(
     body: Schemas["OntologyDefineRequest"],
     opts: CallOptions = {},

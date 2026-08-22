@@ -1395,7 +1395,17 @@ export class LbbClient {
     return this.request("POST", "/v1/ontology/resolve", { body });
   }
 
-  /** Define the active ontology before the scoped graph's first commit. */
+  /**
+   * Put the scoped graph on an imported ontology, creating the graph when it
+   * does not exist yet. Safe to repeat: an unchanged ontology answers
+   * `changed: false` without writing. An additive difference is applied,
+   * including a wider relation domain or range and a new property field, and
+   * `changed` reports what was written. A document that narrows or drops what
+   * the graph already defines, or states a change no additive operation
+   * expresses, is refused with `ontology_restrictive_change`,
+   * `ontology_identity_breaking_change`, or `ontology_unsupported_change`, and
+   * writes nothing.
+   */
   ontologyDefine(
     body: Schemas["OntologyDefineRequest"],
   ): Promise<Schemas["OntologyDefineResponse"]> {
