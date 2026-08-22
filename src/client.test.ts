@@ -263,7 +263,7 @@ test("waitForIndexLineage retains the satisfying build and replica headers", asy
   const { fetch, calls } = recordingFetch({
     body: JSON.stringify({
       graph: { tenant_id: "t", graph_id: "g", branch_id: "main" },
-      snapshot: { commit_seq: 7, compacted_seq: 0 },
+      snapshot: { commit_seq: 7, compacted_seq: 0, served_at_seq: 7 },
       ontology_version: 1,
       head_generation: 1,
       wal_tail_commits: 0,
@@ -288,6 +288,64 @@ test("waitForIndexLineage retains the satisfying build and replica headers", asy
   assert.equal(observed.replica, "eu1-node2");
   assert.equal(observed.requestId, "req-1");
   assert.equal(calls.length, 1);
+});
+
+test("waitForIndexLineage owns its deadline across pending publication", async () => {
+  const pending = {
+    graph: { tenant_id: "t", graph_id: "g", branch_id: "main" },
+    snapshot: {
+      commit_seq: 7,
+      compacted_seq: 0,
+      stale: true,
+      stale_reason: "published_read_pending",
+    },
+    ontology_version: 1,
+    head_generation: 1,
+    wal_tail_commits: 1,
+    wal_tail_bytes: 42,
+    segment_count: 0,
+    segment_bytes: 0,
+    published_lag_commits: 7,
+    index_caught_up: false,
+  };
+  const lineage = {
+    head_commit_seq: 7,
+    caught_up: false,
+    manifest_view_token: "index-view:ready",
+    observed_at_micros: 2,
+  };
+  const { fetch, calls } = recordingFetch([
+    {
+      status: 429,
+      body: JSON.stringify({
+        error: {
+          code: "ingest_busy",
+          message: "publication pending",
+          retryable: true,
+          retry_after_seconds: 0,
+        },
+      }),
+    },
+    { body: JSON.stringify(pending) },
+    {
+      body: JSON.stringify({
+        ...pending,
+        snapshot: { commit_seq: 7, compacted_seq: 0, served_at_seq: 7 },
+        published_lag_commits: 0,
+        index_caught_up: true,
+        index_lineage: lineage,
+      }),
+    },
+  ]);
+
+  const observed = await new LbbClient({
+    baseUrl: "http://h",
+    fetch,
+    maxRetries: 6,
+  }).waitForIndexLineage(7, { timeoutMs: 1_000, pollIntervalMs: 0 });
+
+  assert.equal(observed.lineage.manifest_view_token, "index-view:ready");
+  assert.equal(calls.length, 3);
 });
 
 test("namespace facts.create injects auth, scope, version, and idempotency", async () => {
