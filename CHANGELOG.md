@@ -4,6 +4,12 @@ All notable changes to the `@littlebigbrain/client` package are documented here.
 
 ## 0.11.1 (2026-08-22)
 
+- `createGraph` now creates the scoped graph with an empty ontology. The
+  built-in AI-context vocabulary is opt-in through `ontologyDefine` with
+  `merge_default: true`.
+- `ontologyDefine` is safe to rerun on an existing graph: identical definitions
+  are no-ops, additive differences are applied, and its response reports
+  `graph_created`, `changed`, and the applied `changes`.
 - Treat an absent first published generation as normal asynchronous build
   progress instead of retrying the metadata request until the generic retry
   budget is exhausted.
