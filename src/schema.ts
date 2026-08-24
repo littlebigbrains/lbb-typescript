@@ -5976,11 +5976,10 @@ export interface components {
             /** @description WHERE: the conjunctive basic graph pattern (shares the analytic engine). */
             patterns: components["schemas"]["AnalyticTriplePattern"][];
             /**
-             * @description Reason over the graph's stored inference rules so a pattern matches
-             *     asserted **and** derived edges in one shot. Off by default
-             *     (asserted-only). Public serving requires a compatible reasoned
-             *     projection in the pinned published generation and fails closed when it
-             *     is absent; it never forces an overlay reduce.
+             * @description Not available on the published SPARQL surface: a branch's stored
+             *     inference rules already run at publish time, folding derived facts into
+             *     the asserted dataset every query reads. Requesting `reason: true`
+             *     returns a typed, non-retryable error.
              */
             reason?: boolean;
             /**
