@@ -111,7 +111,9 @@ The `graph(...)` scope exposes `facts`, `entities`, `ontology`, `query`,
 the one query language on the API; `schema`
 reads or atomically publishes the active ontology/shapes bundle. Writes enqueue
 published-generation maintenance automatically. Every generated shape is
-available as `Schemas["TypeName"]`.
+available as `Schemas["TypeName"]`. Retired request-time JSON SHACL DTOs are
+intentionally absent: publish RDF shapes with `schema.publish`, then read
+`ontology.conformance`.
 
 Full reference and guides: [docs.littlebigbrain.com/sdks/typescript](https://docs.littlebigbrain.com/sdks/typescript/).
 

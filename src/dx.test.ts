@@ -1,6 +1,20 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { LbbClient, type Entity, type FetchLike } from "./index.js";
+import {
+  LbbClient,
+  type Entity,
+  type FetchLike,
+  type Schemas,
+} from "./index.js";
+
+test("generated schemas exclude the retired request-time SHACL DTO family", () => {
+  const noRetiredShaclModels: [
+    Extract<keyof Schemas, `Shacl${string}`>,
+  ] extends [never]
+    ? true
+    : false = true;
+  assert.equal(noRetiredShaclModels, true);
+});
 
 function queuedFetch(
   payloads: Array<{
