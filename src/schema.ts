@@ -5773,11 +5773,14 @@ export interface components {
          */
         SparqlCompareOp: "eq" | "ne" | "lt" | "le" | "gt" | "ge";
         /**
-         * @description RDFS entailment regime applied when projecting the graph for a conformant
-         *     SPARQL query. Controls whether a class term matches subtype instances.
+         * @description RDFS entailment regime applied to a conformant SPARQL query. The regime is
+         *     evaluated at query time as a closure-driven pattern rewrite over the
+         *     dataset's asserted schema triples (`rdfs:subClassOf`, `rdfs:subPropertyOf`,
+         *     `rdfs:domain`, `rdfs:range`); the published dataset itself stays
+         *     asserted-only.
          * @enum {string}
          */
-        SparqlEntailment: "subclass" | "none";
+        SparqlEntailment: "rdfs" | "subclass" | "none";
         /**
          * @description A FILTER over a solution: a comparison, or a boolean composition of filters.
          *     A comparison whose operands are unbound, incomparable, or a type mismatch is
@@ -6039,9 +6042,10 @@ export interface components {
          */
         SparqlTextRequest: {
             /**
-             * @description RDFS entailment regime. `None` (default) reads the asserted published
-             *     projection. `Subclass` requires a compatible reasoned projection and
-             *     fails closed while one is unavailable.
+             * @description RDFS entailment regime. `None` (default) matches asserted triples only.
+             *     `Rdfs` applies the practical RDFS core at query time; `Subclass` applies
+             *     the class-only subset. Both derive the closure from the pinned
+             *     generation's asserted schema triples.
              */
             entailment?: components["schemas"]["SparqlEntailment"];
             /**
@@ -6054,12 +6058,10 @@ export interface components {
             /** @description The SPARQL query text (SELECT or ASK). */
             query: string;
             /**
-             * @description Reason over the branch's stored inference rules: project the rule-derived
-             *     facts into the dataset the conformant engine runs over, so a query reasons
-             *     over asserted **and** derived edges. Off by default; a no-op when the branch
-             *     has no stored rules. Combine with `entailment: subclass` for full
-             *     reasoning—rule-derived facts plus `rdfs:subClassOf` type closure—once
-             *     maintenance publishes a compatible reasoned projection.
+             * @description Not available on the published SPARQL surface: a branch's stored
+             *     inference rules already run at publish time, folding derived facts into
+             *     the asserted dataset every query reads. Requesting `reason: true`
+             *     returns a typed, non-retryable error.
              */
             reason?: boolean;
         };
