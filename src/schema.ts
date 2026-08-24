@@ -4740,6 +4740,11 @@ export interface components {
         };
         SchemaAuditResult: {
             component: string;
+            /**
+             * @description Nested results explaining a composite violation (`sh:detail`), e.g.
+             *     which constraint inside a `sh:node` shape the value node failed.
+             */
+            details?: components["schemas"]["SchemaAuditResult"][];
             focus_node: string;
             message?: string | null;
             result_path?: string | null;
