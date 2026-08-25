@@ -5773,14 +5773,13 @@ export interface components {
          */
         SparqlCompareOp: "eq" | "ne" | "lt" | "le" | "gt" | "ge";
         /**
-         * @description RDFS entailment regime applied to a conformant SPARQL query. The regime is
+         * @description Entailment regime applied to a conformant SPARQL query. The regime is
          *     evaluated at query time as a closure-driven pattern rewrite over the
-         *     dataset's asserted schema triples (`rdfs:subClassOf`, `rdfs:subPropertyOf`,
-         *     `rdfs:domain`, `rdfs:range`); the published dataset itself stays
+         *     dataset's asserted schema triples; the published dataset itself stays
          *     asserted-only.
          * @enum {string}
          */
-        SparqlEntailment: "rdfs" | "subclass" | "none";
+        SparqlEntailment: "owl" | "rdfs" | "subclass" | "none";
         /**
          * @description A FILTER over a solution: a comparison, or a boolean composition of filters.
          *     A comparison whose operands are unbound, incomparable, or a type mismatch is
@@ -6041,10 +6040,11 @@ export interface components {
          */
         SparqlTextRequest: {
             /**
-             * @description RDFS entailment regime. `None` (default) matches asserted triples only.
-             *     `Rdfs` applies the practical RDFS core at query time; `Subclass` applies
-             *     the class-only subset. Both derive the closure from the pinned
-             *     generation's asserted schema triples.
+             * @description Entailment regime. `None` (default) matches asserted triples only.
+             *     `Rdfs` applies the practical RDFS core at query time, `Subclass` the
+             *     class-only subset, and `Owl` the OWL profile on top of `Rdfs`. All
+             *     derive the closure from the pinned generation's asserted schema
+             *     triples.
              */
             entailment?: components["schemas"]["SparqlEntailment"];
             /**
