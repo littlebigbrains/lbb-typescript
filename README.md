@@ -69,17 +69,22 @@ const accepted = await lbb.submitImport(records(), {
 const completed = await lbb.waitForImportJob(accepted.job_id);
 console.log(completed.state, completed.committed_commit_seq);
 if (completed.committed_commit_seq != null) {
-  await lbb.waitForIndexLineage(completed.committed_commit_seq);
+  await lbb.waitForPublished(completed.committed_commit_seq);
 }
 ```
 
 `records()` may be an iterable or async iterable. Success means every grouped
-commit is durable and final publication was enqueued; it does not mean indexes
-have already reached `committed_commit_seq`. Wait once after the final commit,
-not after each source row or chunk. The lineage waiter polls normal
-`index_caught_up=false` metadata until its own deadline, including on an
-RDF-only deployment. An empty iterable is rejected locally before an import
-POST is sent.
+commit is durable and the graph's coalesced desired publication fence advanced;
+it does not mean the exact generation has already reached
+`committed_commit_seq`. Wait once after the final commit, not after each source
+row or chunk. The publication waiter follows concrete lifecycle stages and
+watermarks until its own deadline. An empty iterable is rejected locally before
+an import POST is sent.
+
+For several RDF documents, `facts.importRdfMany(...)` automatically sends
+`build=false` for every intermediate document and triggers publication on the
+last. Call `graph.waitForPublished(result.finalSequence)` once when the caller
+needs strong-read visibility.
 
 **Time-travel read.** Pin a SPARQL read to a past instant — results reflect the graph as it was then:
 
@@ -101,8 +106,9 @@ const { rows } = await lbb.sparqlRows({
 ## Errors & retries
 
 Methods return parsed JSON and throw `LbbError` (with `status`, `code`, `message`, `param`, `requestId`, `docUrl`) on any non-2xx response. Safe reads and idempotency-keyed writes retry `429`/`5xx` and network failures with full-jitter backoff, bounded by a retry budget (`retryBudgetMs`, default 60s) rather than a fixed count, and honor `Retry-After` — a terminal error the server marks non-retryable surfaces immediately. Use `rawRequest()` for response headers, request id, and retry/timing metadata.
-`waitForIndexLineage(...)` is a separate deadline-bounded poller, so the generic
+`waitForPublished(...)` is a separate deadline-bounded poller, so the generic
 request retry-count cap cannot end publication waiting early.
+`waitForIndexLineage(...)` remains as a deprecated compatibility alias.
 
 ## More
 

@@ -73,6 +73,17 @@ export interface RdfImportOptions {
   idempotencyKey?: string;
 }
 
+export interface RdfImportDocument {
+  rdf: string;
+  options?: RdfImportOptions;
+}
+
+export interface RdfImportManyResult {
+  imports: Schemas["GraphRdfImportResponse"][];
+  finalSequence?: number;
+  publication?: Schemas["GraphImportPublishedGenerationOutcome"] | null;
+}
+
 export type AttributeFilterOp = "eq" | "ne" | "lt" | "le" | "gt" | "ge";
 
 export type AttributeFilterValue =

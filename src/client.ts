@@ -10,6 +10,8 @@ import type {
   ListResponse,
   RawLbbResponse,
   ReadConsistencyOptions,
+  RdfImportDocument,
+  RdfImportManyResult,
   RdfImportOptions,
   Schemas,
   SearchConsistency,
@@ -60,6 +62,8 @@ export type {
   ListResponse,
   RawLbbResponse,
   ReadConsistencyOptions,
+  RdfImportDocument,
+  RdfImportManyResult,
   RdfImportOptions,
   Schemas,
   SearchConsistency,
@@ -791,6 +795,36 @@ export class LbbClient {
     });
   }
 
+  /** Import several RDF documents with one final automatic publication. */
+  async importRdfMany(
+    documents: readonly RdfImportDocument[],
+    opts: RdfImportOptions = {},
+  ): Promise<RdfImportManyResult> {
+    if (documents.length === 0) {
+      throw new RangeError("importRdfMany requires at least one document");
+    }
+    const imports: Schemas["GraphRdfImportResponse"][] = [];
+    for (const [index, document] of documents.entries()) {
+      const merged = { ...opts, ...document.options };
+      const idempotencyKey = merged.idempotencyKey
+        ? `${merged.idempotencyKey}:${index + 1}`
+        : undefined;
+      imports.push(
+        await this.importRdf(document.rdf, {
+          ...merged,
+          idempotencyKey,
+          build: index === documents.length - 1,
+        }),
+      );
+    }
+    const final = imports[imports.length - 1];
+    return {
+      imports,
+      finalSequence: final?.committed_commit_seq ?? undefined,
+      publication: final?.published_generation,
+    };
+  }
+
   /**
    * Retract specific edges and/or every edge touching given entities. Appends
    * superseding retract events rather than deleting — history stays visible in an
@@ -1467,12 +1501,62 @@ export class LbbClient {
     });
   }
 
+  /** Automatic publication lifecycle, available before the first generation exists. */
+  publicationStatus(): Promise<Schemas["PublicationStatusResponse"]> {
+    return this.request("GET", "/v1/graph/publication-status");
+  }
+
+  /** Wait until an exact published generation covers `targetSeq`. */
+  async waitForPublished(
+    targetSeq: number,
+    opts: { timeoutMs?: number; pollIntervalMs?: number } = {},
+  ): Promise<Schemas["PublicationStatusResponse"]> {
+    if (!Number.isSafeInteger(targetSeq) || targetSeq < 0) {
+      throw new RangeError("targetSeq must be a non-negative safe integer");
+    }
+    const timeoutMs = opts.timeoutMs ?? 30_000;
+    const pollIntervalMs = opts.pollIntervalMs ?? 250;
+    if (!Number.isFinite(timeoutMs) || timeoutMs < 0) {
+      throw new RangeError("timeoutMs must be a non-negative number");
+    }
+    if (!Number.isFinite(pollIntervalMs) || pollIntervalMs < 0) {
+      throw new RangeError("pollIntervalMs must be a non-negative number");
+    }
+    const deadline = Date.now() + timeoutMs;
+    let last: Schemas["PublicationStatusResponse"] | undefined;
+    while (true) {
+      last = await this.publicationStatus();
+      if (last.state === "blocked") {
+        throw new Error(
+          `publication blocked at ${last.current_stage ?? "unknown stage"}: ${last.retry.message}`,
+        );
+      }
+      if (last.state === "current" && last.published_seq >= targetSeq) {
+        return last;
+      }
+      const now = Date.now();
+      if (now >= deadline) {
+        throw new Error(
+          `publication did not reach ${targetSeq} before timeout (state=${last.state}, head=${last.head_seq}, target=${last.target_seq}, published=${last.published_seq}, stage=${last.current_stage ?? "unknown"})`,
+        );
+      }
+      await sleep(
+        Math.min(
+          Math.max(pollIntervalMs, last.retry.retry_after_ms),
+          deadline - now,
+        ),
+      );
+    }
+  }
+
   /**
    * Wait until one published generation covers `targetSeq`.
    *
    * The returned lineage may name absent BM25/ANN families on an RDF-only
    * deployment; `metadata.index_caught_up` is the generation-level readiness
    * signal used by bulk loaders.
+   *
+   * @deprecated Use {@link waitForPublished}; publication is fully server-managed.
    */
   async waitForIndexLineage(
     targetSeq: number,
