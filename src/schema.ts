@@ -382,6 +382,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/graph/publication-status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Automatic publication lifecycle and exact read watermarks */
+        get: operations["get_v1_graph_publication_status"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/graph/read-snapshot": {
         parameters: {
             query?: never;
@@ -4344,6 +4361,42 @@ export interface components {
         } | {
             /** @description Members of an `i64_set` field; canonicalized like `keyword_set`. */
             i64_set: number[];
+        };
+        PublicationRetryGuidance: {
+            eventual_read_available: boolean;
+            message: string;
+            /** Format: int64 */
+            retry_after_ms: number;
+        };
+        /**
+         * @description Server-managed publication lifecycle for one graph epoch.
+         * @enum {string}
+         */
+        PublicationState: "current" | "queued" | "planning" | "building" | "verifying" | "publishing" | "blocked";
+        /**
+         * @description One bounded status document for automatic exact-generation publication.
+         *     It is available before the first generation publishes, unlike
+         *     [`PublishedReadStatusResponse`], so SDKs can wait without probing SPARQL.
+         */
+        PublicationStatusResponse: {
+            current_stage?: string | null;
+            /** Format: int64 */
+            epoch: number;
+            /** Format: int64 */
+            head_generation: number;
+            head_seq: components["schemas"]["CommitSeq"];
+            /** Format: int64 */
+            lag_commits: number;
+            /** Format: int64 */
+            last_progress_at_micros: number;
+            /** Format: int64 */
+            published_generation?: number | null;
+            published_seq: components["schemas"]["CommitSeq"];
+            retry: components["schemas"]["PublicationRetryGuidance"];
+            state: components["schemas"]["PublicationState"];
+            /** Format: int64 */
+            target_head_generation: number;
+            target_seq: components["schemas"]["CommitSeq"];
         };
         /**
          * @description Whether an import's deterministic published-generation job was newly
@@ -10236,6 +10289,142 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["GraphMetadataResponse"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Rate limit exceeded */
+            429: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Service unavailable */
+            503: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+        };
+    };
+    get_v1_graph_publication_status: {
+        parameters: {
+            query?: {
+                /** @description Graph name (default `main`) */
+                graph?: string;
+                /** @description Branch name (default `main`) */
+                branch?: string;
+            };
+            header?: {
+                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                "Lbb-Version"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicationStatusResponse"];
                 };
             };
             /** @description Bad request */

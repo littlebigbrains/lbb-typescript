@@ -348,6 +348,144 @@ test("waitForIndexLineage owns its deadline across pending publication", async (
   assert.equal(calls.length, 3);
 });
 
+test("waitForPublished follows publication stages and returns the exact target", async () => {
+  const status = (state: "building" | "current", published: number) => ({
+    state,
+    epoch: 1,
+    head_seq: 7,
+    head_generation: 7,
+    target_seq: 7,
+    target_head_generation: 7,
+    published_seq: published,
+    published_generation: published > 0 ? 1 : null,
+    lag_commits: 7 - published,
+    current_stage: state === "current" ? null : "rdf_build",
+    last_progress_at_micros: 1,
+    retry: {
+      retry_after_ms: 0,
+      eventual_read_available: published > 0,
+      message: "poll",
+    },
+  });
+  const { fetch, calls } = recordingFetch([
+    { body: JSON.stringify(status("building", 3)) },
+    { body: JSON.stringify(status("current", 7)) },
+  ]);
+  const ready = await new LbbClient({
+    baseUrl: "http://h",
+    fetch,
+  }).waitForPublished(7, { timeoutMs: 1_000, pollIntervalMs: 0 });
+  assert.equal(ready.state, "current");
+  assert.equal(ready.published_seq, 7);
+  assert.equal(calls.length, 2);
+  assert.match(calls[0].input, /\/v1\/graph\/publication-status/);
+});
+
+test("waitForPublished rejects invalid targets and polling budgets before reading", async () => {
+  const client = new LbbClient({
+    baseUrl: "http://h",
+    fetch: recordingFetch([]).fetch,
+  });
+  await assert.rejects(
+    client.waitForPublished(-1),
+    /non-negative safe integer/,
+  );
+  await assert.rejects(
+    client.waitForPublished(1, { timeoutMs: Number.POSITIVE_INFINITY }),
+    /timeoutMs must be a non-negative number/,
+  );
+  await assert.rejects(
+    client.waitForPublished(1, { pollIntervalMs: -1 }),
+    /pollIntervalMs must be a non-negative number/,
+  );
+});
+
+test("waitForPublished surfaces a blocked publication immediately", async () => {
+  const { fetch } = recordingFetch({
+    body: JSON.stringify({
+      state: "blocked",
+      epoch: 1,
+      head_seq: 7,
+      head_generation: 7,
+      target_seq: 7,
+      target_head_generation: 7,
+      published_seq: 3,
+      lag_commits: 4,
+      current_stage: "rdf_build",
+      last_progress_at_micros: 1,
+      retry: {
+        retry_after_ms: 5_000,
+        eventual_read_available: true,
+        message: "operator action required",
+      },
+    }),
+  });
+  await assert.rejects(
+    new LbbClient({ baseUrl: "http://h", fetch }).waitForPublished(7),
+    /publication blocked at rdf_build/,
+  );
+});
+
+test("waitForPublished reports the last lifecycle watermarks on timeout", async () => {
+  const { fetch } = recordingFetch({
+    body: JSON.stringify({
+      state: "verifying",
+      epoch: 1,
+      head_seq: 9,
+      head_generation: 9,
+      target_seq: 9,
+      target_head_generation: 9,
+      published_seq: 7,
+      published_generation: 1,
+      lag_commits: 2,
+      current_stage: "verify_generation",
+      last_progress_at_micros: 1,
+      retry: {
+        retry_after_ms: 0,
+        eventual_read_available: true,
+        message: "poll",
+      },
+    }),
+  });
+  await assert.rejects(
+    new LbbClient({ baseUrl: "http://h", fetch }).waitForPublished(9, {
+      timeoutMs: 0,
+      pollIntervalMs: 0,
+    }),
+    /state=verifying, head=9, target=9, published=7, stage=verify_generation/,
+  );
+});
+
+test("graph.waitForPublished keeps publication polling in the graph scope", async () => {
+  const { fetch, calls } = recordingFetch({
+    body: JSON.stringify({
+      state: "current",
+      epoch: 1,
+      head_seq: 7,
+      head_generation: 7,
+      target_seq: 7,
+      target_head_generation: 7,
+      published_seq: 7,
+      published_generation: 1,
+      lag_commits: 0,
+      current_stage: null,
+      last_progress_at_micros: 1,
+      retry: {
+        retry_after_ms: 0,
+        eventual_read_available: true,
+        message: "current",
+      },
+    }),
+  });
+  const ready = await new LbbClient({ baseUrl: "http://h", fetch })
+    .graph("perritos", { branch: "review" })
+    .waitForPublished(7);
+  assert.equal(ready.published_seq, 7);
+  const url = new URL(calls[0].input);
+  assert.equal(url.searchParams.get("graph"), "perritos");
+  assert.equal(url.searchParams.get("branch"), "review");
+});
+
 test("namespace facts.create injects auth, scope, version, and idempotency", async () => {
   const { fetch, calls } = recordingFetch({
     body: JSON.stringify({
@@ -1316,6 +1454,64 @@ test("facts.importRdf selects Turtle and forwards its base IRI", async () => {
   assert.match(call.input, /graph_uri=http%3A%2F%2Fex%2Fgraph/);
   assert.equal(call.init.headers?.["content-type"], "text/turtle");
   assert.equal(call.init.body, body);
+});
+
+test("facts.importRdfMany defers intermediates and publishes only the final document", async () => {
+  const response = (seq: number, final: boolean) => ({
+    batches: 1,
+    committed_commit_seq: seq,
+    duplicate_literal_triples: 0,
+    duplicate_resource_triples: 0,
+    error_count: 0,
+    graph_created: false,
+    imported_triplets: 1,
+    lines_read: 1,
+    literal_triples: 0,
+    predicate_count: 1,
+    resource_triples: 1,
+    triples_read: 1,
+    published_generation: final
+      ? {
+          job_id: "publication",
+          disposition: "queued",
+          status: "pending",
+          due_seq: seq,
+        }
+      : null,
+  });
+  const { fetch, calls } = recordingFetch([
+    { body: JSON.stringify(response(1, false)) },
+    { body: JSON.stringify(response(2, false)) },
+    { body: JSON.stringify(response(3, true)) },
+  ]);
+  const result = await new LbbClient({ baseUrl: "http://h", fetch })
+    .graph("main")
+    .facts.importRdfMany(
+      [
+        { rdf: "<a> <p> <b> .", options: { format: "turtle" } },
+        { rdf: "<b> <p> <c> .", options: { format: "turtle" } },
+        { rdf: "<c> <p> <d> .", options: { format: "turtle" } },
+      ],
+      { idempotencyKey: "perritos" },
+    );
+  assert.equal(result.finalSequence, 3);
+  assert.equal(result.publication?.due_seq, 3);
+  assert.match(calls[0].input, /build=false/);
+  assert.match(calls[1].input, /build=false/);
+  assert.match(calls[2].input, /build=true/);
+  assert.equal(calls[0].init.headers?.["idempotency-key"], "perritos:1");
+  assert.equal(calls[2].init.headers?.["idempotency-key"], "perritos:3");
+});
+
+test("facts.importRdfMany rejects an empty document list before importing", async () => {
+  const { fetch, calls } = recordingFetch([]);
+  await assert.rejects(
+    new LbbClient({ baseUrl: "http://h", fetch })
+      .graph("main")
+      .facts.importRdfMany([]),
+    /requires at least one document/,
+  );
+  assert.equal(calls.length, 0);
 });
 
 test("graph.retract posts edge/entity retractions", async () => {

@@ -7,6 +7,8 @@ import {
   type ImportLine,
   parseSparqlResults,
   type ReadConsistencyOptions,
+  type RdfImportDocument,
+  type RdfImportManyResult,
   type RdfImportOptions,
   type Schemas,
 } from "./types.js";
@@ -54,6 +56,19 @@ export class GraphNamespace {
 
   branch(name: string): GraphNamespace {
     return new GraphNamespace(this.client.withScope({ branch: name }));
+  }
+
+  /** Publication lifecycle for this graph/branch, including pre-first-publish state. */
+  publicationStatus(): Promise<Schemas["PublicationStatusResponse"]> {
+    return this.client.publicationStatus();
+  }
+
+  /** Wait until this graph/branch has an exact generation covering `targetSeq`. */
+  waitForPublished(
+    targetSeq: number,
+    opts: { timeoutMs?: number; pollIntervalMs?: number } = {},
+  ): Promise<Schemas["PublicationStatusResponse"]> {
+    return this.client.waitForPublished(targetSeq, opts);
   }
 
   create(opts: CallOptions = {}): Promise<Schemas["CreateGraphResponse"]> {
@@ -182,6 +197,14 @@ export class FactsNamespace {
         build,
       },
     });
+  }
+
+  /** Import several RDF documents and enqueue publication only for the final commit. */
+  importRdfMany(
+    documents: readonly RdfImportDocument[],
+    opts: RdfImportOptions = {},
+  ): Promise<RdfImportManyResult> {
+    return this.client.importRdfMany(documents, opts);
   }
 }
 
