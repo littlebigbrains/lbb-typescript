@@ -32,7 +32,7 @@ import {
   type Query,
   type RequestOptions,
 } from "./transport.js";
-import { LbbCapabilityError, LbbError } from "./transport.js";
+import { LbbCapabilityError } from "./transport.js";
 import {
   EntityNamespace,
   GraphNamespace,
@@ -95,16 +95,6 @@ export {
   SchemaNamespace,
   SearchNamespace,
 } from "./namespaces.js";
-
-export interface IndexLineageObservation {
-  metadata: Schemas["GraphMetadataResponse"];
-  lineage: Schemas["IndexLineage"];
-  buildCommit?: string;
-  replica?: string;
-  requestId?: string;
-  attempts: number;
-  elapsedMs: number;
-}
 
 type ImportStreamController = {
   enqueue(chunk: Uint8Array): void;
@@ -1506,7 +1496,7 @@ export class LbbClient {
     return this.request("GET", "/v1/graph/publication-status");
   }
 
-  /** Wait until an exact published generation covers `targetSeq`. */
+  /** Wait until background reconciliation folds `targetSeq` into the RDF base. */
   async waitForPublished(
     targetSeq: number,
     opts: { timeoutMs?: number; pollIntervalMs?: number } = {},
@@ -1546,89 +1536,6 @@ export class LbbClient {
           deadline - now,
         ),
       );
-    }
-  }
-
-  /**
-   * Wait until one published generation covers `targetSeq`.
-   *
-   * The returned lineage may name absent BM25/ANN families on an RDF-only
-   * deployment; `metadata.index_caught_up` is the generation-level readiness
-   * signal used by bulk loaders.
-   *
-   * @deprecated Use {@link waitForPublished}; publication is fully server-managed.
-   */
-  async waitForIndexLineage(
-    targetSeq: number,
-    opts: { timeoutMs?: number; pollIntervalMs?: number } = {},
-  ): Promise<IndexLineageObservation> {
-    const deadline = Date.now() + (opts.timeoutMs ?? 30_000);
-    let last: RawLbbResponse<Schemas["GraphMetadataResponse"]> | undefined;
-    while (true) {
-      try {
-        // This method is already an explicit, deadline-bounded poller. Avoid
-        // nesting the generic request retry count inside it: publication may
-        // legitimately take longer than that secondary cap.
-        last = await this.rawRequest("GET", "/v1/graph/metadata", {
-          maxRetries: 0,
-        });
-      } catch (error) {
-        const retryableHttpError =
-          error instanceof LbbError &&
-          retryableStatus(error.status) &&
-          error.retryable !== false;
-        const retryableTransportError =
-          error instanceof Error && !(error instanceof LbbError);
-        if (!retryableHttpError && !retryableTransportError) throw error;
-        const now = Date.now();
-        if (now >= deadline) {
-          throw new Error(
-            `index lineage did not reach ${targetSeq} before timeout (last_error=${error.message})`,
-            { cause: error },
-          );
-        }
-        const retryAfterMs =
-          error instanceof LbbError
-            ? (error.retryAfterSeconds ?? 0) * 1_000
-            : 0;
-        await sleep(
-          Math.min(
-            Math.max(opts.pollIntervalMs ?? 250, retryAfterMs),
-            deadline - now,
-          ),
-        );
-        continue;
-      }
-      const lineage = last.data.index_lineage;
-      const servedAt = last.data.snapshot.served_at_seq;
-      if (
-        lineage != null &&
-        servedAt != null &&
-        servedAt >= targetSeq &&
-        (last.data.index_caught_up === true ||
-          (lineage.bm25_indexed_commit_seq != null &&
-            lineage.bm25_indexed_commit_seq >= targetSeq &&
-            lineage.ann_indexed_commit_seq != null &&
-            lineage.ann_indexed_commit_seq >= targetSeq))
-      ) {
-        return {
-          metadata: last.data,
-          lineage,
-          buildCommit: last.headers?.get("lbb-build-commit") ?? undefined,
-          replica: last.headers?.get("lbb-replica") ?? undefined,
-          requestId: last.requestId,
-          attempts: last.attempts,
-          elapsedMs: last.elapsedMs,
-        };
-      }
-      if (Date.now() >= deadline) {
-        const build = last.headers?.get("lbb-build-commit") ?? "unknown";
-        const replica = last.headers?.get("lbb-replica") ?? "unknown";
-        throw new Error(
-          `index lineage did not reach ${targetSeq} before timeout (build=${build}, replica=${replica}, last=${JSON.stringify(last.data.index_lineage)})`,
-        );
-      }
-      await sleep(opts.pollIntervalMs ?? 250);
     }
   }
 

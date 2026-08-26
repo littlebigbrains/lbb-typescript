@@ -4372,7 +4372,7 @@ export interface components {
          * @description Server-managed publication lifecycle for one graph epoch.
          * @enum {string}
          */
-        PublicationState: "current" | "queued" | "planning" | "building" | "verifying" | "publishing" | "blocked";
+        PublicationState: "current" | "queued" | "compacting" | "building" | "publishing" | "blocked";
         /**
          * @description One bounded status document for automatic exact-generation publication.
          *     It is available before the first generation publishes, unlike
