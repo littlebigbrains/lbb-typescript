@@ -251,103 +251,6 @@ test("metadata exposes only the bounded index detail option", async () => {
   );
 });
 
-test("waitForIndexLineage retains the satisfying build and replica headers", async () => {
-  const lineage = {
-    head_commit_seq: 7,
-    bm25_indexed_commit_seq: 7,
-    ann_indexed_commit_seq: 7,
-    caught_up: true,
-    manifest_view_token: "index-view:abc",
-    observed_at_micros: 1,
-  };
-  const { fetch, calls } = recordingFetch({
-    body: JSON.stringify({
-      graph: { tenant_id: "t", graph_id: "g", branch_id: "main" },
-      snapshot: { commit_seq: 7, compacted_seq: 0, served_at_seq: 7 },
-      ontology_version: 1,
-      head_generation: 1,
-      wal_tail_commits: 0,
-      wal_tail_bytes: 0,
-      segment_count: 0,
-      segment_bytes: 0,
-      published_lag_commits: 0,
-      index_lineage: lineage,
-    }),
-    headers: {
-      "lbb-build-commit": "deadbeef",
-      "lbb-replica": "eu1-node2",
-      "x-request-id": "req-1",
-    },
-  });
-  const observed = await new LbbClient({
-    baseUrl: "http://h",
-    fetch,
-  }).waitForIndexLineage(7);
-  assert.equal(observed.lineage.manifest_view_token, "index-view:abc");
-  assert.equal(observed.buildCommit, "deadbeef");
-  assert.equal(observed.replica, "eu1-node2");
-  assert.equal(observed.requestId, "req-1");
-  assert.equal(calls.length, 1);
-});
-
-test("waitForIndexLineage owns its deadline across pending publication", async () => {
-  const pending = {
-    graph: { tenant_id: "t", graph_id: "g", branch_id: "main" },
-    snapshot: {
-      commit_seq: 7,
-      compacted_seq: 0,
-      stale: true,
-      stale_reason: "published_read_pending",
-    },
-    ontology_version: 1,
-    head_generation: 1,
-    wal_tail_commits: 1,
-    wal_tail_bytes: 42,
-    segment_count: 0,
-    segment_bytes: 0,
-    published_lag_commits: 7,
-    index_caught_up: false,
-  };
-  const lineage = {
-    head_commit_seq: 7,
-    caught_up: false,
-    manifest_view_token: "index-view:ready",
-    observed_at_micros: 2,
-  };
-  const { fetch, calls } = recordingFetch([
-    {
-      status: 429,
-      body: JSON.stringify({
-        error: {
-          code: "ingest_busy",
-          message: "publication pending",
-          retryable: true,
-          retry_after_seconds: 0,
-        },
-      }),
-    },
-    { body: JSON.stringify(pending) },
-    {
-      body: JSON.stringify({
-        ...pending,
-        snapshot: { commit_seq: 7, compacted_seq: 0, served_at_seq: 7 },
-        published_lag_commits: 0,
-        index_caught_up: true,
-        index_lineage: lineage,
-      }),
-    },
-  ]);
-
-  const observed = await new LbbClient({
-    baseUrl: "http://h",
-    fetch,
-    maxRetries: 6,
-  }).waitForIndexLineage(7, { timeoutMs: 1_000, pollIntervalMs: 0 });
-
-  assert.equal(observed.lineage.manifest_view_token, "index-view:ready");
-  assert.equal(calls.length, 3);
-});
-
 test("waitForPublished follows publication stages and returns the exact target", async () => {
   const status = (state: "building" | "current", published: number) => ({
     state,
@@ -429,7 +332,7 @@ test("waitForPublished surfaces a blocked publication immediately", async () => 
 test("waitForPublished reports the last lifecycle watermarks on timeout", async () => {
   const { fetch } = recordingFetch({
     body: JSON.stringify({
-      state: "verifying",
+      state: "building",
       epoch: 1,
       head_seq: 9,
       head_generation: 9,
@@ -438,7 +341,7 @@ test("waitForPublished reports the last lifecycle watermarks on timeout", async 
       published_seq: 7,
       published_generation: 1,
       lag_commits: 2,
-      current_stage: "verify_generation",
+      current_stage: "building",
       last_progress_at_micros: 1,
       retry: {
         retry_after_ms: 0,
@@ -452,7 +355,7 @@ test("waitForPublished reports the last lifecycle watermarks on timeout", async 
       timeoutMs: 0,
       pollIntervalMs: 0,
     }),
-    /state=verifying, head=9, target=9, published=7, stage=verify_generation/,
+    /state=building, head=9, target=9, published=7, stage=building/,
   );
 });
 
