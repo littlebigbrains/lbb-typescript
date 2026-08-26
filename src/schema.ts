@@ -6092,6 +6092,7 @@ export interface components {
          *     RDF graph, not a results table).
          */
         SparqlTextRequest: {
+            as_of_commit_seq?: null | components["schemas"]["CommitSeq"];
             /**
              * @description Entailment regime. `None` (default) matches asserted triples only.
              *     `Rdfs` applies the practical RDFS core at query time, `Subclass` the
