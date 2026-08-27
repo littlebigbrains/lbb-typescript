@@ -450,6 +450,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/graph/schema-summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Compact observed RDF schema attached to the immutable F3 base */
+        get: operations["get_v1_graph_schema_summary"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/graph/summary": {
         parameters: {
             query?: never;
@@ -816,7 +833,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Read the durable ontology-conformance report referenced by the published snapshot, including its validation watermark and ontology/shapes provenance */
+        /** Read the immutable branch-owned ontology-conformance sidecar selected by the F3 checksum and schema identity */
         get: operations["get_v1_ontology_conformance"];
         put?: never;
         post?: never;
@@ -4525,6 +4542,46 @@ export interface components {
              *     a raw region.
              */
             rerank_raw_bytes_fetched?: number;
+        };
+        /**
+         * @description The RDF node kind of a bounded observed-schema statement object.
+         * @enum {string}
+         */
+        RdfSchemaObjectKind: "iri" | "blank_node" | "literal";
+        /** @description One OWL/RDFS vocabulary or annotation statement retained for schema UIs. */
+        RdfSchemaStatement: {
+            object: string;
+            object_kind: components["schemas"]["RdfSchemaObjectKind"];
+            predicate: string;
+            subject: string;
+        };
+        /**
+         * @description Compact, immutable observed-schema artifact attached to one exact F3 base.
+         *
+         *     This is the overview/read-model surface for Explorer and Ontology. It is
+         *     produced by maintenance while publishing F3 and is therefore cheap to read:
+         *     no request-time graph scan or base-plus-delta assembly is required.
+         */
+        RdfSchemaSummaryResponse: {
+            /** Format: int64 */
+            ontology_version: number;
+            resource_predicate_counts: components["schemas"]["RdfSchemaTermCount"][];
+            snapshot: components["schemas"]["SnapshotView"];
+            statements: components["schemas"]["RdfSchemaStatement"][];
+            truncated: boolean;
+            type_counts: components["schemas"]["RdfSchemaTermCount"][];
+        };
+        /**
+         * @description One exact RDF term count in the compact observed-schema summary.
+         *
+         *     `term` is the complete IRI rather than a display-local name. This keeps
+         *     foreign vocabularies unambiguous; clients may choose their own prefix or
+         *     local-name presentation.
+         */
+        RdfSchemaTermCount: {
+            /** Format: int64 */
+            count: number;
+            term: string;
         };
         /**
          * @description A page-region provenance anchor on a fact's evidence (region provenance
@@ -10134,7 +10191,7 @@ export interface operations {
                 blank_node_scope?: string;
                 /** @description Entity type name for imported RDF resources (default Resource) */
                 resource_type?: string;
-                /** @description Set false on intermediate chunks to suppress the publication enqueue. Each request still atomically commits a compacted truth segment and exact per-commit F3 delta; graph reconstruction, SHACL, and complete F3 construction run off-path. Omit build=false on the final chunk to advance one coalesced publication fence. Default true. */
+                /** @description Set false on intermediate chunks to defer eager publication. Each request still atomically commits a compacted truth segment and exact per-commit F3 delta; graph reconstruction, SHACL, and complete F3 construction run off-path. The server advances one coalesced safety fence when the deferred delta tail reaches 8 entries or 32 MiB, so a large stream cannot wedge itself. Omit build=false on the final chunk to advance the final fence. Default true. */
                 build?: string;
             };
             header?: {
@@ -10855,6 +10912,142 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["GraphRetractResponse"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Rate limit exceeded */
+            429: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Service unavailable */
+            503: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+        };
+    };
+    get_v1_graph_schema_summary: {
+        parameters: {
+            query?: {
+                /** @description Graph name (default `main`) */
+                graph?: string;
+                /** @description Branch name (default `main`) */
+                branch?: string;
+            };
+            header?: {
+                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                "Lbb-Version"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RdfSchemaSummaryResponse"];
                 };
             };
             /** @description Bad request */
@@ -14190,7 +14383,7 @@ export interface operations {
                 graph?: string;
                 /** @description Branch name (default `main`) */
                 branch?: string;
-                /** @description eventual (default) serves the referenced durable report; strong requires validation at current head with current ontology/shapes */
+                /** @description eventual (default) serves the selected base sidecar; strong requires an exact-head sidecar with current ontology/shapes */
                 consistency?: string;
                 /** @description Maximum returned result rows; result_count remains exact */
                 limit?: string;
