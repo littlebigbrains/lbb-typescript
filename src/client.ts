@@ -1353,7 +1353,7 @@ export class LbbClient {
     });
   }
 
-  /** SPARQL 1.1 query from text (SELECT/ASK) over the live graph; `results` is SPARQL 1.1 Query Results JSON. The text dialect carries `consistency`/`min_indexed_seq` on the URL. */
+  /** SPARQL 1.1 query from text (SELECT/ASK) over the live graph; `results` is SPARQL 1.1 Query Results JSON. The text dialect carries `consistency`/`min_indexed_seq` on the URL; a floor with no explicit consistency implies a strong base-plus-delta read. */
   sparqlText(
     body: Schemas["SparqlTextRequest"],
     opts?: ReadConsistencyOptions,
