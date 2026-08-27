@@ -65,11 +65,10 @@ export interface RdfImportOptions {
   resourceType?: string;
   edgeIdempotency?: "append" | "skip_unchanged";
   /**
-   * Set `false` to defer eager RDF-base reconciliation. Send `build: false` on
-   * every chunk except the last of a chunked bulk stream. The server may still
-   * coalesce a safety reconciliation when the bounded exact-query suffix
-   * reaches its soft watermark, so the stream remains writable. Defaults to
-   * `true`.
+   * Set `false` on intermediate chunks to suppress the publication enqueue.
+   * Every request still commits durable truth and an exact per-commit F3 delta;
+   * omit `build: false` on the last chunk to advance one final coalesced fence.
+   * Defaults to `true`.
    */
   build?: boolean;
   idempotencyKey?: string;
