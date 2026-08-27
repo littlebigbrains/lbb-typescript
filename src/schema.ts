@@ -835,7 +835,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Import a custom ontology and create the scoped graph head with it; fails if the graph already exists */
+        /** Define or additively evolve a graph ontology, or preview the exact result without mutation */
         post: operations["post_v1_ontology_define"];
         delete?: never;
         options?: never;
@@ -3776,6 +3776,12 @@ export interface components {
          *     difference is refused with a typed error naming the route that applies it.
          */
         OntologyDefineRequest: {
+            /**
+             * @description Preview the exact definition without creating a graph, writing an
+             *     ontology object, or changing the graph head. Equivalent to the
+             *     `?dry_run=true` query parameter; either signal enables preview mode.
+             */
+            dry_run?: boolean;
             /** @description Import format hint. `auto` (the default) sniffs the content. */
             format?: string | null;
             /**
@@ -3791,29 +3797,28 @@ export interface components {
         };
         OntologyDefineResponse: {
             /**
-             * @description True when this call wrote a new ontology version, either by creating the
-             *     graph or by applying an additive difference. False when the proposed
-             *     ontology already matched the active one, which is what makes re-running
-             *     the same bootstrap request a no-op.
+             * @description True when this call wrote a new ontology version, or when a dry run
+             *     predicts that it would. False when the proposed ontology already matched
+             *     the active one, which is what makes re-running the same bootstrap request
+             *     a no-op.
              *
-             *     This tracks what was written, so it never reports `false` for a call
-             *     that changed the ontology: a widened relation domain or range and a new
-             *     property field both set it, even though neither appears in the
-             *     class-and-relation schema diff.
+             *     A widened relation domain or range and a new property field both set it,
+             *     even though neither appears in the class-and-relation schema diff.
              */
             changed?: boolean;
             /**
-             * @description The additive changes this call applied to an existing graph's ontology.
-             *     Empty when the graph was created and when nothing changed.
+             * @description The additive changes this call applied, or would apply during a dry run,
+             *     to an existing graph's ontology. Empty on create and no-op.
              */
             changes?: components["schemas"]["SchemaDiffEntry"][];
+            /** @description True when this response is a preview and no durable state changed. */
+            dry_run?: boolean;
             entity_types: components["schemas"]["OntologyTermView"][];
             format: string;
             graph: components["schemas"]["GraphKey"];
             /**
-             * @description True when this call created the graph head. False when the graph already
-             *     existed, whether the ontology then changed or not. This is the `created`
-             *     signal for the define route.
+             * @description True when this call created the graph head, or when a dry run predicts
+             *     that the real definition would create it.
              */
             graph_created: boolean;
             merged_default: boolean;
@@ -14325,6 +14330,8 @@ export interface operations {
                 graph?: string;
                 /** @description Branch name (default `main`) */
                 branch?: string;
+                /** @description Validate and return the exact predicted definition without creating a graph, writing an ontology object, or changing the graph head */
+                dry_run?: string;
             };
             header?: {
                 /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
