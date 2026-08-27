@@ -785,7 +785,7 @@ export class LbbClient {
     });
   }
 
-  /** Import several RDF documents with a final fence and server-managed safety compaction. */
+  /** Import several RDF documents as truth-only chunks, then advance one final publication fence. */
   async importRdfMany(
     documents: readonly RdfImportDocument[],
     opts: RdfImportOptions = {},

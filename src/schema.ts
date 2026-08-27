@@ -10129,7 +10129,7 @@ export interface operations {
                 blank_node_scope?: string;
                 /** @description Entity type name for imported RDF resources (default Resource) */
                 resource_type?: string;
-                /** @description Set false to defer eager RDF-base reconciliation during a chunked bulk stream. The server still starts one coalesced safety reconciliation when the bounded exact-query delta suffix crosses its soft watermark, so long streams remain writable without client-managed compaction. Send build=false on every chunk except the last. Default true. */
+                /** @description Set false on intermediate chunks to suppress the publication enqueue. Each request still atomically commits a compacted truth segment and exact per-commit F3 delta; graph reconstruction, SHACL, and complete F3 construction run off-path. Omit build=false on the final chunk to advance one coalesced publication fence. Default true. */
                 build?: string;
             };
             header?: {
