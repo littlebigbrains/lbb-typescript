@@ -1360,8 +1360,25 @@ export interface components {
             /** @description Whether the relation is transitive (default false). */
             transitive?: boolean;
         };
+        /**
+         * @description Add direct parent classes to an existing entity type. All named classes
+         *     must already exist, or be declared earlier in the same request with
+         *     `add_entity_type`. Existing links are skipped, so the op is idempotent.
+         *     Removing a parent is not additive and requires an explicit migration.
+         */
+        AddSuperTypesOp: {
+            /** @description Entity type whose direct parents should grow. */
+            entity_type: string;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            op: "add_super_types";
+            /** @description Direct parent entity-type names to add. */
+            super_types: string[];
+        };
         /** @description Governed proposal operation restricted to additive ontology changes. */
-        AdditiveOntologyEvolveOp: components["schemas"]["WidenRelationOp"] | components["schemas"]["AddEntityTypeOp"] | components["schemas"]["AddRelationOp"] | components["schemas"]["AddPropertyOp"];
+        AdditiveOntologyEvolveOp: components["schemas"]["WidenRelationOp"] | components["schemas"]["AddEntityTypeOp"] | components["schemas"]["AddSuperTypesOp"] | components["schemas"]["AddRelationOp"];
         /** @description Additive-only ontology proposal helper for structured-output systems. */
         AdditiveOntologyEvolveRequest: {
             ops: components["schemas"]["AdditiveOntologyEvolveOp"][];
@@ -3880,6 +3897,8 @@ export interface components {
         OntologyDraftStatus: "draft" | "validated" | "promoted" | "rejected";
         /** @description The full definition of one entity type (class) in the active ontology. */
         OntologyEntityTypeView: {
+            /** @description Canonical query IRI minted by Little Big Brain for this class identity. */
+            iri?: string;
             name: string;
             properties: components["schemas"]["OntologyPropertyView"][];
             /** Format: int64 */
@@ -3888,6 +3907,17 @@ export interface components {
             resolvable: boolean;
             /** Format: int64 */
             since_version: number;
+            /**
+             * @description Frozen class identity used by commits and the RDF projection. This is
+             *     unique even when imported vocabularies reuse the same local name.
+             */
+            stable_id?: string;
+            /**
+             * @description Direct parent classes (`rdfs:subClassOf`), named by their frozen
+             *     `stable_id`s. Clients can build the full class lattice without a SPARQL
+             *     scan or a second ontology lookup.
+             */
+            super_types?: string[];
         };
         OntologyEvidenceSample: {
             /** @description Stable connector/source reference; sample content is never used as identity. */
@@ -3906,7 +3936,7 @@ export interface components {
          *     the supported "ontology evolution" path; identity-breaking changes (removals,
          *     narrowing) still require an explicit expand→migrate→contract plan.
          */
-        OntologyEvolveOp: components["schemas"]["WidenRelationOp"] | components["schemas"]["AddEntityTypeOp"] | components["schemas"]["AddRelationOp"] | components["schemas"]["AddPropertyOp"] | components["schemas"]["SetPropertyConstraintOp"] | components["schemas"]["RenameEntityTypeOp"] | components["schemas"]["RenameRelationOp"] | components["schemas"]["SetRelationInverseOp"] | components["schemas"]["SetRelationCardinalityOp"] | components["schemas"]["NarrowRelationOp"] | components["schemas"]["RemoveEntityTypeOp"] | components["schemas"]["RemoveRelationOp"];
+        OntologyEvolveOp: components["schemas"]["WidenRelationOp"] | components["schemas"]["AddEntityTypeOp"] | components["schemas"]["AddSuperTypesOp"] | components["schemas"]["AddRelationOp"] | components["schemas"]["AddPropertyOp"] | components["schemas"]["SetPropertyConstraintOp"] | components["schemas"]["RenameEntityTypeOp"] | components["schemas"]["RenameRelationOp"] | components["schemas"]["SetRelationInverseOp"] | components["schemas"]["SetRelationCardinalityOp"] | components["schemas"]["NarrowRelationOp"] | components["schemas"]["RemoveEntityTypeOp"] | components["schemas"]["RemoveRelationOp"];
         /**
          * @description Apply a list of additive ontology changes in order, writing a new ontology
          *     version when anything actually changes. Ops are applied against the
@@ -4907,6 +4937,8 @@ export interface components {
         /** @enum {string} */
         SchemaChangeKind: "additive" | "restrictive" | "identity_breaking";
         SchemaClassView: {
+            /** @description Canonical query IRI minted by Little Big Brain for this class identity. */
+            iri?: string;
             name: string;
             property_count: number;
             /** Format: int64 */
@@ -4914,6 +4946,8 @@ export interface components {
             /** Format: int64 */
             since_version: number;
             stable_id: string;
+            /** @description Direct parent classes (`rdfs:subClassOf`), named by `stable_id`. */
+            super_types?: string[];
         };
         /** @enum {string} */
         SchemaCompatibilityVerdict: "compatible" | "restrictive" | "migration_required";
