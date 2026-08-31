@@ -4593,6 +4593,12 @@ export interface components {
          *     no request-time graph scan or base-plus-delta assembly is required.
          */
         RdfSchemaSummaryResponse: {
+            /**
+             * @description Per-predicate totals of literal-valued statements, the data-property
+             *     sibling of `resource_predicate_counts`. `None` when the stored summary
+             *     artifact predates this field; the next full summary rebuild fills it.
+             */
+            literal_predicate_counts?: components["schemas"]["RdfSchemaTermCount"][] | null;
             /** Format: int64 */
             ontology_version: number;
             resource_predicate_counts: components["schemas"]["RdfSchemaTermCount"][];
