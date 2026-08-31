@@ -1553,6 +1553,17 @@ export class LbbClient {
     return this.request("GET", "/v1/graph/read-snapshot");
   }
 
+  /**
+   * Compact observed RDF schema attached to the immutable published base:
+   * class populations, resource- and literal-valued predicate counts, and
+   * bounded OWL/RDFS statements. `literal_predicate_counts` is `null` when
+   * the stored summary artifact predates the field; the next full summary
+   * rebuild fills it.
+   */
+  schemaSummary(): Promise<Schemas["RdfSchemaSummaryResponse"]> {
+    return this.request("GET", "/v1/graph/schema-summary");
+  }
+
   /** List the graphs (and branches) under the scoped tenant. */
   listGraphs(): Promise<Schemas["GraphListResponse"]> {
     return this.request("GET", "/v1/graphs");
