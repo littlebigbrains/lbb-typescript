@@ -260,11 +260,9 @@ export class EntityNamespace {
     return this.client.entityMetadata(opts);
   }
 
-  detail(opts: {
-    id?: string;
-    type?: string;
-    name?: string;
-  }): Promise<Schemas["EntityDetailResponse"]> {
+  detail(
+    opts: Parameters<LbbClient["entityDetail"]>[0],
+  ): Promise<Schemas["EntityDetailResponse"]> {
     return this.client.entityDetail(opts);
   }
 

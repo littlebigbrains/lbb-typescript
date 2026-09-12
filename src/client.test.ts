@@ -819,6 +819,10 @@ test("entities namespace encodes detail lookups", async () => {
   const detail = await client.entities.detail({
     type: "SERVICE",
     name: "billing-api",
+    key: "service/billing",
+    consistency: "strong",
+    edges: 20,
+    asOfCommitSeq: 3,
   });
 
   const input = calls[0].input;
@@ -827,6 +831,10 @@ test("entities namespace encodes detail lookups", async () => {
   assert.match(input, /branch=b/);
   assert.match(input, /type=SERVICE/);
   assert.match(input, /name=billing-api/);
+  assert.match(input, /key=service%2Fbilling/);
+  assert.match(input, /consistency=strong/);
+  assert.match(input, /edges=20/);
+  assert.match(input, /as_of_commit_seq=3/);
   assert.equal(detail.attributes?.status, "synced");
 });
 
