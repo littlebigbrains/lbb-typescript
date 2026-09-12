@@ -233,7 +233,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Entity detail */
+        /** Native entity attributes and relationships from the branch-owned RDF view; unavailable provenance sections are explicitly listed */
         get: operations["get_v1_graph_entity"];
         put?: never;
         post?: never;
@@ -1974,12 +1974,9 @@ export interface components {
         };
         EntityDetailResponse: {
             /**
-             * @description The entity's typed scalar properties as native JSON — the flat read-back
-             *     of what a commit's `entity_properties` wrote, so round-trip verification
-             *     is a one-hop lookup. A numeric property reads back as a JSON number, a
-             *     bool as a bool, a datetime as an RFC3339 string; empty when the entity
-             *     carries no scalar attributes. The `/entities` list returns the same
-             *     `attributes` shape under `?fields=`.
+             * @description The entity's RDF-projected properties as typed JSON: numbers, booleans,
+             *     RFC3339 datetime strings, strings and sets. Nulls, bytes, vectors,
+             *     non-finite numbers and empty sets have no RDF projection and are omitted.
              */
             attributes?: {
                 [key: string]: unknown;
@@ -1991,8 +1988,14 @@ export interface components {
             metadata: components["schemas"]["EntityMetadataResponse"];
             observations: components["schemas"]["ObservationRow"][];
             outgoing: components["schemas"]["GraphEdgeRow"][];
+            rdf_relations?: null | components["schemas"]["EntityRdfRelations"];
             snapshot: components["schemas"]["SnapshotView"];
             truncation?: null | components["schemas"]["EntityDetailTruncation"];
+            /**
+             * @description Legacy sections unavailable in this read model. An empty listed section
+             *     means unavailable, not that the entity has no history or relationships.
+             */
+            unavailable_sections?: string[];
         };
         /**
          * @description Which of an entity read's degree-proportional collections were cut, and by
@@ -2198,6 +2201,12 @@ export interface components {
              */
             remove_fields?: string[];
             type: string;
+        };
+        EntityRdfRelations: {
+            incoming: components["schemas"]["RdfEntityRelation"][];
+            incoming_truncation?: null | components["schemas"]["TruncatedCollection"];
+            outgoing: components["schemas"]["RdfEntityRelation"][];
+            outgoing_truncation?: null | components["schemas"]["TruncatedCollection"];
         };
         EntitySelector: {
             entity_id?: null | components["schemas"]["EntityId"];
@@ -3295,7 +3304,7 @@ export interface components {
             valid_time: components["schemas"]["ValidTime"];
         };
         /** @enum {string} */
-        HistoryObjectKind: "wal" | "segment" | "pending";
+        HistoryObjectKind: "wal" | "segment" | "unavailable" | "pending";
         HybridMultiSearchExplain: {
             fused_candidates: number;
             rrf_k: string;
@@ -4572,6 +4581,10 @@ export interface components {
              *     a raw region.
              */
             rerank_raw_bytes_fetched?: number;
+        };
+        RdfEntityRelation: {
+            entity: components["schemas"]["EntityView"];
+            relation: components["schemas"]["RelationView"];
         };
         /**
          * @description The RDF node kind of a bounded observed-schema statement object.
@@ -8779,6 +8792,14 @@ export interface operations {
                 type?: string;
                 /** @description Entity canonical name for name-addressed lookup */
                 name?: string;
+                /** @description External entity key; takes precedence over name */
+                key?: string;
+                /** @description strong or eventual (default); strong includes the exact durable delta suffix */
+                consistency?: string;
+                /** @description Retained commit sequence; valid-time as_of is unsupported */
+                as_of_commit_seq?: string;
+                /** @description Maximum RDF relationships per direction (default 1000, ceiling 10000) */
+                edges?: string;
             };
             header?: {
                 /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */

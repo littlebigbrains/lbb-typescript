@@ -1266,14 +1266,18 @@ export class LbbClient {
   }
 
   /**
-   * Entity detail: metadata, attributes, current state, edge history, and
-   * observations. Pass `asOf` / `asOfCommitSeq` to reproduce the node as of a
-   * past instant / commit (the state, edges, and history are pinned to it).
+   * Read projected attributes and current relationships from one RDF snapshot.
+   * Inspect `unavailable_sections` before interpreting legacy provenance arrays.
+   * Use strong consistency for read-after-write, or a retained commit sequence.
    */
   entityDetail(opts: {
     id?: string;
     type?: string;
     name?: string;
+    key?: string;
+    consistency?: "strong" | "eventual";
+    edges?: number;
+    /** @deprecated Valid-time reads are unsupported; use asOfCommitSeq. */
     asOf?: string;
     asOfCommitSeq?: number;
   }): Promise<Schemas["EntityDetailResponse"]> {
@@ -1282,6 +1286,9 @@ export class LbbClient {
         id: opts.id,
         type: opts.type,
         name: opts.name,
+        key: opts.key,
+        consistency: opts.consistency,
+        edges: opts.edges,
         as_of: opts.asOf,
         as_of_commit_seq: opts.asOfCommitSeq,
       },
