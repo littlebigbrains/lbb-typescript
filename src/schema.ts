@@ -6082,6 +6082,7 @@ export interface components {
              *     the query into grouped/aggregated mode.
              */
             aggregates?: components["schemas"]["SparqlAggregate"][];
+            as_of_commit_seq?: null | components["schemas"]["CommitSeq"];
             /**
              * @description `ASK` form: return only `boolean` (whether the pattern has any solution).
              *     Projection, DISTINCT, and limit/offset are ignored.
