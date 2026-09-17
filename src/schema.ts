@@ -4993,6 +4993,7 @@ export interface components {
             ontology_version: number;
             /** Format: int64 */
             shapes_version?: number | null;
+            write_enforcement?: null | components["schemas"]["SchemaWriteEnforcement"];
         };
         SchemaRelationView: {
             dst_types: string[];
@@ -5003,6 +5004,12 @@ export interface components {
             since_version: number;
             src_types: string[];
             stable_id: string;
+        };
+        SchemaShapeWriteEnforcement: {
+            blockers?: components["schemas"]["SchemaWriteEnforcementBlocker"][];
+            /** @description An active root shape: one that selects focus nodes. */
+            shape: string;
+            write_enforceable: boolean;
         };
         SchemaSource: {
             /**
@@ -5015,6 +5022,36 @@ export interface components {
             /** @description RDF or ontology document text. */
             source: string;
         };
+        /** @description How the published shape set is enforced on this branch. */
+        SchemaWriteEnforcement: {
+            shapes: components["schemas"]["SchemaShapeWriteEnforcement"][];
+            timing: components["schemas"]["SchemaWriteEnforcementTiming"];
+            /**
+             * @description True when no root shape has a blocker. An RDF-native branch accepts
+             *     `reject` mode only for such a shape set.
+             */
+            write_enforceable: boolean;
+        };
+        /**
+         * @description A constraint with no bounded affected set: the engine cannot tell which
+         *     focus nodes a write changes its verdict for.
+         */
+        SchemaWriteEnforcementBlocker: {
+            /**
+             * @description The SHACL parameter: `sh:sparql`, or the shape reference that closes a
+             *     cycle (`sh:node`, `sh:property`, `sh:or`, ...).
+             */
+            constraint: string;
+            /** @description `sparql_constraint` or `recursive_shape`. */
+            reason: string;
+            /** @description The shape that carries the constraint. */
+            shape: string;
+        };
+        /**
+         * @description When the engine checks the published shapes against a write.
+         * @enum {string}
+         */
+        SchemaWriteEnforcementTiming: "write_time" | "write_time_full_scan" | "after_publication";
         /**
          * @description One scored retrieval candidate on the wire: which entity matched and its raw
          *     (pre-calibration) score from whatever channel produced it. The entity is
