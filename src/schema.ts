@@ -1142,7 +1142,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Atomically activate a SHACL shapes bundle and enqueue durable conformance validation */
+        /** Atomically activate a SHACL shapes bundle, or preview compatibility without writes or validation jobs */
         post: operations["post_v1_schema_publish"];
         delete?: never;
         options?: never;
@@ -17168,6 +17168,8 @@ export interface operations {
                 graph?: string;
                 /** @description Branch name (default `main`) */
                 branch?: string;
+                /** @description Parse and check compatibility without activation; returns activated=false and predicted schema versions. Does not run whole-graph conformance */
+                dry_run?: string;
             };
             header?: {
                 /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
