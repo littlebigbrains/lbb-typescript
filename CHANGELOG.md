@@ -2,6 +2,14 @@
 
 All notable changes to the `@littlebigbrain/client` package are documented here.
 
+## 0.13.1 (2026-09-18)
+
+- Expose non-mutating schema publication and ontology evolution previews
+  through `schema.publish(..., { dryRun: true })` and
+  `ontology.evolve(..., { dryRun: true })`.
+- Refresh generated schema contracts with publication preview and SHACL write
+  enforcement results.
+
 ## 0.13.0 (2026-08-31)
 
 Additive release covering the schema-observability surface that landed since
