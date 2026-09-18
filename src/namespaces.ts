@@ -307,10 +307,11 @@ export class SchemaNamespace {
   /** Atomically publish a bundle; conformance is produced asynchronously. */
   publish(
     body: Schemas["SchemaPublishRequest"],
-    opts: CallOptions = {},
+    opts: CallOptions & { dryRun?: boolean } = {},
   ): Promise<Schemas["SchemaPublishResponse"]> {
     return this.client.request("POST", "/v1/schema/publish", {
       ...opts,
+      query: { dry_run: opts.dryRun },
       idempotencyKey:
         opts.idempotencyKey ?? this.client.idempotencyKey("schema-publish"),
       body,
@@ -381,10 +382,11 @@ export class OntologyNamespace {
 
   evolve(
     body: Schemas["OntologyEvolveRequest"],
-    opts: CallOptions = {},
+    opts: CallOptions & { dryRun?: boolean } = {},
   ): Promise<Schemas["OntologyEvolveResponse"]> {
     return this.client.request("POST", "/v1/ontology/evolve", {
       ...opts,
+      query: { dry_run: opts.dryRun },
       body,
     });
   }
