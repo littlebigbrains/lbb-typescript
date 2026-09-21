@@ -44,6 +44,7 @@ export class GraphNamespace {
   readonly query: QueryNamespace;
   readonly schema: SchemaNamespace;
   readonly search: SearchNamespace;
+  readonly evals: EvalsNamespace;
 
   constructor(private readonly client: LbbClient) {
     this.facts = new FactsNamespace(client);
@@ -52,6 +53,7 @@ export class GraphNamespace {
     this.query = client.query;
     this.schema = client.schema;
     this.search = client.search;
+    this.evals = client.evals;
   }
 
   branch(name: string): GraphNamespace {
@@ -292,6 +294,116 @@ export class EntityNamespace {
       max_object_reads: opts.maxObjectReads,
       max_fetched_bytes: opts.maxFetchedBytes,
     });
+  }
+}
+
+/** Managed evals: traces, labels (thumbs up or down), goldens, and runs. */
+export class EvalsNamespace {
+  constructor(private readonly client: LbbClient) {}
+
+  /** Settings, golden counts, unlabeled traces, the latest run, and the score by commit. */
+  summary(opts: CallOptions = {}): Promise<Schemas["EvalSummaryResponse"]> {
+    return this.client.request("GET", "/v1/evals", opts);
+  }
+
+  /** Recent traces, newest first. */
+  traces(
+    options: { limit?: number; unlabeled?: boolean } & CallOptions = {},
+  ): Promise<Schemas["EvalTraceListResponse"]> {
+    const { limit, unlabeled, ...opts } = options;
+    return this.client.request("GET", "/v1/evals/traces", {
+      ...opts,
+      query: { limit, unlabeled: unlabeled ? "true" : undefined },
+    });
+  }
+
+  /** Label a trace valid (thumbs up) or not (thumbs down). A valid label
+   * promotes the trace to a golden. */
+  label(
+    traceId: string,
+    body: Schemas["EvalLabelRequest"],
+    opts: CallOptions = {},
+  ): Promise<Schemas["EvalLabelResponse"]> {
+    return this.client.request("POST", "/v1/evals/label", {
+      ...opts,
+      query: { trace: traceId },
+      body,
+    });
+  }
+
+  /** Let the managed judge label one trace, or a batch of unlabeled traces. */
+  judge(
+    options: { traceId?: string; limit?: number } & CallOptions = {},
+  ): Promise<Schemas["EvalJudgeResponse"]> {
+    const { traceId, limit, ...opts } = options;
+    return this.client.request("POST", "/v1/evals/judge", {
+      ...opts,
+      query: { trace: traceId, limit },
+    });
+  }
+
+  goldens(opts: CallOptions = {}): Promise<Schemas["GoldenSuite"]> {
+    return this.client.request("GET", "/v1/evals/goldens", opts);
+  }
+
+  /** Freeze a query and the rows it returns now. */
+  createGolden(
+    body: Schemas["GoldenCreateRequest"],
+    opts: CallOptions = {},
+  ): Promise<Schemas["GoldenResponse"]> {
+    return this.client.request("POST", "/v1/evals/goldens", { ...opts, body });
+  }
+
+  /** Accept the rows a golden returns now as its new reference. */
+  acceptGolden(
+    id: string,
+    opts: CallOptions & Pick<ReadConsistencyOptions, "consistency"> = {},
+  ): Promise<Schemas["GoldenResponse"]> {
+    return this.client.request("POST", "/v1/evals/goldens/accept", {
+      ...opts,
+      query: { id, consistency: opts.consistency },
+    });
+  }
+
+  deleteGolden(
+    id: string,
+    opts: CallOptions = {},
+  ): Promise<Schemas["GoldenDeleteResponse"]> {
+    return this.client.request("DELETE", "/v1/evals/goldens", {
+      ...opts,
+      query: { id },
+    });
+  }
+
+  /** Replay every golden at the current commit. */
+  run(
+    opts: CallOptions & Pick<ReadConsistencyOptions, "consistency"> = {},
+  ): Promise<Schemas["EvalRunResponse"]> {
+    return this.client.request("POST", "/v1/evals/run", {
+      ...opts,
+      query: { consistency: opts.consistency },
+    });
+  }
+
+  results(
+    options: { limit?: number } & CallOptions = {},
+  ): Promise<Schemas["EvalResultsListResponse"]> {
+    const { limit, ...opts } = options;
+    return this.client.request("GET", "/v1/evals/results", {
+      ...opts,
+      query: { limit },
+    });
+  }
+
+  settings(opts: CallOptions = {}): Promise<Schemas["EvalSettings"]> {
+    return this.client.request("GET", "/v1/evals/settings", opts);
+  }
+
+  setSettings(
+    body: Schemas["EvalSettings"],
+    opts: CallOptions = {},
+  ): Promise<Schemas["EvalSettings"]> {
+    return this.client.request("PUT", "/v1/evals/settings", { ...opts, body });
   }
 }
 

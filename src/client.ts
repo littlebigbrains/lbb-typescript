@@ -40,6 +40,7 @@ import {
   QueryNamespace,
   SchemaNamespace,
   SearchNamespace,
+  EvalsNamespace,
 } from "./namespaces.js";
 
 export { parseSparqlResults } from "./types.js";
@@ -221,6 +222,7 @@ export class LbbClient {
   readonly schema: SchemaNamespace;
   readonly ontology: OntologyNamespace;
   readonly query: QueryNamespace;
+  readonly evals: EvalsNamespace;
 
   constructor(options: LbbClientOptions) {
     const baseUrl = options.baseUrl?.trim();
@@ -267,6 +269,7 @@ export class LbbClient {
     this.schema = new SchemaNamespace(this);
     this.ontology = new OntologyNamespace(this);
     this.query = new QueryNamespace(this);
+    this.evals = new EvalsNamespace(this);
   }
 
   graph(
