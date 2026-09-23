@@ -13,8 +13,9 @@ import {
   type Schemas,
 } from "./types.js";
 
-// SPARQL is the only query surface. The search, embedding, decode,
-// groundability, and analytics operations were removed with their routes.
+// SPARQL is the query language. Search by meaning is `embeddings.search`
+// (`POST /v1/search`); the older search, embedding, decode, groundability,
+// and analytics operations were removed with their routes.
 
 /** A5: fold read-consistency options into a request body's `consistency` /
  * `min_indexed_seq` fields; a per-call value wins over the client default. */
@@ -45,6 +46,7 @@ export class GraphNamespace {
   readonly schema: SchemaNamespace;
   readonly search: SearchNamespace;
   readonly evals: EvalsNamespace;
+  readonly embeddings: EmbeddingsNamespace;
 
   constructor(private readonly client: LbbClient) {
     this.facts = new FactsNamespace(client);
@@ -54,6 +56,7 @@ export class GraphNamespace {
     this.schema = client.schema;
     this.search = client.search;
     this.evals = client.evals;
+    this.embeddings = client.embeddings;
   }
 
   branch(name: string): GraphNamespace {
@@ -212,7 +215,7 @@ export class FactsNamespace {
 
 /**
  * Relevance-label storage. The query surfaces this namespace once fronted were
- * removed with their routes; SPARQL is the only query path now.
+ * removed with their routes; search by meaning is `embeddings.search`.
  */
 export class SearchNamespace {
   constructor(private readonly client: LbbClient) {}
@@ -297,6 +300,111 @@ export class EntityNamespace {
   }
 }
 
+/**
+ * Search: embeddings declared on classes of the graph. The platform keeps the
+ * vectors in step with the published graph; a search checks every hit against
+ * one graph snapshot.
+ */
+export class EmbeddingsNamespace {
+  constructor(private readonly client: LbbClient) {}
+
+  /** Every embedding of the branch with its status. */
+  list(opts: CallOptions = {}): Promise<Schemas["EmbeddingListResponse"]> {
+    return this.client.request("GET", "/v1/embeddings", opts);
+  }
+
+  /** One embedding: serving and building version, backfill, lag, recall. */
+  get(
+    name: string,
+    opts: CallOptions = {},
+  ): Promise<Schemas["EmbeddingStatus"]> {
+    return this.client.request("GET", "/v1/embeddings", {
+      ...opts,
+      query: { name },
+    });
+  }
+
+  /**
+   * Declare or change the embedding of a class. Without `from` the server
+   * picks the fields (the label, frequent text, the names of linked
+   * entities). A new recipe builds as a new version while the old one serves.
+   */
+  declare(
+    body: Schemas["EmbeddingDeclareRequest"],
+    opts: CallOptions = {},
+  ): Promise<Schemas["EmbeddingStatus"]> {
+    return this.client.request("PUT", "/v1/embeddings", { ...opts, body });
+  }
+
+  /**
+   * What a declaration would embed: the fields, every candidate fact of the
+   * class with its coverage and examples, and sample texts. Calls no model.
+   */
+  preview(
+    body: Schemas["EmbeddingPreviewRequest"],
+    opts: CallOptions = {},
+  ): Promise<Schemas["EmbeddingPreviewResponse"]> {
+    return this.client.request("POST", "/v1/embeddings/preview", {
+      ...opts,
+      body,
+    });
+  }
+
+  /**
+   * Move every embedding of the graph to another model (one model per
+   * graph). Each builds a new version; the graph switches at once when
+   * every embedding has it ready, so a search never mixes two models.
+   */
+  setModel(
+    body: Schemas["EmbeddingModelRequest"],
+    opts: CallOptions = {},
+  ): Promise<Schemas["EmbeddingListResponse"]> {
+    return this.client.request("PUT", "/v1/embeddings/model", {
+      ...opts,
+      body,
+    });
+  }
+
+  /** Run one bounded step of the embed job now. */
+  refresh(
+    name: string,
+    opts: CallOptions = {},
+  ): Promise<Schemas["EmbeddingRefreshResponse"]> {
+    return this.client.request("POST", "/v1/embeddings/refresh", {
+      ...opts,
+      query: { name },
+    });
+  }
+
+  /** Remove an embedding. */
+  delete(name: string, opts: CallOptions = {}): Promise<unknown> {
+    return this.client.request("DELETE", "/v1/embeddings", {
+      ...opts,
+      query: { name, confirm: name },
+    });
+  }
+
+  /**
+   * Search by meaning over every searchable class of the graph (or one
+   * `embedding`). `filter` lists the conditions every hit must meet:
+   * `{ class: iri }` (or a list; subclasses too) and
+   * `{ via: "calls", to: "payment-service", direction?: "in" }` (`to` an IRI
+   * or a name). Every hit carries its class and is checked against one
+   * graph snapshot; `include: ["text"]` returns the embedded text of each
+   * hit; `explain: true` plans without running.
+   */
+  search(
+    body: Schemas["SearchRequest"],
+    opts: CallOptions = {},
+  ): Promise<Schemas["SearchResponse"]> {
+    return this.client.request("POST", "/v1/search", {
+      ...opts,
+      retry: opts.retry ?? true,
+      body,
+    });
+  }
+}
+
 /** Managed evals: traces, labels (thumbs up or down), goldens, and runs. */
 export class EvalsNamespace {
   constructor(private readonly client: LbbClient) {}
@@ -317,8 +425,18 @@ export class EvalsNamespace {
     });
   }
 
-  /** Label a trace valid (thumbs up) or not (thumbs down). A valid label
-   * promotes the trace to a golden. */
+  /** One trace: the request, its query, its results (one item per hit or
+   * row), and their labels. */
+  trace(id: string, opts: CallOptions = {}): Promise<Schemas["EvalTrace"]> {
+    return this.client.request("GET", "/v1/evals/trace", {
+      ...opts,
+      query: { id },
+    });
+  }
+
+  /** Thumbs up or down on results of a trace: one result as `item` +
+   * `valid`, or several in `items`. The labels become the golden's ground
+   * truth. */
   label(
     traceId: string,
     body: Schemas["EvalLabelRequest"],
@@ -331,7 +449,8 @@ export class EvalsNamespace {
     });
   }
 
-  /** Let the managed judge label one trace, or a batch of unlabeled traces. */
+  /** Let the managed judge label the results of one trace, or of a batch of
+   * traces with unlabeled results. */
   judge(
     options: { traceId?: string; limit?: number } & CallOptions = {},
   ): Promise<Schemas["EvalJudgeResponse"]> {
@@ -346,7 +465,7 @@ export class EvalsNamespace {
     return this.client.request("GET", "/v1/evals/goldens", opts);
   }
 
-  /** Freeze a query and the rows it returns now. */
+  /** Freeze a query: every result it returns now is relevant. */
   createGolden(
     body: Schemas["GoldenCreateRequest"],
     opts: CallOptions = {},
@@ -354,7 +473,7 @@ export class EvalsNamespace {
     return this.client.request("POST", "/v1/evals/goldens", { ...opts, body });
   }
 
-  /** Accept the rows a golden returns now as its new reference. */
+  /** Accept the results a golden returns now as its reference. */
   acceptGolden(
     id: string,
     opts: CallOptions & Pick<ReadConsistencyOptions, "consistency"> = {},

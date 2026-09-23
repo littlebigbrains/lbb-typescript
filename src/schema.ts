@@ -89,6 +89,76 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/embeddings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The embeddings of the branch with their status: serving and building version, backfill progress, watermark, lag, recall; `name` for one */
+        get: operations["get_v1_embeddings"];
+        /** Declare or change the embedding of a class: its fields (one-hop property paths, or chosen automatically), and model. A new recipe builds as a new version while the old one serves */
+        put: operations["put_v1_embeddings"];
+        post?: never;
+        /** Remove an embedding; `graph index-gc` removes its runs */
+        delete: operations["delete_v1_embeddings"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/embeddings/model": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Move every embedding of the graph to another model (one model per graph): each builds a new version beside the serving one, and the graph switches to the new model at once when every embedding has it ready */
+        put: operations["put_v1_embeddings_model"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/embeddings/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** What a declaration would embed: the resolved fields, every candidate fact of the class with its coverage and examples, the instance count, and the exact text of sample entities. Stores nothing and calls no model */
+        post: operations["post_v1_embeddings_preview"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/embeddings/refresh": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Run one bounded step of the embed job now (backfill pages, the commit deltas, a fold, a switch) */
+        post: operations["post_v1_embeddings_refresh"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/evals": {
         parameters: {
             query?: never;
@@ -168,7 +238,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Label a trace valid or not (thumbs up or down); a valid label promotes it to a golden */
+        /** Label results of a trace relevant or not (thumbs up or down per result); the labels become the golden's ground truth */
         post: operations["post_v1_evals_label"];
         delete?: never;
         options?: never;
@@ -228,6 +298,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/evals/trace": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** One eval trace: the request, its query, its results, and their labels */
+        get: operations["get_v1_evals_trace"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/evals/traces": {
         parameters: {
             query?: never;
@@ -235,7 +322,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Recent eval traces (a request, its query, and the rows it got), newest first */
+        /** Recent eval traces (a request, its query, and the results it got), newest first */
         get: operations["get_v1_evals_traces"];
         put?: never;
         post?: never;
@@ -649,6 +736,23 @@ export interface paths {
         };
         /** List the graphs (and branches) under the scoped tenant */
         get: operations["get_v1_graphs"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/managed-models": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The managed models the platform uses per role (embedding, judge, rewriter): the operator's catalog, or the compiled defaults */
+        get: operations["get_v1_managed_models"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1300,6 +1404,23 @@ export interface paths {
         put?: never;
         /** Atomically activate a SHACL shapes bundle, or preview compatibility without writes or validation jobs */
         post: operations["post_v1_schema_publish"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Search by meaning over every searchable class of the graph, or one `embedding`; `filter` lists the conditions every hit must meet (a class, its subclasses included; relationships to entities by IRI or name); every hit is checked against one RDF snapshot and carries its class; `explain` plans without running; `include: ["text"]` returns the embedded text */
+        post: operations["post_v1_search"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1982,6 +2103,135 @@ export interface components {
         };
         /** @enum {string} */
         EdgeIdempotencyMode: "append" | "skip_unchanged";
+        /**
+         * @description The persisted embedding (`…/embeddings/epoch=<e>/<name>/embedding.json`):
+         *     the latest declaration and which version serves, builds, and was served
+         *     before.
+         */
+        Embedding: {
+            /** Format: int64 */
+            building?: number | null;
+            created_at: string;
+            name: string;
+            /** Format: int64 */
+            next_version: number;
+            /**
+             * Format: int64
+             * @description The version that served before the last switch (one rollback).
+             */
+            previous?: number | null;
+            /** @description The latest declared recipe. */
+            recipe: components["schemas"]["EmbeddingRecipe"];
+            /**
+             * Format: int64
+             * @description Every write increments it.
+             */
+            revision: number;
+            /** Format: int64 */
+            serving?: number | null;
+            updated_at: string;
+            /**
+             * Format: int32
+             * @description Format version. Currently `1`.
+             */
+            v: number;
+        };
+        /**
+         * @description A pass over every instance of the class: the first backfill of a
+         *     version, or a rescan when the commit deltas are not available.
+         */
+        EmbeddingBackfill: {
+            /** @description The last instance IRI done; the next page starts after it. */
+            cursor?: string | null;
+            /** Format: int64 */
+            embedded: number;
+            /** Format: int64 */
+            removed: number;
+            /** @description A rescan of a ready version (the delta chain was not available). */
+            rescan?: boolean;
+            /** Format: int64 */
+            reused: number;
+            /** Format: int64 */
+            scanned: number;
+            /** @description The published commit the pass reads. */
+            target_seq: components["schemas"]["CommitSeq"];
+        };
+        /**
+         * @description One fact the instances of a class could give their text, measured on a
+         *     sample of the class.
+         */
+        EmbeddingCandidate: {
+            /** @description The field is in the previewed recipe. */
+            chosen: boolean;
+            /**
+             * Format: double
+             * @description Share of the sampled instances with at least one value (0 to 1).
+             */
+            coverage: number;
+            /** @description Up to three values from the sample, as they appear in the text. */
+            examples?: string[];
+            kind: components["schemas"]["EmbeddingCandidateKind"];
+            /** @description Values per instance the field keeps (the recipe's `max`). */
+            max: number;
+            /** @description The line name the field gets in the text. */
+            name: string;
+            /**
+             * @description The path as a recipe stores it: one predicate IRI, or a link and the
+             *     predicate read on the linked entity.
+             */
+            path: string[];
+        };
+        /**
+         * @description What kind of value a candidate field gives the text.
+         * @enum {string}
+         */
+        EmbeddingCandidateKind: "text" | "value" | "link";
+        /** @description Declare or change an embedding (`PUT /v1/embeddings`). */
+        EmbeddingDeclareRequest: {
+            /** @description The class IRI. */
+            class: string;
+            /**
+             * Format: int32
+             * @description The vector dimension; the model's when absent.
+             */
+            dim?: number | null;
+            /** @description Names or IRIs to drop from the automatic choice. */
+            exclude?: string[];
+            /**
+             * @description The fields in text order. Absent: the server picks them from a sample
+             *     of the class (the label, frequent text literals, the labels of linked
+             *     entities) and stores the result.
+             */
+            from?: components["schemas"]["EmbeddingFieldSpec"][] | null;
+            /** @description The model id; the catalog's embedding model when absent. */
+            model?: string | null;
+            /** @description `[a-z0-9][a-z0-9-]{0,62}`; defaults to the class's local name. */
+            name?: string | null;
+        };
+        /**
+         * @description A resolved field: the predicate IRIs of the path (one or two), the name
+         *     in the text, and the value cap.
+         */
+        EmbeddingField: {
+            max: number;
+            name: string;
+            path: string[];
+        };
+        EmbeddingFieldInput: {
+            /** @description Values kept per entity (default 10). */
+            max?: number | null;
+            /**
+             * @description The word before the colon in the text; defaults to the local name of
+             *     the first predicate.
+             */
+            name?: string | null;
+            path: string;
+        };
+        /**
+         * @description A field as a caller writes it: a path, or a path with a display name and
+         *     a value cap.
+         */
+        EmbeddingFieldSpec: string | components["schemas"]["EmbeddingFieldInput"];
         EmbeddingIndexClusterView: {
             cluster_id: number;
             entry_count: number;
@@ -2009,6 +2259,98 @@ export interface components {
             target_counts: {
                 [key: string]: number;
             };
+        };
+        EmbeddingListResponse: {
+            /** Format: int32 */
+            dim?: number | null;
+            embeddings: components["schemas"]["EmbeddingStatus"][];
+            /**
+             * @description The embedding model of the graph: every serving embedding of the
+             *     branch uses it, so one query vector serves a search over all classes.
+             *     Absent before the first declaration (the catalog's model applies then).
+             */
+            model_id?: string | null;
+            /**
+             * @description The model a move goes to: every embedding builds a version with it,
+             *     and the graph switches when all are ready (the search keeps
+             *     `model_id` until then).
+             */
+            next_model_id?: string | null;
+        };
+        /**
+         * @description One version (`…/<name>/v<n>/manifest.json`, CAS): its recipe, its runs,
+         *     and how far it covers the graph.
+         */
+        EmbeddingManifest: {
+            backfill?: null | components["schemas"]["EmbeddingBackfill"];
+            covers_through_seq?: null | components["schemas"]["CommitSeq"];
+            /** @description Live entries across the runs. */
+            entries: number;
+            name: string;
+            recipe: components["schemas"]["EmbeddingRecipe"];
+            /** Format: int64 */
+            revision: number;
+            /** @description Oldest first. A newer run shadows an older run for the same id. */
+            runs: components["schemas"]["EmbeddingRunRef"][];
+            state: components["schemas"]["EmbeddingVersionState"];
+            updated_at: string;
+            usage?: components["schemas"]["EmbeddingUsage"];
+            /**
+             * Format: int32
+             * @description Format version. Currently `1`.
+             */
+            v: number;
+            /** Format: int64 */
+            version: number;
+        };
+        /**
+         * @description Move every embedding of the graph to another model
+         *     (`PUT /v1/embeddings/model`). Each embedding builds a new version beside
+         *     the serving one; the graph switches to the new model at once when every
+         *     embedding has it ready, so a search never mixes two models.
+         */
+        EmbeddingModelRequest: {
+            /**
+             * Format: int32
+             * @description The vector dimension; the model's when absent.
+             */
+            dim?: number | null;
+            model: string;
+        };
+        /**
+         * @description Preview a declaration (`POST /v1/embeddings/preview`): stores nothing and
+         *     calls no model.
+         */
+        EmbeddingPreviewRequest: components["schemas"]["EmbeddingDeclareRequest"] & {
+            /** @description Show these instances instead of the first ones. */
+            iris?: string[];
+            /** @description Sample entities to show (default 5, at most 50). */
+            sample?: number | null;
+        };
+        EmbeddingPreviewResponse: {
+            /**
+             * @description Every field the class could give its text: the recipe's fields first,
+             *     then the others by coverage. The automatic choice takes the label,
+             *     text facts on at least 10% of the sample, and links to named
+             *     entities; values and rarer facts are left for the caller to add.
+             */
+            candidates?: components["schemas"]["EmbeddingCandidate"][];
+            /** @description The spend of embedding every instance, from the samples' mean length. */
+            estimate: components["schemas"]["EmbeddingUsage"];
+            /**
+             * Format: int64
+             * @description Instances of the class at the published generation.
+             */
+            instances: number;
+            name: string;
+            read_at_seq?: null | components["schemas"]["CommitSeq"];
+            recipe: components["schemas"]["EmbeddingRecipe"];
+            /**
+             * Format: int64
+             * @description Instances the candidates were measured on (up to 1,000).
+             */
+            sampled?: number;
+            samples: components["schemas"]["EmbeddingSample"][];
         };
         EmbeddingProviderConfig: {
             /** Format: int32 */
@@ -2043,6 +2385,76 @@ export interface components {
             kind: components["schemas"]["EmbeddingProviderKind"];
             metric: components["schemas"]["VectorMetric"];
             model_id: string;
+        };
+        /**
+         * @description Recall of the version's index against an exhaustive search over the same
+         *     runs and filter, from sampled searches.
+         */
+        EmbeddingRecallStats: {
+            /**
+             * Format: float
+             * @description The last sample's recall@k.
+             */
+            last: number;
+            last_at?: string | null;
+            /**
+             * Format: float
+             * @description The mean recall@k over the samples.
+             */
+            recall_at_k: number;
+            /** Format: int64 */
+            samples: number;
+        };
+        /**
+         * @description What an embedding embeds and with which model. A change of fields or
+         *     model is a new version.
+         */
+        EmbeddingRecipe: {
+            /** @description The class IRI whose instances (`?s a <class>`) are embedded. */
+            class: string;
+            /** Format: int32 */
+            dim: number;
+            fields: components["schemas"]["EmbeddingField"][];
+            metric?: components["schemas"]["VectorMetric"];
+            model_id: string;
+        };
+        EmbeddingRefreshResponse: {
+            embedding: components["schemas"]["EmbeddingStatus"];
+            steps: components["schemas"]["EmbeddingStep"][];
+        };
+        /** @enum {string} */
+        EmbeddingRunKind: "base" | "delta";
+        /**
+         * @description One immutable run of a version: an `lbb-ann` ranged v4 index with a raw
+         *     f32 region, and an `ids` table.
+         */
+        EmbeddingRunRef: {
+            /**
+             * Format: int64
+             * @description Bytes of the run's objects (meta, blocks, ids); 0 for runs written
+             *     before the field existed.
+             */
+            bytes?: number;
+            clusters: number;
+            created_at: string;
+            /** @description Entries with a vector. */
+            entries: number;
+            /** @description `<micros:020>-<nonce>`: unique per write. */
+            id: string;
+            kind: components["schemas"]["EmbeddingRunKind"];
+            /** @description Ids the run removes from older runs. */
+            tombstones: number;
+        };
+        EmbeddingSample: {
+            iri: string;
+            label: string;
+            /**
+             * @description The exact text the model would embed; empty when the entity has no
+             *     value in any field (it gets no vector).
+             */
+            text: string;
+            /** Format: int64 */
+            tokens_estimate: number;
         };
         EmbeddingSearchExplain: {
             candidates_after_filter: number;
@@ -2127,6 +2539,110 @@ export interface components {
             /** Format: int64 */
             ontology_version: number;
             target_kind: components["schemas"]["AnnTargetKind"];
+        };
+        /** @description An embedding as `GET /v1/embeddings` reports it. */
+        EmbeddingStatus: {
+            building?: null | components["schemas"]["EmbeddingVersionStatus"];
+            class: string;
+            created_at: string;
+            /**
+             * Format: int64
+             * @description Commits the serving version is behind the published generation.
+             */
+            lag_commits?: number | null;
+            name: string;
+            /** Format: int64 */
+            previous?: number | null;
+            published_seq?: null | components["schemas"]["CommitSeq"];
+            /** @description The latest declared recipe. */
+            recipe: components["schemas"]["EmbeddingRecipe"];
+            serving?: null | components["schemas"]["EmbeddingVersionStatus"];
+            updated_at: string;
+        };
+        /** @description What one step of the embed job did. */
+        EmbeddingStep: {
+            action: components["schemas"]["EmbeddingStepAction"];
+            /** Format: int64 */
+            embedded: number;
+            embedded_through_seq?: null | components["schemas"]["CommitSeq"];
+            /** @description The version has more work (a backfill page, a fold). */
+            more: boolean;
+            name: string;
+            /** Format: int64 */
+            removed: number;
+            /** Format: int64 */
+            reused: number;
+            /**
+             * Format: int64
+             * @description Instances whose text the step rebuilt.
+             */
+            scanned: number;
+            timings?: components["schemas"]["EmbeddingStepTimings"];
+            usage: components["schemas"]["EmbeddingUsage"];
+            /** Format: int64 */
+            version: number;
+        };
+        /** @enum {string} */
+        EmbeddingStepAction: "idle" | "backfill" | "rescan" | "incremental" | "fold" | "switch";
+        /** @description Where the time of one job step went, in milliseconds. */
+        EmbeddingStepTimings: {
+            /**
+             * Format: int64
+             * @description Reading reused vectors and calling the model.
+             */
+            embed_ms: number;
+            /**
+             * Format: int64
+             * @description Finding the instances: the class page, or the commit deltas and the
+             *     instances they make dirty.
+             */
+            scan_ms: number;
+            /**
+             * Format: int64
+             * @description Building the texts from the graph.
+             */
+            text_ms: number;
+            /** Format: int64 */
+            total_ms: number;
+            /**
+             * Format: int64
+             * @description Building and writing the run, and the manifest CAS.
+             */
+            write_ms: number;
+        };
+        /** @description Embedding spend. The token count is an estimate: characters / 4. */
+        EmbeddingUsage: {
+            /** Format: double */
+            cost_usd_estimate: number;
+            /**
+             * Format: int64
+             * @description Texts sent to the model.
+             */
+            texts: number;
+            /** Format: int64 */
+            tokens_estimate: number;
+        };
+        /** @enum {string} */
+        EmbeddingVersionState: "backfilling" | "ready";
+        EmbeddingVersionStatus: {
+            backfill?: null | components["schemas"]["EmbeddingBackfill"];
+            /** Format: int32 */
+            dim: number;
+            embedded_through_seq?: null | components["schemas"]["CommitSeq"];
+            entries: number;
+            fields: components["schemas"]["EmbeddingField"][];
+            model_id: string;
+            recall?: null | components["schemas"]["EmbeddingRecallStats"];
+            runs: number;
+            state: components["schemas"]["EmbeddingVersionState"];
+            /**
+             * Format: int64
+             * @description Bytes the version's runs store (the storage it is billed for).
+             */
+            stored_bytes?: number;
+            usage: components["schemas"]["EmbeddingUsage"];
+            /** Format: int64 */
+            version: number;
         };
         EntityDetailResponse: {
             /**
@@ -2422,47 +2938,91 @@ export interface components {
             name: string;
             type: string;
         };
+        /** @description One result of a query: a hit of a search, or a row of a SPARQL query. */
+        EvalItem: {
+            /**
+             * @description Stable id of the result: the term id of a hit; the blake3 of the
+             *     canonical row; `ask:true` / `ask:false` for an ASK answer.
+             */
+            id: string;
+            /** @description The entity the result names, when it names one. */
+            iri?: string | null;
+            /** @description A short display form: the hit's label, or the row's values. */
+            label: string;
+            /** @description Position in the returned list, from 0. */
+            rank: number;
+            /** @description The result as returned: a SPARQL binding row, or a hit. */
+            value: unknown;
+        };
+        /** @description One result to label. */
+        EvalItemLabelInput: {
+            /** @description The result id (`id` on a hit or a trace item). */
+            id: string;
+            note?: string | null;
+            /** @description True: the result answers the request (thumbs up). */
+            valid: boolean;
+        };
+        /** @description The results a query returned, in a form that compares across commits. */
+        EvalItems: {
+            item_count: number;
+            /** @description The first [`EVAL_INLINE_ITEM_LIMIT`] results, in returned order. */
+            items?: components["schemas"]["EvalItem"][];
+            /** @description blake3 over the sorted result ids: the set, not the order. */
+            items_blake3: string;
+        };
         EvalJudgeResponse: {
             judged: components["schemas"]["EvalTrace"][];
-            /** @description Traces the judge labeled valid and promoted to goldens. */
-            promoted: number;
             provider: string;
-            /** @description Traces the judge labeled invalid. */
+            /** @description Results the judge labeled not relevant. */
             rejected: number;
-            /** @description Traces left for human review. */
+            /** @description Results the judge labeled relevant. */
+            relevant: number;
+            /** @description Results the judge left for a person. */
             review: number;
         };
         EvalJudgeStatus: {
             available: boolean;
-            /** @description `off`, `mock`, or `typesafe`. */
+            /** @description The model behind the provider, when it has one. */
+            model?: string | null;
+            /** @description `off`, `mock`, `openrouter`, or `typesafe`. */
             provider: string;
         };
+        /** @description A label on one result. */
         EvalLabel: {
             /** @description Free-form labeler identity (an agent name, a user id, a judge model). */
             by?: string | null;
             note?: string | null;
             /**
              * Format: float
-             * @description The judge's probability that the rows answer the request.
+             * @description The judge's probability that the result answers the request.
              */
             probability?: number | null;
             source: components["schemas"]["EvalLabelSource"];
             /** @description RFC 3339. */
             ts: string;
+            /** @description True: the result answers the request (thumbs up). */
             valid: boolean;
         };
+        /**
+         * @description Thumbs up or down on results of a trace: one result as `item` + `valid`,
+         *     or several in `items`.
+         */
         EvalLabelRequest: {
             by?: string | null;
+            item?: string | null;
+            items?: components["schemas"]["EvalItemLabelInput"][];
             note?: string | null;
             source?: null | components["schemas"]["EvalLabelSource"];
-            valid: boolean;
+            valid?: boolean | null;
         };
         EvalLabelResponse: {
             golden?: null | components["schemas"]["Golden"];
+            /** @description Results labeled by this call. */
+            labeled?: number;
             trace: components["schemas"]["EvalTrace"];
         };
         /**
-         * @description Who labeled a trace.
+         * @description Who labeled a result.
          * @enum {string}
          */
         EvalLabelSource: "explicit" | "implicit" | "judge";
@@ -2475,7 +3035,6 @@ export interface components {
         EvalMode: "off" | "advisory";
         /** @description One run of the suite at one commit of the graph. One object per commit. */
         EvalResults: {
-            accepted: number;
             /** Format: int64 */
             elapsed_ms: number;
             errors: number;
@@ -2486,15 +3045,27 @@ export interface components {
              */
             goldens_version: number;
             passed: number;
-            /** @description RFC 3339. */
-            ran_at: string;
-            /** @description `manual`, `tick`, or `judge`. */
-            ran_by: string;
-            /** @description True when `score` is below the settings threshold. */
-            regression: boolean;
             /**
              * Format: float
-             * @description Share of goldens with `pass` or `accepted`; `1.0` for an empty suite.
+             * @description Mean precision over the goldens with judged results returned.
+             */
+            precision?: number;
+            /** @description RFC 3339. */
+            ran_at: string;
+            /** @description `manual` or `tick`. */
+            ran_by: string;
+            /**
+             * Format: float
+             * @description Mean recall over the goldens with known-relevant results.
+             */
+            recall?: number;
+            /** @description True when `score` is below the settings threshold. */
+            regression: boolean;
+            /** @description Traces this run opened for results nobody judged yet. */
+            review_traces?: number;
+            /**
+             * Format: float
+             * @description Share of goldens that pass; `1.0` for an empty suite.
              */
             score: number;
             served_at_seq: components["schemas"]["CommitSeq"];
@@ -2502,7 +3073,7 @@ export interface components {
             total: number;
             /**
              * Format: int32
-             * @description Results format version. Currently `1`.
+             * @description Results format version. Currently `2`.
              */
             v: number;
             verdicts: {
@@ -2512,25 +3083,17 @@ export interface components {
         EvalResultsListResponse: {
             results: components["schemas"]["EvalResults"][];
         };
-        /** @description The rows a query returned, in a form that compares across commits. */
-        EvalRows: {
-            row_count: number;
-            /**
-             * @description The SPARQL Results JSON bindings, present when the set has at most
-             *     [`EVAL_INLINE_ROW_LIMIT`] rows.
-             */
-            rows?: unknown[] | null;
-            /** @description blake3 over the canonical, sorted row set. */
-            rows_blake3: string;
-        };
         EvalRunResponse: {
             results: components["schemas"]["EvalResults"];
         };
         EvalScorePoint: {
-            accepted: number;
             failed: number;
             passed: number;
+            /** Format: float */
+            precision?: number;
             ran_at: string;
+            /** Format: float */
+            recall?: number;
             regression: boolean;
             /** Format: float */
             score: number;
@@ -2558,38 +3121,59 @@ export interface components {
             /** @description Oldest first. */
             history: components["schemas"]["EvalScorePoint"][];
             judge: components["schemas"]["EvalJudgeStatus"];
+            /** @description Judged results across every golden. */
+            judged_results?: number;
             latest?: null | components["schemas"]["EvalResults"];
-            /** @description Traces the judge left for review, among the most recent traces. */
+            /** @description Traces with results the judge left for a person. */
             review_traces: number;
             settings: components["schemas"]["EvalSettings"];
             /** Format: int64 */
             suite_version: number;
-            /** @description Traces without a label, among the most recent traces. */
+            /** @description Results nobody labeled yet, across those traces. */
+            unlabeled_items?: number;
+            /** @description Traces with a result nobody labeled yet, among the most recent traces. */
             unlabeled_traces: number;
         };
+        /**
+         * @description Which surface a trace or a golden belongs to.
+         * @enum {string}
+         */
+        EvalSurface: "sparql" | "search";
         EvalTrace: {
+            /** @description The embedding name, for `surface: search`. */
+            embedding?: string | null;
             entailment: components["schemas"]["SparqlEntailment"];
-            /** @description The golden this trace was promoted to, when labeled valid. */
+            /** @description The golden that holds this trace's labels. */
             golden_id?: string | null;
-            /**
-             * Format: float
-             * @description The judge's probability when the judge looked at the trace but the
-             *     value fell between the two thresholds (the review queue).
-             */
-            judge_probability?: number | null;
-            label?: null | components["schemas"]["EvalLabel"];
+            /** @description RFC 3339; set when the judge looked at the trace. */
+            judged_at?: string | null;
+            /** @description Labels by result id. */
+            labels?: {
+                [key: string]: components["schemas"]["EvalLabel"];
+            };
             /** @description The user's words, as the caller passed them in `request`. */
             request: string;
-            rows: components["schemas"]["EvalRows"];
-            /** @description The commit of the graph the rows were read at. */
+            results: components["schemas"]["EvalItems"];
+            /**
+             * @description Results the judge looked at but left for a person, with its
+             *     probability (between the two thresholds).
+             */
+            review?: {
+                [key: string]: number;
+            };
+            /** @description The commit of the graph the results were read at. */
             served_at_seq: components["schemas"]["CommitSeq"];
+            /** @description The SPARQL query, or the query text on the vector surface. */
             sparql: string;
+            surface?: components["schemas"]["EvalSurface"];
+            /** @description The `top_k` of a search. */
+            top_k?: number | null;
             trace_id: string;
             /** @description RFC 3339. */
             ts: string;
             /**
              * Format: int32
-             * @description Trace format version. Currently `1`.
+             * @description Trace format version. Currently `2`: labels per result.
              */
             v: number;
         };
@@ -2598,14 +3182,33 @@ export interface components {
             truncated: boolean;
         };
         /** @enum {string} */
-        EvalVerdict: "pass" | "fail" | "accepted" | "error" | "skipped";
+        EvalVerdict: "pass" | "fail" | "error" | "skipped";
         EvalVerdictDetail: {
-            /** Format: float */
-            judge_probability?: number | null;
+            /** @description Results the query returned now. */
+            item_count?: number | null;
             message?: string | null;
-            row_count?: number | null;
-            rows_blake3?: string | null;
+            /**
+             * Format: float
+             * @description `relevant_returned / (relevant_returned + wrong_returned)`, over the
+             *     judged results that came back.
+             */
+            precision?: number | null;
+            /**
+             * Format: float
+             * @description `relevant_returned / relevant`, over the known-relevant results.
+             */
+            recall?: number | null;
+            /** @description Known-relevant results that did not come back. */
+            relevant_missing?: number;
+            /** @description Known-relevant results that came back. */
+            relevant_returned?: number;
+            /** @description The trace opened for the unknown results (the review queue). */
+            review_trace_id?: string | null;
+            /** @description Returned results nobody judged yet. */
+            unknown_returned?: number;
             verdict: components["schemas"]["EvalVerdict"];
+            /** @description Known-wrong results that came back. */
+            wrong_returned?: number;
         };
         EvidenceInput: string | {
             /**
@@ -2841,47 +3444,69 @@ export interface components {
             weights: components["schemas"]["SearchSignalWeights"];
         };
         Golden: {
-            /** @description RFC 3339; set when a changed row set was accepted as the new reference. */
+            /** @description RFC 3339; set when the current results were accepted as the reference. */
             accepted_at?: string | null;
             /** @description Who accepted the last change: `user` or the judge provider. */
             accepted_by?: string | null;
             /** @description RFC 3339. */
             created_at: string;
+            embedding?: string | null;
             entailment: components["schemas"]["SparqlEntailment"];
-            expected: components["schemas"]["EvalRows"];
-            /** @description The commit the expected rows were frozen at. */
+            /** @description The commit the judgments were last changed at. */
             frozen_at_seq: components["schemas"]["CommitSeq"];
             /**
-             * @description blake3 of the query text and entailment, so a regenerated or re-added
-             *     golden keeps its identity and its trend.
+             * @description blake3 of the request words, the query text and entailment (plus
+             *     embedding and `top_k` for a search), so a regenerated or
+             *     re-added golden keeps its identity and its trend.
              */
             id: string;
+            /** @description The judged results by id: the ground truth. */
+            judgments?: {
+                [key: string]: components["schemas"]["GoldenJudgment"];
+            };
             label_source?: null | components["schemas"]["EvalLabelSource"];
             origin: components["schemas"]["GoldenOrigin"];
             request?: string | null;
             sparql: string;
-            /** @description The most recent traces that promoted to this golden (bounded). */
+            surface?: components["schemas"]["EvalSurface"];
+            top_k?: number | null;
+            /** @description The most recent traces that labeled into this golden (bounded). */
             trace_ids?: string[];
             /**
              * Format: int32
-             * @description Golden format version. Currently `1`.
+             * @description Golden format version. Currently `2`: judgments per result.
              */
             v: number;
-            /**
-             * Format: int32
-             * @description How many valid labels promoted to this golden.
-             */
-            valid_count: number;
         };
         GoldenCreateRequest: {
+            embedding?: string | null;
             entailment?: components["schemas"]["SparqlEntailment"];
             request?: string | null;
+            /** @description The SPARQL query, or the query text for `surface: vector`. */
             sparql: string;
+            surface?: components["schemas"]["EvalSurface"];
+            top_k?: number | null;
         };
         GoldenDeleteResponse: {
             deleted: boolean;
             /** Format: int64 */
             suite_version: number;
+        };
+        /** @description What a golden knows about one result. */
+        GoldenJudgment: {
+            by?: string | null;
+            iri?: string | null;
+            label: string;
+            /** Format: float */
+            probability?: number | null;
+            /**
+             * @description True: the result answers the request and must keep being returned.
+             *     False: the result is wrong and must not come back.
+             */
+            relevant: boolean;
+            source: components["schemas"]["EvalLabelSource"];
+            /** @description RFC 3339. */
+            ts: string;
         };
         /** @enum {string} */
         GoldenOrigin: "trace" | "manual";
@@ -3801,6 +4426,112 @@ export interface components {
         LbbErrorEnvelope: {
             error: components["schemas"]["LbbErrorBody"];
         };
+        ManagedModel: {
+            /**
+             * Format: int32
+             * @description The vector dimension, for an embedding model.
+             */
+            dim?: number | null;
+            /**
+             * @description The provider's model id (`openai/text-embedding-3-small`,
+             *     `anthropic/claude-sonnet-5`, …).
+             */
+            id: string;
+            /**
+             * Format: double
+             * @description Refuse the model when the provider prices it above this (USD per
+             *     million tokens); `None` leaves the platform default in force.
+             */
+            max_price_per_million_usd?: number | null;
+            note?: string | null;
+            provider: components["schemas"]["ManagedModelProvider"];
+            role: components["schemas"]["ManagedModelRole"];
+        };
+        /**
+         * @description The catalog: one model per role. A role that is absent falls back to the
+         *     server's compiled default.
+         */
+        ManagedModelCatalog: {
+            models: components["schemas"]["ManagedModel"][];
+            /** @description RFC 3339. */
+            updated_at?: string | null;
+            updated_by?: string | null;
+            /**
+             * Format: int32
+             * @description Catalog format version. Currently `1`.
+             */
+            v: number;
+            /**
+             * Format: int64
+             * @description Monotonic; every write increments it. `0` for the compiled defaults.
+             */
+            version: number;
+        };
+        /**
+         * @description A model the operator can pick for a role: what the platform knows how
+         *     to serve today.
+         */
+        ManagedModelChoice: {
+            /** Format: int32 */
+            dim?: number | null;
+            id: string;
+            label: string;
+            /**
+             * Format: int32
+             * @description The most tokens one input may have (embedding models). The embed job
+             *     shortens a longer text, longest values first.
+             */
+            max_input_tokens?: number | null;
+            note?: string | null;
+            /**
+             * Format: double
+             * @description USD per million input tokens, for cost estimates.
+             */
+            price_per_million_usd?: number | null;
+            provider: components["schemas"]["ManagedModelProvider"];
+            role: components["schemas"]["ManagedModelRole"];
+        };
+        /**
+         * @description Who serves the model.
+         * @enum {string}
+         */
+        ManagedModelProvider: "openrouter" | "modal" | "typesafe" | "mock";
+        /**
+         * @description What a managed model is used for.
+         * @enum {string}
+         */
+        ManagedModelRole: "embedding" | "judge" | "rewriter";
+        /**
+         * @description Replace the catalog. Every role named here is set; a role left out keeps
+         *     the compiled default.
+         */
+        ManagedModelsPutRequest: {
+            /**
+             * Format: int64
+             * @description Refuse the write when the document's version is not this one.
+             */
+            expected_version?: number | null;
+            models: components["schemas"]["ManagedModel"][];
+        };
+        ManagedModelsResponse: {
+            catalog: components["schemas"]["ManagedModelCatalog"];
+            /**
+             * @description The models the platform can serve per role, for a picker. A catalog
+             *     entry may still name a model outside this list.
+             */
+            choices?: components["schemas"]["ManagedModelChoice"][];
+            source: components["schemas"]["ManagedModelsSource"];
+            /**
+             * @description Whether the caller may write the catalog on this route (single
+             *     mode). In SaaS mode the operator writes it through the ops route.
+             */
+            writable?: boolean;
+        };
+        /**
+         * @description Where the served catalog came from.
+         * @enum {string}
+         */
+        ManagedModelsSource: "document" | "defaults";
         ModelArtifact: {
             blake3: string;
             /** Format: int64 */
@@ -5482,6 +6213,20 @@ export interface components {
             /** Format: float */
             weighted_score: number;
         };
+        /** @description One class IRI, or several. */
+        SearchClasses: string | string[];
+        /**
+         * @description One filter condition as the search resolved it, in request order: the
+         *     classes of a class condition, or a relationship condition's IRI,
+         *     direction, and entities.
+         */
+        SearchConditionResolved: {
+            class?: string[];
+            direction?: null | components["schemas"]["SearchDirection"];
+            to?: components["schemas"]["SearchTargetResolved"][];
+            /** @description The relationship IRI. */
+            via?: string | null;
+        };
         /**
          * @description Read consistency for a query surface (search, graph summary, SPARQL).
          *
@@ -5496,6 +6241,11 @@ export interface components {
          * @enum {string}
          */
         SearchConsistency: "strong" | "eventual";
+        /**
+         * @description Which way a relationship condition reads.
+         * @enum {string}
+         */
+        SearchDirection: "out" | "in";
         SearchEngineOptions: {
             bm25?: boolean;
             consistency?: null | components["schemas"]["SearchConsistency"];
@@ -5721,6 +6471,20 @@ export interface components {
             kind: "concept";
             name?: string | null;
         };
+        /**
+         * @description One condition of a search's filter: a class (`class`), or a relationship
+         *     to entities (`via`, `to`, and optionally `direction`).
+         */
+        SearchFilter: {
+            class?: null | components["schemas"]["SearchClasses"];
+            direction?: null | components["schemas"]["SearchDirection"];
+            to?: null | components["schemas"]["SearchTargets"];
+            /**
+             * @description The relationship: a local name the instances use (`calls`), a known
+             *     prefix (`schema:knows`), or a full IRI (`<https://…>`).
+             */
+            via?: string | null;
+        };
         SearchFilterExpr: {
             /** @enum {string} */
             op: "true";
@@ -5825,7 +6589,39 @@ export interface components {
             /** @enum {string} */
             op: "not";
         };
+        /**
+         * @description How a relationship filter ran.
+         * @enum {string}
+         */
+        SearchFilterMode: "clusters" | "after";
+        /**
+         * @description A search's filter: its conditions as resolved and, with a relationship
+         *     condition, how it ran and how many entities it allows.
+         */
+        SearchFilterReport: {
+            /**
+             * Format: int64
+             * @description Entities of the searched classes that meet every condition. In mode
+             *     `after` it is the selective limit plus one (there are more).
+             */
+            allowed?: number | null;
+            conditions: components["schemas"]["SearchConditionResolved"][];
+            mode?: null | components["schemas"]["SearchFilterMode"];
+        };
         SearchFilterValue: null | boolean | number | string;
+        SearchHit: {
+            /** @description The class of the embedding that found the hit. */
+            class?: string;
+            /** @description The embedding that found the hit. */
+            embedding?: string;
+            /** @description The RDF term id of the IRI (hex). */
+            id: string;
+            iri: string;
+            label: string;
+            /** Format: float */
+            score: number;
+            text?: string | null;
+        };
         SearchHitContributions: {
             bm25: components["schemas"]["SearchChannelContribution"];
             bm25_indexed_commit_seq?: null | components["schemas"]["CommitSeq"];
@@ -5869,6 +6665,76 @@ export interface components {
             /** @enum {string} */
             by: "metadata";
             field: string;
+        };
+        /** @description `POST /v1/search`. Unknown fields are refused. */
+        SearchRequest: {
+            /**
+             * @description Search one embedding by name. Without it, the search covers every
+             *     searchable class of the graph.
+             */
+            embedding?: string | null;
+            /**
+             * @description Plan the search without running it: the scope, the resolved filters,
+             *     and how the filter would run. No model call, no hits.
+             */
+            explain?: boolean;
+            /**
+             * @description The conditions every hit must meet, checked in the graph at the
+             *     search's snapshot: `{"class": …}` keeps the instances of a class (one
+             *     IRI or a list, any of; their subclasses too; one class condition per
+             *     search), and `{"via": …, "to": …, "direction": …}` keeps the hits
+             *     linked to entities.
+             */
+            filter?: components["schemas"]["SearchFilter"][];
+            /** @description Extra hit fields: `text` (the embedded text). */
+            include?: string[];
+            /**
+             * @description Clusters to read across the big runs (default 4·√clusters, at least
+             *     8). Runs of up to 4,096 entries are always read whole.
+             */
+            probe?: number | null;
+            /**
+             * @description The user's words behind this search. When present the server records
+             *     an eval trace and returns its `trace_id`.
+             */
+            request?: string | null;
+            /** @description The query text; embedded with the serving version's model. */
+            text?: string | null;
+            top_k?: number | null;
+        };
+        SearchResponse: {
+            clusters_probed: number;
+            /** @description Candidates the graph check removed (deleted or re-typed entities). */
+            dropped_by_graph: number;
+            embedded_through_seq?: null | components["schemas"]["CommitSeq"];
+            /** @description The embeddings the search read, and how current each is. */
+            embeddings: components["schemas"]["SearchedEmbedding"][];
+            entries_considered: number;
+            /** @description Only planned (`explain`): no hits and no model call. */
+            explain?: boolean;
+            filter?: null | components["schemas"]["SearchFilterReport"];
+            /**
+             * @description The best hits over every searched embedding, by score; an entity two
+             *     embeddings hold comes back once, with its best score.
+             */
+            hits: components["schemas"]["SearchHit"][];
+            /**
+             * Format: int64
+             * @description The most published commits one searched embedding does not cover yet
+             *     (`served_at_seq` − its watermark); the embed job catches up by itself.
+             */
+            lag_commits?: number;
+            /**
+             * @description Embeddings in scope that are still building their first version; the
+             *     search skipped them.
+             */
+            not_ready?: string[];
+            /** Format: int64 */
+            query_ms: number;
+            served_at_seq?: null | components["schemas"]["CommitSeq"];
+            timings?: components["schemas"]["SearchTimings"];
+            trace_id?: string | null;
+            usage: components["schemas"]["EmbeddingUsage"];
         };
         SearchSignalWeights: {
             /** Format: float */
@@ -5949,6 +6815,20 @@ export interface components {
             text: string;
         };
         /**
+         * @description How a `to` value matched an entity.
+         * @enum {string}
+         */
+        SearchTargetMatch: "iri" | "label" | "normalized" | "close";
+        /** @description A `to` value and the entity it resolved to. */
+        SearchTargetResolved: {
+            input: string;
+            iri: string;
+            label?: string | null;
+            matched: components["schemas"]["SearchTargetMatch"];
+        };
+        /** @description One entity or several, each an IRI or a name (a label). */
+        SearchTargets: string | string[];
+        /**
          * @description Provenance for the immutable family roots selected from one pinned published
          *     generation. `ceiling_commit_seq` is that generation's common query
          *     watermark; per-leg fields are `None` only when the corresponding leg was
@@ -5961,6 +6841,57 @@ export interface components {
             ceiling_commit_seq: components["schemas"]["CommitSeq"];
             vector_covered_through?: null | components["schemas"]["CommitSeq"];
             vector_run_snapshot_commit_seq?: null | components["schemas"]["CommitSeq"];
+        };
+        /** @description Where the time of a search went, in milliseconds. */
+        SearchTimings: {
+            /**
+             * Format: int64
+             * @description The graph check of the candidates.
+             */
+            check_ms: number;
+            /**
+             * Format: int64
+             * @description Embedding the query text.
+             */
+            embed_ms: number;
+            /**
+             * Format: int64
+             * @description Resolving a relationship filter and finding its allowed entities.
+             */
+            filter_ms?: number;
+            /**
+             * Format: int64
+             * @description Probing the runs and scoring their codes.
+             */
+            index_ms: number;
+            /**
+             * Format: int64
+             * @description Reading the exact vectors of the best candidates and scoring them.
+             */
+            rerank_ms?: number;
+            /**
+             * Format: int64
+             * @description Reading the embedding, its manifest, and its runs.
+             */
+            resolve_ms: number;
+        };
+        /** @description One embedding a search read. */
+        SearchedEmbedding: {
+            /**
+             * Format: int64
+             * @description A newer version that builds while this one serves (a changed recipe).
+             */
+            building_version?: number | null;
+            class: string;
+            embedded_through_seq?: null | components["schemas"]["CommitSeq"];
+            /** @description The hits of this response it found. */
+            hits: number;
+            /** Format: int64 */
+            lag_commits?: number;
+            model_id: string;
+            name: string;
+            /** Format: int64 */
+            version: number;
         };
         SemanticGraphSearchRequest: {
             explain?: boolean;
@@ -7942,6 +8873,848 @@ export interface operations {
             };
         };
     };
+    get_v1_embeddings: {
+        parameters: {
+            query?: {
+                /** @description Graph name (default `main`) */
+                graph?: string;
+                /** @description Branch name (default `main`) */
+                branch?: string;
+                /** @description one embedding (returns EmbeddingStatus) */
+                name?: string;
+            };
+            header?: {
+                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                "Lbb-Version"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EmbeddingListResponse"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Rate limit exceeded */
+            429: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Service unavailable */
+            503: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+        };
+    };
+    put_v1_embeddings: {
+        parameters: {
+            query?: {
+                /** @description Graph name (default `main`) */
+                graph?: string;
+                /** @description Branch name (default `main`) */
+                branch?: string;
+            };
+            header?: {
+                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                "Lbb-Version"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EmbeddingDeclareRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EmbeddingStatus"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Rate limit exceeded */
+            429: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Service unavailable */
+            503: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+        };
+    };
+    delete_v1_embeddings: {
+        parameters: {
+            query?: {
+                /** @description Graph name (default `main`) */
+                graph?: string;
+                /** @description Branch name (default `main`) */
+                branch?: string;
+                /** @description the embedding */
+                name?: string;
+                /** @description the embedding name again */
+                confirm?: string;
+            };
+            header?: {
+                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                "Lbb-Version"?: string;
+                /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
+                "Idempotency-Key"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Rate limit exceeded */
+            429: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Service unavailable */
+            503: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+        };
+    };
+    put_v1_embeddings_model: {
+        parameters: {
+            query?: {
+                /** @description Graph name (default `main`) */
+                graph?: string;
+                /** @description Branch name (default `main`) */
+                branch?: string;
+            };
+            header?: {
+                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                "Lbb-Version"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EmbeddingModelRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EmbeddingListResponse"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Rate limit exceeded */
+            429: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Service unavailable */
+            503: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+        };
+    };
+    post_v1_embeddings_preview: {
+        parameters: {
+            query?: {
+                /** @description Graph name (default `main`) */
+                graph?: string;
+                /** @description Branch name (default `main`) */
+                branch?: string;
+            };
+            header?: {
+                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                "Lbb-Version"?: string;
+                /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
+                "Idempotency-Key"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EmbeddingPreviewRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EmbeddingPreviewResponse"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Rate limit exceeded */
+            429: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Service unavailable */
+            503: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+        };
+    };
+    post_v1_embeddings_refresh: {
+        parameters: {
+            query?: {
+                /** @description Graph name (default `main`) */
+                graph?: string;
+                /** @description Branch name (default `main`) */
+                branch?: string;
+                /** @description the embedding */
+                name?: string;
+            };
+            header?: {
+                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                "Lbb-Version"?: string;
+                /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
+                "Idempotency-Key"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EmbeddingRefreshResponse"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Rate limit exceeded */
+            429: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Service unavailable */
+            503: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+        };
+    };
     get_v1_evals: {
         parameters: {
             query?: {
@@ -9478,6 +11251,144 @@ export interface operations {
             };
         };
     };
+    get_v1_evals_trace: {
+        parameters: {
+            query?: {
+                /** @description Graph name (default `main`) */
+                graph?: string;
+                /** @description Branch name (default `main`) */
+                branch?: string;
+                /** @description the trace id returned by the query */
+                id?: string;
+            };
+            header?: {
+                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                "Lbb-Version"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EvalTrace"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Rate limit exceeded */
+            429: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Service unavailable */
+            503: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+        };
+    };
     get_v1_evals_traces: {
         parameters: {
             query?: {
@@ -9487,7 +11398,7 @@ export interface operations {
                 branch?: string;
                 /** @description traces to return (default 50, at most 200) */
                 limit?: string;
-                /** @description true to return only traces without a label */
+                /** @description true to return only traces with a result nobody labeled yet */
                 unlabeled?: string;
             };
             header?: {
@@ -13494,6 +15405,142 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["GraphListResponse"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Rate limit exceeded */
+            429: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Service unavailable */
+            503: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+        };
+    };
+    get_v1_managed_models: {
+        parameters: {
+            query?: {
+                /** @description Graph name (default `main`) */
+                graph?: string;
+                /** @description Branch name (default `main`) */
+                branch?: string;
+            };
+            header?: {
+                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                "Lbb-Version"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ManagedModelsResponse"];
                 };
             };
             /** @description Bad request */
@@ -19268,6 +21315,148 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SchemaPublishResponse"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Rate limit exceeded */
+            429: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Service unavailable */
+            503: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+        };
+    };
+    post_v1_search: {
+        parameters: {
+            query?: {
+                /** @description Graph name (default `main`) */
+                graph?: string;
+                /** @description Branch name (default `main`) */
+                branch?: string;
+            };
+            header?: {
+                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                "Lbb-Version"?: string;
+                /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
+                "Idempotency-Key"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SearchRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SearchResponse"];
                 };
             };
             /** @description Bad request */

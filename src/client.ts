@@ -41,6 +41,7 @@ import {
   SchemaNamespace,
   SearchNamespace,
   EvalsNamespace,
+  EmbeddingsNamespace,
 } from "./namespaces.js";
 
 export { parseSparqlResults } from "./types.js";
@@ -223,6 +224,7 @@ export class LbbClient {
   readonly ontology: OntologyNamespace;
   readonly query: QueryNamespace;
   readonly evals: EvalsNamespace;
+  readonly embeddings: EmbeddingsNamespace;
 
   constructor(options: LbbClientOptions) {
     const baseUrl = options.baseUrl?.trim();
@@ -270,6 +272,7 @@ export class LbbClient {
     this.ontology = new OntologyNamespace(this);
     this.query = new QueryNamespace(this);
     this.evals = new EvalsNamespace(this);
+    this.embeddings = new EmbeddingsNamespace(this);
   }
 
   graph(
@@ -1504,6 +1507,12 @@ export class LbbClient {
   /** Automatic publication lifecycle, available before the first generation exists. */
   publicationStatus(): Promise<Schemas["PublicationStatusResponse"]> {
     return this.request("GET", "/v1/graph/publication-status");
+  }
+
+  /** The managed models the platform uses per role (embedding, judge,
+   * rewriter): the operator's catalog, or the compiled defaults. */
+  managedModels(): Promise<Schemas["ManagedModelsResponse"]> {
+    return this.request("GET", "/v1/managed-models");
   }
 
   /** Wait until background reconciliation folds `targetSeq` into the RDF base. */
