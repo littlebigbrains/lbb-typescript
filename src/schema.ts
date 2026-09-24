@@ -2361,12 +2361,15 @@ export interface components {
             /** @description Where the recipe's `title` comes from. */
             title_source: components["schemas"]["EmbeddingTitleSource"];
             /**
-             * @description A field that looks like a name, when the hits are named by
-             *     `rdfs:label` (found or declared) and the labels look like keys
-             *     (`yc-job:94386`: no space, and a colon, a slash, or digits), or the
-             *     instances have no name: a text fact on at least 90% of the
-             *     sample, one value each, with short values that are not keys. A
-             *     suggestion only; the recipe keeps its `title` until a declaration
+             * @description A fact whose values read as names, when the hits are named by
+             *     `rdfs:label` (found or declared) and the labels do not name them (on
+             *     less than half of the instances, keys or codes like `yc-job:94386`,
+             *     or one value repeated), or the instances have no name. The choice
+             *     reads the values, never the property names: a text fact on at least
+             *     90% of the sample, about one value per instance, at least 80%
+             *     distinct, at most 10% keys or codes, one sentence each, and a median
+             *     of at most 120 characters. The most distinct wins, then the shortest.
+             *     A suggestion only; the recipe keeps its `title` until a declaration
              *     names another.
              */
             title_suggestion?: string[];
