@@ -2,6 +2,18 @@
 
 All notable changes to the `@littlebigbrain/client` package are documented here.
 
+## 0.13.2 (2026-09-24)
+
+- Add the `embeddings` namespace to preview and configure embeddings, change
+  models, and search by meaning with class and relationship filters.
+- Add the `evals` namespace for query traces, result labels, saved evaluation
+  queries, and evaluation runs. Expose managed model settings with
+  `managedModels()`.
+- Refresh generated request and response types, including query trace IDs and
+  commit selectors used by the MCP server.
+- Rewrite the README with a complete RDF import and relationship query, expected
+  output, commit replay, and links to the current guides.
+
 ## 0.13.1 (2026-09-18)
 
 - Expose non-mutating schema publication and ontology evolution previews

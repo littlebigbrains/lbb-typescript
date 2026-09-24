@@ -1,129 +1,144 @@
 # @littlebigbrain/client
 
-The typed TypeScript client for [Little Big Brain](https://littlebigbrain.com) — write graph facts and query one immutable published snapshot. Request and response types are generated from the API contract, so every call is fully typed. Runs anywhere there's a global `fetch`: Node 18+, browsers, and edge workers.
+TypeScript client for [little big brain](https://littlebigbrain.com), a search
+platform for AI applications such as chatbots, search tools, and agents.
+Load facts, query their relationships, and keep the data version behind an answer
+so you can check it later.
+
+The client has no runtime dependencies and includes generated request and response
+types. It uses `fetch` and supports Node.js 18+, browsers, and edge workers.
+Keep stack API keys on your server or local machine, outside browser bundles.
+
+[Documentation](https://docs.littlebigbrain.com/sdks/typescript/) ·
+[Quickstart](https://docs.littlebigbrain.com/start/quickstart/) ·
+[Issues](https://github.com/littlebigbrains/lbb-typescript/issues)
+
+## Install
 
 ```sh
 npm install @littlebigbrain/client
 ```
 
-## Quickstart
+## Load facts and run a query
+
+Create a stack in the [console](https://cloud.littlebigbrain.com) and open
+**Connect**. Copy its complete endpoint and a stack API key:
+
+```sh
+export LBB_URL="https://<your-complete-stack-host>"
+export LBB_API_KEY="<your-stack-api-key>"
+```
+
+This example creates a graph named `quickstart` on its first write. It stores
+three facts: a service writes to a database, and each has a label. The data uses
+Resource Description Framework (RDF), where each line names a subject, a
+relationship, and a value or another record. SPARQL is the query language for
+those facts.
+
+Save as `quickstart.mts`, then run `npx tsx quickstart.mts`:
 
 ```ts
 import { LbbClient } from "@littlebigbrain/client";
 
 const lbb = new LbbClient({
-  baseUrl: "https://0abc1def--production.db.eu.littlebigbrain.com",
-  apiKey: process.env.LBB_API_KEY, // lbb_sk_live_… — keep it server-side
+  baseUrl: process.env.LBB_URL!,
+  apiKey: process.env.LBB_API_KEY!,
+  graph: "quickstart",
 });
-const graph = lbb.graph("main");
 
-// 1. Write a fact.
-await graph.facts.create(
-  {
-    triplets: [
-      {
-        source: { type: "CONCEPT", name: "policy-42" },
-        relation: "RELATED_TO",
-        target: { type: "CONCEPT", name: "seven-year retention" },
-        evidence: "Customer records are retained for seven years.",
-      },
-    ],
-  },
-  { idempotencyKey: "policy-42-v1" },
+const facts = `
+<https://example.org/auth-service> <https://example.org/writesTo> <https://example.org/user-db> .
+<https://example.org/auth-service> <http://www.w3.org/2000/01/rdf-schema#label> "Auth Service" .
+<https://example.org/user-db> <http://www.w3.org/2000/01/rdf-schema#label> "User Database" .
+`;
+
+const imported = await lbb.graph("quickstart").facts.importRdf(facts, {
+  format: "ntriples",
+  idempotencyKey: "sdk-quickstart-v1",
+});
+const commitSeq = imported.committed_commit_seq;
+if (commitSeq == null) throw new Error("The import did not return a commit sequence.");
+
+const query = `
+  SELECT ?service ?database WHERE {
+    ?s <https://example.org/writesTo> ?db .
+    ?s <http://www.w3.org/2000/01/rdf-schema#label> ?service .
+    ?db <http://www.w3.org/2000/01/rdf-schema#label> ?database .
+  } ORDER BY ?service ?database LIMIT 10
+`;
+
+const { rows } = await lbb.sparqlRows(
+  { query },
+  { consistency: "strong", minIndexedSeq: commitSeq },
 );
 
-// 2. Publication is automatic. Inspect one coherent watermark when needed.
-const published = await lbb.readSnapshot();
-console.log(published.snapshot.served_at_seq, published.query_lag_commits);
-
-// 3. Query the snapshot with SPARQL.
-const rows = await lbb.sparqlRows({
-  query: "SELECT ?s ?o WHERE { ?s <policy:retention> ?o } LIMIT 10",
-});
+for (const row of rows) console.log(`${row.service} -> ${row.database}`);
 ```
 
-For hosted use, `baseUrl` is required and must be the exact `endpoint_url`
-shown on the stack's Connect page. Graph and branch remain client scope
-parameters; they are not encoded in the hostname.
+On a fresh graph, this prints:
 
-## Examples
+```text
+Auth Service -> User Database
+```
 
-**Bulk import.** Load an array of records (or an NDJSON string) in one call:
+The query follows the stored relationship between the service and database.
+`consistency: "strong"` makes the new facts available to this read without
+waiting for a background index job. Reads default to eventual consistency, so
+omit this option only when an earlier version is acceptable.
+
+The idempotency key makes repeating the same import safe. Use a new key if you
+change the data.
+
+## Read the same version again
+
+Run the query at the commit returned by the import:
 
 ```ts
-await graph.facts.import(
-  [
-    { source: { type: "DOC", name: "handbook", key: "doc:42" }, relation: "HAS_PASSAGE", target: { type: "PASSAGE", name: "leave-policy", key: "p:42:1" } },
-    // …one record per line
-  ],
-  { idempotencyKey: "handbook-batch-1" },
-);
-```
-
-For large or long-running loads, stream records to a durable job instead:
-
-```ts
-const accepted = await lbb.submitImport(records(), {
-  idempotencyKey: "hubspot:portal-42:run-2026-07-29",
+const replay = await lbb.sparqlRows({
+  query,
+  as_of_commit_seq: commitSeq,
 });
-const completed = await lbb.waitForImportJob(accepted.job_id);
-console.log(completed.state, completed.committed_commit_seq);
+console.log(replay.rows);
 ```
 
-`records()` may be an iterable or async iterable. Success means every grouped
-commit is durable and immediately queryable by a strong SPARQL read. The same
-commits advance the graph's coalesced RDF reconciliation fence; waiting for base
-compaction is optional. An empty iterable is rejected locally before an import
-POST is sent.
+Save the query, its options, and the commit sequence with any answer you need to
+check later. See [history and replay](https://docs.littlebigbrain.com/guides/time-travel-audit/)
+for retention and evidence handling.
 
-For several RDF documents, `facts.importRdfMany(...)` automatically defers
-intermediate reconciliation and triggers it on the last document. Call
-`graph.waitForPublished(result.finalSequence)` only when the caller needs the
-immutable base itself to cover the import; strong reads need no waiter.
+## Next steps
 
-**Time-travel read.** Pin a SPARQL read to a past instant — results reflect the graph as it was then:
+- [Search by meaning](https://docs.littlebigbrain.com/guides/search-by-meaning/): choose which facts to embed and find records from a text description.
+- [Load your own RDF](https://docs.littlebigbrain.com/guides/load-rdf/): import Turtle, N-Triples, N-Quads, or TriG.
+- [Work with JSON records](https://docs.littlebigbrain.com/guides/without-rdf/): define a schema and write records without writing RDF.
+- [Validate writes](https://docs.littlebigbrain.com/guides/sparql-and-shacl/): define constraints with the Shapes Constraint Language (SHACL).
 
-```ts
-const asOf = await lbb.sparqlRows({
-  query: "SELECT ?s ?o WHERE { ?s <policy:retention> ?o }",
-  as_of_valid_time: "2026-01-01T00:00:00Z",
-});
-```
+The RDF and JSON guides use different write workflows. Choose one when creating
+a graph; a graph first written through RDF import does not accept
+`facts.create` or JSON record imports.
 
-**SPARQL.** `sparqlRows` runs a SPARQL 1.1 SELECT/ASK and returns parsed rows:
+## Errors and retries
 
-```ts
-const { rows } = await lbb.sparqlRows({
-  query: `SELECT ?doc WHERE { ?doc ?p ?o } LIMIT 10`,
-});
-```
+Failed HTTP requests throw `LbbError`, with a status, error code, message, and
+request ID. Use `rawRequest()` when you also need response headers or timing.
 
-## Errors & retries
+Safe reads and writes with an idempotency key retry rate limits, retryable server
+errors, and network failures. Retries respect `Retry-After` and use a 60-second
+budget by default. See the [client reference](https://docs.littlebigbrain.com/sdks/typescript/)
+for timeout and retry options.
 
-Methods return parsed JSON and throw `LbbError` (with `status`, `code`, `message`, `param`, `requestId`, `docUrl`) on any non-2xx response. Safe reads and idempotency-keyed writes retry `429`/`5xx` and network failures with full-jitter backoff, bounded by a retry budget (`retryBudgetMs`, default 60s) rather than a fixed count, and honor `Retry-After` — a terminal error the server marks non-retryable surfaces immediately. Use `rawRequest()` for response headers, request id, and retry/timing metadata.
-`waitForPublished(...)` is an optional, deadline-bounded maintenance poller for
-workflows that want the immutable RDF base itself to cover a commit. Strong
-SPARQL does not need it: acknowledged commits are queryable immediately from
-the branch head's base-plus-delta lineage.
+## Development
 
-## More
-
-The `graph(...)` scope exposes `facts`, `entities`, `ontology`, `query`,
-`search` (feedback surfaces), and `schema` namespaces. `query` runs SPARQL,
-the one query language on the API; `schema`
-reads or atomically publishes the active ontology/shapes bundle. Writes enqueue
-published-generation maintenance automatically. Every generated shape is
-available as `Schemas["TypeName"]`. Retired request-time JSON SHACL DTOs are
-intentionally absent: publish RDF shapes with `schema.publish`, then read
-`ontology.conformance`.
-
-Full reference and guides: [docs.littlebigbrain.com/sdks/typescript](https://docs.littlebigbrain.com/sdks/typescript/).
-
-## Develop
+From a clone of this repository:
 
 ```sh
-npm install
-npm run generate    # regenerate types from contracts/openapi.json
+npm ci
 npm run typecheck
 npm test
 ```
+
+The request and response types are generated from the API contract. See
+[CONTRIBUTING.md](CONTRIBUTING.md) for changes to generated types.
+
+## License
+
+[Apache-2.0](LICENSE).

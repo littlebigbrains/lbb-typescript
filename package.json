@@ -1,7 +1,7 @@
 {
   "name": "@littlebigbrain/client",
-  "version": "0.13.1",
-  "description": "TypeScript client for the little big brain graph + hybrid search HTTP API",
+  "version": "0.13.2",
+  "description": "TypeScript client for little big brain: search, graph queries, and data import",
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
