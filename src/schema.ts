@@ -2207,6 +2207,13 @@ export interface components {
             model?: string | null;
             /** @description `[a-z0-9][a-z0-9-]{0,62}`; defaults to the class's local name. */
             name?: string | null;
+            /**
+             * @description The field that names each hit, as a path (`display_name`,
+             *     `schema:name`, `<https://…>`, `company/label`). Absent on a new
+             *     embedding: the ontology's name property (see
+             *     [`EmbeddingTitleSource`]); absent on an existing one: its name stays.
+             */
+            title?: string | null;
         };
         /**
          * @description A resolved field: the predicate IRIs of the path (one or two), the name
@@ -2351,6 +2358,18 @@ export interface components {
              */
             sampled?: number;
             samples: components["schemas"]["EmbeddingSample"][];
+            /** @description Where the recipe's `title` comes from. */
+            title_source: components["schemas"]["EmbeddingTitleSource"];
+            /**
+             * @description A field that looks like a name, when the hits are named by
+             *     `rdfs:label` (found or declared) and the labels look like keys
+             *     (`yc-job:94386`: no space, and a colon, a slash, or digits), or the
+             *     instances have no name: a text fact on at least 90% of the
+             *     sample, one value each, with short values that are not keys. A
+             *     suggestion only; the recipe keeps its `title` until a declaration
+             *     names another.
+             */
+            title_suggestion?: string[];
         };
         EmbeddingProviderConfig: {
             /** Format: int32 */
@@ -2417,6 +2436,13 @@ export interface components {
             fields: components["schemas"]["EmbeddingField"][];
             metric?: components["schemas"]["VectorMetric"];
             model_id: string;
+            /**
+             * @description The path whose value names each hit: one predicate IRI, or a link and
+             *     the predicate read on the linked entity. Empty: the instance's
+             *     `rdfs:label`. An instance with no value here shows its `rdfs:label`,
+             *     else the local name of its IRI.
+             */
+            title?: string[];
         };
         EmbeddingRefreshResponse: {
             embedding: components["schemas"]["EmbeddingStatus"];
@@ -2610,6 +2636,11 @@ export interface components {
              */
             write_ms: number;
         };
+        /**
+         * @description Where the name of a hit comes from.
+         * @enum {string}
+         */
+        EmbeddingTitleSource: "declared" | "ontology" | "label" | "iri";
         /** @description Embedding spend. The token count is an estimate: characters / 4. */
         EmbeddingUsage: {
             /** Format: double */
