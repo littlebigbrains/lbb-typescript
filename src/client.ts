@@ -196,14 +196,13 @@ async function durableImportBody(
 
 /**
  * A typed HTTP client for a little big brain graph server. One instance is scoped to a
- * single graph/branch; construct another for a different scope. All methods
+ * single graph; construct another for a different scope. All methods
  * return the parsed JSON response and throw {@link LbbError} on failure.
  */
 export class LbbClient {
   private readonly baseUrl: string;
   private readonly apiKey?: string;
   private readonly graphName?: string;
-  private readonly branchName?: string;
   private readonly stack?: string;
   private readonly fetchImpl: FetchLike;
   private readonly apiVersion: string;
@@ -236,7 +235,6 @@ export class LbbClient {
     this.baseUrl = baseUrl.replace(/\/+$/, "");
     this.apiKey = options.apiKey;
     this.graphName = options.graph;
-    this.branchName = options.branch;
     this.stack = options.stack;
     this.apiVersion = options.apiVersion ?? "2026-07-23";
     this.maxRetries = options.maxRetries ?? 6;
@@ -275,34 +273,25 @@ export class LbbClient {
     this.embeddings = new EmbeddingsNamespace(this);
   }
 
-  graph(
-    name: string,
-    opts: { branch?: string; stack?: string } = {},
-  ): GraphNamespace {
+  graph(name: string, opts: { stack?: string } = {}): GraphNamespace {
     return new GraphNamespace(
       this.withScope({
         graph: name,
-        branch: opts.branch ?? this.branchName,
         stack: opts.stack ?? this.stack,
       }),
     );
   }
 
   /**
-   * A new client for a different graph/branch on the same server and credential.
-   * Each instance is scoped to one graph/branch, so use this to target another
+   * A new client for a different graph on the same server and credential.
+   * Each instance is scoped to one graph, so use this to target another
    * scope (e.g. creating a fresh graph) without mutating the current client.
    */
-  withScope(scope: {
-    graph?: string;
-    branch?: string;
-    stack?: string;
-  }): LbbClient {
+  withScope(scope: { graph?: string; stack?: string }): LbbClient {
     return new LbbClient({
       baseUrl: this.baseUrl,
       apiKey: this.apiKey,
       graph: scope.graph ?? this.graphName,
-      branch: scope.branch ?? this.branchName,
       stack: scope.stack ?? this.stack,
       fetch: this.fetchImpl,
       apiVersion: this.apiVersion,
@@ -363,7 +352,6 @@ export class LbbClient {
         `${encodeURIComponent(key)}=${encodeURIComponent(String(value))}`,
       );
     if (this.graphName !== undefined) push("graph", this.graphName);
-    if (this.branchName !== undefined) push("branch", this.branchName);
     if (this.stack !== undefined) push("stack", this.stack);
     for (const [key, value] of Object.entries(query ?? {})) {
       if (value !== undefined) push(key, value);
@@ -838,8 +826,8 @@ export class LbbClient {
   }
 
   /**
-   * Create the scoped graph/branch with an empty ontology. Construct the client
-   * with the desired graph/branch first, then call `ontology.define` before
+   * Create the scoped graph with an empty ontology. Construct the client
+   * with the desired graph first, then call `ontology.define` before
    * writing typed data.
    */
   createGraph(): Promise<Schemas["CreateGraphResponse"]> {
@@ -908,61 +896,13 @@ export class LbbClient {
     });
   }
 
-  /** Fork the scoped branch from an existing branch in the same graph. */
-  createBranch(
-    body: Schemas["GraphBranchCreateRequest"],
-  ): Promise<Schemas["GraphBranchCreateResponse"]> {
-    return this.request("POST", "/v1/graph/branch", { body });
-  }
-
-  /**
-   * Validate-then-merge: replay `from_branch`'s post-fork commits onto the
-   * SCOPED branch (its fork parent) as one new commit. A write — sends an
-   * Idempotency-Key so a retry replays instead of re-applying.
-   */
-  mergeBranch(
-    body: Schemas["GraphBranchMergeRequest"],
-    opts: { idempotencyKey?: string } = {},
-  ): Promise<Schemas["GraphBranchMergeResponse"]> {
-    return this.request("POST", "/v1/graph/branch/merge", {
-      body,
-      idempotencyKey:
-        opts.idempotencyKey ?? this.idempotencyKey("branch-merge"),
-    });
-  }
-
-  /**
-   * Observe: store a conversation episode verbatim as EPISODE evidence,
-   * anchor + gate extracted facts on an observe branch, and optionally
-   * auto-merge when validation is clean. Flag-gated server-side
-   * (`--enable-observe`). A write — carries an Idempotency-Key.
-   */
-  observe(
-    body: Schemas["ObserveRequest"],
-    opts: { idempotencyKey?: string } = {},
-  ): Promise<Schemas["ObserveResponse"]> {
-    return this.request("POST", "/v1/memory/observe", {
-      body,
-      idempotencyKey: opts.idempotencyKey ?? this.idempotencyKey("observe"),
-    });
-  }
-
-  /** Delete the scoped graph, including every branch, feedback, and active graph-scoped job. */
+  /** Delete the scoped graph, including its feedback and active graph-scoped jobs. */
   deleteGraph(opts: {
     confirm: string;
   }): Promise<Schemas["GraphDeleteResponse"]> {
     return this.request("POST", "/v1/graph/delete", {
       query: { confirm: opts.confirm },
       retry: true,
-    });
-  }
-
-  /** Delete only the scoped branch. The server refuses to delete a graph's final live branch. */
-  deleteBranch(opts: {
-    confirm: string;
-  }): Promise<Schemas["GraphBranchDeleteResponse"]> {
-    return this.request("DELETE", "/v1/graph/branch", {
-      query: { confirm: opts.confirm },
     });
   }
 
@@ -1583,7 +1523,7 @@ export class LbbClient {
     return this.request("GET", "/v1/graph/schema-summary");
   }
 
-  /** List the graphs (and branches) under the scoped tenant. */
+  /** List the graphs under the scoped tenant. */
   listGraphs(): Promise<Schemas["GraphListResponse"]> {
     return this.request("GET", "/v1/graphs");
   }

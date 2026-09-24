@@ -2,6 +2,15 @@
 
 All notable changes to the `@littlebigbrain/client` package are documented here.
 
+## Unreleased
+
+Breaking removal of branches and observe. Every graph has one line of history.
+
+- Remove the `branch` option from `LbbClient`, `graph(name, opts)`, and
+  `withScope`. A client is scoped by graph only.
+- Remove `createBranch`, `mergeBranch`, `deleteBranch`, and `observe`, and the
+  `branch()` and `deleteBranch()` methods of the graph namespace.
+
 ## 0.13.2 (2026-09-24)
 
 - Add the `embeddings` namespace to preview and configure embeddings, change

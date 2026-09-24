@@ -96,7 +96,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** The embeddings of the branch with their status: serving and building version, backfill progress, watermark, lag, recall; `name` for one */
+        /** The embeddings of the graph with their status: serving and building version, backfill progress, watermark, lag, recall; `name` for one */
         get: operations["get_v1_embeddings"];
         /** Declare or change the embedding of a class: its fields (one-hop property paths, or chosen automatically), and model. A new recipe builds as a new version while the old one serves */
         put: operations["put_v1_embeddings"];
@@ -287,9 +287,9 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Read the evals settings of the branch */
+        /** Read the evals settings of the graph */
         get: operations["get_v1_evals_settings"];
-        /** Write the evals settings of the branch */
+        /** Write the evals settings of the graph */
         put: operations["put_v1_evals_settings"];
         post?: never;
         delete?: never;
@@ -326,41 +326,6 @@ export interface paths {
         get: operations["get_v1_evals_traces"];
         put?: never;
         post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/graph/branch": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Fork the scoped branch from an existing branch in the same graph */
-        post: operations["post_v1_graph_branch"];
-        /** Delete the scoped branch; refuses to delete a graph's final live branch */
-        delete: operations["delete_v1_graph_branch"];
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/graph/branch/merge": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Replay a child branch's post-fork commits onto the scoped branch (its fork parent) as one commit — validate-then-merge; requires an Idempotency-Key */
-        post: operations["post_v1_graph_branch_merge"];
         delete?: never;
         options?: never;
         head?: never;
@@ -427,7 +392,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Create the scoped graph and branch with an empty ontology */
+        /** Create the scoped graph with an empty ontology */
         post: operations["post_v1_graph_create"];
         delete?: never;
         options?: never;
@@ -444,7 +409,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Delete every branch and deregister the scoped graph; destructive and idempotent */
+        /** Delete and deregister the scoped graph; destructive and idempotent */
         post: operations["post_v1_graph_delete"];
         delete?: never;
         options?: never;
@@ -476,7 +441,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Native entity attributes and relationships from the branch-owned RDF view; unavailable provenance sections are explicitly listed */
+        /** Native entity attributes and relationships from the graph-owned RDF view; unavailable provenance sections are explicitly listed */
         get: operations["get_v1_graph_entity"];
         put?: never;
         post?: never;
@@ -734,7 +699,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List the graphs (and branches) under the scoped tenant */
+        /** List the graphs under the scoped tenant */
         get: operations["get_v1_graphs"];
         put?: never;
         post?: never;
@@ -755,23 +720,6 @@ export interface paths {
         get: operations["get_v1_managed_models"];
         put?: never;
         post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/memory/observe": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Observe a conversation episode: store it verbatim as EPISODE evidence, anchor and gate extracted facts on an observe branch, optionally auto-merge when validation is clean; requires an Idempotency-Key (flag-gated: --enable-observe) */
-        post: operations["post_v1_memory_observe"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1093,7 +1041,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Read the immutable branch-owned ontology-conformance sidecar selected by the F3 checksum and schema identity */
+        /** Read the immutable graph-owned ontology-conformance sidecar selected by the F3 checksum and schema identity */
         get: operations["get_v1_ontology_conformance"];
         put?: never;
         post?: never;
@@ -1857,16 +1805,6 @@ export interface components {
             why: components["schemas"]["SearchExplanation"][];
         };
         BranchId: string;
-        BranchMergeConflict: {
-            /** @description The dropped branch edge event. */
-            edge_event_id: string;
-            /** @description Conflict class; v1 emits only `supersedure_race`. */
-            kind: string;
-        };
-        BranchParentView: {
-            commit_seq: components["schemas"]["CommitSeq"];
-            graph: components["schemas"]["GraphKey"];
-        };
         /**
          * @description Calibration serving default derived from a promoted `calibration` run:
          *     the Platt scaler the retrieval-premise producer applies when a request
@@ -2273,7 +2211,7 @@ export interface components {
             embeddings: components["schemas"]["EmbeddingStatus"][];
             /**
              * @description The embedding model of the graph: every serving embedding of the
-             *     branch uses it, so one query vector serves a search over all classes.
+             *     graph uses it, so one query vector serves a search over all classes.
              *     Absent before the first declaration (the catalog's model applies then).
              */
             model_id?: string | null;
@@ -3347,8 +3285,8 @@ export interface components {
         /**
          * @description One extractor training fact, mirroring the resident extractor's strict
          *     output JSON (`{statement, source_type, source, relation, target_type,
-         *     target, confidence}`) — every committed fact was vocabulary-snapped and
-         *     branch-gated at observe time, so labels are execution-verified.
+         *     target, confidence}`) — every committed fact was vocabulary-snapped
+         *     before it was committed, so labels are execution-verified.
          */
         ExtractorFact: {
             /** Format: float */
@@ -3549,7 +3487,7 @@ export interface components {
             /** Format: int64 */
             suite_version: number;
         };
-        /** @description The suite: one CAS-versioned document per branch. */
+        /** @description The suite: one CAS-versioned document per graph. */
         GoldenSuite: {
             goldens: components["schemas"]["Golden"][];
             /**
@@ -3622,80 +3560,6 @@ export interface components {
          * @enum {string}
          */
         GraphBindMode: "filter" | "boost";
-        GraphBranchCreateRequest: {
-            from_branch: string;
-        };
-        GraphBranchCreateResponse: {
-            graph: components["schemas"]["GraphKey"];
-            parent: components["schemas"]["BranchParentView"];
-            snapshot: components["schemas"]["SnapshotView"];
-        };
-        GraphBranchDeleteResponse: {
-            branch_id: string;
-            /** Format: int64 */
-            deleted_bytes: number;
-            deleted_objects: number;
-            graph_id: string;
-            ok: boolean;
-        };
-        /**
-         * @description `POST /v1/graph/branch/merge` — replay a child branch's commits onto its
-         *     fork parent (the branch named by the request URL) as one new commit batch.
-         *     Append-only: provenance and event ids are preserved, commit seqs are
-         *     re-stamped onto the target's next seq.
-         */
-        GraphBranchMergeRequest: {
-            /**
-             * @description Delete every object under the source branch's prefix after a successful
-             *     merge (the branch is consumed).
-             */
-            delete_source?: boolean;
-            /**
-             * @description The child branch whose post-fork commits are replayed. It must have been
-             *     created from the branch this request is addressed to (its fork parent).
-             */
-            from_branch: string;
-            /**
-             * @description Run the active SHACL schema on the would-be merged state BEFORE the head
-             *     write and refuse (merged=false + report) on violations — even when the
-             *     graph's enforce mode is `report`. With no active shapes (or mode `off`)
-             *     there is nothing to validate against and this is a no-op.
-             */
-            validate?: boolean;
-        };
-        GraphBranchMergeResponse: {
-            /**
-             * Format: int64
-             * @description Branch-local commits replayed (0 for a no-op merge of an unchanged
-             *     branch).
-             */
-            commits_applied: number;
-            /**
-             * @description Branch facts dropped by the conflict rule: a fact superseded on the
-             *     target after the fork point wins over the branch's version.
-             */
-            conflicts?: components["schemas"]["BranchMergeConflict"][];
-            /**
-             * @description True when this request id was already applied; `commits_applied` and
-             *     `conflicts` are not re-derived on a replay.
-             */
-            idempotent_replay?: boolean;
-            /**
-             * @description False when `validate` refused the merge; the target is untouched and
-             *     `validation` carries the report.
-             */
-            merged: boolean;
-            /** @description Why `merged` is false, when it is. */
-            refusal?: string | null;
-            /**
-             * @description The target branch snapshot after the merge (or its untouched head on
-             *     refusal / no-op).
-             */
-            snapshot: components["schemas"]["SnapshotView"];
-            /** @description True when `delete_source` ran (the source branch's objects are gone). */
-            source_deleted?: boolean;
-            validation?: null | components["schemas"]["SchemaAuditReport"];
-        };
         /**
          * @description WS3 — a per-graph, per-snapshot self-description an agent can inject as prompt
          *     context: the types, relations, properties, and top attribute values that
@@ -3724,7 +3588,7 @@ export interface components {
          *     include edge retractions/tombstones. Paging is by whole commits (`next_since`
          *     walks the window). Segment folds repackage history rather than reduce it, so
          *     any `since` up to the head is served; a `since` BEYOND the head (a cursor
-         *     from a wiped/re-created branch) returns `reset` and is served as HTTP 409
+         *     from a wiped/re-created graph) returns `reset` and is served as HTTP 409
          *     with body `{"error":"delta_unavailable","reset":true,"snapshot_token":…}`.
          */
         GraphChangesResponse: {
@@ -3742,8 +3606,8 @@ export interface components {
             next_since: number;
             observations: components["schemas"]["ChangedObservation"][];
             /**
-             * @description The cursor cannot be answered from this branch's history (`since` beyond
-             *     the head — the branch was wiped or re-created); the client must
+             * @description The cursor cannot be answered from this graph's history (`since` beyond
+             *     the head — the graph was wiped or re-created); the client must
              *     full-read. Served as HTTP 409 with an `error: delta_unavailable` body.
              */
             reset?: boolean;
@@ -3817,7 +3681,6 @@ export interface components {
             written_properties?: components["schemas"]["EntityFieldsWritten"][];
         };
         GraphDeleteResponse: {
-            deleted_branches: number;
             /** Format: int64 */
             deleted_bytes: number;
             deleted_feedback_objects: number;
@@ -4083,7 +3946,6 @@ export interface components {
             index_lineage?: null | components["schemas"]["IndexLineage"];
             /** Format: int64 */
             ontology_version: number;
-            parent?: null | components["schemas"]["BranchParentView"];
             /** @description Commit distance from the graph head to the pinned published generation. */
             published_lag_commits: number;
             /** Format: int64 */
@@ -4305,8 +4167,6 @@ export interface components {
             visibility_token: string;
         };
         GraphSummary: {
-            /** @description Branches that exist under this graph (e.g. `["main"]`). */
-            branches: string[];
             graph_id: string;
         };
         GraphSummaryResponse: {
@@ -4701,7 +4561,7 @@ export interface components {
         };
         /**
          * @description The serving defaults derived from promoted model runs, pinned to the
-         *     branch head like the embedding config (`model_defaults_ref`). One object
+         *     graph head like the embedding config (`model_defaults_ref`). One object
          *     serves every in-process kind; promotion truth stays the registry's
          *     `CURRENT` pointer — this is its read-optimized projection. **[PIN]**
          *     field names (persisted object).
@@ -4748,7 +4608,7 @@ export interface components {
         };
         /**
          * @description Per-graph automatic-training configuration, stored as one small CAS
-         *     object under the branch prefix (purged with the tenant). **[PIN]** field
+         *     object under the graph prefix (purged with the tenant). **[PIN]** field
          *     names. Default: off — training never starts without an explicit opt-in.
          */
         ModelTrainingConfig: {
@@ -4849,92 +4709,6 @@ export interface components {
             source_id: string;
             text?: string | null;
             text_preview?: string | null;
-        };
-        /** @description A caller-extracted candidate fact (`extraction.byo_completion`). */
-        ObserveByoFact: {
-            /** Format: float */
-            confidence?: number;
-            /** @description Natural-language statement of the fact. */
-            fact: string;
-            triplet?: null | components["schemas"]["TripletInput"];
-        };
-        /**
-         * @description The raw conversation slice to remember. Ground truth — stored verbatim on
-         *     the main branch as an `EPISODE` evidence entity.
-         */
-        ObserveEpisode: {
-            /** @description Caller's conversation id (opaque; drives the default branch name). */
-            session_id: string;
-            /** @description Optional source label, e.g. `support-bot`. */
-            source?: string | null;
-            /** @description 1..=500 turns, <= 1 MiB of content in total. */
-            turns: components["schemas"]["ObserveTurn"][];
-        };
-        ObserveExtraction: {
-            /**
-             * @description Caller-side extraction: skip the model, run anchoring / supersedure /
-             *     gating only.
-             */
-            byo_completion?: components["schemas"]["ObserveByoFact"][];
-            /** @description Cap on extracted facts (clamped to 32). */
-            max_facts?: number | null;
-            /**
-             * @description `byo` | `resident`. Defaults to `resident` when the server has a
-             *     planner endpoint configured, else `byo`.
-             */
-            model?: string | null;
-        };
-        /** @description Per-fact outcome. `status`: `committed` | `rejected` | `needs_review`. */
-        ObserveFact: {
-            /** @description Both endpoints resolved to entities that already existed. */
-            anchored: boolean;
-            /** Format: float */
-            confidence: number;
-            statement: string;
-            status: string;
-            /** @description The current edge this fact displaces (commit-ordered reducers only). */
-            supersedes?: string | null;
-            triplet?: null | components["schemas"]["TripletInput"];
-        };
-        ObserveRequest: {
-            /**
-             * @description Merge the branch back onto the scoped branch when validation is clean
-             *     (the WS16 validate-then-merge).
-             */
-            auto_merge?: boolean;
-            /**
-             * @description Branch the facts commit to. Defaults to `observe-<hash12(session_id)>`
-             *     (branch names are `[a-z0-9-_]{1,32}`, so the session id is hashed, not
-             *     embedded). Created from the scoped branch if absent.
-             */
-            branch?: string | null;
-            episode: components["schemas"]["ObserveEpisode"];
-            /** @description `false` stores the episode only (no facts, no branch). */
-            extract?: boolean;
-            extraction?: components["schemas"]["ObserveExtraction"];
-        };
-        ObserveResponse: {
-            /** @description The branch the facts committed to (empty when `extract: false`). */
-            branch: string;
-            /** @description Stable entity id of the stored `EPISODE` evidence entity. */
-            episode_id: string;
-            facts?: components["schemas"]["ObserveFact"][];
-            /** @description True when this Idempotency-Key was already applied (episode replayed). */
-            idempotent_replay?: boolean;
-            merged: boolean;
-            /** @description The scoped (main) branch snapshot after the observe. */
-            snapshot: components["schemas"]["SnapshotView"];
-            validation?: null | components["schemas"]["SchemaAuditReport"];
-        };
-        /** @description One conversation turn of an episode. */
-        ObserveTurn: {
-            content: string;
-            /** @description Optional speaker/tool name. */
-            name?: string | null;
-            /** @description `user` | `assistant` | `tool` (free-form label; not enforced). */
-            role: string;
-            /** @description Optional RFC 3339 timestamp of the turn. */
-            ts?: string | null;
         };
         OntologyCompetencyQuestion: {
             id: string;
@@ -6171,12 +5945,12 @@ export interface components {
             /** @description RDF or ontology document text. */
             source: string;
         };
-        /** @description How the published shape set is enforced on this branch. */
+        /** @description How the published shape set is enforced on this graph. */
         SchemaWriteEnforcement: {
             shapes: components["schemas"]["SchemaShapeWriteEnforcement"][];
             timing: components["schemas"]["SchemaWriteEnforcementTiming"];
             /**
-             * @description True when no root shape has a blocker. An RDF-native branch accepts
+             * @description True when no root shape has a blocker. An RDF-native graph accepts
              *     `reject` mode only for such a shape set.
              */
             write_enforceable: boolean;
@@ -7235,6 +7009,9 @@ export interface components {
          *     v1.1 (2026-07-07, planner-feedback capture): adds the legacy
          *     `ask_trace`/`ask_feedback` supervision records. They remain decodable for
          *     durable training data, but no public Ask endpoint emits them.
+         *
+         *     `branch_merge_accepted`/`branch_merge_rejected` stay decodable for stored
+         *     signal records only: graphs have no branches, and nothing emits them.
          * @enum {string}
          */
         SignalKind: "suggestion_shown" | "suggestion_adopted" | "zero_result" | "atom_cited" | "branch_merge_accepted" | "branch_merge_rejected" | "tool_error" | "speculation_summary" | "ask_trace" | "ask_feedback" | "external_planner_trace";
@@ -7530,7 +7307,7 @@ export interface components {
             /** @description WHERE: the conjunctive basic graph pattern (shares the analytic engine). */
             patterns: components["schemas"]["AnalyticTriplePattern"][];
             /**
-             * @description Not available on the published SPARQL surface: a branch's stored
+             * @description Not available on the published SPARQL surface: a graph's stored
              *     inference rules already run at publish time, folding derived facts into
              *     the asserted dataset every query reads. Requesting `reason: true`
              *     returns a typed, non-retryable error.
@@ -7613,7 +7390,7 @@ export interface components {
             /** @description The SPARQL query text (SELECT or ASK). */
             query: string;
             /**
-             * @description Not available on the published SPARQL surface: a branch's stored
+             * @description Not available on the published SPARQL surface: a graph's stored
              *     inference rules already run at publish time, folding derived facts into
              *     the asserted dataset every query reads. Requesting `reason: true`
              *     returns a typed, non-retryable error.
@@ -8218,8 +7995,6 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
-                /** @description Branch name (default `main`) */
-                branch?: string;
             };
             header?: {
                 /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
@@ -8354,8 +8129,6 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
-                /** @description Branch name (default `main`) */
-                branch?: string;
                 /** @description Public dataset id */
                 dataset?: string;
             };
@@ -8494,8 +8267,6 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
-                /** @description Branch name (default `main`) */
-                branch?: string;
                 /** @description Dataset id */
                 dataset?: string;
                 /** @description Build indexes after loading */
@@ -8636,8 +8407,6 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
-                /** @description Branch name (default `main`) */
-                branch?: string;
             };
             header?: {
                 /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
@@ -8772,8 +8541,6 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
-                /** @description Branch name (default `main`) */
-                branch?: string;
                 /** @description Dataset id */
                 dataset?: string;
             };
@@ -8912,8 +8679,6 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
-                /** @description Branch name (default `main`) */
-                branch?: string;
                 /** @description one embedding (returns EmbeddingStatus) */
                 name?: string;
             };
@@ -9050,8 +8815,6 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
-                /** @description Branch name (default `main`) */
-                branch?: string;
             };
             header?: {
                 /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
@@ -9190,8 +8953,6 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
-                /** @description Branch name (default `main`) */
-                branch?: string;
                 /** @description the embedding */
                 name?: string;
                 /** @description the embedding name again */
@@ -9332,8 +9093,6 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
-                /** @description Branch name (default `main`) */
-                branch?: string;
             };
             header?: {
                 /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
@@ -9472,8 +9231,6 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
-                /** @description Branch name (default `main`) */
-                branch?: string;
             };
             header?: {
                 /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
@@ -9614,8 +9371,6 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
-                /** @description Branch name (default `main`) */
-                branch?: string;
                 /** @description the embedding */
                 name?: string;
             };
@@ -9754,8 +9509,6 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
-                /** @description Branch name (default `main`) */
-                branch?: string;
             };
             header?: {
                 /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
@@ -9890,8 +9643,6 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
-                /** @description Branch name (default `main`) */
-                branch?: string;
             };
             header?: {
                 /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
@@ -10026,8 +9777,6 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
-                /** @description Branch name (default `main`) */
-                branch?: string;
             };
             header?: {
                 /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
@@ -10168,8 +9917,6 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
-                /** @description Branch name (default `main`) */
-                branch?: string;
                 /** @description the golden id */
                 id?: string;
             };
@@ -10308,8 +10055,6 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
-                /** @description Branch name (default `main`) */
-                branch?: string;
                 /** @description the golden id */
                 id?: string;
                 /** @description eventual (default) reads the last published commit; strong reads the head */
@@ -10450,8 +10195,6 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
-                /** @description Branch name (default `main`) */
-                branch?: string;
                 /** @description one trace id; omit to judge a batch of unlabeled traces */
                 trace?: string;
                 /** @description batch size when no trace is named (default 20) */
@@ -10592,8 +10335,6 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
-                /** @description Branch name (default `main`) */
-                branch?: string;
                 /** @description the trace id returned by the query */
                 trace?: string;
             };
@@ -10736,8 +10477,6 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
-                /** @description Branch name (default `main`) */
-                branch?: string;
                 /** @description runs to return (default 20, at most 40) */
                 limit?: string;
             };
@@ -10874,8 +10613,6 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
-                /** @description Branch name (default `main`) */
-                branch?: string;
                 /** @description eventual (default) checks the last published commit; strong checks the head */
                 consistency?: string;
             };
@@ -11014,8 +10751,6 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
-                /** @description Branch name (default `main`) */
-                branch?: string;
             };
             header?: {
                 /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
@@ -11150,8 +10885,6 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
-                /** @description Branch name (default `main`) */
-                branch?: string;
             };
             header?: {
                 /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
@@ -11290,8 +11023,6 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
-                /** @description Branch name (default `main`) */
-                branch?: string;
                 /** @description the trace id returned by the query */
                 id?: string;
             };
@@ -11428,8 +11159,6 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
-                /** @description Branch name (default `main`) */
-                branch?: string;
                 /** @description traces to return (default 50, at most 200) */
                 limit?: string;
                 /** @description true to return only traces with a result nobody labeled yet */
@@ -11563,437 +11292,11 @@ export interface operations {
             };
         };
     };
-    post_v1_graph_branch: {
-        parameters: {
-            query?: {
-                /** @description Graph name (default `main`) */
-                graph?: string;
-                /** @description Branch name (default `main`) */
-                branch?: string;
-            };
-            header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
-                "Lbb-Version"?: string;
-                /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
-                "Idempotency-Key"?: string;
-            };
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["GraphBranchCreateRequest"];
-            };
-        };
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["GraphBranchCreateResponse"];
-                };
-            };
-            /** @description Bad request */
-            400: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Forbidden */
-            403: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Not found */
-            404: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Conflict */
-            409: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Rate limit exceeded */
-            429: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Internal server error */
-            500: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Service unavailable */
-            503: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-        };
-    };
-    delete_v1_graph_branch: {
-        parameters: {
-            query?: {
-                /** @description Graph name (default `main`) */
-                graph?: string;
-                /** @description Branch name (default `main`) */
-                branch?: string;
-                /** @description Must equal the target branch id */
-                confirm?: string;
-            };
-            header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
-                "Lbb-Version"?: string;
-                /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
-                "Idempotency-Key"?: string;
-            };
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["GraphBranchDeleteResponse"];
-                };
-            };
-            /** @description Bad request */
-            400: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Forbidden */
-            403: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Not found */
-            404: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Conflict */
-            409: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Rate limit exceeded */
-            429: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Internal server error */
-            500: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Service unavailable */
-            503: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-        };
-    };
-    post_v1_graph_branch_merge: {
-        parameters: {
-            query?: {
-                /** @description Graph name (default `main`) */
-                graph?: string;
-                /** @description Branch name (default `main`) */
-                branch?: string;
-            };
-            header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
-                "Lbb-Version"?: string;
-                /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
-                "Idempotency-Key"?: string;
-            };
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["GraphBranchMergeRequest"];
-            };
-        };
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["GraphBranchMergeResponse"];
-                };
-            };
-            /** @description Bad request */
-            400: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Forbidden */
-            403: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Not found */
-            404: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Conflict */
-            409: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Rate limit exceeded */
-            429: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Internal server error */
-            500: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Service unavailable */
-            503: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-        };
-    };
     get_v1_graph_changes: {
         parameters: {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
-                /** @description Branch name (default `main`) */
-                branch?: string;
                 /** @description Exclusive lower bound commit_seq (default 0) */
                 since?: string;
                 /** @description Max records per page (default 500, max 5000) */
@@ -12132,8 +11435,6 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
-                /** @description Branch name (default `main`) */
-                branch?: string;
                 /** @description Validate only and return a GraphCommitDryRunResponse without writing (no Idempotency-Key required) */
                 dry_run?: string;
             };
@@ -12276,8 +11577,6 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
-                /** @description Branch name (default `main`) */
-                branch?: string;
                 /** @description Minimum tail commits before compaction */
                 min_tail_commits?: string;
                 /** @description Merge into at most this many segments */
@@ -12418,8 +11717,6 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
-                /** @description Branch name (default `main`) */
-                branch?: string;
             };
             header?: {
                 /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
@@ -12556,8 +11853,6 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
-                /** @description Branch name (default `main`) */
-                branch?: string;
                 /** @description Must equal the target graph id to authorize deletion */
                 confirm?: string;
             };
@@ -12696,8 +11991,6 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
-                /** @description Branch name (default `main`) */
-                branch?: string;
                 /** @description Exact entity type */
                 type?: string;
                 /** @description Max sampled rows (up to 128) */
@@ -12838,8 +12131,6 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
-                /** @description Branch name (default `main`) */
-                branch?: string;
                 /** @description Entity id */
                 id?: string;
                 /** @description Entity type for name-addressed lookup */
@@ -12988,8 +12279,6 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
-                /** @description Branch name (default `main`) */
-                branch?: string;
                 /** @description Entity id */
                 id?: string;
                 /** @description Entity type for name-addressed lookup */
@@ -13132,8 +12421,6 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
-                /** @description Branch name (default `main`) */
-                branch?: string;
                 /** @description Entity id */
                 id?: string;
                 /** @description Entity type for name-addressed lookup */
@@ -13280,8 +12567,6 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
-                /** @description Branch name (default `main`) */
-                branch?: string;
                 /** @description The export job id returned by the enqueue call */
                 job_id?: string;
             };
@@ -13418,8 +12703,6 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
-                /** @description Branch name (default `main`) */
-                branch?: string;
                 /** @description Pin the export to a past snapshot commit_seq */
                 as_of_commit_seq?: string;
             };
@@ -13558,8 +12841,6 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
-                /** @description Branch name (default `main`) */
-                branch?: string;
                 /** @description Source graph id to fork from */
                 src?: string;
                 /** @description Destination graph id to create (must not exist) */
@@ -13702,8 +12983,6 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
-                /** @description Branch name (default `main`) */
-                branch?: string;
                 /** @description Records per internal commit (default 1000, clamped 1-10000) */
                 batch?: string;
                 /** @description Abort on the first malformed line instead of skipping it */
@@ -13846,8 +13125,6 @@ export interface operations {
             query: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
-                /** @description Branch name (default `main`) */
-                branch?: string;
                 /** @description Stable job id returned by the submit call */
                 job_id: string;
             };
@@ -13984,8 +13261,6 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
-                /** @description Branch name (default `main`) */
-                branch?: string;
                 /** @description Records per grouped commit (default and maximum 10000; minimum 1) */
                 batch?: string;
                 /** @description Fail the durable job on the first malformed line instead of recording and skipping it */
@@ -14146,8 +13421,6 @@ export interface operations {
             query: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
-                /** @description Branch name (default `main`) */
-                branch?: string;
                 /** @description Stable job id returned by the submit call */
                 job_id: string;
             };
@@ -14286,8 +13559,6 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
-                /** @description Branch name (default `main`) */
-                branch?: string;
                 /** @description RDF statements per internal commit (default 1000000, the cap: one commit per fully-buffered request; clamped 1-1000000) */
                 batch?: string;
                 /** @description Abort on the first malformed RDF parse error instead of reporting it */
@@ -14444,8 +13715,6 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
-                /** @description Branch name (default `main`) */
-                branch?: string;
             };
             header?: {
                 /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
@@ -14580,8 +13849,6 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
-                /** @description Branch name (default `main`) */
-                branch?: string;
             };
             header?: {
                 /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
@@ -14716,8 +13983,6 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
-                /** @description Branch name (default `main`) */
-                branch?: string;
             };
             header?: {
                 /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
@@ -14852,8 +14117,6 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
-                /** @description Branch name (default `main`) */
-                branch?: string;
                 /** @description Must equal the target graph id (reload is semi-destructive) */
                 confirm?: string;
                 /** @description true = preview the delta; nothing durable changes */
@@ -14998,8 +14261,6 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
-                /** @description Branch name (default `main`) */
-                branch?: string;
             };
             header?: {
                 /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
@@ -15140,8 +14401,6 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
-                /** @description Branch name (default `main`) */
-                branch?: string;
             };
             header?: {
                 /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
@@ -15276,8 +14535,6 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
-                /** @description Branch name (default `main`) */
-                branch?: string;
             };
             header?: {
                 /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
@@ -15412,8 +14669,6 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
-                /** @description Branch name (default `main`) */
-                branch?: string;
                 /** @description Max rows */
                 limit?: string;
                 /** @description Opaque cursor from the previous page */
@@ -15552,8 +14807,6 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
-                /** @description Branch name (default `main`) */
-                branch?: string;
             };
             header?: {
                 /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
@@ -15683,155 +14936,11 @@ export interface operations {
             };
         };
     };
-    post_v1_memory_observe: {
-        parameters: {
-            query?: {
-                /** @description Graph name (default `main`) */
-                graph?: string;
-                /** @description Branch name (default `main`) */
-                branch?: string;
-            };
-            header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
-                "Lbb-Version"?: string;
-                /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
-                "Idempotency-Key"?: string;
-            };
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["ObserveRequest"];
-            };
-        };
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ObserveResponse"];
-                };
-            };
-            /** @description Bad request */
-            400: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Forbidden */
-            403: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Not found */
-            404: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Conflict */
-            409: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Rate limit exceeded */
-            429: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Internal server error */
-            500: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Service unavailable */
-            503: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-        };
-    };
     get_v1_models_cadence: {
         parameters: {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
-                /** @description Branch name (default `main`) */
-                branch?: string;
                 /** @description Model kind */
                 kind?: string;
             };
@@ -15968,8 +15077,6 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
-                /** @description Branch name (default `main`) */
-                branch?: string;
                 /** @description Max episodes (default 200, cap 500) */
                 limit?: string;
                 /** @description Maximum fact sequence included */
@@ -16108,8 +15215,6 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
-                /** @description Branch name (default `main`) */
-                branch?: string;
                 /** @description Max examples (default 500, cap 2000) */
                 limit?: string;
                 /** @description Maximum signal sequence included */
@@ -16248,8 +15353,6 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
-                /** @description Branch name (default `main`) */
-                branch?: string;
                 /** @description Max pairs (default 500, cap 2000) */
                 limit?: string;
                 /** @description Maximum signal sequence included */
@@ -16388,8 +15491,6 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
-                /** @description Branch name (default `main`) */
-                branch?: string;
                 /** @description Model kind (embedding|calibration|fusion|suggest_ranker|planner|extractor) */
                 kind?: string;
                 /** @description Run number to promote */
@@ -16530,8 +15631,6 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
-                /** @description Branch name (default `main`) */
-                branch?: string;
                 /** @description The extractor_lora training run to promote */
                 run_id?: string;
                 /** @description Promote even when tuned fact F1 regressed */
@@ -16672,8 +15771,6 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
-                /** @description Branch name (default `main`) */
-                branch?: string;
                 /** @description The planner_lora training run to promote */
                 run_id?: string;
                 /** @description Promote even when tuned slot exactness regressed */
@@ -16814,8 +15911,6 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
-                /** @description Branch name (default `main`) */
-                branch?: string;
             };
             header?: {
                 /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
@@ -16956,8 +16051,6 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
-                /** @description Branch name (default `main`) */
-                branch?: string;
                 /** @description Model kind */
                 kind?: string;
             };
@@ -17094,8 +16187,6 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
-                /** @description Branch name (default `main`) */
-                branch?: string;
                 /** @description Model kind */
                 kind?: string;
                 /** @description Most-recent runs to keep besides the promoted one (default 3) */
@@ -17236,8 +16327,6 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
-                /** @description Branch name (default `main`) */
-                branch?: string;
             };
             header?: {
                 /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
@@ -17378,8 +16467,6 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
-                /** @description Branch name (default `main`) */
-                branch?: string;
                 /** @description Model kind */
                 kind?: string;
                 /** @description Run number */
@@ -17518,8 +16605,6 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
-                /** @description Branch name (default `main`) */
-                branch?: string;
                 /** @description Max probes (default 100, cap 200) */
                 limit?: string;
                 /** @description Maximum signal sequence included */
@@ -17658,8 +16743,6 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
-                /** @description Branch name (default `main`) */
-                branch?: string;
                 /** @description Max probes (default 100, max 500) */
                 limit?: string;
             };
@@ -17796,8 +16879,6 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
-                /** @description Branch name (default `main`) */
-                branch?: string;
                 /** @description Stable job id returned by the submit call */
                 job_id?: string;
             };
@@ -17934,8 +17015,6 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
-                /** @description Branch name (default `main`) */
-                branch?: string;
             };
             header?: {
                 /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
@@ -18076,8 +17155,6 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
-                /** @description Branch name (default `main`) */
-                branch?: string;
             };
             header?: {
                 /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
@@ -18218,8 +17295,6 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
-                /** @description Branch name (default `main`) */
-                branch?: string;
             };
             header?: {
                 /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
@@ -18354,8 +17429,6 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
-                /** @description Branch name (default `main`) */
-                branch?: string;
             };
             header?: {
                 /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
@@ -18496,8 +17569,6 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
-                /** @description Branch name (default `main`) */
-                branch?: string;
             };
             header?: {
                 /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
@@ -18632,8 +17703,6 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
-                /** @description Branch name (default `main`) */
-                branch?: string;
                 /** @description eventual (default) serves the selected base sidecar; strong requires an exact-head sidecar with current ontology/shapes */
                 consistency?: string;
                 /** @description Maximum returned result rows; result_count remains exact */
@@ -18772,8 +17841,6 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
-                /** @description Branch name (default `main`) */
-                branch?: string;
                 /** @description Validate and return the exact predicted definition without creating a graph, writing an ontology object, or changing the graph head */
                 dry_run?: string;
             };
@@ -18916,8 +17983,6 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
-                /** @description Branch name (default `main`) */
-                branch?: string;
                 /** @description Stable ontology draft identifier */
                 draft_id?: string;
             };
@@ -19054,8 +18119,6 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
-                /** @description Branch name (default `main`) */
-                branch?: string;
             };
             header?: {
                 /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
@@ -19196,8 +18259,6 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
-                /** @description Branch name (default `main`) */
-                branch?: string;
                 /** @description Stable ontology draft identifier */
                 draft_id?: string;
             };
@@ -19336,8 +18397,6 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
-                /** @description Branch name (default `main`) */
-                branch?: string;
                 /** @description Stable ontology draft identifier */
                 draft_id?: string;
                 /** @description Auditable rejection reason */
@@ -19478,8 +18537,6 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
-                /** @description Branch name (default `main`) */
-                branch?: string;
                 /** @description Stable ontology draft identifier */
                 draft_id?: string;
             };
@@ -19618,8 +18675,6 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
-                /** @description Branch name (default `main`) */
-                branch?: string;
                 /** @description Validate and return the exact predicted evolution without writing an ontology object or graph head */
                 dry_run?: string;
             };
@@ -19762,8 +18817,6 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
-                /** @description Branch name (default `main`) */
-                branch?: string;
             };
             header?: {
                 /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
@@ -19904,8 +18957,6 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
-                /** @description Branch name (default `main`) */
-                branch?: string;
             };
             header?: {
                 /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
@@ -20046,8 +19097,6 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
-                /** @description Branch name (default `main`) */
-                branch?: string;
             };
             header?: {
                 /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
@@ -20188,8 +19237,6 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
-                /** @description Branch name (default `main`) */
-                branch?: string;
             };
             header?: {
                 /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
@@ -20330,8 +19377,6 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
-                /** @description Branch name (default `main`) */
-                branch?: string;
             };
             header?: {
                 /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
@@ -20472,8 +19517,6 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
-                /** @description Branch name (default `main`) */
-                branch?: string;
             };
             header?: {
                 /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
@@ -20614,8 +19657,6 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
-                /** @description Branch name (default `main`) */
-                branch?: string;
             };
             header?: {
                 /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
@@ -20756,8 +19797,6 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
-                /** @description Branch name (default `main`) */
-                branch?: string;
             };
             header?: {
                 /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
@@ -20898,8 +19937,6 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
-                /** @description Branch name (default `main`) */
-                branch?: string;
             };
             header?: {
                 /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
@@ -21040,8 +20077,6 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
-                /** @description Branch name (default `main`) */
-                branch?: string;
             };
             header?: {
                 /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
@@ -21182,8 +20217,6 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
-                /** @description Branch name (default `main`) */
-                branch?: string;
             };
             header?: {
                 /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
@@ -21318,8 +20351,6 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
-                /** @description Branch name (default `main`) */
-                branch?: string;
                 /** @description Parse and check compatibility without activation; returns activated=false and predicted schema versions. Does not run whole-graph conformance */
                 dry_run?: string;
             };
@@ -21462,8 +20493,6 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
-                /** @description Branch name (default `main`) */
-                branch?: string;
             };
             header?: {
                 /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
@@ -21604,8 +20633,6 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
-                /** @description Branch name (default `main`) */
-                branch?: string;
             };
             header?: {
                 /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
@@ -21746,8 +20773,6 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
-                /** @description Branch name (default `main`) */
-                branch?: string;
             };
             header?: {
                 /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
@@ -21882,8 +20907,6 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
-                /** @description Branch name (default `main`) */
-                branch?: string;
             };
             header?: {
                 /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
@@ -22018,8 +21041,6 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
-                /** @description Branch name (default `main`) */
-                branch?: string;
                 /** @description Inclusive lower flush seq (default 0) */
                 from?: string;
                 /** @description Inclusive upper flush seq (default unbounded) */
@@ -22160,8 +21181,6 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
-                /** @description Branch name (default `main`) */
-                branch?: string;
             };
             header: {
                 /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
@@ -22302,8 +21321,6 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
-                /** @description Branch name (default `main`) */
-                branch?: string;
             };
             header?: {
                 /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
@@ -22438,8 +21455,6 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
-                /** @description Branch name (default `main`) */
-                branch?: string;
                 /** @description Key prefix */
                 prefix?: string;
                 /** @description Max keys */

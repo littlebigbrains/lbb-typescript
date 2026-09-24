@@ -150,11 +150,9 @@ test("graph scope carries the preferred namespaces", async () => {
   ]);
   const client = new LbbClient({ baseUrl: "http://h", fetch });
 
-  await client
-    .graph("support", { branch: "review" })
-    .query.structured({ patterns: [], select: [] });
+  await client.graph("support").query.structured({ patterns: [], select: [] });
 
-  assert.equal(urls[0], "http://h/v1/query/sparql?graph=support&branch=review");
+  assert.equal(urls[0], "http://h/v1/query/sparql?graph=support");
 });
 
 test("request hooks and raw metadata expose retries without exposing bodies", async () => {
