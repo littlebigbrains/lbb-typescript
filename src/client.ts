@@ -1068,24 +1068,6 @@ export class LbbClient {
     );
   }
 
-  /** Planner training examples at or before an optional signal split. */
-  plannerDataset(
-    opts: { limit?: number; splitSeq?: number } = {},
-  ): Promise<Schemas["PlannerDatasetResponse"]> {
-    return this.request("GET", "/v1/models/planner-dataset", {
-      query: { limit: opts.limit, split_seq: opts.splitSeq },
-    });
-  }
-
-  /** Planner preference pairs at or before an optional signal split. */
-  plannerPreferenceDataset(
-    opts: { limit?: number; splitSeq?: number } = {},
-  ): Promise<Schemas["PlannerPreferenceDatasetResponse"]> {
-    return this.request("GET", "/v1/models/planner-preference-dataset", {
-      query: { limit: opts.limit, split_seq: opts.splitSeq },
-    });
-  }
-
   /** Suggest-ranker examples at or before an optional signal split. */
   suggestDataset(
     opts: { limit?: number; splitSeq?: number } = {},
@@ -1114,19 +1096,6 @@ export class LbbClient {
     allowRegression?: boolean;
   }): Promise<unknown> {
     return this.request("POST", "/v1/models/promote-extractor", {
-      query: { run_id: opts.runId, allow_regression: opts.allowRegression },
-    });
-  }
-
-  /**
-   * Promote a finished `planner_lora` training run: gated on held-out slot
-   * exactness and recorded as a `kind=planner` training run.
-   */
-  promotePlanner(opts: {
-    runId: string;
-    allowRegression?: boolean;
-  }): Promise<unknown> {
-    return this.request("POST", "/v1/models/promote-planner", {
       query: { run_id: opts.runId, allow_regression: opts.allowRegression },
     });
   }
