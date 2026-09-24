@@ -842,8 +842,6 @@ test("model dataset routes remain public", async () => {
   const client = new LbbClient({ baseUrl: "http://h", graph: "main", fetch });
 
   await client.shadowEval({ queries: [], challenger: {} });
-  await client.plannerDataset({ limit: 10, splitSeq: 7 });
-  await client.plannerPreferenceDataset({ limit: 11, splitSeq: 8 });
   await client.suggestDataset({ limit: 12, splitSeq: 9 });
   await client.extractorDataset({ limit: 13, splitSeq: 10 });
 
@@ -851,12 +849,21 @@ test("model dataset routes remain public", async () => {
     calls.map((call) => call.input),
     [
       "http://h/v1/models/shadow-eval?graph=main",
-      "http://h/v1/models/planner-dataset?graph=main&limit=10&split_seq=7",
-      "http://h/v1/models/planner-preference-dataset?graph=main&limit=11&split_seq=8",
       "http://h/v1/models/suggest-dataset?graph=main&limit=12&split_seq=9",
       "http://h/v1/models/extractor-dataset?graph=main&limit=13&split_seq=10",
     ],
   );
+  for (const removed of [
+    "plannerDataset",
+    "plannerPreferenceDataset",
+    "promotePlanner",
+  ]) {
+    assert.equal(
+      removed in client,
+      false,
+      `LbbClient must not expose ${removed}`,
+    );
+  }
 });
 
 test("creates a graph with a scoped v1 URL", async () => {

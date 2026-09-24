@@ -4,12 +4,17 @@ All notable changes to the `@littlebigbrain/client` package are documented here.
 
 ## Unreleased
 
-Breaking removal of branches and observe. Every graph has one line of history.
+Breaking removal of branches, observe, and planner training. Every graph has
+one line of history.
 
 - Remove the `branch` option from `LbbClient`, `graph(name, opts)`, and
   `withScope`. A client is scoped by graph only.
 - Remove `createBranch`, `mergeBranch`, `deleteBranch`, and `observe`, and the
   `branch()` and `deleteBranch()` methods of the graph namespace.
+- Remove `plannerDataset`, `plannerPreferenceDataset`, and `promotePlanner`.
+  The server no longer trains the planner.
+- Remove the generated planner training types and the `planner` field of
+  `ModelServingDefaults`.
 
 ## 0.13.2 (2026-09-24)
 
