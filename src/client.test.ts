@@ -370,12 +370,11 @@ test("graph.waitForPublished keeps publication polling in the graph scope", asyn
     }),
   });
   const ready = await new LbbClient({ baseUrl: "http://h", fetch })
-    .graph("perritos", { branch: "review" })
+    .graph("perritos")
     .waitForPublished(7);
   assert.equal(ready.published_seq, 7);
   const url = new URL(calls[0].input);
   assert.equal(url.searchParams.get("graph"), "perritos");
-  assert.equal(url.searchParams.get("branch"), "review");
 });
 
 test("namespace facts.create injects auth, scope, version, and idempotency", async () => {
@@ -403,14 +402,14 @@ test("namespace facts.create injects auth, scope, version, and idempotency", asy
   });
 
   const result = await client
-    .graph("main", { branch: "b" })
+    .graph("main")
     .facts.create({ triplets: [] }, { idempotencyKey: "ik_test_1" });
   assert.equal(result.commit.commit_seq, 1);
   assert.equal(result.commit.no_op, true);
   assert.deepEqual(result.commit.skipped_edges, []);
 
   const [call] = calls;
-  assert.equal(call.input, "http://h:7400/v1/graph/commit?graph=main&branch=b");
+  assert.equal(call.input, "http://h:7400/v1/graph/commit?graph=main");
   assert.equal(call.init.method, "POST");
   assert.equal(call.init.headers?.authorization, "Bearer lbb_sk_test_client");
   assert.equal(call.init.headers?.["content-type"], "application/json");
@@ -658,7 +657,6 @@ test("search.feedback posts labels with idempotency", async () => {
   const client = new LbbClient({
     baseUrl: "http://h",
     graph: "crm",
-    branch: "main",
     fetch,
   });
   await client.search.feedback(
@@ -678,7 +676,7 @@ test("search.feedback posts labels with idempotency", async () => {
   );
 
   const [call] = calls;
-  assert.equal(call.input, "http://h/v1/search/feedback?graph=crm&branch=main");
+  assert.equal(call.input, "http://h/v1/search/feedback?graph=crm");
   assert.equal(call.init.method, "POST");
   assert.equal(call.init.headers?.["idempotency-key"], "fb_1");
   assert.deepEqual(JSON.parse(stringBody(call.init.body)), {
@@ -740,14 +738,10 @@ test("search.feedbackExport reads scoped feedback rows", async () => {
   const client = new LbbClient({
     baseUrl: "http://h",
     graph: "crm",
-    branch: "main",
     fetch,
   });
   await client.search.feedbackExport();
-  assert.equal(
-    calls[0].input,
-    "http://h/v1/search/feedback/export?graph=crm&branch=main",
-  );
+  assert.equal(calls[0].input, "http://h/v1/search/feedback/export?graph=crm");
   assert.equal(calls[0].init.method, "GET");
 });
 
@@ -765,14 +759,10 @@ test("search.feedbackSummary reads scoped feedback administration counts", async
   const client = new LbbClient({
     baseUrl: "http://h",
     graph: "crm",
-    branch: "main",
     fetch,
   });
   await client.search.feedbackSummary();
-  assert.equal(
-    calls[0].input,
-    "http://h/v1/search/feedback/summary?graph=crm&branch=main",
-  );
+  assert.equal(calls[0].input, "http://h/v1/search/feedback/summary?graph=crm");
   assert.equal(calls[0].init.method, "GET");
 });
 
@@ -802,7 +792,6 @@ test("entities namespace encodes detail lookups", async () => {
   const client = new LbbClient({
     baseUrl: "http://h",
     graph: "main",
-    branch: "b",
     fetch,
   });
   const detail = await client.entities.detail({
@@ -817,7 +806,6 @@ test("entities namespace encodes detail lookups", async () => {
   const input = calls[0].input;
   assert.match(input, /^http:\/\/h\/v1\/graph\/entity\?/);
   assert.match(input, /graph=main/);
-  assert.match(input, /branch=b/);
   assert.match(input, /type=SERVICE/);
   assert.match(input, /name=billing-api/);
   assert.match(input, /key=service%2Fbilling/);
@@ -871,54 +859,35 @@ test("model dataset routes remain public", async () => {
   );
 });
 
-test("creates graph and forks branch with scoped v1 URLs", async () => {
+test("creates a graph with a scoped v1 URL", async () => {
   const { fetch, calls } = recordingFetch();
   const client = new LbbClient({
     baseUrl: "http://h",
     graph: "research",
-    branch: "analysis",
     fetch,
   });
 
   await client.createGraph();
-  await client.createBranch({ from_branch: "main" });
 
-  assert.equal(
-    calls[0].input,
-    "http://h/v1/graph/create?graph=research&branch=analysis",
-  );
-  assert.equal(
-    calls[1].input,
-    "http://h/v1/graph/branch?graph=research&branch=analysis",
-  );
-  assert.equal(calls[1].init.method, "POST");
-  assert.deepEqual(JSON.parse(stringBody(calls[1].init.body)), {
-    from_branch: "main",
-  });
+  assert.equal(calls[0].input, "http://h/v1/graph/create?graph=research");
+  assert.equal(calls[0].init.method, "POST");
 });
 
-test("uses whole-graph and branch-delete routes", async () => {
+test("uses the whole-graph delete route", async () => {
   const { fetch, calls } = recordingFetch({ body: "{}" });
   const client = new LbbClient({
     baseUrl: "http://h",
     graph: "research",
-    branch: "review",
     fetch,
   });
 
   await client.deleteGraph({ confirm: "research" });
-  await client.deleteBranch({ confirm: "review" });
 
   assert.equal(
     calls[0].input,
-    "http://h/v1/graph/delete?graph=research&branch=review&confirm=research",
+    "http://h/v1/graph/delete?graph=research&confirm=research",
   );
   assert.equal(calls[0].init.method, "POST");
-  assert.equal(
-    calls[1].input,
-    "http://h/v1/graph/branch?graph=research&branch=review&confirm=review",
-  );
-  assert.equal(calls[1].init.method, "DELETE");
 });
 
 test("rawRequest returns request metadata", async () => {

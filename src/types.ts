@@ -231,8 +231,6 @@ export interface LbbClientOptions {
   apiKey?: string;
   /** Graph name (sent as `?graph=`; server default is `main`). */
   graph?: string;
-  /** Branch name (sent as `?branch=`; server default is `main`). */
-  branch?: string;
   /**
    * Stack slug (sent as `?stack=`). Needed only with a session-token `apiKey`
    * (`lbb_ses_…`), which authorizes an account rather than a single stack; a

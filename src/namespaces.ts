@@ -59,16 +59,12 @@ export class GraphNamespace {
     this.embeddings = client.embeddings;
   }
 
-  branch(name: string): GraphNamespace {
-    return new GraphNamespace(this.client.withScope({ branch: name }));
-  }
-
-  /** Publication lifecycle for this graph/branch, including pre-first-publish state. */
+  /** Publication lifecycle for this graph, including pre-first-publish state. */
   publicationStatus(): Promise<Schemas["PublicationStatusResponse"]> {
     return this.client.publicationStatus();
   }
 
-  /** Wait until this graph/branch has an exact generation covering `targetSeq`. */
+  /** Wait until this graph has an exact generation covering `targetSeq`. */
   waitForPublished(
     targetSeq: number,
     opts: { timeoutMs?: number; pollIntervalMs?: number } = {},
@@ -88,16 +84,6 @@ export class GraphNamespace {
       ...request,
       query: { confirm },
       retry: request.retry ?? true,
-    });
-  }
-
-  deleteBranch(
-    opts: { confirm: string } & CallOptions,
-  ): Promise<Schemas["GraphBranchDeleteResponse"]> {
-    const { confirm, ...request } = opts;
-    return this.client.request("DELETE", "/v1/graph/branch", {
-      ...request,
-      query: { confirm },
     });
   }
 
@@ -308,7 +294,7 @@ export class EntityNamespace {
 export class EmbeddingsNamespace {
   constructor(private readonly client: LbbClient) {}
 
-  /** Every embedding of the branch with its status. */
+  /** Every embedding of the graph with its status. */
   list(opts: CallOptions = {}): Promise<Schemas["EmbeddingListResponse"]> {
     return this.client.request("GET", "/v1/embeddings", opts);
   }
