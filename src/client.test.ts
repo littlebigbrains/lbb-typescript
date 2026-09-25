@@ -454,6 +454,30 @@ test("sparqlText sends row paging fields and exposes row_page", async () => {
   assert.equal(result.row_page.next_offset, 150);
 });
 
+test("sparqlText preserves snapshot-bound cursor continuation", async () => {
+  const { fetch, calls } = recordingFetch({
+    body: JSON.stringify({
+      results: "{}",
+      next_cursor: "opaque-next",
+      snapshot: { commit_seq: 7, compacted_seq: 7, served_at_seq: 7 },
+    }),
+  });
+  const client = new LbbClient({ baseUrl: "http://h", graph: "main", fetch });
+  const query =
+    "SELECT ?s ?o { ?s <urn:title> ?o } ORDER BY LCASE(STR(?o)) STR(?s) LIMIT 25";
+  const first = await client.sparqlText({ query, cursor: "" });
+  await client.sparqlText({ query, cursor: first.next_cursor });
+  assert.deepEqual(JSON.parse(stringBody(calls[0].init.body)), {
+    query,
+    cursor: "",
+  });
+  assert.deepEqual(JSON.parse(stringBody(calls[1].init.body)), {
+    query,
+    cursor: "opaque-next",
+  });
+  assert.equal(first.snapshot?.served_at_seq, 7);
+});
+
 test("commitDryRun sends dry_run=true and no idempotency key", async () => {
   const { fetch, calls } = recordingFetch({
     body: JSON.stringify({
