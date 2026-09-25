@@ -232,25 +232,6 @@ export class SearchNamespace {
 export class EntityNamespace {
   constructor(private readonly client: LbbClient) {}
 
-  /**
-   * Return the exact type cardinality and a bounded deterministic sample from
-   * the Base family pinned by the published generation.
-   */
-  sample(
-    opts: { type: string; limit?: number } & CallOptions,
-  ): Promise<Schemas["EntityTypeSampleResponse"]> {
-    return this.client.entityTypeSample(opts);
-  }
-
-  get(opts: {
-    id?: string;
-    type?: string;
-    name?: string;
-    asOf?: string;
-  }): Promise<Schemas["EntityMetadataResponse"]> {
-    return this.client.entityMetadata(opts);
-  }
-
   detail(
     opts: Parameters<LbbClient["entityDetail"]>[0],
   ): Promise<Schemas["EntityDetailResponse"]> {
