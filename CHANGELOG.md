@@ -2,7 +2,7 @@
 
 All notable changes to the `@littlebigbrain/client` package are documented here.
 
-## Unreleased
+## 0.14.0 (2026-09-25)
 
 Breaking removal of branches, observe, and planner training. Every graph has
 one line of history.
@@ -15,6 +15,11 @@ one line of history.
   The server no longer trains the planner.
 - Remove the generated planner training types and the `planner` field of
   `ModelServingDefaults`.
+
+Added:
+
+- `sparqlText` accepts a `cursor` and returns `next_cursor` for
+  snapshot-bound pagination of an indexed, ordered `LIMIT` query.
 
 ## 0.13.2 (2026-09-24)
 
