@@ -28,7 +28,6 @@ import {
   retryableStatus,
   retryDelayMs,
   sleep,
-  type CallOptions,
   type Query,
   type RequestOptions,
 } from "./transport.js";
@@ -1125,62 +1124,6 @@ export class LbbClient {
   }
 
   /**
-   * Ranked incoming/outgoing neighborhood for a graph entity.
-   *
-   * `edges` caps the edges returned per direction (default 1000, maximum
-   * 10000). When a cap cuts a direction the response carries a `truncation`
-   * block; an uncut response omits it entirely.
-   */
-  entityNeighborhood(opts: {
-    id?: string;
-    type?: string;
-    name?: string;
-    relations?: string[];
-    asOf?: string;
-    edges?: number;
-  }): Promise<Schemas["EntityNeighborhoodResponse"]> {
-    return this.request("GET", "/v1/graph/entity/neighborhood", {
-      query: {
-        id: opts.id,
-        type: opts.type,
-        name: opts.name,
-        relations: opts.relations?.join(","),
-        as_of: opts.asOf,
-        edges: opts.edges,
-      },
-    });
-  }
-
-  /** Exact type cardinality plus a bounded deterministic sample from Base. */
-  entityTypeSample(
-    opts: { type: string; limit?: number } & CallOptions,
-  ): Promise<Schemas["EntityTypeSampleResponse"]> {
-    const { type, limit, ...request } = opts;
-    return this.request("GET", "/v1/graph/entities/sample", {
-      ...request,
-      query: { type, limit },
-    });
-  }
-
-  /** Stored entity object-ref status and index-coverage metadata (no
-   * attributes — read those from `entityDetail`'s top-level `attributes`). */
-  entityMetadata(opts: {
-    id?: string;
-    type?: string;
-    name?: string;
-    asOf?: string;
-  }): Promise<Schemas["EntityMetadataResponse"]> {
-    return this.request("GET", "/v1/graph/entity/metadata", {
-      query: {
-        id: opts.id,
-        type: opts.type,
-        name: opts.name,
-        as_of: opts.asOf,
-      },
-    });
-  }
-
-  /**
    * Read projected attributes and current relationships from one RDF snapshot.
    * Inspect `unavailable_sections` before interpreting legacy provenance arrays.
    * Use strong consistency for read-after-write, or a retained commit sequence.
@@ -1228,33 +1171,7 @@ export class LbbClient {
     }
   }
 
-  // --- temporal / lineage / shapes ---
-
-  /** Current state of an entity's relations, optionally as-of a timestamp. */
-  currentState(
-    body: Schemas["CurrentStateRequest"],
-  ): Promise<Schemas["CurrentStateResponse"]> {
-    return this.request("POST", "/v1/query/state", { body });
-  }
-
-  /** Full edge-event history for a relationship. */
-  history(
-    body: Schemas["RelationshipHistoryRequest"],
-  ): Promise<Schemas["RelationshipHistoryResponse"]> {
-    return this.request("POST", "/v1/query/history", { body });
-  }
-
-  /** Ordered state-transition log for an entity's relation, with dwell time. */
-  transitions(
-    body: Schemas["EntityTransitionsRequest"],
-  ): Promise<Schemas["EntityTransitionsResponse"]> {
-    return this.request("POST", "/v1/query/transitions", { body });
-  }
-
-  /** Lineage and evidence for a single edge. */
-  why(body: Schemas["WhyRequest"]): Promise<Schemas["WhyResponse"]> {
-    return this.request("POST", "/v1/query/why", { body });
-  }
+  // --- query ---
 
   /**
    * SPARQL-subset SELECT/ASK/aggregate query (FILTER, HAVING, ORDER BY, ASK,

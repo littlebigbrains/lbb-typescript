@@ -2,6 +2,22 @@
 
 All notable changes to the `@littlebigbrain/client` package are documented here.
 
+## Unreleased
+
+Breaking removal of the Base-family reads. Their routes answered
+`429 ingest_busy` on every graph. No publication job writes the Base read root
+they need. The server now answers 404 and names the replacement.
+
+- Remove `currentState`, `history`, `transitions`, and `why`. Read the graph
+  at a past commit with `sparqlText({ query, as_of_commit_seq })`.
+- Remove `entityNeighborhood`, `entityMetadata`, and `entities.get`. Use
+  `entityDetail` or `entities.detail`. It returns the entity with its
+  attributes and relationships.
+- Remove `entityTypeSample` and `entities.sample`. Page class members with
+  SPARQL.
+- Remove the generated types of those routes. Also remove the types of
+  `/v1/graph/changes` and `/v1/query/conflicts`, which are gone too.
+
 ## 0.14.0 (2026-09-25)
 
 Breaking removal of branches, observe, and planner training. Every graph has

@@ -500,41 +500,23 @@ test("commitDryRun sends dry_run=true and no idempotency key", async () => {
   assert.equal(result.op_count, 2);
 });
 
-test("entities.sample uses the bounded Base sample route", async () => {
-  const { fetch, calls } = recordingFetch({
-    body: JSON.stringify({
-      entity_type: "SERVICE",
-      total_count: 59150,
-      entities: [],
-      snapshot: { commit_seq: 3 },
-      indexed_commit_seq: 3,
-    }),
-  });
+test("Base-family read methods are removed with their routes", () => {
+  const { fetch } = recordingFetch({ body: "{}" });
   const client = new LbbClient({ baseUrl: "http://h", graph: "main", fetch });
-
-  const sample = await client.entities.sample({ type: "SERVICE", limit: 48 });
-
-  assert.match(calls[0].input, /^http:\/\/h\/v1\/graph\/entities\/sample\?/);
-  assert.match(calls[0].input, /type=SERVICE/);
-  assert.match(calls[0].input, /limit=48/);
-  assert.equal(sample.total_count, 59150);
-});
-
-test("entityNeighborhood always uses the published ranged path", async () => {
-  const { fetch, calls } = recordingFetch({
-    body: JSON.stringify({
-      center: { id: "abc", entity_type: "SERVICE", name: "api" },
-      nodes: [],
-      edges: [],
-      snapshot: { commit_seq: 3 },
-      ranged: true,
-    }),
-  });
-  const client = new LbbClient({ baseUrl: "http://h", graph: "main", fetch });
-
-  await client.entityNeighborhood({ id: "abc" });
-
-  assert.equal(/indexed=/.test(calls[0].input), false);
+  const removed = [
+    "entityNeighborhood",
+    "entityTypeSample",
+    "entityMetadata",
+    "currentState",
+    "history",
+    "transitions",
+    "why",
+  ];
+  for (const name of removed) {
+    assert.equal(name in client, false, `${name} must be gone`);
+  }
+  assert.equal("sample" in client.entities, false);
+  assert.equal("get" in client.entities, false);
 });
 
 test("entities.filterByAttributes builds structured SPARQL property filters", async () => {

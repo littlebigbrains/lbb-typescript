@@ -63,12 +63,12 @@ test("preferred namespaces make entity, ontology, and query operations discovera
   ]);
   const client = new LbbClient({ baseUrl: "http://h", fetch });
 
-  await client.entities.get({ type: "SERVICE", name: "auth" });
+  await client.entities.detail({ type: "SERVICE", name: "auth" });
   await client.ontology.view({ counts: true });
   await client.query.structured({ patterns: [], select: [] });
 
   assert.deepEqual(urls, [
-    "http://h/v1/graph/entity/metadata?type=SERVICE&name=auth",
+    "http://h/v1/graph/entity?type=SERVICE&name=auth",
     "http://h/v1/ontology?counts=true",
     "http://h/v1/query/sparql",
   ]);
