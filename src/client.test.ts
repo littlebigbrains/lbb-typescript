@@ -635,6 +635,117 @@ test("sparqlRows parses SELECT bindings into typed terms and flat rows", async (
     { s: "https://littlebigbrain.com/e/a", o: "Acme" },
     { s: "https://littlebigbrain.com/e/b" },
   ]);
+  // A plain strong read carries no snapshot block.
+  assert.equal(result.snapshot, null);
+});
+
+const oneRowSparqlResults = JSON.stringify({
+  head: { vars: ["s"] },
+  results: { bindings: [{ s: { type: "uri", value: "x" } }] },
+});
+
+test("sparqlRows pins as_of_commit_seq and returns the served snapshot", async () => {
+  const snapshot = {
+    commit_seq: 9,
+    compacted_seq: 9,
+    as_of_commit_seq: 4,
+    served_at_seq: 4,
+  };
+  const { fetch, calls } = recordingFetch({
+    body: JSON.stringify({ results: oneRowSparqlResults, snapshot }),
+  });
+  const client = new LbbClient({ baseUrl: "http://h", graph: "main", fetch });
+
+  const result = await client.sparqlRows({
+    query: "SELECT ?s WHERE { ?s ?p ?o }",
+    as_of_commit_seq: 4,
+  });
+
+  assert.deepEqual(JSON.parse(stringBody(calls[0].init.body)), {
+    query: "SELECT ?s WHERE { ?s ?p ?o }",
+    as_of_commit_seq: 4,
+  });
+  assert.deepEqual(result.rows, [{ s: "x" }]);
+  assert.deepEqual(result.snapshot, snapshot);
+});
+
+test("sparqlText retries read_your_writes_pending until the floor is served", async () => {
+  // A read right after a write: publication does not cover the floor yet, so
+  // the server answers 429 with a Retry-After. The query is read-only, so the
+  // client waits and asks again.
+  const { fetch, calls } = recordingFetch([
+    {
+      status: 429,
+      headers: { "retry-after": "0" },
+      body: JSON.stringify({
+        error: { code: "read_your_writes_pending", retryable: true },
+      }),
+    },
+    {
+      body: JSON.stringify({
+        results: oneRowSparqlResults,
+        snapshot: { commit_seq: 12, compacted_seq: 12, served_at_seq: 12 },
+      }),
+    },
+  ]);
+  const events: LbbRetryEvent[] = [];
+  const client = new LbbClient({
+    baseUrl: "http://h",
+    graph: "main",
+    fetch,
+    retryDelayMs: 0,
+    onRetry: (event) => events.push(event),
+  });
+
+  const result = await client.sparqlRows(
+    { query: "SELECT ?s WHERE { ?s ?p ?o }" },
+    { consistency: "eventual", minIndexedSeq: 12 },
+  );
+
+  assert.equal(calls.length, 2);
+  assert.equal(
+    calls[1].input,
+    "http://h/v1/query/sparql-text?graph=main&consistency=eventual&min_indexed_seq=12",
+  );
+  assert.deepEqual(
+    events.map((event) => event.errorCode),
+    ["read_your_writes_pending"],
+  );
+  assert.equal(result.snapshot?.served_at_seq, 12);
+});
+
+test("sparqlText does not retry a server error or a network failure", async () => {
+  // Only a 429 is retried: the server refused the query before it ran. A
+  // query that timed out (503) or a lost connection would run again.
+  const { fetch, calls } = recordingFetch([
+    {
+      status: 503,
+      body: JSON.stringify({ error: { code: "query_deadline_exceeded" } }),
+    },
+    { body: JSON.stringify({ results: oneRowSparqlResults }) },
+  ]);
+  const client = new LbbClient({ baseUrl: "http://h", fetch, retryDelayMs: 0 });
+  await assert.rejects(
+    () => client.sparqlText({ query: "SELECT ?s WHERE { ?s ?p ?o }" }),
+    (error: unknown) =>
+      error instanceof LbbError && error.code === "query_deadline_exceeded",
+  );
+  assert.equal(calls.length, 1);
+
+  let attempts = 0;
+  const refusing = new LbbClient({
+    baseUrl: "http://h",
+    retryDelayMs: 0,
+    fetch: async () => {
+      attempts += 1;
+      throw new Error("connection reset");
+    },
+  });
+  await assert.rejects(
+    () => refusing.sparqlText({ query: "SELECT ?s WHERE { ?s ?p ?o }" }),
+    /connection reset/,
+  );
+  assert.equal(attempts, 1);
 });
 
 test("parseSparqlResults surfaces the ASK boolean", () => {
