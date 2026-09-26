@@ -6,9 +6,9 @@ import { resolve } from "node:path";
 // Contract-drift guard for the hand-written TS client surface (S8). The
 // generated types (schema.ts) are gated by the `contracts` CI job, but the
 // hand-written `this.request("METHOD", "/path")` calls embed route strings
-// nothing checks. This asserts every literal route the client issues is either
-// a real operation in contracts/openapi.json or an explicitly allow-listed
-// control-plane route.
+// nothing checks. This asserts every literal route the client issues is a real
+// operation in contracts/openapi.json. (The /api/admin/* control-plane surface
+// lives in apps/saas-api/src/controlPlaneClient.ts, not in this SDK.)
 //
 // `npm test` runs from the package dir. Locate contracts/openapi.json by
 // walking up from cwd so the test works both in the monorepo (two levels up)
@@ -28,13 +28,6 @@ function findContract(): string {
 }
 const OPENAPI = findContract();
 const CLIENT = resolve(process.cwd(), "src/client.ts");
-
-// Routes the TS client legitimately calls that are intentionally NOT in the
-// public data-plane OpenAPI contract. This allow-list is the visible debt
-// register: adding a route here is a conscious decision to leave it
-// uncontracted. (The /api/admin/* control-plane surface lives in
-// apps/saas-api/src/controlPlaneClient.ts, not in this SDK.)
-const UNCONTRACTED = new Set<string>();
 
 const HTTP_METHODS = new Set(["get", "post", "put", "patch", "delete"]);
 
@@ -67,32 +60,15 @@ function clientRoutes(): Set<string> {
   return routes;
 }
 
-test("every TS client route is contracted or explicitly allow-listed", () => {
+test("every TS client route is contracted", () => {
   const spec = specOperations();
   const routes = clientRoutes();
   assert.ok(routes.size > 0, "no request routes parsed from client.ts");
-  const missing = [...routes]
-    .filter((route) => !spec.has(route) && !UNCONTRACTED.has(route))
-    .sort();
+  const missing = [...routes].filter((route) => !spec.has(route)).sort();
   assert.deepEqual(
     missing,
     [],
-    `client calls route(s) absent from contracts/openapi.json and not allow-listed ` +
+    `client calls route(s) absent from contracts/openapi.json ` +
       `(typo or removed route?): ${missing.join(", ")}`,
-  );
-});
-
-test("the uncontracted allow-list has no stale entries", () => {
-  // Prune an allow-listed route the client no longer calls, or that has since
-  // been added to the contract — keep the debt register honest.
-  const spec = specOperations();
-  const routes = clientRoutes();
-  const stale = [...UNCONTRACTED]
-    .filter((route) => !routes.has(route) || spec.has(route))
-    .sort();
-  assert.deepEqual(
-    stale,
-    [],
-    `stale allow-list entries (client no longer calls, or now contracted): ${stale.join(", ")}`,
   );
 });
