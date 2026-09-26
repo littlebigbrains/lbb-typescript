@@ -2566,7 +2566,11 @@ export interface components {
              */
             key?: string | null;
             name: string;
-            properties?: components["schemas"]["PropertyInput"][];
+            /**
+             * @description The field values to write, as a list of `{ "field", "value" }` objects or
+             *     as a flat `{ "field": value }` map (see [`PropertiesInput`]).
+             */
+            properties?: components["schemas"]["PropertiesInput"];
             /**
              * @description Field names to **drop** from this entity, applied after `properties` in the
              *     same commit — a surgical per-field delete that avoids a replace-mode
@@ -2998,6 +3002,14 @@ export interface components {
             field: string;
             missing: number;
         };
+        /**
+         * @description A bare JSON value in the flat `{ field: value }` property shape: a boolean,
+         *     an integer, a number, a string, or an array of integers or of strings. The
+         *     wire type is inferred from JSON; the commit path coerces it to the field's
+         *     declared `PropertyType`, so the inferred variant only needs to be in the
+         *     right ballpark.
+         */
+        FlatPropertyValue: boolean | number | string | number[] | string[];
         FullTextIndexInspectRequest: {
             include_terms: boolean;
             targets: components["schemas"]["AnnTargetKind"][];
@@ -4865,6 +4877,14 @@ export interface components {
             a: number;
             /** Format: double */
             b: number;
+        };
+        /**
+         * @description The accepted shapes of [`EntityPropertiesInput::properties`]: a list of
+         *     [`PropertyInput`] objects, or a flat map of field name to
+         *     [`FlatPropertyValue`].
+         */
+        PropertiesInput: components["schemas"]["PropertyInput"][] | {
+            [key: string]: components["schemas"]["FlatPropertyValue"];
         };
         /** @description One literal property: an ontology field name plus a typed value. */
         PropertyInput: {
