@@ -157,12 +157,19 @@ export interface SparqlResultsJson {
 }
 
 /** Parsed SPARQL results: the head vars, the ASK boolean (or null), the raw
- * typed bindings, and the bindings flattened to `{ variable: lexicalValue }`. */
+ * typed bindings, the bindings flattened to `{ variable: lexicalValue }`, and
+ * the served snapshot (or null). */
 export interface SparqlResults {
   vars: string[];
   boolean: boolean | null;
   bindings: Record<string, SparqlTerm>[];
   rows: Record<string, string>[];
+  /**
+   * The snapshot the rows were read from, for an eventual or pinned
+   * (`as_of_commit_seq`) read: `served_at_seq` is that commit. `null` for a
+   * plain strong read.
+   */
+  snapshot: Schemas["SnapshotView"] | null;
 }
 
 /**
@@ -176,8 +183,9 @@ export function parseSparqlResults(
 ): SparqlResults {
   const doc = JSON.parse(response.results) as SparqlResultsJson;
   const vars = doc.head?.vars ?? [];
+  const snapshot = response.snapshot ?? null;
   if (typeof doc.boolean === "boolean") {
-    return { vars, boolean: doc.boolean, bindings: [], rows: [] };
+    return { vars, boolean: doc.boolean, bindings: [], rows: [], snapshot };
   }
   const bindings = doc.results?.bindings ?? [];
   const rows = bindings.map((binding) =>
@@ -185,7 +193,7 @@ export function parseSparqlResults(
       Object.entries(binding).map(([name, term]) => [name, term.value]),
     ),
   );
-  return { vars, boolean: null, bindings, rows };
+  return { vars, boolean: null, bindings, rows, snapshot };
 }
 
 export function firstPatternVariable(

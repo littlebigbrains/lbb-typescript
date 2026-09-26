@@ -2,7 +2,7 @@
 
 All notable changes to the `@littlebigbrain/client` package are documented here.
 
-## Unreleased
+## 0.15.0 (2026-09-26)
 
 Breaking removal of the Base-family reads. Their routes answered
 `429 ingest_busy` on every graph. No publication job writes the Base read root
@@ -17,6 +17,19 @@ they need. The server now answers 404 and names the replacement.
   SPARQL.
 - Remove the generated types of those routes. Also remove the types of
   `/v1/graph/changes` and `/v1/query/conflicts`, which are gone too.
+
+Added:
+
+- `SparqlResults` has a new `snapshot` field, and `sparqlRows` and
+  `parseSparqlResults` fill it. For an eventual or pinned read,
+  `snapshot.served_at_seq` is the commit the rows came from. A plain strong
+  read returns `snapshot: null`.
+- `sparqlText` and `sparqlRows` retry a retryable `429` within the retry
+  budget. A read right after a write with `minIndexedSeq` now waits for
+  `read_your_writes_pending` to clear. A `5xx` or a network failure is not
+  retried, because the query could run twice.
+- `CallOptions.retry` accepts `"rate_limited"`, which retries only a retryable
+  `429`.
 
 ## 0.14.0 (2026-09-25)
 

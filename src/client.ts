@@ -24,6 +24,8 @@ import {
   fullJitterBackoffMs,
   parseLbbError,
   parseResponseJson,
+  retriesNetworkFailure,
+  retriesStatus,
   retryAllowed,
   retryableStatus,
   retryDelayMs,
@@ -373,7 +375,7 @@ export class LbbClient {
     if (opts.idempotencyKey !== undefined)
       headers["idempotency-key"] = opts.idempotencyKey;
     Object.assign(headers, opts.headers ?? {});
-    const canRetry = opts.retry ?? retryAllowed(method, opts.idempotencyKey);
+    const retry = opts.retry ?? retryAllowed(method, opts.idempotencyKey);
     const body =
       opts.rawBody !== undefined
         ? opts.rawBody
@@ -450,7 +452,11 @@ export class LbbClient {
                 { name: "TimeoutError" },
               )
             : error;
-        if (!callerAborted && canRetry && attempt < maxRetries) {
+        if (
+          !callerAborted &&
+          retriesNetworkFailure(retry) &&
+          attempt < maxRetries
+        ) {
           const delayMs = fullJitterBackoffMs(this.retryDelayMs, attempt);
           if (Date.now() + delayMs <= deadline) {
             this.onRetry?.({
@@ -477,7 +483,7 @@ export class LbbClient {
       ) {
         break;
       }
-      if (!canRetry) {
+      if (!retriesStatus(retry, response.status)) {
         break;
       }
       // Honor the server's typed body verdict: a terminal error
@@ -1192,7 +1198,18 @@ export class LbbClient {
     });
   }
 
-  /** SPARQL 1.1 query from text (SELECT/ASK) over the live graph; `results` is SPARQL 1.1 Query Results JSON. The text dialect carries `consistency`/`min_indexed_seq` on the URL; a floor with no explicit consistency implies a strong base-plus-delta read. */
+  /**
+   * SPARQL 1.1 query from text (SELECT/ASK) over the live graph; `results` is
+   * SPARQL 1.1 Query Results JSON. The text dialect carries
+   * `consistency`/`min_indexed_seq` on the URL; a floor with no explicit
+   * consistency implies a strong base-plus-delta read. `as_of_commit_seq` in
+   * the body reads the retained published generation of that exact commit.
+   *
+   * The query is read-only, so a retryable `429` (for example
+   * `read_your_writes_pending` while publication catches up to the floor) is
+   * retried within the retry budget. A `5xx` is not retried: a query that
+   * timed out would run again.
+   */
   sparqlText(
     body: Schemas["SparqlTextRequest"],
     opts?: ReadConsistencyOptions,
@@ -1200,15 +1217,18 @@ export class LbbClient {
     return this.request("POST", "/v1/query/sparql-text", {
       body,
       query: this.readConsistencyQuery(opts),
+      retry: "rate_limited",
     });
   }
 
   /**
    * Run a SPARQL 1.1 text query and return parsed results — the ergonomic
    * complement to {@link sparqlText} (which hands back the raw results string).
-   * Returns `{ vars, boolean, bindings, rows }` via {@link parseSparqlResults}:
-   * `rows` is the bindings flattened to `{ variable: lexicalValue }`, `boolean`
-   * is the ASK answer (or `null` for a SELECT).
+   * Returns `{ vars, boolean, bindings, rows, snapshot }` via
+   * {@link parseSparqlResults}: `rows` is the bindings flattened to
+   * `{ variable: lexicalValue }`, `boolean` is the ASK answer (or `null` for a
+   * SELECT), and `snapshot.served_at_seq` is the commit an eventual or pinned
+   * read answered from (`snapshot` is `null` for a plain strong read).
    */
   async sparqlRows(
     body: Schemas["SparqlTextRequest"],

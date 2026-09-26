@@ -8,8 +8,13 @@ export interface CallOptions {
   maxRetries?: number;
   /** Override the client's deadline-based retry budget (ms) for this request. */
   retryBudgetMs?: number;
-  /** Override retry safety classification. Read-only POST namespaces set this automatically. */
-  retry?: boolean;
+  /**
+   * Override retry safety classification. Read-only POST namespaces set this
+   * automatically. `true` retries a `429`, a `5xx` and a network failure;
+   * `"rate_limited"` retries only a retryable `429`, which the server returns
+   * before it runs the request.
+   */
+  retry?: boolean | "rate_limited";
   /** Abort the request and suppress any further retries. */
   signal?: AbortSignal;
   /** Additional request headers. Values override SDK defaults intentionally. */
@@ -106,6 +111,27 @@ export function retryAllowed(method: string, idempotencyKey?: string): boolean {
     upper === "OPTIONS" ||
     idempotencyKey !== undefined
   );
+}
+
+/**
+ * Whether a request's retry classification covers a network failure.
+ * `"rate_limited"` does not: the request may have run on the server.
+ */
+export function retriesNetworkFailure(
+  retry: boolean | "rate_limited",
+): boolean {
+  return retry === true;
+}
+
+/**
+ * Whether a request's retry classification covers a retryable status.
+ * `"rate_limited"` covers only `429`.
+ */
+export function retriesStatus(
+  retry: boolean | "rate_limited",
+  status: number,
+): boolean {
+  return retry === "rate_limited" ? status === 429 : retry;
 }
 
 const MAX_RETRY_AFTER_MS = 60_000;
