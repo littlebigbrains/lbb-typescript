@@ -418,6 +418,48 @@ test("namespace facts.create injects auth, scope, version, and idempotency", asy
   assert.deepEqual(JSON.parse(stringBody(call.init.body)), { triplets: [] });
 });
 
+test("facts.create accepts flat and verbose entity properties and sends them unchanged", async () => {
+  const { fetch, calls } = recordingFetch({
+    body: JSON.stringify({ commit: { commit_seq: 1 } }),
+  });
+  const client = new LbbClient({ baseUrl: "http://h", graph: "main", fetch });
+  const ticket = { type: "Ticket", key: "4821", name: "login fails after 3.1" };
+  // The flat `{ field: value }` map the docs use must type-check as written.
+  const flat: Schemas["TripletCommitFile"] = {
+    entity_properties: [
+      {
+        ...ticket,
+        properties: {
+          description: "Sent back to the login screen.",
+          priority: 2,
+          score: 0.5,
+          open: true,
+          labels: ["auth", "3.1"],
+          builds: [310, 311],
+        },
+      },
+      {
+        ...ticket,
+        properties: [{ field: "priority", value: { i64: 2 } }],
+      },
+    ],
+  };
+  const invalid: Schemas["TripletCommitFile"] = {
+    entity_properties: [
+      {
+        ...ticket,
+        // @ts-expect-error a flat value is a scalar or an array, never a typed object
+        properties: { priority: { i64: 2 } },
+      },
+    ],
+  };
+  void invalid;
+
+  await client.graph("main").facts.create(flat, { idempotencyKey: "ik_flat" });
+
+  assert.deepEqual(JSON.parse(stringBody(calls[0].init.body)), flat);
+});
+
 test("sparqlText sends row paging fields and exposes row_page", async () => {
   const { fetch, calls } = recordingFetch({
     body: JSON.stringify({

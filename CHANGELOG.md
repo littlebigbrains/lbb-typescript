@@ -30,6 +30,11 @@ Added:
   retried, because the query could run twice.
 - `CallOptions.retry` accepts `"rate_limited"`, which retries only a retryable
   `429`.
+- The type of `entity_properties[].properties` accepts the flat
+  `{ field: value }` map as well as the `{ field, value }` list. The server
+  always decoded both shapes, but a flat map failed strict type checks. New
+  generated types: `PropertiesInput` and `FlatPropertyValue`, a boolean,
+  number, string, or array of numbers or strings.
 
 ## 0.14.0 (2026-09-25)
 
