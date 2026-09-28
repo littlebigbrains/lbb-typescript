@@ -332,6 +332,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/graph/activity": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Background work on the graph: publication, compaction, statistics, validation, embeddings, and imports, exports, forks and index upgrades; bounded to 30 object reads per call */
+        get: operations["get_v1_graph_activity"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/graph/commit": {
         parameters: {
             query?: never;
@@ -1330,6 +1347,116 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** @description One embedding declared on a class of the graph. */
+        ActivityEmbedding: {
+            /** @description The class IRI the embedding covers. */
+            class: string;
+            embedded_through_seq?: null | components["schemas"]["CommitSeq"];
+            error?: null | components["schemas"]["ActivityError"];
+            /**
+             * Format: int64
+             * @description Commits the serving version is behind `published_seq`.
+             */
+            lag_commits: number;
+            name: string;
+            progress?: null | components["schemas"]["ActivityProgress"];
+            state: components["schemas"]["ActivityEmbeddingState"];
+        };
+        /** @enum {string} */
+        ActivityEmbeddingState: "ready" | "backfilling" | "behind" | "failed";
+        /**
+         * @description A tenant-safe failure: a stable code and a short message. Unknown
+         *     failures carry `job_failed`; the item id identifies the job for an
+         *     operator.
+         */
+        ActivityError: {
+            code: string;
+            message: string;
+            /** @description True when a retry can succeed without a change by the user. */
+            retryable: boolean;
+        };
+        /** @description One background job. */
+        ActivityItem: {
+            /** Format: int32 */
+            attempts: number;
+            /** Format: int64 */
+            enqueued_at_micros: number;
+            error?: null | components["schemas"]["ActivityError"];
+            /**
+             * Format: int64
+             * @description Set for succeeded, failed and cancelled items.
+             */
+            finished_at_micros?: number | null;
+            /** @description The job id. */
+            id: string;
+            kind: components["schemas"]["ActivityKind"];
+            progress?: null | components["schemas"]["ActivityProgress"];
+            /**
+             * @description Machine stage, for example `compacting_truth`, `building`,
+             *     `publishing`, `rdf_partitions_pending`, `admission_deferred`, or the
+             *     import stage.
+             */
+            stage?: string | null;
+            state: components["schemas"]["ActivityState"];
+            /**
+             * @description What the job works on beyond the graph: the export id, or the graph a
+             *     fork writes.
+             */
+            subject?: string | null;
+            target_seq?: null | components["schemas"]["CommitSeq"];
+            /** Format: int64 */
+            updated_at_micros: number;
+        };
+        /** @enum {string} */
+        ActivityKind: "publish" | "compaction" | "statistics" | "validation" | "embeddings" | "import" | "export" | "fork" | "index_upgrade";
+        /** @description How far a job has come. `total` is absent when the job does not know it. */
+        ActivityProgress: {
+            /** Format: int64 */
+            done: number;
+            /** Format: int64 */
+            total?: number | null;
+            unit: components["schemas"]["ActivityUnit"];
+        };
+        /** @enum {string} */
+        ActivityState: "queued" | "waiting" | "running" | "succeeded" | "failed" | "cancelled";
+        /** @enum {string} */
+        ActivityUnit: "phases" | "partitions" | "lines" | "bytes" | "entities" | "commits" | "tables";
+        /**
+         * @description The unpublished commits on the graph head against the write path's limits
+         *     on them. Past any `soft_*` limit each write waits a little (the wait grows
+         *     toward the hard limit); at any `max_*` (hard) limit a write is refused with
+         *     a retryable `429 ingest_busy` until the index catches up.
+         */
+        ActivityWriteLimit: {
+            /** Format: int64 */
+            max_pending_bytes: number;
+            /** Format: int64 */
+            max_pending_commits: number;
+            /** Format: int64 */
+            max_pending_records?: number;
+            /**
+             * Format: int64
+             * @description What the unpublished commits store for strong reads: their runs'
+             *     bytes, or the decoded text of a commit without runs.
+             */
+            pending_bytes: number;
+            /** Format: int64 */
+            pending_commits: number;
+            /**
+             * Format: int64
+             * @description Statements the unpublished commits assert or retract.
+             */
+            pending_records?: number;
+            /** Format: int64 */
+            soft_pending_bytes?: number;
+            /**
+             * Format: int64
+             * @description Where writes start to slow down. 0 when the server has no soft limit.
+             */
+            soft_pending_commits?: number;
+            /** Format: int64 */
+            soft_pending_records?: number;
+        };
         /**
          * @description Declare a new entity type. Idempotent: a no-op if the name already exists.
          *     Pair with `widen_relation` (in the same request, ordered before it) to add
@@ -3198,6 +3325,54 @@ export interface components {
              * @description Monotonic; every write increments it.
              */
             version: number;
+        };
+        /**
+         * @description The background work on one graph epoch, as `GET /v1/graph/activity`
+         *     reports it.
+         */
+        GraphActivityResponse: {
+            embeddings: components["schemas"]["ActivityEmbedding"][];
+            /** Format: int64 */
+            epoch: number;
+            graph_id: string;
+            /** @description The newest commit written to the graph. */
+            head_seq: components["schemas"]["CommitSeq"];
+            /**
+             * @description True when no item is queued, waiting or running, `publication` is
+             *     `current`, and every embedding is `ready` with `lag_commits` 0 or
+             *     `failed` (a failed embedding waits for a fix, so no work runs).
+             */
+            idle: boolean;
+            /**
+             * @description Queued, waiting and running items first, then finished items. Newest
+             *     first in each group. At most 25.
+             */
+            items: components["schemas"]["ActivityItem"][];
+            /**
+             * Format: int64
+             * @description `target_seq - published_seq`.
+             */
+            lag_commits: number;
+            /**
+             * Format: int64
+             * @description Server clock when the route read the state (micros since the Unix
+             *     epoch).
+             */
+            observed_at_micros: number;
+            publication: components["schemas"]["PublicationState"];
+            /**
+             * @description The newest commit the published RDF generation covers (queries see
+             *     it). 0 before the first generation.
+             */
+            published_seq: components["schemas"]["CommitSeq"];
+            /** @description The commit the publication works toward. */
+            target_seq: components["schemas"]["CommitSeq"];
+            /**
+             * @description How close the unpublished commits are to the limit at which the
+             *     server refuses new writes (retryable `429 ingest_busy`) until the
+             *     index catches up.
+             */
+            write_limit: components["schemas"]["ActivityWriteLimit"];
         };
         /**
          * @description A structural co-bind constraint: restrict (or boost) the text/vector
@@ -10710,6 +10885,140 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["EvalTraceListResponse"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Rate limit exceeded */
+            429: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Service unavailable */
+            503: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+        };
+    };
+    get_v1_graph_activity: {
+        parameters: {
+            query?: {
+                /** @description Graph name (default `main`) */
+                graph?: string;
+            };
+            header?: {
+                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                "Lbb-Version"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GraphActivityResponse"];
                 };
             };
             /** @description Bad request */
