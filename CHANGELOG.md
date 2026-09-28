@@ -35,6 +35,11 @@ Added:
   always decoded both shapes, but a flat map failed strict type checks. New
   generated types: `PropertiesInput` and `FlatPropertyValue`, a boolean,
   number, string, or array of numbers or strings.
+- `SchemaBundleView` has a new `shapes` field: the active SHACL shapes as the
+  validator parsed them. New generated types: `SchemaShapeView`,
+  `SchemaShapeTarget`, and `SchemaShapeConstraint`.
+- `ontology.conformance()` accepts `limit`, the number of result rows to
+  return (server default 200, maximum 2,000).
 
 ## 0.14.0 (2026-09-25)
 

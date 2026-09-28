@@ -1020,6 +1020,25 @@ test("entities namespace encodes detail lookups", async () => {
   assert.equal(detail.attributes?.status, "synced");
 });
 
+test("ontology conformance passes the result window", async () => {
+  const { fetch, calls } = recordingFetch({
+    body: JSON.stringify({ conforms: true, result_count: 0 }),
+  });
+  const client = new LbbClient({ baseUrl: "http://h", graph: "main", fetch });
+
+  await client.ontology.conformance({ consistency: "eventual", limit: 2000 });
+  await client.ontology.conformance({ consistency: "eventual" });
+
+  assert.equal(
+    calls[0].input,
+    "http://h/v1/ontology/conformance?graph=main&consistency=eventual&limit=2000",
+  );
+  assert.equal(
+    calls[1].input,
+    "http://h/v1/ontology/conformance?graph=main&consistency=eventual",
+  );
+});
+
 test("schema namespace reads metadata and publishes without request-time audit", async () => {
   const { fetch, calls } = recordingFetch({
     body: JSON.stringify({ activated: true }),
