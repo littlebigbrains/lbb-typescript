@@ -377,6 +377,52 @@ test("graph.waitForPublished keeps publication polling in the graph scope", asyn
   assert.equal(url.searchParams.get("graph"), "perritos");
 });
 
+test("activity reads the graph's background work in the graph scope", async () => {
+  const activity: Schemas["GraphActivityResponse"] = {
+    graph_id: "perritos",
+    epoch: 0,
+    observed_at_micros: 10,
+    idle: false,
+    head_seq: 3,
+    published_seq: 2,
+    target_seq: 3,
+    lag_commits: 1,
+    publication: "building",
+    write_limit: {
+      pending_commits: 1,
+      max_pending_commits: 256,
+      pending_bytes: 300,
+      max_pending_bytes: 4294967296,
+    },
+    embeddings: [],
+    items: [
+      {
+        id: "reconcile_rdf_graph:abc",
+        kind: "publish",
+        state: "running",
+        stage: "building",
+        subject: null,
+        progress: { done: 4, total: 13, unit: "phases" },
+        target_seq: 3,
+        attempts: 1,
+        enqueued_at_micros: 1,
+        updated_at_micros: 2,
+        finished_at_micros: null,
+        error: null,
+      },
+    ],
+  };
+  const { fetch, calls } = recordingFetch({ body: JSON.stringify(activity) });
+  const client = new LbbClient({ baseUrl: "http://h", fetch });
+  const read = await client.graph("perritos").activity();
+  assert.equal(read.idle, false);
+  assert.equal(read.items[0]?.progress?.total, 13);
+  assert.equal(calls[0].init.method, "GET");
+  const url = new URL(calls[0].input);
+  assert.equal(url.pathname, "/v1/graph/activity");
+  assert.equal(url.searchParams.get("graph"), "perritos");
+});
+
 test("namespace facts.create injects auth, scope, version, and idempotency", async () => {
   const { fetch, calls } = recordingFetch({
     body: JSON.stringify({

@@ -1355,6 +1355,15 @@ export class LbbClient {
     return this.request("GET", "/v1/graph/publication-status");
   }
 
+  /** Background work on the graph: publication, compaction, query
+   * statistics, validation, embeddings, and imports, exports, forks and
+   * index upgrades. One call reads at most 30 objects, so a status view can
+   * poll it every few seconds. Needs the server capability
+   * `graph_activity_v1`. */
+  activity(): Promise<Schemas["GraphActivityResponse"]> {
+    return this.request("GET", "/v1/graph/activity");
+  }
+
   /** The managed models the platform uses per role (embedding, judge,
    * rewriter): the operator's catalog, or the compiled defaults. */
   managedModels(): Promise<Schemas["ManagedModelsResponse"]> {

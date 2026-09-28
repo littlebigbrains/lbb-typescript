@@ -64,6 +64,11 @@ export class GraphNamespace {
     return this.client.publicationStatus();
   }
 
+  /** Background work on this graph. See {@link LbbClient.activity}. */
+  activity(): Promise<Schemas["GraphActivityResponse"]> {
+    return this.client.activity();
+  }
+
   /** Wait until this graph has an exact generation covering `targetSeq`. */
   waitForPublished(
     targetSeq: number,
