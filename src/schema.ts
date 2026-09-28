@@ -5601,6 +5601,15 @@ export interface components {
              *     nodes, not the inline `sh:property` blank-node constraints.
              */
             shape_count: number;
+            /**
+             * @description Every shape of the active set as the validator parsed it: the root
+             *     shapes that select focus nodes and the property, node, and logical
+             *     shapes they reference. Terms use the N-Triples form the conformance
+             *     report uses (`<iri>`, `_:label`, `"lexical"^^<datatype>`), so a report
+             *     result's `source_node_shape`, `source_shape`, and `result_path` match a
+             *     shape's `id` and `path` exactly. Empty when no shapes are active.
+             */
+            shapes?: components["schemas"]["SchemaShapeView"][];
             shapes_digest?: string | null;
             /** Format: int64 */
             shapes_version?: number | null;
@@ -5656,6 +5665,57 @@ export interface components {
             since_version: number;
             src_types: string[];
             stable_id: string;
+        };
+        /** @description One constraint parameter of a shape. */
+        SchemaShapeConstraint: {
+            /**
+             * @description The SHACL parameter's local name: `minCount`, `class`, `datatype`,
+             *     `in`, `pattern`, `node`, `property`, `or`, `qualifiedValueShape`,
+             *     `sparql`, and so on.
+             */
+            parameter: string;
+            /**
+             * @description The parameter's values. Terms (a class, a datatype, a referenced
+             *     shape, an `sh:in` member) use N-Triples form; counts and lengths are
+             *     decimal numbers; `pattern` is the regular expression, `nodeKind` the
+             *     `sh:` local name, `languageIn` the tags, and `sparql` the SELECT text.
+             */
+            values?: string[];
+        };
+        /** @description How a root shape selects its focus nodes. */
+        SchemaShapeTarget: {
+            /**
+             * @description `class` (`sh:targetClass`, or the shape is itself a class), `node`
+             *     (`sh:targetNode`), `subjects_of` (`sh:targetSubjectsOf`), or
+             *     `objects_of` (`sh:targetObjectsOf`).
+             */
+            kind: string;
+            /** @description The class, node, or predicate term. */
+            term: string;
+        };
+        /** @description One parsed SHACL shape: a node shape, or a property shape when `path` is set. */
+        SchemaShapeView: {
+            /** @description `sh:closed true`: a focus node may carry only the declared properties. */
+            closed?: boolean;
+            /** @description The constraint parameters, in declaration order. */
+            constraints?: components["schemas"]["SchemaShapeConstraint"][];
+            /** @description `sh:deactivated true`: the validator skips the shape. */
+            deactivated?: boolean;
+            /** @description The shape's term, `<iri>` or `_:label`. */
+            id: string;
+            /** @description `sh:ignoredProperties` of a closed shape, as `<iri>` terms. */
+            ignored_properties?: string[];
+            /** @description The shape's `sh:message`, when it declares one. */
+            message?: string | null;
+            /**
+             * @description The property path in SPARQL path syntax (`<p>`, `^<p>`, `<p>/<q>`),
+             *     the form of the report's `result_path`. Absent for a node shape.
+             */
+            path?: string | null;
+            /** @description `violation`, `warning`, or `info`. */
+            severity: string;
+            /** @description How the shape selects focus nodes. Only root shapes have targets. */
+            targets?: components["schemas"]["SchemaShapeTarget"][];
         };
         SchemaShapeWriteEnforcement: {
             blockers?: components["schemas"]["SchemaWriteEnforcementBlocker"][];

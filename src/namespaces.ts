@@ -536,13 +536,21 @@ export class OntologyNamespace {
     });
   }
 
+  /**
+   * Read the published SHACL conformance report. `limit` bounds the returned
+   * `results` (server default 200, maximum 2,000); `result_count` and
+   * `conforms` stay exact, and `truncated` says the window is partial.
+   */
   conformance(
-    opts: CallOptions & Pick<ReadConsistencyOptions, "consistency"> = {},
+    opts: CallOptions &
+      Pick<ReadConsistencyOptions, "consistency"> & { limit?: number } = {},
   ): Promise<Schemas["SchemaAuditReport"]> {
+    const { limit, ...rest } = opts;
     return this.client.request("GET", "/v1/ontology/conformance", {
-      ...opts,
+      ...rest,
       query: {
         consistency: opts.consistency ?? this.client.defaultConsistency,
+        ...(limit !== undefined ? { limit } : {}),
       },
     });
   }
