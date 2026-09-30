@@ -97,6 +97,43 @@ test("ontology namespace covers its complete read and lifecycle family", async (
   ]);
 });
 
+test("ontology suggestions namespace maps each operation to its route", async () => {
+  const { fetch, urls, bodies } = queuedFetch([]);
+  const client = new LbbClient({ baseUrl: "http://h", fetch });
+
+  await client.ontology.suggestions.list({
+    status: "open",
+    originKind: "integration",
+    originId: "hubspot-main",
+    limit: 20,
+  });
+  await client.ontology.suggestions.get("sg_1");
+  await client.ontology.suggestions.create({
+    title: "Add class Deal",
+    origin: { kind: "integration", id: "hubspot-main" },
+    change: [{ op: "add_entity_type", name: "Deal" }],
+    key: "hubspot-main/deals",
+  });
+  await client.ontology.suggestions.validate("sg_1");
+  await client.ontology.suggestions.accept("sg_1");
+  await client.ontology.suggestions.dismiss("sg_1", { reason: "not now" });
+  await client.ontology.suggestions.supersede("sg_1", { reason: "gone" });
+  await client.ontology.suggestions.comment("sg_1", { text: "why?" });
+
+  assert.deepEqual(urls, [
+    "http://h/v1/ontology/suggestions?status=open&origin_kind=integration&origin_id=hubspot-main&limit=20",
+    "http://h/v1/ontology/suggestions/detail?suggestion_id=sg_1",
+    "http://h/v1/ontology/suggestions",
+    "http://h/v1/ontology/suggestions/validate?suggestion_id=sg_1",
+    "http://h/v1/ontology/suggestions/accept?suggestion_id=sg_1",
+    "http://h/v1/ontology/suggestions/dismiss?suggestion_id=sg_1",
+    "http://h/v1/ontology/suggestions/supersede?suggestion_id=sg_1",
+    "http://h/v1/ontology/suggestions/comment?suggestion_id=sg_1",
+  ]);
+  assert.equal(bodies[4], "{}");
+  assert.deepEqual(JSON.parse(bodies[5] ?? ""), { reason: "not now" });
+});
+
 test("query namespace covers the parsed and raw SPARQL reads", async () => {
   const sparqlEnvelope = {
     results: JSON.stringify({ head: { vars: [] }, results: { bindings: [] } }),

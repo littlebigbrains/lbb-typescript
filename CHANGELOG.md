@@ -4,6 +4,11 @@ All notable changes to the `@littlebigbrain/client` package are documented here.
 
 ## Unreleased
 
+- Add `ontology.suggestions` with `list`, `get`, `create`, `validate`,
+  `accept`, `dismiss`, `supersede` and `comment` for the
+  `/v1/ontology/suggestions` routes. Integrations, agents and people file
+  ontology change suggestions; a person accepts or dismisses them.
+  `accept` takes `change_sources` with an edited change.
 - Remove `ontology.induce` and `induceOntology`, and the generated types
   `OntologyInduceRequest`, `OntologyInduceResponse`, `OntologySuggestion`
   and `OntologySuggestionKind`. The route answered `429` on every graph and
