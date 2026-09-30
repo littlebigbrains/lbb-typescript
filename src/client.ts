@@ -1,3 +1,4 @@
+import { WorkflowNamespace } from "./workflows.js";
 import type {
   DurableImportLine,
   DurableImportSource,
@@ -225,6 +226,7 @@ export class LbbClient {
   readonly query: QueryNamespace;
   readonly evals: EvalsNamespace;
   readonly embeddings: EmbeddingsNamespace;
+  readonly workflows: WorkflowNamespace;
 
   constructor(options: LbbClientOptions) {
     const baseUrl = options.baseUrl?.trim();
@@ -272,6 +274,7 @@ export class LbbClient {
     this.query = new QueryNamespace(this);
     this.evals = new EvalsNamespace(this);
     this.embeddings = new EmbeddingsNamespace(this);
+    this.workflows = new WorkflowNamespace(this);
   }
 
   graph(name: string, opts: { stack?: string } = {}): GraphNamespace {

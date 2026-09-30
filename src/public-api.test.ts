@@ -7,7 +7,12 @@ test("the runtime entrypoint exposes only the supported public values", () => {
     "LbbCapabilityError",
     "LbbClient",
     "LbbError",
+    "WorkflowError",
+    "WorkflowHandle",
+    "WorkflowNamespace",
+    "WorkflowWorker",
     "parseSparqlResults",
+    "workflow",
   ]);
 });
 

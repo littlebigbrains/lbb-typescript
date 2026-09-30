@@ -1,3 +1,4 @@
+import type { WorkflowNamespace } from "./workflows.js";
 import type { LbbClient } from "./client.js";
 import type { CallOptions } from "./transport.js";
 import {
@@ -47,6 +48,7 @@ export class GraphNamespace {
   readonly search: SearchNamespace;
   readonly evals: EvalsNamespace;
   readonly embeddings: EmbeddingsNamespace;
+  readonly workflows: WorkflowNamespace;
 
   constructor(private readonly client: LbbClient) {
     this.facts = new FactsNamespace(client);
@@ -57,6 +59,7 @@ export class GraphNamespace {
     this.search = client.search;
     this.evals = client.evals;
     this.embeddings = client.embeddings;
+    this.workflows = client.workflows;
   }
 
   /** Publication lifecycle for this graph, including pre-first-publish state. */
