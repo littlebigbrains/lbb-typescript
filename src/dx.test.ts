@@ -86,7 +86,6 @@ test("ontology namespace covers its complete read and lifecycle family", async (
   await client.ontology.resolve({} as never);
   await client.ontology.define({} as never);
   await client.ontology.evolve({} as never);
-  await client.ontology.induce({} as never);
 
   assert.deepEqual(urls, [
     "http://h/v1/ontology",
@@ -95,7 +94,6 @@ test("ontology namespace covers its complete read and lifecycle family", async (
     "http://h/v1/ontology/resolve",
     "http://h/v1/ontology/define",
     "http://h/v1/ontology/evolve",
-    "http://h/v1/ontology/induce",
   ]);
 });
 

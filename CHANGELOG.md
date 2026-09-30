@@ -2,6 +2,13 @@
 
 All notable changes to the `@littlebigbrain/client` package are documented here.
 
+## Unreleased
+
+- Remove `ontology.induce` and `induceOntology`, and the generated types
+  `OntologyInduceRequest`, `OntologyInduceResponse`, `OntologySuggestion`
+  and `OntologySuggestionKind`. The route answered `429` on every graph and
+  is removed from the server.
+
 ## 0.15.0 (2026-09-26)
 
 Breaking removal of the Base-family reads. Their routes answered
