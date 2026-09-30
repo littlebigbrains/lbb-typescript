@@ -1311,13 +1311,6 @@ export class LbbClient {
     return this.request("POST", "/v1/ontology/evolve", { body });
   }
 
-  /** Suggest ontology additions from the current graph without mutating it. */
-  induceOntology(
-    body: Schemas["OntologyInduceRequest"],
-  ): Promise<Schemas["OntologyInduceResponse"]> {
-    return this.request("POST", "/v1/ontology/induce", { body, retry: true });
-  }
-
   /** Fold the WAL tail into snapshot segments. */
   compact(
     opts: { minTailCommits?: number; maxSegments?: number } = {},

@@ -601,17 +601,6 @@ export class OntologyNamespace {
       body,
     });
   }
-
-  induce(
-    body: Schemas["OntologyInduceRequest"],
-    opts: CallOptions = {},
-  ): Promise<Schemas["OntologyInduceResponse"]> {
-    return this.client.request("POST", "/v1/ontology/induce", {
-      ...opts,
-      retry: opts.retry ?? true,
-      body,
-    });
-  }
 }
 
 /** Structured and SPARQL-text query operations. */
