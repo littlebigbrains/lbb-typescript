@@ -7,6 +7,7 @@ import {
   type EntityAttributeFilterOptions,
   type ImportLine,
   parseSparqlResults,
+  profileBody,
   type ReadConsistencyOptions,
   type RdfImportDocument,
   type RdfImportManyResult,
@@ -37,6 +38,19 @@ function withReadConsistency<B extends object>(
     merged.min_indexed_seq = opts.minIndexedSeq;
   }
   return merged as B;
+}
+
+/** Ask the server to return its measurements for one query. */
+export interface ProfileOption {
+  /** Same as `profile: true` in the request body. */
+  profile?: boolean;
+}
+
+function withProfile(
+  body: Schemas["SparqlTextRequest"],
+  opts: ProfileOption,
+): Schemas["SparqlTextRequest"] {
+  return profileBody(body, opts.profile);
 }
 
 export class GraphNamespace {
@@ -70,6 +84,16 @@ export class GraphNamespace {
   /** Background work on this graph. See {@link LbbClient.activity}. */
   activity(): Promise<Schemas["GraphActivityResponse"]> {
     return this.client.activity();
+  }
+
+  /**
+   * The SPARQL planner's statistics for the published generation latest reads
+   * use. See {@link LbbClient.plannerStats}.
+   */
+  plannerStats(
+    opts: { cursor?: string; limit?: number } = {},
+  ): Promise<Schemas["PlannerStatsResponse"]> {
+    return this.client.plannerStats(opts);
   }
 
   /** Wait until this graph has an exact generation covering `targetSeq`. */
@@ -760,13 +784,18 @@ export class QueryNamespace {
     return this.client.request("POST", "/v1/query/sparql", {
       ...opts,
       retry: opts.retry ?? true,
-      body: withReadConsistency(this.client, body, opts),
+      body: profileBody(withReadConsistency(this.client, body, opts)),
     });
   }
 
+  /**
+   * Run a SPARQL text query and parse its rows. `profile: true` (in `opts` or
+   * the body) returns the server's measurements in `profile`; a profiled
+   * request never uses the result cache.
+   */
   async sparql(
     body: Schemas["SparqlTextRequest"],
-    opts: CallOptions & ReadConsistencyOptions = {},
+    opts: CallOptions & ReadConsistencyOptions & ProfileOption = {},
   ) {
     // The text dialect carries consistency/floor on the URL, not the body.
     const response = await this.client.request<Schemas["SparqlTextResponse"]>(
@@ -775,7 +804,7 @@ export class QueryNamespace {
       {
         ...opts,
         retry: opts.retry ?? true,
-        body,
+        body: withProfile(body, opts),
         query: {
           consistency: opts.consistency ?? this.client.defaultConsistency,
           min_indexed_seq: opts.minIndexedSeq,
@@ -785,14 +814,15 @@ export class QueryNamespace {
     return parseSparqlResults(response);
   }
 
+  /** As {@link sparql}, returning the raw response with its `results` string. */
   sparqlRaw(
     body: Schemas["SparqlTextRequest"],
-    opts: CallOptions & ReadConsistencyOptions = {},
+    opts: CallOptions & ReadConsistencyOptions & ProfileOption = {},
   ): Promise<Schemas["SparqlTextResponse"]> {
     return this.client.request("POST", "/v1/query/sparql-text", {
       ...opts,
       retry: opts.retry ?? true,
-      body,
+      body: withProfile(body, opts),
       query: {
         consistency: opts.consistency ?? this.client.defaultConsistency,
         min_indexed_seq: opts.minIndexedSeq,

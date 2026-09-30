@@ -7,6 +7,13 @@ All notable changes to the `@littlebigbrain/client` package are documented here.
 - Add `workflows.deleteInstance(id)` for `POST /v1/workflows/instances/delete`.
   It deletes a message workflow instance with its turns and history and
   answers `{ deleted }`.
+- Add the `profile` option to `query.sparql` and `query.sparqlRaw` (and the
+  `profile` body field on `SparqlTextRequest` and `SparqlSelectRequest`). A
+  profiled answer carries `profile`: timings, reads, plan counters and the
+  join order with estimates. `SparqlResults.profile` holds it.
+- Add `plannerStats({ cursor, limit })` and `graph(name).plannerStats()` for
+  `GET /v1/graph/planner-stats`, and the generated `PlannerStatsResponse` and
+  `SparqlQueryProfile` types.
 - Add `ontology.suggestions` with `list`, `get`, `create`, `validate`,
   `accept`, `dismiss`, `supersede` and `comment` for the
   `/v1/ontology/suggestions` routes. Integrations, agents and people file

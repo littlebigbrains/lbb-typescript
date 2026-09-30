@@ -574,6 +574,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/graph/planner-stats": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** SPARQL planner statistics of the published generation latest reads use: per-predicate counts, histogram, pair-count and trigram sidecars, value-order index coverage; reads manifests and sidecar metadata only */
+        get: operations["get_v1_graph_planner_stats"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/graph/publication-status": {
         parameters: {
             query?: never;
@@ -1250,7 +1267,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** SPARQL-subset SELECT/ASK query (BGP WHERE, projection, DISTINCT, LIMIT/OFFSET) */
+        /** SPARQL-subset SELECT/ASK query (BGP WHERE, projection, DISTINCT, LIMIT/OFFSET); `profile: true` adds the server's measurements */
         post: operations["post_v1_query_sparql"];
         delete?: never;
         options?: never;
@@ -1267,7 +1284,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** SPARQL 1.1 query from text (SELECT/ASK) over the live graph -> SPARQL Results JSON */
+        /** SPARQL 1.1 query from text (SELECT/ASK) over the live graph -> SPARQL Results JSON; `profile: true` adds the server's measurements and bypasses the result cache */
         post: operations["post_v1_query_sparql_text"];
         delete?: never;
         options?: never;
@@ -5641,6 +5658,44 @@ export interface components {
             /** @description Count of surface terms (labels/synonyms) in the semantic layer. */
             term_count?: number;
         };
+        /** @description The per-(predicate, subject) and per-(predicate, object) count histograms. */
+        PlannerKeyHistograms: {
+            /**
+             * Format: int64
+             * @description Compressed chunk bytes of both artifacts, base and layers.
+             */
+            bytes: number;
+            /**
+             * Format: int64
+             * @description Compressed chunk bytes the layers alone occupy.
+             */
+            layer_bytes: number;
+            /**
+             * Format: int64
+             * @description Delta layers over both artifacts, not yet folded into their bases.
+             */
+            layers: number;
+            present: boolean;
+        };
+        /** @description The pairwise join-count sidecar. */
+        PlannerPairCounts: {
+            /**
+             * Format: int64
+             * @description Predicates its count matrix covers.
+             */
+            predicates: number;
+            present: boolean;
+        };
+        /** @description Exact visible counts for one predicate. */
+        PlannerPredicateStats: {
+            /** Format: int64 */
+            distinct_objects: number;
+            /** Format: int64 */
+            distinct_subjects: number;
+            iri: string;
+            /** Format: int64 */
+            triples: number;
+        };
         /**
          * @description Adapter serving default derived from a promoted adapter run (today only
          *     `extractor`): the LoRA adapter (a path on the model-serving volume) the
@@ -5654,6 +5709,58 @@ export interface components {
              * @description The promoted registry run this adapter came from.
              */
             run: number;
+        };
+        /**
+         * @description The statistics the SPARQL planner reads for the published generation a
+         *     latest read uses (`GET /v1/graph/planner-stats`). Read from the
+         *     generation's manifest and sidecar metadata; never a scan of the graph.
+         */
+        PlannerStatsResponse: {
+            /** Format: int64 */
+            generation?: number | null;
+            key_histograms: components["schemas"]["PlannerKeyHistograms"];
+            /**
+             * @description Pass as `cursor` for the next page; `null` on the last page. A cursor
+             *     belongs to this generation: after a newer one is published it is
+             *     refused with `400` (`planner-stats cursor expired`), and paging starts
+             *     again without a cursor.
+             */
+            next_cursor?: string | null;
+            pair_counts: components["schemas"]["PlannerPairCounts"];
+            /**
+             * Format: int64
+             * @description Predicates in the generation, across all pages.
+             */
+            predicate_count: number;
+            /** @description One page of predicates, by triple count descending, then IRI. */
+            predicates: components["schemas"]["PlannerPredicateStats"][];
+            /**
+             * @description When the generation was published (RFC 3339, UTC). `null` while the
+             *     published manifest records no wall-clock time: its `created_at_micros`
+             *     only orders generations.
+             */
+            published_at?: string | null;
+            served_at_seq?: null | components["schemas"]["CommitSeq"];
+            trigram: components["schemas"]["PlannerTrigram"];
+            /** Format: int64 */
+            triple_count: number;
+            /**
+             * @description Value-order index coverage: the plan `GET /v1/graph/index-upgrade`
+             *     reports.
+             */
+            value_order_index: components["schemas"]["IndexUpgradePlan"];
+        };
+        /** @description Label-trigram sidecar coverage. */
+        PlannerTrigram: {
+            /**
+             * @description Label predicates in this generation that the sidecar serves. Empty
+             *     unless every PSO table carries a sidecar.
+             */
+            predicates_covered: string[];
+            /** Format: int64 */
+            tables: number;
+            /** Format: int64 */
+            tables_with_sidecar: number;
         };
         /**
          * @description Inline Platt calibration `(a, b)`: maps a raw retrieval score `s` to
@@ -7625,6 +7732,316 @@ export interface components {
             var: string;
         };
         /**
+         * @description The order the planner chose for one basic graph pattern (`bgp`) or one
+         *     join group (`join_group`).
+         */
+        SparqlProfileJoinOrder: {
+            /** @description Variables already bound when the order was chosen (a seeded join). */
+            bound_before: string[];
+            /**
+             * Format: int64
+             * @description How many times the planner made this same decision in the request,
+             *     for example once per seed row.
+             */
+            evaluations: number;
+            kind: string;
+            steps: components["schemas"]["SparqlProfileJoinStep"][];
+            /**
+             * Format: int64
+             * @description Steps in the decision; `steps` keeps at most 64.
+             */
+            steps_total: number;
+        };
+        /** @description One step of a join order, in the order the planner chose. */
+        SparqlProfileJoinStep: {
+            /**
+             * Format: int64
+             * @description For `bgp`, the cardinality estimate the planner compared when it chose
+             *     this pattern, given the variables bound before it. For `join_group`,
+             *     the child's standalone estimate. Absent when not priced.
+             */
+            estimate?: number | null;
+            /**
+             * @description The triple pattern (`bgp`) or a short label of the child group
+             *     (`join_group`). Literals are cut at 64 characters and the whole step
+             *     at 512, IRIs included; a cut ends with `…`.
+             */
+            pattern: string;
+            /**
+             * Format: int64
+             * @description `join_group` only: the rows accumulated after this child folded in.
+             */
+            rows_after?: number | null;
+        };
+        /** @description Binary-join counters of a profiled request, by strategy. */
+        SparqlProfileJoins: {
+            /** Format: int64 */
+            anchored_intersection_bitmap_steps: number;
+            /** Format: int64 */
+            anchored_intersection_gallop_steps: number;
+            /** Format: int64 */
+            anchored_intersection_merge_steps: number;
+            /** Format: int64 */
+            anchored_intersection_output_rows: number;
+            /** Format: int64 */
+            anchored_intersection_plans: number;
+            /** Format: int64 */
+            anchored_intersection_posting_rows: number;
+            /** Format: int64 */
+            independent_left_rows: number;
+            /** Format: int64 */
+            independent_output_rows: number;
+            /** Format: int64 */
+            independent_plans: number;
+            /** Format: int64 */
+            independent_right_rows: number;
+            /** Format: int64 */
+            path_frontier_batches: number;
+            /** Format: int64 */
+            path_frontier_candidate_rows: number;
+            /** Format: int64 */
+            path_frontier_full_scans: number;
+            /** Format: int64 */
+            path_frontier_probes: number;
+            /** Format: int64 */
+            values_batch_candidates: number;
+            /** Format: int64 */
+            values_batch_output_rows: number;
+            /** Format: int64 */
+            values_batch_plans: number;
+            /** Format: int64 */
+            values_batch_seeds: number;
+        };
+        /**
+         * @description One operator kind that ran in a profiled request. Counters an operator
+         *     does not keep are zero; its other counters are in `detail`.
+         */
+        SparqlProfileOperator: {
+            detail?: {
+                [key: string]: number;
+            };
+            /** Format: int64 */
+            input_rows: number;
+            /** Format: double */
+            ms: number;
+            /**
+             * @description `path_step`, `filter`, `distinct`, `fused_path_result`,
+             *     `result_decode`, `reordered_join`, `scoped_union`, `trigram`,
+             *     `predicate_filter`, `ordered_slice`, `ordered_topk`, `composite_order`,
+             *     `filter_limit`, `encoded_filter`, `filtered_order`,
+             *     `filter_first_topk`, `dynamic_topk`, `filter_block_pruning`,
+             *     `nested_optional`, or `values_fuse`.
+             */
+            operator: string;
+            /** Format: int64 */
+            output_rows: number;
+            /** Format: int64 */
+            plans: number;
+        };
+        /** @description Which specialized plans ran, as counts of sub-plans. */
+        SparqlProfilePlans: {
+            /**
+             * Format: int64
+             * @description Grouped counts answered from the key histograms.
+             */
+            histogram_runs: number;
+            /**
+             * Format: int64
+             * @description Range FILTERs served from an object-value window.
+             */
+            obj_window: number;
+            /**
+             * Format: int64
+             * @description Two-pattern join counts answered from the pair-count sidecar.
+             */
+            pair_join_stats: number;
+            /**
+             * Format: int64
+             * @description Join steps that reused their row buffers.
+             */
+            row_reuse: number;
+            /**
+             * Format: int64
+             * @description Hash joins that built on the smaller pattern side.
+             */
+            small_build: number;
+            /**
+             * Format: int64
+             * @description Star joins evaluated by sort-merge.
+             */
+            star_merge: number;
+            /**
+             * Format: int64
+             * @description BGPs evaluated as a merged star plus the rest.
+             */
+            star_prefix: number;
+            /**
+             * Format: int64
+             * @description Sub-plans answered from index statistics, reading no data blocks.
+             */
+            stats_answered: number;
+            /**
+             * Format: int64
+             * @description String tests evaluated on raw dictionary bytes.
+             */
+            str_byte: number;
+            /**
+             * @description The published summary answered the query: `hit`, `entailed_hit`, or
+             *     `declined`. Absent on the structured route, which has no fast path.
+             */
+            summary_fast_path?: string | null;
+            /**
+             * Format: int64
+             * @description Typed-adjacency grouped counts answered by the batched plan.
+             */
+            typed_adjacency: number;
+        };
+        /** @description Object reads of a profiled request. */
+        SparqlProfileReads: {
+            /**
+             * Format: int64
+             * @description Block and dictionary reads the plan charged.
+             */
+            blocks: number;
+            /**
+             * Format: int64
+             * @description Times the request read budget stopped the query.
+             */
+            budget_trips: number;
+            /**
+             * Format: int64
+             * @description Stored bytes of the block reads that missed the request block cache.
+             *     Such a read goes to the node's cache tiers (RAM, NVMe) or to object
+             *     storage, so a miss is not always an object-storage GET. Zero when the
+             *     request block cache is off.
+             */
+            bytes_fetched: number;
+            /**
+             * Format: int64
+             * @description Bytes of those reads.
+             */
+            bytes_read: number;
+            /**
+             * Format: int64
+             * @description Block reads the request block cache served; zero when it is off.
+             */
+            cache_hits: number;
+            /**
+             * Format: int64
+             * @description Block reads that missed the request block cache; zero when it is off.
+             */
+            cache_misses: number;
+            /**
+             * Format: int64
+             * @description The request block cache's largest residency, in bytes.
+             */
+            peak_bytes_held: number;
+        };
+        /** @description One timed stage of a profiled request. */
+        SparqlProfileStage: {
+            /** Format: double */
+            ms: number;
+            stage: string;
+        };
+        /** @description Worst-case-optimal join counters of a profiled request. */
+        SparqlProfileWcoj: {
+            /** Format: int64 */
+            anti_join_plans: number;
+            /** Format: double */
+            build_ms: number;
+            /** Format: int64 */
+            candidates: number;
+            /** Format: int64 */
+            emitted: number;
+            /** Format: int64 */
+            factorized_plans: number;
+            /** Format: int64 */
+            factorized_star_plans: number;
+            /** Format: double */
+            join_ms: number;
+            /** Format: int64 */
+            membership_checks: number;
+            /** Format: int64 */
+            path_join_plans: number;
+            /** Format: int64 */
+            plans: number;
+            /** Format: int64 */
+            relation_build_rows: number;
+            /** Format: int64 */
+            relation_cache_builds: number;
+            /** Format: int64 */
+            relation_cache_hits: number;
+            /** Format: int64 */
+            relation_rows: number;
+        };
+        /**
+         * @description What the server measured while it answered one profiled SPARQL request.
+         *     It describes that request only. Times are milliseconds of wall time.
+         */
+        SparqlQueryProfile: {
+            /**
+             * Format: double
+             * @description The query executor alone.
+             */
+            execution_ms: number;
+            /**
+             * Format: int64
+             * @description FILTER conditions dropped by a type error (for example a comparison
+             *     between datatypes with no defined order).
+             */
+            filter_type_errors: number;
+            /**
+             * @description The order the planner chose for each basic graph pattern and join
+             *     group, with its estimates. At most 64 records of 64 steps each.
+             */
+            join_orders: components["schemas"]["SparqlProfileJoinOrder"][];
+            /**
+             * Format: int64
+             * @description Distinct join orders past the 64-record bound.
+             */
+            join_orders_dropped: number;
+            joins: components["schemas"]["SparqlProfileJoins"];
+            /** @description Operators that ran, with the rows they took and produced. */
+            operators: components["schemas"]["SparqlProfileOperator"][];
+            plans: components["schemas"]["SparqlProfilePlans"];
+            reads: components["schemas"]["SparqlProfileReads"];
+            /**
+             * @description The result-cache outcome. Always `bypassed`: a profiled request never
+             *     reads or fills the cache.
+             */
+            result_cache: string;
+            /**
+             * Format: int64
+             * @description Rows in this answer, after `offset`/`limit`.
+             */
+            rows: number;
+            /**
+             * Format: int64
+             * @description Rows before `offset`/`limit`.
+             */
+            rows_total: number;
+            /**
+             * @description Stage timings in order. The text route reports `resolve_snapshot`,
+             *     `parse_rewrite`, `execute` and `serialize`; the structured route
+             *     reports `resolve_snapshot`, `lower`, `execute` and `decode`.
+             */
+            stages: components["schemas"]["SparqlProfileStage"][];
+            /**
+             * Format: double
+             * @description The whole request inside the graph store, snapshot resolution included.
+             */
+            total_ms: number;
+            /**
+             * @description The label-trigram decision for a string FILTER: `used`, a decline
+             *     reason (`unsupported`, `no_sidecar`, `predicate_not_covered`,
+             *     `short_needle`, `or_chain`, `candidate_cap`, `not_selective`,
+             *     `live_delta`, `read_failed`), or absent when the query had no string
+             *     test the index could serve.
+             */
+            trigram?: string | null;
+            wcoj: components["schemas"]["SparqlProfileWcoj"];
+        };
+        /**
          * @description A scalar aggregate result value. `null` is an empty AVG/MIN/MAX (no numeric
          *     rows).
          */
@@ -7710,6 +8127,12 @@ export interface components {
             /** @description WHERE: the conjunctive basic graph pattern (shares the analytic engine). */
             patterns: components["schemas"]["AnalyticTriplePattern"][];
             /**
+             * @description Return what the server measured while it answered this request in
+             *     `profile`. A profiled request never reads or fills the result cache,
+             *     so the profile always describes an execution.
+             */
+            profile?: boolean;
+            /**
              * @description Not available on the published SPARQL surface: a graph's stored
              *     inference rules already run at publish time, folding derived facts into
              *     the asserted dataset every query reads. Requesting `reason: true`
@@ -7731,6 +8154,7 @@ export interface components {
             boolean?: boolean | null;
             /** @description Aggregated/grouped result rows. Empty unless the query aggregates. */
             groups?: components["schemas"]["SparqlGroup"][];
+            profile?: null | components["schemas"]["SparqlQueryProfile"];
             row_page: components["schemas"]["RowPage"];
             snapshot: components["schemas"]["SnapshotView"];
             /** @description Non-aggregated SELECT rows. Empty in aggregated mode and for ASK. */
@@ -7797,6 +8221,12 @@ export interface components {
             limit?: number | null;
             /** @description Skip this many result rows before `limit`. */
             offset?: number | null;
+            /**
+             * @description Return what the server measured while it answered this request in
+             *     `profile`. A profiled request never reads or fills the result cache,
+             *     so the profile always describes an execution.
+             */
+            profile?: boolean;
             /** @description The SPARQL query text (SELECT or ASK). */
             query: string;
             /**
@@ -7827,6 +8257,7 @@ export interface components {
              *     continuation whose following page is empty.
              */
             next_cursor?: string | null;
+            profile?: null | components["schemas"]["SparqlQueryProfile"];
             /** @description SPARQL 1.1 Query Results JSON, serialized. */
             results: string;
             row_page: components["schemas"]["RowPage"];
@@ -14592,6 +15023,144 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["GraphMetadataResponse"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Rate limit exceeded */
+            429: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Service unavailable */
+            503: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+        };
+    };
+    get_v1_graph_planner_stats: {
+        parameters: {
+            query?: {
+                /** @description Graph name (default `main`) */
+                graph?: string;
+                /** @description Predicates per page, 1 to 500 (default 200) */
+                limit?: string;
+                /** @description Opaque cursor from the previous page; refused with 400 once a newer generation is published */
+                cursor?: string;
+            };
+            header?: {
+                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                "Lbb-Version"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlannerStatsResponse"];
                 };
             };
             /** @description Bad request */

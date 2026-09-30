@@ -18,7 +18,7 @@ import type {
   SearchConsistency,
   SparqlResults,
 } from "./types.js";
-import { parseSparqlResults } from "./types.js";
+import { parseSparqlResults, profileBody } from "./types.js";
 import {
   bodyMarksTerminal,
   errorCodeFromBody,
@@ -1197,7 +1197,7 @@ export class LbbClient {
     opts?: ReadConsistencyOptions,
   ): Promise<Schemas["SparqlSelectResponse"]> {
     return this.request("POST", "/v1/query/sparql", {
-      body: this.mergeReadConsistency(body, opts),
+      body: profileBody(this.mergeReadConsistency(body, opts)),
     });
   }
 
@@ -1218,7 +1218,7 @@ export class LbbClient {
     opts?: ReadConsistencyOptions,
   ): Promise<Schemas["SparqlTextResponse"]> {
     return this.request("POST", "/v1/query/sparql-text", {
-      body,
+      body: profileBody(body),
       query: this.readConsistencyQuery(opts),
       retry: "rate_limited",
     });
@@ -1415,6 +1415,22 @@ export class LbbClient {
   ): Promise<Schemas["GraphSummaryResponse"]> {
     return this.request("GET", "/v1/graph/summary", {
       query: this.readConsistencyQuery(opts),
+    });
+  }
+
+  /**
+   * The SPARQL planner's statistics for the published generation latest reads
+   * use: per-predicate triple and distinct counts (by triple count, paged by
+   * `cursor`/`limit`, 200 by default and 500 at most), key-histogram,
+   * pair-count and trigram sidecars, and value-order index coverage. Read from
+   * the generation's manifest and sidecar metadata; nothing scans the graph.
+   * A graph with no published generation answers `served_at_seq: null`.
+   */
+  plannerStats(
+    opts: { cursor?: string; limit?: number } = {},
+  ): Promise<Schemas["PlannerStatsResponse"]> {
+    return this.request("GET", "/v1/graph/planner-stats", {
+      query: { cursor: opts.cursor, limit: opts.limit },
     });
   }
 
