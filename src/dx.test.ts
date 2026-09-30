@@ -159,6 +159,87 @@ test("query namespace covers the parsed and raw SPARQL reads", async () => {
   ]);
 });
 
+test("query profile option asks for the server's measurements", async () => {
+  const profile = {
+    total_ms: 2.5,
+    execution_ms: 1.0,
+    rows: 0,
+    rows_total: 0,
+    result_cache: "bypassed",
+    stages: [{ stage: "execute", ms: 1.0 }],
+    join_orders: [],
+  };
+  const envelope = {
+    results: JSON.stringify({ head: { vars: [] }, results: { bindings: [] } }),
+    profile,
+  };
+  const { fetch, bodies } = queuedFetch([
+    { body: envelope },
+    { body: envelope },
+    { body: { results: envelope.results } },
+  ]);
+  const client = new LbbClient({ baseUrl: "http://h", fetch });
+
+  const parsed = await client.query.sparql(
+    { query: "SELECT * WHERE { ?s ?p ?o }" },
+    { profile: true },
+  );
+  const raw = await client.query.sparqlRaw({
+    query: "ASK { ?s ?p ?o }",
+    profile: true,
+  });
+  const plain = await client.query.sparql({ query: "ASK { ?s ?p ?o }" });
+
+  assert.equal(JSON.parse(bodies[0] ?? "").profile, true);
+  assert.equal(JSON.parse(bodies[1] ?? "").profile, true);
+  assert.equal(JSON.parse(bodies[2] ?? "").profile, undefined);
+  assert.equal(parsed.profile?.result_cache, "bypassed");
+  assert.equal(raw.profile?.total_ms, 2.5);
+  assert.equal(plain.profile, undefined);
+});
+
+test("a false profile is never sent, so older servers accept the body", async () => {
+  const envelope = {
+    results: JSON.stringify({ head: { vars: [] }, results: { bindings: [] } }),
+  };
+  const { fetch, bodies } = queuedFetch([
+    { body: envelope },
+    { body: envelope },
+    { body: envelope },
+    { body: { snapshot: {}, vars: [], solutions: [] } },
+    { body: { snapshot: {}, vars: [], solutions: [] } },
+  ]);
+  const client = new LbbClient({ baseUrl: "http://h", fetch });
+
+  await client.query.sparql({ query: "ASK {}", profile: false });
+  await client.query.sparqlRaw({ query: "ASK {}" }, { profile: false });
+  await client.sparqlText({ query: "ASK {}", profile: false });
+  await client.query.structured({ patterns: [], select: [], profile: false });
+  await client.sparql({ patterns: [], select: [], profile: false });
+
+  for (const body of bodies) {
+    assert.equal("profile" in JSON.parse(body ?? "{}"), false, body);
+  }
+});
+
+test("graph namespace reads planner statistics with paging", async () => {
+  const { fetch, urls } = queuedFetch([
+    { body: { served_at_seq: null, predicates: [], next_cursor: null } },
+    { body: { served_at_seq: 3, predicates: [], next_cursor: null } },
+  ]);
+  const client = new LbbClient({ baseUrl: "http://h", fetch });
+
+  const empty = await client.graph("main").plannerStats();
+  const page = await client.plannerStats({ cursor: "3a", limit: 50 });
+
+  assert.equal(empty.served_at_seq, null);
+  assert.equal(page.served_at_seq, 3);
+  assert.deepEqual(urls, [
+    "http://h/v1/graph/planner-stats?graph=main",
+    "http://h/v1/graph/planner-stats?cursor=3a&limit=50",
+  ]);
+});
+
 test("read-only POST namespaces retry safely without an idempotency key", async () => {
   const { fetch, urls } = queuedFetch([
     { status: 503, body: { error: { message: "retry" } } },

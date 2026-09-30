@@ -170,6 +170,12 @@ export interface SparqlResults {
    * plain strong read.
    */
   snapshot: Schemas["SnapshotView"] | null;
+  /**
+   * What the server measured for the request: timings, reads, plan counters
+   * and the join order with estimates. Present only when the request set
+   * `profile: true`.
+   */
+  profile?: Schemas["SparqlQueryProfile"];
 }
 
 /**
@@ -178,14 +184,36 @@ export interface SparqlResults {
  * `{ variable: lexicalValue }` rows — the form most callers want, so they never
  * have to `JSON.parse` and zip `head.vars` with binding values by hand.
  */
+/**
+ * Send `profile` only when it is `true`. An answer without the field is the
+ * default, and a server that predates `profile` refuses unknown body fields.
+ */
+export function profileBody<B extends { profile?: boolean }>(
+  body: B,
+  profile?: boolean,
+): B {
+  const { profile: bodyProfile, ...rest } = body;
+  return (bodyProfile ?? profile) === true
+    ? ({ ...rest, profile: true } as B)
+    : (rest as B);
+}
+
 export function parseSparqlResults(
   response: Schemas["SparqlTextResponse"],
 ): SparqlResults {
   const doc = JSON.parse(response.results) as SparqlResultsJson;
   const vars = doc.head?.vars ?? [];
   const snapshot = response.snapshot ?? null;
+  const profile = response.profile ? { profile: response.profile } : {};
   if (typeof doc.boolean === "boolean") {
-    return { vars, boolean: doc.boolean, bindings: [], rows: [], snapshot };
+    return {
+      vars,
+      boolean: doc.boolean,
+      bindings: [],
+      rows: [],
+      snapshot,
+      ...profile,
+    };
   }
   const bindings = doc.results?.bindings ?? [];
   const rows = bindings.map((binding) =>
@@ -193,7 +221,7 @@ export function parseSparqlResults(
       Object.entries(binding).map(([name, term]) => [name, term.value]),
     ),
   );
-  return { vars, boolean: null, bindings, rows, snapshot };
+  return { vars, boolean: null, bindings, rows, snapshot, ...profile };
 }
 
 export function firstPatternVariable(
