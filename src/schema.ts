@@ -4571,6 +4571,20 @@ export interface components {
             /** Format: float */
             weight?: number | null;
         };
+        /** @description One record of a [`SuggestedIdentity`], by its import identity. */
+        IdentityMember: {
+            /** @description Its stable import key (for an integration, `<connection>:<stream>:<id>`). */
+            key: string;
+            /**
+             * @description Its current display name. The `SAME_AS` edge names both endpoints, so
+             *     a different name would rename the record.
+             */
+            name: string;
+            /** @description Display text for the source, for example `hubspot-main contacts`. */
+            source?: string | null;
+            /** @description The record's class. */
+            type: string;
+        };
         /** @description Typed convergence view over the persisted serving families. */
         IndexLineage: {
             /**
@@ -5049,12 +5063,20 @@ export interface components {
         /** @description A durable, reviewable ontology change suggestion. */
         OntologyChangeSuggestion: {
             /**
+             * Format: int32
+             * @description How many `SAME_AS` edges the accept wrote.
+             */
+            accepted_links?: number | null;
+            /**
              * Format: int64
              * @description The ontology version the accepted change produced.
              */
             accepted_ontology_version?: number | null;
             anchor: components["schemas"]["SuggestionAnchor"];
-            /** @description The evolve operations that accepting applies, in order. */
+            /**
+             * @description The evolve operations that accepting applies, in order. May be empty
+             *     when `identities` is not.
+             */
             change: components["schemas"]["OntologyEvolveOp"][];
             /**
              * @description For an edited change: for each op of `change`, the index of the op in
@@ -5071,6 +5093,8 @@ export interface components {
             decision_reason?: string | null;
             evidence?: components["schemas"]["SuggestionEvidence"];
             graph: components["schemas"]["GraphKey"];
+            /** @description Records to link as one identity after `change` applies. */
+            identities?: components["schemas"]["SuggestedIdentity"][];
             impact?: null | components["schemas"]["OntologyEvolveResponse"];
             /** @description Why the last dry run failed (for example an unknown class). */
             impact_error?: string | null;
@@ -5090,6 +5114,11 @@ export interface components {
              *     `change` before accepting.
              */
             proposed_change?: components["schemas"]["OntologyEvolveOp"][] | null;
+            /**
+             * @description The identities as the producer proposed them, kept when a person
+             *     removed some before accepting.
+             */
+            proposed_identities?: components["schemas"]["SuggestedIdentity"][] | null;
             rationale?: string;
             /**
              * Format: int64
@@ -5102,7 +5131,10 @@ export interface components {
             title: string;
             updated_at: string;
         };
-        /** @description Accept a suggestion: apply its change to the current ontology. */
+        /**
+         * @description Accept a suggestion: apply its change to the current ontology, then link
+         *     its identities.
+         */
         OntologyChangeSuggestionAcceptRequest: {
             author?: string | null;
             /** @description An edited change that replaces the proposed one ("edit, then accept"). */
@@ -5115,6 +5147,12 @@ export interface components {
             change_sources?: (number | null)[] | null;
             /** @description Added to the discussion with the acceptance. */
             comment?: string | null;
+            /**
+             * @description The identities to link, when a person removed some or some members:
+             *     each must be a subset of a proposed identity, with at least two
+             *     members. Absent links every proposed identity.
+             */
+            identities?: components["schemas"]["SuggestedIdentity"][] | null;
         };
         /** @description Add a comment to a suggestion's discussion. */
         OntologyChangeSuggestionCommentRequest: {
@@ -5132,13 +5170,19 @@ export interface components {
          */
         OntologyChangeSuggestionCreateRequest: {
             anchor?: null | components["schemas"]["SuggestionAnchor"];
-            /** @description 1 to 64 evolve operations. */
+            /**
+             * @description Up to 64 evolve operations; at least one unless `identities` is set
+             *     (then it may be empty).
+             */
             change: components["schemas"]["OntologyEvolveOp"][];
             evidence?: null | components["schemas"]["SuggestionEvidence"];
+            /** @description Up to 200 identities to link on accept. */
+            identities?: components["schemas"]["SuggestedIdentity"][];
             /**
              * @description Idempotency key, at most 255 characters of `[A-Za-z0-9-_.:/]`, for
              *     example `hubspot-main/deals`. When absent the server derives one from
-             *     `anchor` and `change`, so the same change is filed once.
+             *     `anchor`, `change` and (when set) `identities`, so the same suggestion
+             *     is filed once.
              */
             key?: string | null;
             /** @description Opaque origin data, at most 16 KiB of JSON. */
@@ -5185,6 +5229,8 @@ export interface components {
             change: components["schemas"]["OntologyEvolveOp"][];
             comment_count: number;
             created_at: string;
+            /** @description How many identities the suggestion links. */
+            identity_count?: number;
             key: string;
             origin: components["schemas"]["SuggestionOrigin"];
             /** @description Whether the last dry run can be published; absent before any dry run. */
@@ -7870,6 +7916,26 @@ export interface components {
              */
             run: number;
             weights: components["schemas"]["SuggestRankerWeights"];
+        };
+        /**
+         * @description Records from different sources that describe one real-world thing.
+         *     Accepting links each later member to the first with a `SAME_AS` edge
+         *     (`https://littlebigbrain.com/r/same_as` in SPARQL). Search and SPARQL's
+         *     OWL entailment do not merge linked records yet.
+         */
+        SuggestedIdentity: {
+            /**
+             * Format: float
+             * @description From 0 to 1; 1 for an exact key match.
+             */
+            confidence: number;
+            /** @description 2 to 10 records; the first is the canonical one. */
+            members: components["schemas"]["IdentityMember"][];
+            /**
+             * @description Why they match, for example `email ada@acme.test`. At most 200
+             *     characters.
+             */
+            reason: string;
         };
         /**
          * @description One zero-result-rescue alternative: a query the caller might have meant,
