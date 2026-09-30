@@ -200,6 +200,32 @@ test("handles preserve message id and graph scope", async () => {
   assert.ok(client.graph("other").workflows);
 });
 
+test("deleteInstance posts the workflow id to the delete route in the graph scope", async () => {
+  const seen: { method?: string; url: URL; body: unknown }[] = [];
+  const client = new LbbClient({
+    baseUrl: "http://localhost:7400",
+    maxRetries: 0,
+    fetch: async (input, init) => {
+      seen.push({
+        method: init?.method,
+        url: new URL(input),
+        body: JSON.parse(String(init?.body ?? "null")),
+      });
+      return new Response(JSON.stringify({ deleted: true }), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      });
+    },
+  });
+  const deleted = await client.graph("crm").workflows.deleteInstance("agent");
+  assert.deepEqual(deleted, { deleted: true });
+  assert.equal(seen.length, 1);
+  assert.equal(seen[0]?.method, "POST");
+  assert.equal(seen[0]?.url.pathname, "/v1/workflows/instances/delete");
+  assert.equal(seen[0]?.url.searchParams.get("graph"), "crm");
+  assert.deepEqual(seen[0]?.body, { workflow_id: "agent" });
+});
+
 test("durable signal wait releases the worker and resumes from the received checkpoint", async () => {
   const resolved = {
     key: "review",

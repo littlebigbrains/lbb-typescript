@@ -4,6 +4,9 @@ All notable changes to the `@littlebigbrain/client` package are documented here.
 
 ## Unreleased
 
+- Add `workflows.deleteInstance(id)` for `POST /v1/workflows/instances/delete`.
+  It deletes a message workflow instance with its turns and history and
+  answers `{ deleted }`.
 - Add `ontology.suggestions` with `list`, `get`, `create`, `validate`,
   `accept`, `dismiss`, `supersede` and `comment` for the
   `/v1/ontology/suggestions` routes. Integrations, agents and people file

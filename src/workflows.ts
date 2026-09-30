@@ -240,6 +240,21 @@ export class WorkflowNamespace {
       body: { workflow_id: id, action, turn },
     });
   }
+  /**
+   * Delete an instance with its turns and history. `deleted` is false when
+   * no instance had the id, or when a retry finished an earlier delete.
+   * The id can be created again once this returns.
+   */
+  deleteInstance(
+    id: string,
+    options?: CallOptions,
+  ): Promise<Schemas["WorkflowInstanceDeleteResponse"]> {
+    return this.client.request("POST", `${base}/instances/delete`, {
+      ...options,
+      retry: true,
+      body: { workflow_id: id },
+    });
+  }
 }
 const suspended = Symbol("workflow sleep");
 
