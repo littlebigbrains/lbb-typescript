@@ -525,9 +525,152 @@ export class SchemaNamespace {
   }
 }
 
+/** Filters for {@link OntologySuggestionsNamespace.list}. */
+export interface OntologySuggestionListOptions extends CallOptions {
+  status?: Schemas["OntologyChangeSuggestionStatus"];
+  originKind?: Schemas["SuggestionOriginKind"];
+  /** Producer id, for example an integration connection id. */
+  originId?: string;
+  /** Class, property or relation name. */
+  anchor?: string;
+  key?: string;
+  /** Default 100, maximum 500. */
+  limit?: number;
+}
+
+/**
+ * Ontology change suggestions: durable proposals from integrations,
+ * agents and people. People accept or dismiss them; accepting
+ * applies the change to the current ontology.
+ */
+export class OntologySuggestionsNamespace {
+  constructor(private readonly client: LbbClient) {}
+
+  /** Newest update first, with counts per status over the whole graph. */
+  list(
+    options: OntologySuggestionListOptions = {},
+  ): Promise<Schemas["OntologyChangeSuggestionList"]> {
+    const { status, originKind, originId, anchor, key, limit, ...opts } =
+      options;
+    return this.client.request("GET", "/v1/ontology/suggestions", {
+      ...opts,
+      query: {
+        status,
+        origin_kind: originKind,
+        origin_id: originId,
+        anchor,
+        key,
+        limit,
+      },
+    });
+  }
+
+  /** One suggestion with its evidence, impact and discussion. */
+  get(
+    suggestionId: string,
+    opts: CallOptions = {},
+  ): Promise<Schemas["OntologyChangeSuggestion"]> {
+    return this.client.request("GET", "/v1/ontology/suggestions/detail", {
+      ...opts,
+      query: { suggestion_id: suggestionId },
+    });
+  }
+
+  /**
+   * File a suggestion, or update the one with the same `key`. The server
+   * dry-runs the change and never changes the ontology here, so a retry is
+   * safe.
+   */
+  create(
+    body: Schemas["OntologyChangeSuggestionCreateRequest"],
+    opts: CallOptions = {},
+  ): Promise<Schemas["OntologyChangeSuggestion"]> {
+    return this.client.request("POST", "/v1/ontology/suggestions", {
+      ...opts,
+      retry: opts.retry ?? true,
+      body,
+    });
+  }
+
+  /** Dry-run the change against the current ontology and store the impact. */
+  validate(
+    suggestionId: string,
+    opts: CallOptions = {},
+  ): Promise<Schemas["OntologyChangeSuggestion"]> {
+    return this.client.request("POST", "/v1/ontology/suggestions/validate", {
+      ...opts,
+      retry: opts.retry ?? true,
+      query: { suggestion_id: suggestionId },
+    });
+  }
+
+  /**
+   * Apply the change to the current ontology. Pass `change` to accept an
+   * edited change. Accepting twice returns the accepted suggestion.
+   */
+  accept(
+    suggestionId: string,
+    body: Schemas["OntologyChangeSuggestionAcceptRequest"] = {},
+    opts: CallOptions = {},
+  ): Promise<Schemas["OntologyChangeSuggestion"]> {
+    return this.client.request("POST", "/v1/ontology/suggestions/accept", {
+      ...opts,
+      retry: opts.retry ?? true,
+      query: { suggestion_id: suggestionId },
+      body,
+    });
+  }
+
+  /** Decline with a reason. The ontology does not change. */
+  dismiss(
+    suggestionId: string,
+    body: Schemas["OntologyChangeSuggestionDecisionRequest"],
+    opts: CallOptions = {},
+  ): Promise<Schemas["OntologyChangeSuggestion"]> {
+    return this.client.request("POST", "/v1/ontology/suggestions/dismiss", {
+      ...opts,
+      retry: opts.retry ?? true,
+      query: { suggestion_id: suggestionId },
+      body,
+    });
+  }
+
+  /** Withdraw as the producer, for example when the source field is gone. */
+  supersede(
+    suggestionId: string,
+    body: Schemas["OntologyChangeSuggestionDecisionRequest"],
+    opts: CallOptions = {},
+  ): Promise<Schemas["OntologyChangeSuggestion"]> {
+    return this.client.request("POST", "/v1/ontology/suggestions/supersede", {
+      ...opts,
+      retry: opts.retry ?? true,
+      query: { suggestion_id: suggestionId },
+      body,
+    });
+  }
+
+  /** Add a comment to the discussion. */
+  comment(
+    suggestionId: string,
+    body: Schemas["OntologyChangeSuggestionCommentRequest"],
+    opts: CallOptions = {},
+  ): Promise<Schemas["OntologyChangeSuggestion"]> {
+    return this.client.request("POST", "/v1/ontology/suggestions/comment", {
+      ...opts,
+      query: { suggestion_id: suggestionId },
+      body,
+    });
+  }
+}
+
 /** Ontology discovery and lifecycle operations. */
 export class OntologyNamespace {
-  constructor(private readonly client: LbbClient) {}
+  /** Reviewable change suggestions from every producer. */
+  readonly suggestions: OntologySuggestionsNamespace;
+
+  constructor(private readonly client: LbbClient) {
+    this.suggestions = new OntologySuggestionsNamespace(client);
+  }
 
   view(
     options: { counts?: boolean } & CallOptions = {},
