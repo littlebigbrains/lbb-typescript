@@ -1436,10 +1436,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Local-durable workflows: workflows */
+        /** Activity graphs: workflows */
         get: operations["get_v1_workflows"];
         put?: never;
-        /** Local-durable workflows: workflows */
+        /** Activity graphs: workflows */
         post: operations["post_v1_workflows"];
         delete?: never;
         options?: never;
@@ -1456,7 +1456,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Local-durable workflows: archive */
+        /** Activity graphs: archive */
         post: operations["post_v1_workflows_archive"];
         delete?: never;
         options?: never;
@@ -1473,7 +1473,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Local-durable workflows: cancel */
+        /** Activity graphs: cancel */
         post: operations["post_v1_workflows_cancel"];
         delete?: never;
         options?: never;
@@ -1490,7 +1490,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Local-durable workflows: claim */
+        /** Activity graphs: claim */
         post: operations["post_v1_workflows_claim"];
         delete?: never;
         options?: never;
@@ -1507,7 +1507,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Local-durable workflows: complete */
+        /** Activity graphs: complete */
         post: operations["post_v1_workflows_complete"];
         delete?: never;
         options?: never;
@@ -1524,7 +1524,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Local-durable workflows: heartbeat */
+        /** Activity graphs: heartbeat */
         post: operations["post_v1_workflows_heartbeat"];
         delete?: never;
         options?: never;
@@ -1642,7 +1642,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Local-durable workflows: run */
+        /** Activity graphs: run */
         get: operations["get_v1_workflows_run"];
         put?: never;
         post?: never;
@@ -1661,7 +1661,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Local-durable workflows: signal */
+        /** Activity graphs: signal */
         post: operations["post_v1_workflows_signal"];
         delete?: never;
         options?: never;
@@ -1676,7 +1676,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Local-durable workflows: status */
+        /** Activity graphs: status */
         get: operations["get_v1_workflows_status"];
         put?: never;
         post?: never;
@@ -8541,20 +8541,43 @@ export interface components {
         /** @enum {string} */
         WorkflowState: "running" | "succeeded" | "failed" | "cancelled";
         WorkflowStatusResponse: {
-            /** Format: int64 */
+            /**
+             * Format: int64
+             * @description Running activity-graph runs plus message workflows that are not idle.
+             */
             active_runs: number;
+            /** @description Always false. */
             archive_error: boolean;
-            /** Format: int64 */
+            /**
+             * Format: int64
+             * @description Always 0.
+             */
             archive_lag_ms: number;
-            /** Format: int64 */
+            /**
+             * Format: int64
+             * @description Equal to `local_sequence`: no change waits outside object storage.
+             */
             archived_sequence: number;
+            /**
+             * @description `object_storage` when enabled: an acknowledged request is an object
+             *     write. `disabled` when the server has workflows turned off.
+             */
             durability: string;
             enabled: boolean;
-            /** Format: int64 */
+            /**
+             * Format: int64
+             * @description The generation of the scheduling index of this graph.
+             */
             local_sequence: number;
-            /** Format: int64 */
+            /**
+             * Format: int64
+             * @description Always 0.
+             */
             pending_archive_bytes: number;
-            /** Format: int64 */
+            /**
+             * Format: int64
+             * @description Always 0.
+             */
             unarchived_events: number;
         };
         WorkflowStep: {
