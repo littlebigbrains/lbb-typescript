@@ -4,6 +4,11 @@ All notable changes to the `@littlebigbrain/client` package are documented here.
 
 ## Unreleased
 
+- A workflow value JSON cannot hold (`undefined`, a function, a symbol, a
+  bigint, a non-finite number) still fails the turn for good, and the error
+  now says where it is: `state`, `result`, `continuation`, `message`,
+  `signal "<name>"` or `step "<key>"`, with the path to the field, such as
+  `continuation.message.full is undefined`.
 - Add `modelActivity({ month })` for `GET /v1/models/activity`. It reads what
   each managed model did for the stack in one month (`yyyy-mm`, UTC; the
   current month by default). The answer holds totals, rows by day and rows
