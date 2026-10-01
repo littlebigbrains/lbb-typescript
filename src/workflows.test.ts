@@ -148,6 +148,48 @@ test("changed step order is a permanent failure and cannot commit state", async 
     false,
   );
 });
+test("a value JSON cannot hold fails the turn for good and names where it is", async () => {
+  const { client, calls } = setup([task(), task()]);
+  const counter = workflow<number, { add?: number; full?: boolean }>({
+    name: "counter",
+    version: "v1",
+    initialState: 0,
+    async onMessage(ctx, _state, message) {
+      if (message.add === 1)
+        // A field left undefined, as a sync message without `full` once did.
+        return ctx.continue(1, { full: undefined });
+      return { state: 1 };
+    },
+  });
+  await new WorkflowWorker(client, [counter], { worker: "test" }).runOnce();
+  const fail = calls.find((c) => c.path.endsWith("/fail"))?.body;
+  assert.equal(fail?.non_retryable, true);
+  assert.match(
+    JSON.stringify(fail),
+    /JSON serializable \(use null for no result\): continuation\.message\.full is undefined/,
+  );
+  assert.equal(
+    calls.some((c) => c.path.endsWith("/complete")),
+    false,
+  );
+
+  const stepper = workflow({
+    name: "counter",
+    version: "v1",
+    initialState: 0,
+    async onMessage(ctx) {
+      await ctx.step("page.0", async () => ({ rows: [1, undefined] }));
+      return { state: 1 };
+    },
+  });
+  calls.length = 0;
+  await new WorkflowWorker(client, [stepper], { worker: "test" }).runOnce();
+  assert.match(
+    JSON.stringify(calls.find((c) => c.path.endsWith("/fail"))?.body),
+    /step \\"page\.0\\"\.rows\[1\] is undefined/,
+  );
+});
+
 test("sequential effects checkpoint before completion and fresh turns do not inherit steps", async () => {
   const t1 = task(),
     t2 = task();

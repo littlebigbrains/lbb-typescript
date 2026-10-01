@@ -5,18 +5,48 @@ type Turn = Schemas["WorkflowTurn"];
 type Task = Schemas["WorkflowTurnTask"];
 type Instance = Schemas["WorkflowInstance"];
 const base = "/v1/workflows";
-const copy = <T>(value: T): T => {
+const notJson = (v: unknown): boolean =>
+  v === undefined ||
+  typeof v === "function" ||
+  typeof v === "symbol" ||
+  typeof v === "bigint";
+/** Where the first value JSON cannot hold sits, as `where.a.b[2]`. */
+const badPath = (
+  value: unknown,
+  path: string,
+  seen = new Set<object>(),
+): string | null => {
+  if (notJson(value) || (typeof value === "number" && !Number.isFinite(value)))
+    return path;
+  if (value === null || typeof value !== "object" || seen.has(value))
+    return null;
+  if (typeof (value as { toJSON?: unknown }).toJSON === "function") return null;
+  seen.add(value);
+  for (const [key, item] of Object.entries(value)) {
+    const found = badPath(
+      item,
+      Array.isArray(value) ? `${path}[${key}]` : `${path}.${key}`,
+      seen,
+    );
+    if (found) return found;
+  }
+  return null;
+};
+/**
+ * A JSON copy of a workflow value. `where` names the value in the error
+ * (`state`, `continuation`, `step "page.3"`), with the path to the field.
+ */
+const copy = <T>(value: T, where = "value"): T => {
+  const at = () => {
+    const path = badPath(value, where);
+    return path ? `: ${path}` : "";
+  };
   const encoded = JSON.stringify(value, (_key, v: unknown) => {
     if (typeof v === "number" && !Number.isFinite(v))
-      throw new WorkflowError("Values must be finite JSON numbers");
-    if (
-      v === undefined ||
-      typeof v === "function" ||
-      typeof v === "symbol" ||
-      typeof v === "bigint"
-    )
+      throw new WorkflowError(`Values must be finite JSON numbers${at()}`);
+    if (notJson(v))
       throw new WorkflowError(
-        "Workflow values must be JSON serializable (use null for no result)",
+        `Workflow values must be JSON serializable (use null for no result)${at()} is ${typeof v}`,
       );
     return v;
   });
@@ -102,7 +132,7 @@ export function workflow<S, M, R = unknown>(definition: {
   const registered: WorkflowDefinition<S, M> = {
     name: definition.name,
     version: definition.version,
-    initialState: copy(definition.initialState),
+    initialState: copy(definition.initialState, "initialState"),
     execute: (ctx, state, message) =>
       definition.onMessage(ctx, state as S, message as M),
     start: (client, id, options) =>
@@ -201,7 +231,7 @@ export class WorkflowNamespace {
     return this.client.request("POST", `${base}/instances/message`, {
       ...call,
       retry: true,
-      body: { workflow_id: workflowId, id, message: copy(message) },
+      body: { workflow_id: workflowId, id, message: copy(message, "message") },
     });
   }
   signal(
@@ -214,7 +244,13 @@ export class WorkflowNamespace {
     return this.client.request("POST", `${base}/turns/signal`, {
       ...call,
       retry: true,
-      body: { workflow_id: workflowId, turn, id, name, value: copy(value) },
+      body: {
+        workflow_id: workflowId,
+        turn,
+        id,
+        name,
+        value: copy(value, `signal "${name}"`),
+      },
     });
   }
   history(
@@ -467,10 +503,10 @@ export class WorkflowWorker {
                   check();
                   if (!active)
                     throw new WorkflowError("Operation has already finished");
-                  const savedDetails = copy(details);
+                  const savedDetails = copy(details, `step "${key}" progress`);
                   const savedCursor =
                     options && "checkpoint" in options
-                      ? copy(options.checkpoint)
+                      ? copy(options.checkpoint, `step "${key}" checkpoint`)
                       : undefined;
                   pending = pending.then(async () => {
                     check();
@@ -498,6 +534,7 @@ export class WorkflowWorker {
                   return pending;
                 },
               }),
+              `step "${key}"`,
             );
             active = false;
             await pending;
@@ -627,9 +664,11 @@ export class WorkflowWorker {
       if (stopped) throw suspended; // A handler must not swallow a sleep suspension and commit.
       const body = {
         ...lease,
-        state: copy(result.state),
-        result: copy(result.result ?? null),
-        continuation: result.continuation ? copy(result.continuation) : null,
+        state: copy(result.state, "state"),
+        result: copy(result.result ?? null, "result"),
+        continuation: result.continuation
+          ? copy(result.continuation, "continuation")
+          : null,
       };
       // Serialize completion retries exactly; a lost response must not rerun effects.
       stopHeartbeat();
