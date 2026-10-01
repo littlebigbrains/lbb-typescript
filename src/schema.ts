@@ -4050,12 +4050,29 @@ export interface components {
             written_properties?: components["schemas"]["EntityFieldsWritten"][];
         };
         GraphDeleteResponse: {
-            /** Format: int64 */
+            /**
+             * Format: int64
+             * @description Bytes of `deleted_objects`.
+             */
             deleted_bytes: number;
+            /**
+             * @description Always 0: search feedback is reclaimed in the background with the
+             *     rest of the graph.
+             */
             deleted_feedback_objects: number;
+            /**
+             * @description Objects the request itself removed (the workflow state and history
+             *     of the deleted graph). The rest is reclaimed in the background; see
+             *     `reclaims`.
+             */
             deleted_objects: number;
             graph_id: string;
             ok: boolean;
+            /**
+             * @description The background passes that reclaim the deleted graph's storage, one
+             *     per branch. Empty when reclaim is turned off on the server.
+             */
+            reclaims?: components["schemas"]["GraphReclaimSchedule"][];
         };
         GraphEdgeRow: {
             /** Format: float */
@@ -4390,6 +4407,20 @@ export interface components {
             /** Format: float */
             recall_at_k: number;
             snapshot: components["schemas"]["SnapshotView"];
+        };
+        /** @description A background pass that reclaims the storage of a deleted graph branch. */
+        GraphReclaimSchedule: {
+            branch: string;
+            job_id: string;
+            /** @description `apply` deletes; `plan` only counts what a pass would delete. */
+            mode: string;
+            /** @description RFC 3339. The pass does not start before this time. */
+            not_before: string;
+            /**
+             * Format: int64
+             * @description The epoch the delete retired.
+             */
+            retired_epoch: number;
         };
         /**
          * @description Outcome of `POST /v1/graph/reload` — the declarative "make the graph match
