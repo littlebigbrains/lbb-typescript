@@ -727,6 +727,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/models/activity": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** What each managed model did for the stack in one month: totals, by day and by graph per feature (index, search, fit, judge, training) and model, the months with activity, and the model each feature uses now. A stack read; the answering node adds the calls it has not written to the ledger yet */
+        get: operations["get_v1_models_activity"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/models/cadence": {
         parameters: {
             query?: never;
@@ -4824,6 +4841,164 @@ export interface components {
          * @enum {string}
          */
         ManagedModelsSource: "document" | "defaults";
+        /** @description One feature and model on one day (UTC). */
+        ModelActivityDay: {
+            /** Format: int64 */
+            calls: number;
+            /** Format: int64 */
+            cost_micro_usd: number;
+            /** @description `yyyy-mm-dd`. */
+            day: string;
+            /** Format: int64 */
+            errors: number;
+            feature: components["schemas"]["ModelActivityFeature"];
+            /** Format: int64 */
+            gpu_seconds: number;
+            /** Format: int64 */
+            items: number;
+            /** Format: int64 */
+            last_at_ms: number;
+            model: string;
+            provider: string;
+            /** Format: int64 */
+            tokens_estimate: number;
+        };
+        /**
+         * @description The feature a model call served.
+         * @enum {string}
+         */
+        ModelActivityFeature: "index" | "search" | "fit" | "judge" | "training";
+        /**
+         * @description One feature and model on one graph over the month. `graph` is `*` for
+         *     the graphs past the ledger's bound ("other graphs").
+         */
+        ModelActivityGraph: {
+            /** Format: int64 */
+            calls: number;
+            /** Format: int64 */
+            cost_micro_usd: number;
+            /** Format: int64 */
+            errors: number;
+            feature: components["schemas"]["ModelActivityFeature"];
+            /** Format: int64 */
+            gpu_seconds: number;
+            graph: string;
+            /** Format: int64 */
+            items: number;
+            /** Format: int64 */
+            last_at_ms: number;
+            model: string;
+            provider: string;
+            /** Format: int64 */
+            tokens_estimate: number;
+        };
+        /** @description The model a feature uses now, from the managed model catalog. */
+        ModelActivityManaged: {
+            feature: components["schemas"]["ModelActivityFeature"];
+            /** @description A name for people (`OpenAI text-embedding-3-small`, `Jev`). */
+            label: string;
+            model: string;
+            provider: string;
+        };
+        /** @description One count the SaaS API reports. The counters default to 0. */
+        ModelActivityReportEntry: {
+            /**
+             * Format: int64
+             * @description When the calls happened, in milliseconds since the Unix epoch: it
+             *     selects the day and the month.
+             */
+            at_ms: number;
+            /** Format: int64 */
+            calls?: number;
+            /** Format: int64 */
+            cost_micro_usd?: number;
+            /** Format: int64 */
+            errors?: number;
+            feature: components["schemas"]["ModelActivityFeature"];
+            /** Format: int64 */
+            gpu_seconds?: number;
+            graph: string;
+            /** Format: int64 */
+            items?: number;
+            model: string;
+            provider: string;
+            /** Format: int64 */
+            tokens_estimate?: number;
+        };
+        /**
+         * @description `POST /api/admin/model-activity` (database admin token): counts of model
+         *     calls the SaaS API made for a stack, at most
+         *     [`MODEL_ACTIVITY_REPORT_MAX_ENTRIES`].
+         */
+        ModelActivityReportRequest: {
+            entries: components["schemas"]["ModelActivityReportEntry"][];
+            stack_id: string;
+        };
+        ModelActivityReportResponse: {
+            /**
+             * Format: int64
+             * @description Entries taken into the ledger's next write.
+             */
+            accepted: number;
+        };
+        /**
+         * @description `GET /v1/models/activity?month=<yyyy-mm>`: the stack's model activity in
+         *     one month, with the model each feature uses now. The answering node adds
+         *     the calls it has not written to the ledger yet.
+         */
+        ModelActivityResponse: {
+            by_day: components["schemas"]["ModelActivityDay"][];
+            by_graph: components["schemas"]["ModelActivityGraph"][];
+            managed: components["schemas"]["ModelActivityManaged"][];
+            /** @description `yyyy-mm` (UTC). */
+            month: string;
+            /** @description The months with activity, oldest first. */
+            months: string[];
+            totals: components["schemas"]["ModelActivityTotal"][];
+        };
+        /** @description One feature and model over the month. */
+        ModelActivityTotal: {
+            /**
+             * Format: int64
+             * @description Requests sent to the provider.
+             */
+            calls: number;
+            /**
+             * Format: int64
+             * @description Estimated cost in millionths of a US dollar.
+             */
+            cost_micro_usd: number;
+            /**
+             * Format: int64
+             * @description Calls that failed.
+             */
+            errors: number;
+            feature: components["schemas"]["ModelActivityFeature"];
+            /**
+             * Format: int64
+             * @description Training only.
+             */
+            gpu_seconds: number;
+            /**
+             * Format: int64
+             * @description Graphs with activity (the `*` row of "other graphs" not counted).
+             */
+            graphs: number;
+            /**
+             * Format: int64
+             * @description Texts embedded, questions asked, results judged, or runs.
+             */
+            items: number;
+            /**
+             * Format: int64
+             * @description The last activity, in milliseconds since the Unix epoch (0: none).
+             */
+            last_at_ms: number;
+            model: string;
+            provider: string;
+            /** Format: int64 */
+            tokens_estimate: number;
+        };
         ModelArtifact: {
             blake3: string;
             /** Format: int64 */
@@ -16264,6 +16439,142 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ManagedModelsResponse"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Rate limit exceeded */
+            429: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Service unavailable */
+            503: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+        };
+    };
+    get_v1_models_activity: {
+        parameters: {
+            query?: {
+                /** @description Graph name (default `main`) */
+                graph?: string;
+                /** @description yyyy-mm (UTC); default: the current month */
+                month?: string;
+            };
+            header?: {
+                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                "Lbb-Version"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ModelActivityResponse"];
                 };
             };
             /** @description Bad request */

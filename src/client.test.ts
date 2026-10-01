@@ -423,6 +423,46 @@ test("activity reads the graph's background work in the graph scope", async () =
   assert.equal(url.searchParams.get("graph"), "perritos");
 });
 
+test("modelActivity reads one month of the stack's model activity", async () => {
+  const counters = {
+    calls: 2,
+    items: 300,
+    tokens_estimate: 9000,
+    cost_micro_usd: 180,
+    gpu_seconds: 0,
+    errors: 0,
+    last_at_ms: 1_790_000_000_000,
+  };
+  const model = {
+    feature: "index" as const,
+    provider: "openrouter",
+    model: "openai/text-embedding-3-small",
+  };
+  const answer: Schemas["ModelActivityResponse"] = {
+    month: "2026-09",
+    months: ["2026-09", "2026-10"],
+    managed: [{ ...model, label: "OpenAI text-embedding-3-small" }],
+    totals: [{ ...model, ...counters, graphs: 1 }],
+    by_day: [{ ...model, ...counters, day: "2026-09-30" }],
+    by_graph: [{ ...model, ...counters, graph: "main" }],
+  };
+  const { fetch, calls } = recordingFetch([
+    { body: JSON.stringify(answer) },
+    { body: JSON.stringify({ ...answer, month: "2026-10" }) },
+  ]);
+  const client = new LbbClient({ baseUrl: "http://h", fetch });
+  const september = await client.modelActivity({ month: "2026-09" });
+  assert.equal(september.totals[0]?.items, 300);
+  assert.equal(september.by_graph[0]?.graph, "main");
+  const current = await client.modelActivity();
+  assert.equal(current.month, "2026-10");
+  const [first, second] = calls.map((call) => new URL(call.input));
+  assert.equal(calls[0].init.method, "GET");
+  assert.equal(first.pathname, "/v1/models/activity");
+  assert.equal(first.searchParams.get("month"), "2026-09");
+  assert.equal(second.searchParams.has("month"), false);
+});
+
 test("namespace facts.create injects auth, scope, version, and idempotency", async () => {
   const { fetch, calls } = recordingFetch({
     body: JSON.stringify({

@@ -4,6 +4,11 @@ All notable changes to the `@littlebigbrain/client` package are documented here.
 
 ## Unreleased
 
+- Add `modelActivity({ month })` for `GET /v1/models/activity`. It reads what
+  each managed model did for the stack in one month (`yyyy-mm`, UTC; the
+  current month by default). The answer holds totals, rows by day and rows
+  by graph per feature and model, the months with activity, and the model
+  each feature uses now. Add the generated `ModelActivityResponse` types.
 - `WorkflowInstance` gains `history_pruned_through`: turns up to it were
   removed by the server's history retention. Reading one answers 404, and a
   message id whose turn was removed is admitted again as a new message.
