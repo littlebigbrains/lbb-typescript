@@ -8908,6 +8908,13 @@ export interface components {
             current_turn?: null | components["schemas"]["WorkflowTurn"];
             /**
              * Format: int64
+             * @description Turns `1..=history_pruned_through` were removed by history retention:
+             *     reading one answers 404, and a message id whose turn was removed is
+             *     admitted again as a new message. Zero when nothing was removed.
+             */
+            history_pruned_through?: number;
+            /**
+             * Format: int64
              * @description Completed history safely copied to immutable object storage and evicted locally.
              */
             history_through: number;
@@ -8968,7 +8975,11 @@ export interface components {
             runs: components["schemas"]["WorkflowRun"][];
         };
         WorkflowMessageRequest: {
-            /** @description Caller-assigned idempotency key, retained across history spill and recovery. */
+            /**
+             * @description Caller-assigned idempotency key. A repeated id answers the turn it
+             *     admitted while that turn is in the retained history (by default the
+             *     newest 256 turns, and every turn that finished in the last 24 hours).
+             */
             id: string;
             message: unknown;
             workflow_id: string;
