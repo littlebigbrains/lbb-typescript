@@ -1366,6 +1366,19 @@ export class LbbClient {
     return this.request("GET", "/v1/managed-models");
   }
 
+  /** What each managed model did for the stack in one month (`yyyy-mm`,
+   * UTC; the current month by default): totals, by day and by graph per
+   * feature (`index`, `search`, `fit`, `judge`, `training`) and model, the
+   * months with activity, and the model each feature uses now. A stack
+   * read: the graph scope is not used. */
+  modelActivity(
+    opts: { month?: string } = {},
+  ): Promise<Schemas["ModelActivityResponse"]> {
+    return this.request("GET", "/v1/models/activity", {
+      query: { month: opts.month },
+    });
+  }
+
   /** Wait until background reconciliation folds `targetSeq` into the RDF base. */
   async waitForPublished(
     targetSeq: number,
