@@ -1155,6 +1155,74 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/ontology/starters": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List the ontology starters (CRM, Documents, Work management) with each one's status on the scoped graph; answers for a graph that does not exist yet */
+        get: operations["get_v1_ontology_starters"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/ontology/starters/apply": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Apply a starter to the scoped graph through the evolve path (a relation the graph has is widened); idempotent; refuses a conflicting term with 409 starter_conflict; dry_run writes nothing */
+        post: operations["post_v1_ontology_starters_apply"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/ontology/starters/detail": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read one starter's document, its status on the scoped graph and the evolve operations applying it would run now */
+        get: operations["get_v1_ontology_starters_detail"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/ontology/starters/update": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** File what a graph holding part of a starter lacks as one ontology change suggestion, keyed starter:<id>/<version>; asking again returns the same suggestion */
+        post: operations["post_v1_ontology_starters_update"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/ontology/suggestions": {
         parameters: {
             query?: never;
@@ -5411,7 +5479,7 @@ export interface components {
         OntologyChangeSuggestionCreateRequest: {
             anchor?: null | components["schemas"]["SuggestionAnchor"];
             /**
-             * @description Up to 64 evolve operations; at least one unless `identities` is set
+             * @description Up to 128 evolve operations; at least one unless `identities` is set
              *     (then it may be empty).
              */
             change: components["schemas"]["OntologyEvolveOp"][];
@@ -5827,6 +5895,259 @@ export interface components {
             concepts: boolean;
             relations: boolean;
             terms: boolean;
+        };
+        /** @description What applying a starter would change now. */
+        OntologyStarterAdds: {
+            /** @description Classes to add. */
+            classes: number;
+            /** @description Properties to add. */
+            properties: number;
+            /** @description Relations to add. */
+            relations: number;
+            /** @description Direct parent links to add (`rdfs:subClassOf`). */
+            super_types: number;
+            /**
+             * @description Relations the graph has that lack some of the starter's domain or
+             *     range classes.
+             */
+            widened_relations: number;
+        };
+        /** @description Apply a starter to the scoped graph. */
+        OntologyStarterApplyRequest: {
+            /** @description Answer what applying would do without writing anything. */
+            dry_run?: boolean;
+            /**
+             * Format: int64
+             * @description Refuse with `409 conflict` when the graph's ontology version differs.
+             */
+            expected_ontology_version?: number | null;
+            /** @description The starter id, for example `crm`. */
+            starter: string;
+        };
+        /** @description The result of applying a starter. */
+        OntologyStarterApplyResponse: {
+            /** @description The evolve operations this call ran, or would run in a dry run. */
+            applied_ops: components["schemas"]["OntologyEvolveOp"][];
+            dry_run: boolean;
+            graph: components["schemas"]["GraphKey"];
+            /**
+             * @description True when the graph already held the whole starter: nothing was (or,
+             *     in a dry run, would be) written.
+             */
+            no_op: boolean;
+            /**
+             * Format: int64
+             * @description The ontology version after the call, or the predicted one in a dry run.
+             */
+            ontology_version: number;
+            /** @description The starter id. */
+            starter: string;
+            /** @description The starter's status after the call, or the predicted one in a dry run. */
+            status: components["schemas"]["OntologyStarterStatus"];
+            /** @description The starter version. */
+            version: string;
+        };
+        /**
+         * @description A class of a starter. LBB does not scope properties to classes:
+         *     `properties` is a hint for the fit and the docs.
+         */
+        OntologyStarterClass: {
+            description: string;
+            /** @description Equivalent or closest terms in public vocabularies, as CURIEs. */
+            equivalents?: string[];
+            /**
+             * @description Properties whose value identifies one real thing across sources. No
+             *     ontology operation holds them yet.
+             */
+            keys?: string[];
+            /** @description PascalCase. */
+            name: string;
+            /**
+             * @description The properties records of this class carry, beyond its parents' and
+             *     the shared ones.
+             */
+            properties: string[];
+            /** @description Direct parents, declared earlier in the starter. */
+            superTypes?: string[];
+        };
+        /**
+         * @description A term the graph holds differently from the starter. Applying would keep
+         *     the graph's version silently, so `apply` refuses while one exists.
+         */
+        OntologyStarterConflict: {
+            /** @description What the graph holds. */
+            graph: string;
+            kind: components["schemas"]["OntologyStarterConflictKind"];
+            message: string;
+            /** @description The term's name in the starter. */
+            name: string;
+            /**
+             * @description What the starter declares, for example `keyword` or
+             *     `many_to_one, inverse EMPLOYS`.
+             */
+            starter: string;
+        };
+        /**
+         * @description The kind of term a conflict is about.
+         * @enum {string}
+         */
+        OntologyStarterConflictKind: "class" | "property" | "relation";
+        /** @description The size of a starter. */
+        OntologyStarterCounts: {
+            classes: number;
+            properties: number;
+            questions: number;
+            relations: number;
+        };
+        /**
+         * @description `GET /v1/ontology/starters/detail`: one starter's document, its status and
+         *     the operations applying it would run now.
+         */
+        OntologyStarterDetail: {
+            graph: components["schemas"]["GraphKey"];
+            /**
+             * @description The evolve operations applying the starter would run now: what the
+             *     graph lacks, with a relation the graph has widened instead of added.
+             */
+            missing_ops: components["schemas"]["OntologyEvolveOp"][];
+            /**
+             * Format: int64
+             * @description Null when the graph does not exist yet.
+             */
+            ontology_version?: number | null;
+            starter: components["schemas"]["OntologyStarterDocument"];
+            status: components["schemas"]["OntologyStarterStatus"];
+        };
+        /**
+         * @description A starter as the JSON document the data plane embeds
+         *     (`database/crates/lbb-ontology/starters/<id>.json`).
+         */
+        OntologyStarterDocument: {
+            /** @description Parents first. */
+            classes: components["schemas"]["OntologyStarterClass"][];
+            description: string;
+            /**
+             * Format: int32
+             * @description The document format, 1.
+             */
+            format: number;
+            /** @description Stable id, for example `crm`. */
+            id: string;
+            label: string;
+            /** @description The evolve operations that create the starter on an empty graph. */
+            ops: components["schemas"]["OntologyEvolveOp"][];
+            properties: components["schemas"]["OntologyStarterProperty"][];
+            questions: components["schemas"]["OntologyStarterQuestion"][];
+            relations: components["schemas"]["OntologyStarterRelation"][];
+            /** @description Properties every record of every class may carry (provenance). */
+            shared: string[];
+            /** @description The connector kinds that map to this starter, for example `hubspot`. */
+            sources: string[];
+            /** @description Semantic version. A major change renames or removes terms. */
+            version: string;
+        };
+        /** @description `GET /v1/ontology/starters`: every starter with its status on the graph. */
+        OntologyStarterList: {
+            graph: components["schemas"]["GraphKey"];
+            /**
+             * Format: int64
+             * @description The graph's ontology version; null when the graph does not exist yet
+             *     (every starter is then `absent`).
+             */
+            ontology_version?: number | null;
+            starters: components["schemas"]["OntologyStarterSummary"][];
+        };
+        /** @description How many of a starter's terms the graph holds. */
+        OntologyStarterPresent: {
+            classes: number;
+            properties: number;
+            relations: number;
+        };
+        /** @description A property of a starter. Properties are global: one name, one value type. */
+        OntologyStarterProperty: {
+            description: string;
+            /** @description The schema.org (or other) term it corresponds to, as a CURIE. */
+            equivalent?: string | null;
+            /** @description snake_case. */
+            name: string;
+            /**
+             * @description `bool` | `i64` | `f64` | `date_time` | `keyword` | `text` |
+             *     `keyword_set` | `i64_set`.
+             */
+            type: string;
+        };
+        /**
+         * @description A question the starter's ontology must answer, with the terms an answer
+         *     needs.
+         */
+        OntologyStarterQuestion: {
+            classes: string[];
+            /** @description For example `crm-01`. */
+            id: string;
+            properties: string[];
+            relations: string[];
+            /** @description The SPARQL that answers it, when one exists. */
+            sparql?: string | null;
+            text: string;
+        };
+        /** @description A relation of a starter. */
+        OntologyStarterRelation: {
+            /** @description `one_to_one` | `one_to_many` | `many_to_one` | `many_to_many`. */
+            cardinality: string;
+            description: string;
+            /** @description Class names the relation goes from. */
+            domain: string[];
+            equivalent?: string | null;
+            /** @description The name of the reverse direction. */
+            inverse?: string | null;
+            /** @description UPPER_SNAKE_CASE. */
+            name: string;
+            /** @description Class names the relation goes to. */
+            range: string[];
+            /** @description `append_only` (when absent) or `latest_wins`. */
+            reducer?: string | null;
+            symmetric?: boolean | null;
+            transitive?: boolean | null;
+        };
+        /**
+         * @description How much of a starter a graph holds.
+         * @enum {string}
+         */
+        OntologyStarterState: "absent" | "partial" | "applied";
+        /** @description A starter compared with a graph's ontology. */
+        OntologyStarterStatus: {
+            adds: components["schemas"]["OntologyStarterAdds"];
+            conflicts?: components["schemas"]["OntologyStarterConflict"][];
+            present: components["schemas"]["OntologyStarterPresent"];
+            state: components["schemas"]["OntologyStarterState"];
+        };
+        /** @description One row of `GET /v1/ontology/starters`. */
+        OntologyStarterSummary: {
+            counts: components["schemas"]["OntologyStarterCounts"];
+            description: string;
+            id: string;
+            label: string;
+            sources: string[];
+            status: components["schemas"]["OntologyStarterStatus"];
+            version: string;
+        };
+        /**
+         * @description File the operations a graph lacks of a starter as one ontology change
+         *     suggestion.
+         */
+        OntologyStarterUpdateRequest: {
+            /** @description The starter id, for example `crm`. */
+            starter: string;
+        };
+        /** @description The suggestion a starter update filed. */
+        OntologyStarterUpdateResponse: {
+            /**
+             * @description True when this call filed the suggestion; false when it existed
+             *     already (it may have been revised) or nothing was needed.
+             */
+            created: boolean;
+            /** @description The suggestion's id; null when the graph already holds the starter. */
+            suggestion_id?: string | null;
         };
         /**
          * @description A named entity type or relation in the graph's active ontology. Returned by
@@ -20349,6 +20670,556 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["OntologySearchResponse"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Rate limit exceeded */
+            429: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Service unavailable */
+            503: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+        };
+    };
+    get_v1_ontology_starters: {
+        parameters: {
+            query?: {
+                /** @description Graph name (default `main`) */
+                graph?: string;
+            };
+            header?: {
+                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                "Lbb-Version"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OntologyStarterList"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Rate limit exceeded */
+            429: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Service unavailable */
+            503: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+        };
+    };
+    post_v1_ontology_starters_apply: {
+        parameters: {
+            query?: {
+                /** @description Graph name (default `main`) */
+                graph?: string;
+            };
+            header?: {
+                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                "Lbb-Version"?: string;
+                /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
+                "Idempotency-Key"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OntologyStarterApplyRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OntologyStarterApplyResponse"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Rate limit exceeded */
+            429: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Service unavailable */
+            503: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+        };
+    };
+    get_v1_ontology_starters_detail: {
+        parameters: {
+            query?: {
+                /** @description Graph name (default `main`) */
+                graph?: string;
+                /** @description Starter id, for example crm */
+                starter?: string;
+            };
+            header?: {
+                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                "Lbb-Version"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OntologyStarterDetail"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Rate limit exceeded */
+            429: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Service unavailable */
+            503: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+        };
+    };
+    post_v1_ontology_starters_update: {
+        parameters: {
+            query?: {
+                /** @description Graph name (default `main`) */
+                graph?: string;
+            };
+            header?: {
+                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                "Lbb-Version"?: string;
+                /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
+                "Idempotency-Key"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OntologyStarterUpdateRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OntologyStarterUpdateResponse"];
                 };
             };
             /** @description Bad request */

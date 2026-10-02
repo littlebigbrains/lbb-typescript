@@ -370,6 +370,8 @@ export interface LbbErrorPayload {
   doc_url?: string | null;
   retryable?: boolean;
   retry_after_seconds?: number;
+  /** Per-item reasons for a refusal, for example `conflicts` of `starter_conflict`. */
+  details?: Record<string, unknown>;
 }
 
 export interface RawLbbResponse<T> {

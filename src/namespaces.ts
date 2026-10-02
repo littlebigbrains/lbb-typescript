@@ -687,13 +687,93 @@ export class OntologySuggestionsNamespace {
   }
 }
 
+/** Options for {@link OntologyStartersNamespace.apply}. */
+export interface OntologyStarterApplyOptions extends CallOptions {
+  /** Answer what applying would do without writing anything. */
+  dryRun?: boolean;
+  /** Refuse with `409 conflict` when the graph's ontology version differs. */
+  expectedOntologyVersion?: number;
+}
+
+/**
+ * Ontology starters: versioned base ontologies for a domain (`crm`,
+ * `documents`, `work`) that a graph starts from. The status compares a
+ * starter's terms with the graph's ontology; the graph does not need to exist
+ * for `list` and `get`.
+ */
+export class OntologyStartersNamespace {
+  constructor(private readonly client: LbbClient) {}
+
+  /** Every starter with its status on the graph. */
+  list(opts: CallOptions = {}): Promise<Schemas["OntologyStarterList"]> {
+    return this.client.request("GET", "/v1/ontology/starters", opts);
+  }
+
+  /**
+   * One starter's document, its status on the graph and `missing_ops`, the
+   * evolve operations applying it would run now.
+   */
+  get(
+    starter: string,
+    opts: CallOptions = {},
+  ): Promise<Schemas["OntologyStarterDetail"]> {
+    return this.client.request("GET", "/v1/ontology/starters/detail", {
+      ...opts,
+      query: { starter },
+    });
+  }
+
+  /**
+   * Add what the graph lacks of a starter in one ontology version. A
+   * relation the graph has is widened. Applying again answers
+   * `no_op: true`, so a retry is safe. A term the graph holds differently
+   * fails with `409 starter_conflict` and writes nothing.
+   */
+  apply(
+    starter: string,
+    options: OntologyStarterApplyOptions = {},
+  ): Promise<Schemas["OntologyStarterApplyResponse"]> {
+    const { dryRun, expectedOntologyVersion, ...opts } = options;
+    return this.client.request("POST", "/v1/ontology/starters/apply", {
+      ...opts,
+      retry: opts.retry ?? true,
+      body: {
+        starter,
+        ...(dryRun !== undefined ? { dry_run: dryRun } : {}),
+        ...(expectedOntologyVersion !== undefined
+          ? { expected_ontology_version: expectedOntologyVersion }
+          : {}),
+      },
+    });
+  }
+
+  /**
+   * File what a graph holding part of a starter lacks as one ontology change
+   * suggestion, keyed `starter:<id>/<version>`. Asking again returns the same
+   * suggestion, so a retry is safe.
+   */
+  update(
+    starter: string,
+    opts: CallOptions = {},
+  ): Promise<Schemas["OntologyStarterUpdateResponse"]> {
+    return this.client.request("POST", "/v1/ontology/starters/update", {
+      ...opts,
+      retry: opts.retry ?? true,
+      body: { starter },
+    });
+  }
+}
+
 /** Ontology discovery and lifecycle operations. */
 export class OntologyNamespace {
   /** Reviewable change suggestions from every producer. */
   readonly suggestions: OntologySuggestionsNamespace;
+  /** Base ontologies a graph starts from. */
+  readonly starters: OntologyStartersNamespace;
 
   constructor(private readonly client: LbbClient) {
     this.suggestions = new OntologySuggestionsNamespace(client);
+    this.starters = new OntologyStartersNamespace(client);
   }
 
   view(

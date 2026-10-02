@@ -2,6 +2,21 @@
 
 All notable changes to the `@littlebigbrain/client` package are documented here.
 
+## Unreleased
+
+- Add `ontology.starters` with `list()`, `get(id)`,
+  `apply(id, { dryRun, expectedOntologyVersion })` and `update(id)` for the
+  `/v1/ontology/starters` routes. A starter is a versioned base ontology
+  (`crm`, `documents`, `work`); `list` and `get` answer for a graph that does
+  not exist yet. Add the generated `OntologyStarter*` types.
+- Add `starters`: the starters' classes, properties, relations and
+  competency questions as typed constants with their SPARQL IRIs, for example
+  `starters.crm.classes.Organization.iri` and
+  `starters.crm.relations.WORKS_AT.inverseIri`.
+- A suggestion's `change` holds up to 128 operations (was 64).
+- `LbbError.details` holds the per-item reasons of a refusal, for example
+  the `conflicts` of `409 starter_conflict`.
+
 ## 0.16.0 (2026-10-02)
 
 Breaking removal of `ontology.induce` and `induceOntology`, whose route is

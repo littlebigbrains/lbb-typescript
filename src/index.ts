@@ -29,6 +29,15 @@ export type {
   Snapshot,
 } from "./client.js";
 export type { components, paths, operations } from "./schema.js";
+export * as starters from "./starters.js";
+export type {
+  StarterClassTerm,
+  StarterPropertyTerm,
+  StarterQuestion,
+  StarterRelationTerm,
+  StarterTerms,
+} from "./starters.js";
+export type { OntologyStarterApplyOptions } from "./namespaces.js";
 
 export {
   workflow,

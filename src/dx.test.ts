@@ -2,6 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   LbbClient,
+  LbbError,
   type Entity,
   type FetchLike,
   type Schemas,
@@ -132,6 +133,69 @@ test("ontology suggestions namespace maps each operation to its route", async ()
   ]);
   assert.equal(bodies[4], "{}");
   assert.deepEqual(JSON.parse(bodies[5] ?? ""), { reason: "not now" });
+});
+
+test("ontology starters namespace maps each operation to its route and body", async () => {
+  const { fetch, urls, bodies } = queuedFetch([]);
+  const client = new LbbClient({ baseUrl: "http://h", graph: "crm", fetch });
+
+  await client.ontology.starters.list();
+  await client.ontology.starters.get("crm");
+  await client.ontology.starters.apply("crm");
+  await client.ontology.starters.apply("work", {
+    dryRun: true,
+    expectedOntologyVersion: 4,
+  });
+  await client.ontology.starters.update("crm");
+  await client.graph("sales").ontology.starters.list();
+
+  assert.deepEqual(urls, [
+    "http://h/v1/ontology/starters?graph=crm",
+    "http://h/v1/ontology/starters/detail?graph=crm&starter=crm",
+    "http://h/v1/ontology/starters/apply?graph=crm",
+    "http://h/v1/ontology/starters/apply?graph=crm",
+    "http://h/v1/ontology/starters/update?graph=crm",
+    "http://h/v1/ontology/starters?graph=sales",
+  ]);
+  assert.deepEqual(JSON.parse(bodies[2] ?? ""), { starter: "crm" });
+  assert.deepEqual(JSON.parse(bodies[3] ?? ""), {
+    starter: "work",
+    dry_run: true,
+    expected_ontology_version: 4,
+  });
+  assert.deepEqual(JSON.parse(bodies[4] ?? ""), { starter: "crm" });
+});
+
+test("a refused starter apply exposes its conflicts on the error", async () => {
+  const conflict = {
+    kind: "property",
+    name: "priority",
+    starter: "keyword",
+    graph: "i64",
+    message: "property priority is i64 in the graph",
+  };
+  const { fetch } = queuedFetch([
+    {
+      status: 409,
+      body: {
+        error: {
+          type: "conflict_error",
+          code: "starter_conflict",
+          message: "the graph holds 1 term(s) of the Work starter differently",
+          param: "starter",
+          details: { conflicts: [conflict] },
+        },
+      },
+    },
+  ]);
+  const client = new LbbClient({ baseUrl: "http://h", fetch });
+  await assert.rejects(client.ontology.starters.apply("work"), (error) => {
+    assert.ok(error instanceof LbbError);
+    assert.equal(error.status, 409);
+    assert.equal(error.code, "starter_conflict");
+    assert.deepEqual(error.details, { conflicts: [conflict] });
+    return true;
+  });
 });
 
 test("query namespace covers the parsed and raw SPARQL reads", async () => {
