@@ -43,6 +43,8 @@ export class LbbError extends Error {
   readonly retryAfterSeconds?: number;
   /** Actionable guidance for composite stack-endpoint routing errors. */
   readonly endpointHint?: string;
+  /** Per-item reasons for a refusal, for example `conflicts` of `starter_conflict`. */
+  readonly details?: Record<string, unknown>;
 
   constructor(
     readonly status: number,
@@ -59,6 +61,7 @@ export class LbbError extends Error {
     this.retryable = error?.retryable;
     this.retryAfterSeconds = error?.retry_after_seconds;
     this.endpointHint = endpointMigrationHint(this.code);
+    this.details = error?.details;
   }
 }
 

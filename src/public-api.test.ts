@@ -12,6 +12,7 @@ test("the runtime entrypoint exposes only the supported public values", () => {
     "WorkflowNamespace",
     "WorkflowWorker",
     "parseSparqlResults",
+    "starters",
     "workflow",
   ]);
 });
