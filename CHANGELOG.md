@@ -2,7 +2,10 @@
 
 All notable changes to the `@littlebigbrain/client` package are documented here.
 
-## Unreleased
+## 0.16.0 (2026-10-02)
+
+Breaking removal of `ontology.induce` and `induceOntology`, whose route is
+removed from the server.
 
 - A workflow value JSON cannot hold (`undefined`, a function, a symbol, a
   bigint, a non-finite number) still fails the turn for good, and the error
