@@ -55,10 +55,10 @@ export interface StarterTerms {
   readonly questions: readonly StarterQuestion[];
 }
 
-/** The CRM starter 1.0.0. */
+/** The CRM starter 1.1.0. */
 export const crm = {
   id: "crm",
-  version: "1.0.0",
+  version: "1.1.0",
   label: "CRM",
   classes: {
     Party: {
@@ -328,6 +328,11 @@ export const crm = {
       iri: "https://littlebigbrain.com/p/is_active",
       valueType: "bool",
     },
+    source_user_id: {
+      name: "source_user_id",
+      iri: "https://littlebigbrain.com/p/source_user_id",
+      valueType: "keyword",
+    },
     amount: {
       name: "amount",
       iri: "https://littlebigbrain.com/p/amount",
@@ -387,6 +392,11 @@ export const crm = {
       name: "is_won",
       iri: "https://littlebigbrain.com/p/is_won",
       valueType: "bool",
+    },
+    won_reason: {
+      name: "won_reason",
+      iri: "https://littlebigbrain.com/p/won_reason",
+      valueType: "text",
     },
     lost_reason: {
       name: "lost_reason",
@@ -839,10 +849,10 @@ export const crm = {
   ],
 } as const satisfies StarterTerms;
 
-/** The Documents starter 1.0.0. */
+/** The Documents starter 1.1.0. */
 export const documents = {
   id: "documents",
-  version: "1.0.0",
+  version: "1.1.0",
   label: "Documents",
   classes: {
     Party: {
@@ -1026,6 +1036,11 @@ export const documents = {
       name: "is_active",
       iri: "https://littlebigbrain.com/p/is_active",
       valueType: "bool",
+    },
+    source_user_id: {
+      name: "source_user_id",
+      iri: "https://littlebigbrain.com/p/source_user_id",
+      valueType: "keyword",
     },
     file_extension: {
       name: "file_extension",
@@ -1257,10 +1272,10 @@ export const documents = {
   ],
 } as const satisfies StarterTerms;
 
-/** The Work management starter 1.0.0. */
+/** The Work management starter 1.1.0. */
 export const work = {
   id: "work",
-  version: "1.0.0",
+  version: "1.1.0",
   label: "Work management",
   classes: {
     Party: {
@@ -1494,6 +1509,11 @@ export const work = {
       name: "is_active",
       iri: "https://littlebigbrain.com/p/is_active",
       valueType: "bool",
+    },
+    source_user_id: {
+      name: "source_user_id",
+      iri: "https://littlebigbrain.com/p/source_user_id",
+      valueType: "keyword",
     },
     probability: {
       name: "probability",
