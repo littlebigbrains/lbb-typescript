@@ -5660,6 +5660,9 @@ export interface components {
          *     version stays valid (its positional type/relation ids are preserved). This is
          *     the supported "ontology evolution" path; identity-breaking changes (removals,
          *     narrowing) still require an explicit expand→migrate→contract plan.
+         *
+         *     Every variant rejects unknown fields: a misspelled field fails the request
+         *     with `400 invalid_request` instead of reading as an empty change.
          */
         OntologyEvolveOp: components["schemas"]["WidenRelationOp"] | components["schemas"]["AddEntityTypeOp"] | components["schemas"]["AddSuperTypesOp"] | components["schemas"]["AddRelationOp"] | components["schemas"]["AddPropertyOp"] | components["schemas"]["SetPropertyConstraintOp"] | components["schemas"]["RenameEntityTypeOp"] | components["schemas"]["RenameRelationOp"] | components["schemas"]["SetRelationInverseOp"] | components["schemas"]["SetRelationCardinalityOp"] | components["schemas"]["NarrowRelationOp"] | components["schemas"]["RemoveEntityTypeOp"] | components["schemas"]["RemoveRelationOp"];
         /**
