@@ -2,7 +2,9 @@
 
 All notable changes to the `@littlebigbrain/client` package are documented here.
 
-## Unreleased
+## 0.17.0 (2026-10-02)
+
+Adds the ontology starters (`crm`, `documents`, `work`).
 
 - Add `ontology.starters` with `list()`, `get(id)`,
   `apply(id, { dryRun, expectedOntologyVersion })` and `update(id)` for the
