@@ -8583,6 +8583,135 @@ export interface components {
             f64: number;
         } | "null";
         /**
+         * @description The costs the planner compared when the entities that satisfy the rest
+         *     of the query fit under its limit, counted from cluster metadata. The
+         *     search-first plan runs when `search_first_entries` is below
+         *     `filter_first_scored`.
+         */
+        SparqlSearchEstimate: {
+            /**
+             * Format: int64
+             * @description Entries of the clusters that hold an allowed entity: what the
+             *     filter-first plan reads.
+             */
+            filter_first_entries: number;
+            /**
+             * Format: int64
+             * @description Allowed entities with a vector: what the filter-first plan scores.
+             */
+            filter_first_scored: number;
+            /**
+             * Format: int64
+             * @description Allowed entities inside those nearest clusters: what the search-first
+             *     plan scores.
+             */
+            search_first_allowed?: number | null;
+            /**
+             * Format: int64
+             * @description Entries of the nearest clusters the planner compared: the smallest
+             *     probe that holds enough allowed entities for the exact rerank, or the
+             *     first probe with at least `filter_first_scored` entries. What the
+             *     search-first plan reads.
+             */
+            search_first_entries?: number | null;
+        };
+        /**
+         * @description How the planner answered the search of one query.
+         * @enum {string}
+         */
+        SparqlSearchPlan: "nearest" | "filter_first" | "search_first";
+        /**
+         * @description What the search inside a SPARQL query did. Its hits are bound into the
+         *     query as a `VALUES` block, so the rest of the query sees them as rows.
+         */
+        SparqlSearchReport: {
+            /**
+             * Format: int64
+             * @description Entities that satisfy the rest of the query, when the planner read
+             *     them; capped at 20,001.
+             */
+            allowed?: number | null;
+            /**
+             * Format: int64
+             * @description Candidates scored exactly.
+             */
+            candidates: number;
+            /** Format: int64 */
+            clusters_probed: number;
+            /**
+             * @description False when fewer than `top` entities satisfy the query within the
+             *     candidates the search may score.
+             */
+            complete: boolean;
+            embedded_through_seq?: null | components["schemas"]["CommitSeq"];
+            /** @description The embeddings searched. */
+            embeddings: string[];
+            /** Format: int64 */
+            entries_considered: number;
+            estimate?: null | components["schemas"]["SparqlSearchEstimate"];
+            /**
+             * Format: int64
+             * @description The entities it found and bound.
+             */
+            hits: number;
+            /**
+             * Format: int64
+             * @description Commits between the snapshot the query read and `embedded_through_seq`.
+             */
+            lag_commits: number;
+            model_id: string;
+            plan: components["schemas"]["SparqlSearchPlan"];
+            /**
+             * Format: int32
+             * @description Search rounds (a search-first plan widens until it has `top`).
+             */
+            rounds: number;
+            timings: components["schemas"]["SparqlSearchTimings"];
+            /**
+             * Format: int64
+             * @description The entities the search was asked for: `search:top`, else the query's
+             *     `LIMIT` plus `OFFSET`, else 10.
+             */
+            top: number;
+            /** @description The model call for the query text, if one ran. */
+            usage: components["schemas"]["EmbeddingUsage"];
+        };
+        /** @description The phases of one search inside a SPARQL query, in milliseconds. */
+        SparqlSearchTimings: {
+            /**
+             * Format: int64
+             * @description The graph checks of the candidates.
+             */
+            check_ms: number;
+            /**
+             * Format: int64
+             * @description The query vector (0 when cached, given, or read from an entity).
+             */
+            embed_ms: number;
+            /**
+             * Format: int64
+             * @description The read of the entities that satisfy the rest of the query.
+             */
+            filter_ms: number;
+            /**
+             * Format: int64
+             * @description Cluster probes over the 4-bit codes.
+             */
+            index_ms: number;
+            /**
+             * Format: int64
+             * @description The exact rescoring of the candidates.
+             */
+            rerank_ms: number;
+            /**
+             * Format: int64
+             * @description Embedding documents, manifests and class lists.
+             */
+            resolve_ms: number;
+            /** Format: int64 */
+            total_ms: number;
+        };
+        /**
          * @description A SPARQL-subset SELECT/ASK query: a conjunctive basic graph pattern (the
          *     WHERE) evaluated over the conformant published RDF dataset, with variable
          *     projection, DISTINCT, and LIMIT/OFFSET. Structured-request-first — the SPARQL
@@ -8791,6 +8920,7 @@ export interface components {
             /** @description SPARQL 1.1 Query Results JSON, serialized. */
             results: string;
             row_page: components["schemas"]["RowPage"];
+            search?: null | components["schemas"]["SparqlSearchReport"];
             snapshot?: null | components["schemas"]["SnapshotView"];
             /**
              * @description The eval trace recorded for this query, present only when the request
