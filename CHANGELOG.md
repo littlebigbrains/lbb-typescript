@@ -2,6 +2,27 @@
 
 All notable changes to the `@littlebigbrain/client` package are documented here.
 
+## Unreleased
+
+Adds `client.integrations`: hosted integrations for a developer's end
+customers, one graph per customer.
+
+- Add the `integrationsUrl` option, `https://api.littlebigbrain.com` by
+  default. The integrations routes take the client's `apiKey`.
+- Add `integrations.connectors()`, `create()`, `list()`, `get()`,
+  `setCredentials()`, `setSettings()`, `sync()`, `pause()`, `resume()`,
+  `delete()` and `erase()` for the `/v1/integrations/*` routes of
+  `contracts/integrations-openapi.json`. `sync()` sends an `Idempotency-Key`;
+  without `idempotencyKey` it makes one per call, so its retries queue one
+  sync.
+- Add `integrations.suggestions()`, `accept()` and `dismiss()` for a
+  connection's ontology suggestions on the stack endpoint. `accept()` with
+  `sync: true` then sends the connection a sync under the message id
+  `sync-after-<suggestion id>`.
+- `LbbError` reads the integrations API's error body: `code`, the message and
+  `details`. `retryAfterSeconds` comes from the `Retry-After` header when the
+  body gives no wait.
+
 ## 0.17.0 (2026-10-02)
 
 Adds the ontology starters (`crm`, `documents`, `work`).

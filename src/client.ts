@@ -1,4 +1,8 @@
 import { WorkflowNamespace } from "./workflows.js";
+import {
+  DEFAULT_INTEGRATIONS_URL,
+  IntegrationsNamespace,
+} from "./integrations.js";
 import type {
   DurableImportLine,
   DurableImportSource,
@@ -203,6 +207,8 @@ async function durableImportBody(
  */
 export class LbbClient {
   private readonly baseUrl: string;
+  /** The integrations API, `https://api.littlebigbrain.com` by default. */
+  readonly integrationsUrl: string;
   private readonly apiKey?: string;
   private readonly graphName?: string;
   private readonly stack?: string;
@@ -227,6 +233,8 @@ export class LbbClient {
   readonly evals: EvalsNamespace;
   readonly embeddings: EmbeddingsNamespace;
   readonly workflows: WorkflowNamespace;
+  /** Hosted integrations for your end customers, at `integrationsUrl`. */
+  readonly integrations: IntegrationsNamespace;
 
   constructor(options: LbbClientOptions) {
     const baseUrl = options.baseUrl?.trim();
@@ -236,6 +244,9 @@ export class LbbClient {
       );
     }
     this.baseUrl = baseUrl.replace(/\/+$/, "");
+    const integrationsUrl =
+      options.integrationsUrl?.trim() || DEFAULT_INTEGRATIONS_URL;
+    this.integrationsUrl = integrationsUrl.replace(/\/+$/, "");
     this.apiKey = options.apiKey;
     this.graphName = options.graph;
     this.stack = options.stack;
@@ -275,6 +286,7 @@ export class LbbClient {
     this.evals = new EvalsNamespace(this);
     this.embeddings = new EmbeddingsNamespace(this);
     this.workflows = new WorkflowNamespace(this);
+    this.integrations = new IntegrationsNamespace(this);
   }
 
   graph(name: string, opts: { stack?: string } = {}): GraphNamespace {
@@ -294,6 +306,7 @@ export class LbbClient {
   withScope(scope: { graph?: string; stack?: string }): LbbClient {
     return new LbbClient({
       baseUrl: this.baseUrl,
+      integrationsUrl: this.integrationsUrl,
       apiKey: this.apiKey,
       graph: scope.graph ?? this.graphName,
       stack: scope.stack ?? this.stack,
@@ -364,10 +377,48 @@ export class LbbClient {
     return `${this.baseUrl}${path}${qs}`;
   }
 
+  /** The integrations API URL of a path: no graph or stack scope is added. */
+  private integrationsUrlOf(path: string, query?: Query): string {
+    const params = Object.entries(query ?? {})
+      .filter(([, value]) => value !== undefined)
+      .map(
+        ([key, value]) =>
+          `${encodeURIComponent(key)}=${encodeURIComponent(String(value))}`,
+      );
+    const qs = params.length > 0 ? `?${params.join("&")}` : "";
+    return `${this.integrationsUrl}${path}${qs}`;
+  }
+
   async rawRequest<T>(
     method: string,
     path: string,
     opts: RequestOptions = {},
+  ): Promise<RawLbbResponse<T>> {
+    return this.send<T>(method, this.buildUrl(path, opts.query), opts);
+  }
+
+  /**
+   * A request to the integrations API at `integrationsUrl`, with the same
+   * API key, retries and errors as {@link request}. The client's graph and
+   * stack scope are not added: the integrations routes name their graph.
+   */
+  async integrationsRequest<T>(
+    method: string,
+    path: string,
+    opts: RequestOptions = {},
+  ): Promise<T> {
+    const response = await this.send<T>(
+      method,
+      this.integrationsUrlOf(path, opts.query),
+      opts,
+    );
+    return response.data;
+  }
+
+  private async send<T>(
+    method: string,
+    url: string,
+    opts: RequestOptions,
   ): Promise<RawLbbResponse<T>> {
     const headers: Record<string, string> = {
       "content-type": opts.contentType ?? "application/json",
@@ -400,7 +451,6 @@ export class LbbClient {
     // Deadline is the binding limit; `maxRetries` is a secondary safety cap.
     const deadline =
       startedAt + Math.max(0, opts.retryBudgetMs ?? this.retryBudgetMs);
-    const url = this.buildUrl(path, opts.query);
     let attempts = 0;
     let response: Awaited<ReturnType<FetchLike>> | undefined;
     let text = "";
@@ -528,7 +578,12 @@ export class LbbClient {
       elapsedMs,
     });
     if (!response.ok)
-      throw parseLbbError(response.status, text.trim(), requestId);
+      throw parseLbbError(
+        response.status,
+        text.trim(),
+        requestId,
+        response.headers?.get("retry-after"),
+      );
     const responseContentType =
       response.headers?.get("content-type")?.toLowerCase() ?? "";
     const isRdfText =

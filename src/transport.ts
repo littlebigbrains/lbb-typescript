@@ -195,11 +195,19 @@ export function retryAfterFromBodyMs(body: string): number | undefined {
   return undefined;
 }
 
-/** The parsed `error.code` from an error body, or `undefined` when absent/naked. */
+/**
+ * The parsed error code from an error body, or `undefined` when absent/naked:
+ * `error.code` of the data plane's envelope, or the top-level `code` of the
+ * integrations API's `{ ok: false, error, code }`.
+ */
 export function errorCodeFromBody(body: string): string | undefined {
   try {
-    const parsed = JSON.parse(body) as { error?: { code?: string } };
-    const code = parsed.error?.code;
+    const parsed = JSON.parse(body) as {
+      error?: string | { code?: string };
+      code?: string;
+    };
+    const code =
+      typeof parsed.error === "string" ? parsed.code : parsed.error?.code;
     return typeof code === "string" ? code : undefined;
   } catch {
     return undefined;
@@ -255,15 +263,59 @@ export function parseResponseJson<T>(
   }
 }
 
+/**
+ * A `Retry-After` header in seconds, uncapped, or `undefined` when it is
+ * absent or unparseable. An HTTP date counts from now.
+ */
+export function retryAfterHeaderSeconds(
+  value: string | null | undefined,
+  nowMs = Date.now(),
+): number | undefined {
+  if (!value) return undefined;
+  const seconds = Number(value);
+  if (Number.isFinite(seconds) && seconds >= 0) return seconds;
+  const dateMs = Date.parse(value);
+  if (!Number.isFinite(dateMs)) return undefined;
+  return Math.max(0, Math.ceil((dateMs - nowMs) / 1_000));
+}
+
+/**
+ * The {@link LbbError} for a failed response. It reads the data plane's
+ * envelope `{ error: { code, message, … } }` and the integrations API's
+ * `{ ok: false, error, code, details }`. `retryAfterSeconds` comes from the
+ * body's hint, else from the `Retry-After` header.
+ */
 export function parseLbbError(
   status: number,
   body: string,
   fallbackRequestId?: string,
+  retryAfterHeader?: string | null,
 ): LbbError {
+  const headerSeconds = retryAfterHeaderSeconds(retryAfterHeader);
   try {
-    const parsed = JSON.parse(body) as { error?: LbbErrorPayload };
+    const parsed = JSON.parse(body) as {
+      error?: LbbErrorPayload | string;
+      code?: unknown;
+      details?: unknown;
+    };
+    if (typeof parsed.error === "string") {
+      const { code, details } = parsed;
+      return new LbbError(status, body, {
+        code: typeof code === "string" ? code : undefined,
+        message: parsed.error,
+        request_id: fallbackRequestId ?? null,
+        retry_after_seconds: headerSeconds,
+        details:
+          details && typeof details === "object" && !Array.isArray(details)
+            ? (details as Record<string, unknown>)
+            : undefined,
+      });
+    }
     if (parsed.error) {
       return new LbbError(status, body, {
+        ...(headerSeconds !== undefined
+          ? { retry_after_seconds: headerSeconds }
+          : {}),
         ...parsed.error,
         request_id: parsed.error.request_id ?? fallbackRequestId ?? null,
       });
@@ -276,5 +328,8 @@ export function parseLbbError(
     code: "unstructured_error",
     message: body || `Little Big Brain ${status}`,
     request_id: fallbackRequestId ?? null,
+    ...(headerSeconds !== undefined
+      ? { retry_after_seconds: headerSeconds }
+      : {}),
   });
 }

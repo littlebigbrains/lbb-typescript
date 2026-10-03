@@ -263,6 +263,11 @@ export function attributeFilter(
 export interface LbbClientOptions {
   /** Hosted stack endpoint, e.g. `https://7k3m9q2x--production.db.eu.littlebigbrain.com`. */
   baseUrl: string;
+  /**
+   * The integrations API that `client.integrations` calls. Defaults to
+   * `https://api.littlebigbrain.com`. It takes the same `apiKey`.
+   */
+  integrationsUrl?: string;
   /** Stack API key (`lbb_sk_test_…` / `lbb_sk_live_…`) or single-mode token. */
   apiKey?: string;
   /** Graph name (sent as `?graph=`; server default is `main`). */
