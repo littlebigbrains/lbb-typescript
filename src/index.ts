@@ -38,6 +38,38 @@ export type {
   StarterTerms,
 } from "./starters.js";
 export type { OntologyStarterApplyOptions } from "./namespaces.js";
+export type {
+  IntegrationsNamespace,
+  IntegrationAcceptOptions,
+  IntegrationAcceptResult,
+  IntegrationConfig,
+  IntegrationConnection,
+  IntegrationConnectionAnswer,
+  IntegrationConnectionDetail,
+  IntegrationConnector,
+  IntegrationConnectorsAnswer,
+  IntegrationCreateAnswer,
+  IntegrationCreateInput,
+  IntegrationCredentialField,
+  IntegrationCredentials,
+  IntegrationDeleteAnswer,
+  IntegrationDismissOptions,
+  IntegrationEraseAnswer,
+  IntegrationFit,
+  IntegrationGraphOptions,
+  IntegrationListAnswer,
+  IntegrationReclaim,
+  IntegrationRefAnswer,
+  IntegrationRun,
+  IntegrationStatus,
+  IntegrationStatusAnswer,
+  IntegrationStatusKind,
+  IntegrationSuggestionsOptions,
+  IntegrationSyncAnswer,
+  IntegrationSyncOptions,
+  IntegrationTotals,
+  IntegrationTurn,
+} from "./integrations.js";
 
 export {
   workflow,

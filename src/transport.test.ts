@@ -2,10 +2,13 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   bodyMarksTerminal,
+  errorCodeFromBody,
   fullJitterBackoffMs,
+  parseLbbError,
   parseResponseJson,
   parseRetryAfterMs,
   retryAfterFromBodyMs,
+  retryAfterHeaderSeconds,
   retryAllowed,
   retryDelayMs,
 } from "./transport.js";
@@ -81,4 +84,50 @@ test("invalid success JSON reports HTTP status and request id", () => {
   }
   assert.equal(caught instanceof SyntaxError, true);
   assert.match(String(caught), /HTTP 200 \(request req_json\)/);
+});
+
+test("an error's retryAfterSeconds is the body hint, else the Retry-After header", () => {
+  assert.equal(
+    retryAfterHeaderSeconds(
+      "Thu, 01 Jan 2026 00:30:00 GMT",
+      Date.UTC(2026, 0, 1),
+    ),
+    1_800,
+  );
+  assert.equal(retryAfterHeaderSeconds("1800"), 1_800);
+  assert.equal(retryAfterHeaderSeconds("soon"), undefined);
+  const hinted = parseLbbError(
+    429,
+    JSON.stringify({ error: { code: "ingest_busy", retry_after_seconds: 2 } }),
+    undefined,
+    "5",
+  );
+  assert.equal(hinted.retryAfterSeconds, 2);
+  const headerOnly = parseLbbError(
+    429,
+    JSON.stringify({ error: { code: "ingest_busy" } }),
+    "req_1",
+    "5",
+  );
+  assert.equal(headerOnly.retryAfterSeconds, 5);
+  assert.equal(headerOnly.requestId, "req_1");
+  const integrations = parseLbbError(
+    429,
+    JSON.stringify({ ok: false, error: "slow down", code: "rate_limited" }),
+    undefined,
+    "30",
+  );
+  assert.equal(integrations.code, "rate_limited");
+  assert.equal(integrations.message, "slow down");
+  assert.equal(integrations.retryAfterSeconds, 30);
+  assert.equal(
+    errorCodeFromBody(
+      JSON.stringify({ ok: false, error: "slow down", code: "rate_limited" }),
+    ),
+    "rate_limited",
+  );
+  assert.equal(
+    errorCodeFromBody(JSON.stringify({ error: { code: "ingest_busy" } })),
+    "ingest_busy",
+  );
 });
