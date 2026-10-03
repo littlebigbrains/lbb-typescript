@@ -2,10 +2,10 @@
 
 All notable changes to the `@littlebigbrain/client` package are documented here.
 
-## Unreleased
+## 0.18.0 (2026-10-03)
 
 Adds `client.integrations`: hosted integrations for a developer's end
-customers, one graph per customer.
+customers, one graph per customer, with Google Drive among the connectors.
 
 - Add the `integrationsUrl` option, `https://api.littlebigbrain.com` by
   default. The integrations routes take the client's `apiKey`.
@@ -22,6 +22,11 @@ customers, one graph per customer.
 - `LbbError` reads the integrations API's error body: `code`, the message and
   `details`. `retryAfterSeconds` comes from the `Retry-After` header when the
   body gives no wait.
+- Add `googleDrive.authorizeUrl()` and `googleDrive.exchangeCode()`: the
+  Google consent URL and the code exchange a developer's server runs before
+  it creates a `google_drive` connection. The exchange returns the
+  connection's `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` and
+  `GOOGLE_REFRESH_TOKEN`, and fails with a `GoogleOAuthError`.
 
 ## 0.17.0 (2026-10-02)
 
