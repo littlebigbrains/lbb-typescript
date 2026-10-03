@@ -118,9 +118,10 @@ a graph; a graph first written through RDF import does not accept
 
 ## Integrations for your customers
 
-`client.integrations` connects each of your customers' HubSpot, Linear or
-SharePoint to a graph of their own. Its routes are on the integrations API,
-`https://api.littlebigbrain.com` by default (`integrationsUrl`). They take the
+`client.integrations` connects each of your customers' HubSpot, Linear,
+SharePoint or Google Drive to a graph of their own. Its routes are on the
+integrations API, `https://api.littlebigbrain.com` by default
+(`integrationsUrl`). They take the
 same stack API key. An operator turns on developer access per stack; ask us
 first.
 
@@ -137,6 +138,23 @@ const { connections } = await lbb.integrations.list({ graph });
 const open = await lbb.integrations.suggestions("hubspot", { graph, status: "open" });
 await lbb.integrations.accept(open.suggestions[0].suggestion_id, { graph, sync: true });
 await lbb.integrations.erase(graph, { confirm: graph });
+```
+
+Google Drive connects through your own Google app. `googleDrive` builds the
+consent URL and turns the callback's code into the connection's credentials:
+
+```ts
+import { googleDrive } from "@littlebigbrain/client";
+
+const url = googleDrive.authorizeUrl({ clientId, redirectUri, state });
+// On the callback, after `state` matches:
+const { credentials } = await googleDrive.exchangeCode({
+  clientId,
+  clientSecret,
+  redirectUri,
+  code,
+});
+await lbb.integrations.create({ graph, id: "google-drive", kind: "google_drive", credentials });
 ```
 
 See [Integrations for your customers](https://docs.littlebigbrain.com/guides/integrations-for-your-customers/).

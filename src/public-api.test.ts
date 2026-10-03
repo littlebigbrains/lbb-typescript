@@ -11,6 +11,7 @@ test("the runtime entrypoint exposes only the supported public values", () => {
     "WorkflowHandle",
     "WorkflowNamespace",
     "WorkflowWorker",
+    "googleDrive",
     "parseSparqlResults",
     "starters",
     "workflow",

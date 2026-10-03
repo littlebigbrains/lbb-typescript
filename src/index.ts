@@ -30,6 +30,7 @@ export type {
 } from "./client.js";
 export type { components, paths, operations } from "./schema.js";
 export * as starters from "./starters.js";
+export * as googleDrive from "./google-drive.js";
 export type {
   StarterClassTerm,
   StarterPropertyTerm,
