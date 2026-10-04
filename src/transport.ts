@@ -264,6 +264,21 @@ export function parseResponseJson<T>(
 }
 
 /**
+ * The values of a JSON-lines (`application/x-ndjson`) body, one per non-empty
+ * line. An empty body is an empty list.
+ */
+export function parseNdjson<T>(
+  text: string,
+  status: number,
+  requestId?: string,
+): T[] {
+  return text
+    .split("\n")
+    .filter((line) => line.trim() !== "")
+    .map((line) => parseResponseJson<T>(line, status, requestId));
+}
+
+/**
  * A `Retry-After` header in seconds, uncapped, or `undefined` when it is
  * absent or unparseable. An HTTP date counts from now.
  */

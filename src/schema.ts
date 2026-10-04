@@ -717,7 +717,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** The managed models the platform uses per role (embedding, judge, rewriter): the operator's catalog, or the compiled defaults */
+        /** The managed models the platform uses per role (embedding, judge, router, rewriter): the operator's catalog, or the compiled defaults */
         get: operations["get_v1_managed_models"];
         put?: never;
         post?: never;
@@ -734,7 +734,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** What each managed model did for the stack in one month: totals, by day and by graph per feature (index, search, fit, judge, training) and model, the months with activity, and the model each feature uses now. A stack read; the answering node adds the calls it has not written to the ledger yet */
+        /** What each managed model did for the stack in one month: totals, by day and by graph per feature (index, search, fit, judge, training, rewrite) and model, the months with activity, and the model each feature uses now. A stack read; the answering node adds the calls it has not written to the ledger yet */
         get: operations["get_v1_models_activity"];
         put?: never;
         post?: never;
@@ -753,6 +753,125 @@ export interface paths {
         };
         /** Doubling retrain policy for a model kind: retrain_due when the graph doubled since the promoted run trained */
         get: operations["get_v1_models_cadence"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/models/calls": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The graph's model call log, newest first: every call LBB made for its own work (rerank, route, rewrite, fit, propose, label, embed) with its model, whether it was sampled for a check, and the brief of its check. Walks back day by day from `day` (or the day of `after`), up to 31 days, until the page fills */
+        get: operations["get_v1_models_calls"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/models/calls/check": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Check one logged call now: the call goes to the graph's checks workflow (`lbb.model-checks`, instance `model-checks`) as message `check-<id>`, and the judge checks it again when it has a check (the review stays). A repeated request answers the turn already queued. 400 `model_call_not_checkable` for an embedding or a failed call; 503 when workflows are off or the catalog has no checker */
+        post: operations["post_v1_models_calls_check"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/models/calls/get": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** One logged model call: its provider-neutral input (long system texts as text), its output, usage and check */
+        get: operations["get_v1_models_calls_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/models/checks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The checks of the graph's model calls in one month, newest first: the judge's verdict, score and reason, the review of a person, and the ground truth */
+        get: operations["get_v1_models_checks"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/models/checks/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The checks of one month as JSON lines (`application/x-ndjson`), oldest first: one `{call, check}` per line, at most 10,000 lines */
+        get: operations["get_v1_models_checks_export"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/models/checks/review": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Agree with a check (`agree: true`) or correct it (`agree: false` with the right verdict, a score, a reference and a note). The review replaces the earlier one, which moves to `history`; the person's verdict becomes the ground truth. A relevance correction's `reference.grades` (item id: 0 to 3) go to the graph's relevance grades */
+        post: operations["post_v1_models_checks_review"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/models/checks/summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The graph's checks in one month by job and model (checks, mean score, right, partly, wrong, reviewed, corrected), the judge and its agreement with people, the months with checks, today's check budget of the stack, and whether this node can check calls */
+        get: operations["get_v1_models_checks_summary"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1343,6 +1462,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/query/rewrite": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Turn a question into the SPARQL query to run: the router model picks the kind of query (lookup, aggregate, search, history, schema, unanswerable), the rewriter model writes it from a description of the graph, and the server checks it. `run: true` also runs it (the question becomes the eval trace's request) and corrects a query that fails once */
+        post: operations["post_v1_query_rewrite"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/query/sparql": {
         parameters: {
             query?: never;
@@ -1420,7 +1556,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Search by meaning over every searchable class of the graph, or one `embedding`; `filter` lists the conditions every hit must meet (a class, its subclasses included; relationships to entities by IRI or name); every hit is checked against one RDF snapshot and carries its class; `explain` plans without running; `include: ["text"]` returns the embedded text */
+        /** Search by meaning over every searchable class of the graph, or one `embedding`; `filter` lists the conditions every hit must meet (a class, its subclasses included; relationships to entities by IRI or name); every hit is checked against one RDF snapshot and carries its class; `explain` plans without running; `include: ["text"]` returns the embedded text; `rerank` orders the best hits by the managed rerank model (the graph's search setting when absent), each with its `relevance` */
         post: operations["post_v1_search"];
         delete?: never;
         options?: never;
@@ -1471,6 +1607,76 @@ export interface paths {
         };
         /** Read constant-size feedback counts and promoted-model status */
         get: operations["get_v1_search_feedback_summary"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/search/settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read the graph's search settings: whether every search reranks its best hits, the rerank depth, the blend of relevance and similarity, the probe factor, and the rerank model the server has */
+        get: operations["get_v1_search_settings"];
+        /** Change the graph's search settings: `rerank` on or off, `rerank_depth` (20 to 80 candidates the model reads), `blend` (0 to 1: the final order is blend·relevance + (1 − blend)·similarity) and `probe_factor` (1 to 4 times the default probe). A setting left out keeps its value and `null` sets it back to its default; a value out of bounds answers 400 `invalid_search_settings`. A request's `rerank` and `probe` still decide for themselves */
+        put: operations["put_v1_search_settings"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/search/tuning": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The graph's search tuning sessions, newest first */
+        get: operations["get_v1_search_tuning"];
+        put?: never;
+        /** Start a search tuning session: the graph's recent search texts and search goldens (6 to 40, split by hash into queries that choose and queries that test), the current settings and up to 3 rounds of up to 3 variants the judge proposes, run on one snapshot, the pooled hits graded 0 to 3, scored by nDCG@10, MRR@10 and recall@10, and the best variant tested against the current settings with a bootstrap 95% interval. Answers the queued session; 409 `tuning_running` while another session of the graph is queued or running, 409 `tuning_unavailable` without a searchable embedding */
+        post: operations["post_v1_search_tuning"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/search/tuning/apply": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Apply a done session's proposal: the graph's search settings become exactly the settings the session tested (a setting the proposal leaves unset goes back to its default), and the session records who applied it. 409 `tuning_no_proposal` when the session has none */
+        post: operations["post_v1_search_tuning_apply"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/search/tuning/get": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** One search tuning session: its step, rounds with the judge's notes, the variants with their scores, and the proposal */
+        get: operations["get_v1_search_tuning_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2465,6 +2671,11 @@ export interface components {
             count: number;
             name: string;
         };
+        /**
+         * @description The verdict of a check.
+         * @enum {string}
+         */
+        CheckVerdict: "right" | "partly" | "wrong";
         CommitResponse: {
             commit_seq: components["schemas"]["CommitSeq"];
             conformance?: null | components["schemas"]["ConformanceReport"];
@@ -4841,6 +5052,12 @@ export interface components {
              */
             dim?: number | null;
             /**
+             * @description The reasoning effort sent with each call (`low`, `medium`, `high`,
+             *     `xhigh`, `max`), for a model that takes one. Absent: the server's
+             *     default for the role.
+             */
+            effort?: string | null;
+            /**
              * @description The provider's model id (`openai/text-embedding-3-small`,
              *     `anthropic/claude-sonnet-5`, …).
              */
@@ -4903,12 +5120,12 @@ export interface components {
          * @description Who serves the model.
          * @enum {string}
          */
-        ManagedModelProvider: "openrouter" | "modal" | "typesafe" | "mock";
+        ManagedModelProvider: "openrouter" | "modal" | "typesafe" | "mock" | "anthropic";
         /**
          * @description What a managed model is used for.
          * @enum {string}
          */
-        ManagedModelRole: "embedding" | "judge" | "rewriter";
+        ManagedModelRole: "embedding" | "judge" | "rewriter" | "reranker" | "router" | "checker";
         /**
          * @description Replace the catalog. Every role named here is set; a role left out keeps
          *     the compiled default.
@@ -4944,6 +5161,11 @@ export interface components {
         ModelActivityDay: {
             /** Format: int64 */
             calls: number;
+            /**
+             * Format: int64
+             * @description Calls of this model a judge checked (`docs/architecture/model-checks.md`).
+             */
+            checks?: number;
             /** Format: int64 */
             cost_micro_usd: number;
             /** @description `yyyy-mm-dd`. */
@@ -4958,15 +5180,35 @@ export interface components {
             /** Format: int64 */
             last_at_ms: number;
             model: string;
+            /**
+             * Format: int64
+             * @description The judge's row: reviews that corrected the judge.
+             */
+            overruled?: number;
             provider: string;
+            /**
+             * Format: int64
+             * @description The judge's row: checks of this judge people reviewed.
+             */
+            reviewed?: number;
+            /**
+             * Format: int64
+             * @description The sum of the checked calls' ground-truth scores, in thousandths.
+             */
+            score_milli?: number;
             /** Format: int64 */
             tokens_estimate: number;
+            /**
+             * Format: int64
+             * @description Checked calls whose ground truth is `wrong`.
+             */
+            wrong?: number;
         };
         /**
          * @description The feature a model call served.
          * @enum {string}
          */
-        ModelActivityFeature: "index" | "search" | "fit" | "judge" | "training";
+        ModelActivityFeature: "index" | "search" | "fit" | "judge" | "training" | "rerank" | "rewrite";
         /**
          * @description One feature and model on one graph over the month. `graph` is `*` for
          *     the graphs past the ledger's bound ("other graphs").
@@ -4974,6 +5216,11 @@ export interface components {
         ModelActivityGraph: {
             /** Format: int64 */
             calls: number;
+            /**
+             * Format: int64
+             * @description Calls of this model a judge checked (`docs/architecture/model-checks.md`).
+             */
+            checks?: number;
             /** Format: int64 */
             cost_micro_usd: number;
             /** Format: int64 */
@@ -4987,9 +5234,29 @@ export interface components {
             /** Format: int64 */
             last_at_ms: number;
             model: string;
+            /**
+             * Format: int64
+             * @description The judge's row: reviews that corrected the judge.
+             */
+            overruled?: number;
             provider: string;
+            /**
+             * Format: int64
+             * @description The judge's row: checks of this judge people reviewed.
+             */
+            reviewed?: number;
+            /**
+             * Format: int64
+             * @description The sum of the checked calls' ground-truth scores, in thousandths.
+             */
+            score_milli?: number;
             /** Format: int64 */
             tokens_estimate: number;
+            /**
+             * Format: int64
+             * @description Checked calls whose ground truth is `wrong`.
+             */
+            wrong?: number;
         };
         /** @description The model a feature uses now, from the managed model catalog. */
         ModelActivityManaged: {
@@ -5064,6 +5331,11 @@ export interface components {
             calls: number;
             /**
              * Format: int64
+             * @description Calls of this model a judge checked (`docs/architecture/model-checks.md`).
+             */
+            checks?: number;
+            /**
+             * Format: int64
              * @description Estimated cost in millionths of a US dollar.
              */
             cost_micro_usd: number;
@@ -5094,9 +5366,29 @@ export interface components {
              */
             last_at_ms: number;
             model: string;
+            /**
+             * Format: int64
+             * @description The judge's row: reviews that corrected the judge.
+             */
+            overruled?: number;
             provider: string;
+            /**
+             * Format: int64
+             * @description The judge's row: checks of this judge people reviewed.
+             */
+            reviewed?: number;
+            /**
+             * Format: int64
+             * @description The sum of the checked calls' ground-truth scores, in thousandths.
+             */
+            score_milli?: number;
             /** Format: int64 */
             tokens_estimate: number;
+            /**
+             * Format: int64
+             * @description Checked calls whose ground truth is `wrong`.
+             */
+            wrong?: number;
         };
         ModelArtifact: {
             blake3: string;
@@ -5122,8 +5414,213 @@ export interface components {
             /** Format: int64 */
             trained_at_commit_seq?: number | null;
         };
+        /** @description One logged model call. */
+        ModelCall: {
+            /**
+             * Format: int64
+             * @description When the call was made, in milliseconds since the Unix epoch.
+             */
+            at_ms: number;
+            effort?: string | null;
+            error?: string | null;
+            graph: string;
+            /** @description `<at_ms:020>-<node>-<seq:010>-<n>`: the batch and the index in it. */
+            id: string;
+            /**
+             * @description The provider-neutral request, at most 64 KiB of JSON. A long system
+             *     text is stored once and named by its hash (`{"grounding": "<hash>"}`).
+             */
+            input: unknown;
+            job: components["schemas"]["ModelJob"];
+            model: string;
+            ok: boolean;
+            origin: components["schemas"]["ModelCallOrigin"];
+            /** @description The model's answer, at most 64 KiB of JSON. */
+            output: unknown;
+            provider: string;
+            /** @description The sampler picked the call for a check. */
+            sampled: boolean;
+            /** @description A text or a list was cut to fit the bounds. */
+            truncated?: boolean;
+            usage: components["schemas"]["ModelCallUsage"];
+        };
+        /**
+         * @description `POST /v1/models/calls/check`: the call is queued for a check by the
+         *     graph's checks workflow.
+         */
+        ModelCallCheckResponse: {
+            queued: boolean;
+        };
+        /**
+         * @description `GET /v1/models/calls/get`: one call with its groundings as text, and its
+         *     check.
+         */
+        ModelCallDetailResponse: {
+            call: components["schemas"]["ModelCall"];
+            check?: null | components["schemas"]["ModelCheck"];
+        };
+        /** @description `GET /v1/models/calls`: the call log, newest first. */
+        ModelCallListResponse: {
+            calls: components["schemas"]["ModelCallRow"][];
+            /** @description Pass as `after` for the next page; absent on the last page. */
+            next_after?: string | null;
+        };
+        /** @description Where a call came from. */
+        ModelCallOrigin: {
+            /** @description The HTTP request that made the call. */
+            request_id?: string | null;
+            /** @description The route that made the call (`/v1/search`, `integrations/fit`). */
+            route: string;
+            /** @description The eval trace of the request, when it has one. */
+            trace_id?: string | null;
+        };
+        /** @description One call the SaaS API reports. */
+        ModelCallReport: {
+            /** Format: int64 */
+            at_ms: number;
+            /**
+             * Format: float
+             * @description The top decision probability: a call below 0.6 is sampled four times
+             *     as often.
+             */
+            confidence?: number | null;
+            effort?: string | null;
+            error?: string | null;
+            graph: string;
+            input: unknown;
+            job: components["schemas"]["ModelJob"];
+            model: string;
+            ok: boolean;
+            origin?: null | components["schemas"]["ModelCallOrigin"];
+            output: unknown;
+            provider: string;
+            /** @description The sender cut a text or a list to fit its bounds. */
+            truncated?: boolean;
+            usage?: components["schemas"]["ModelCallUsage"];
+        };
+        /**
+         * @description `POST /api/admin/model-calls` (database admin token): the calls the SaaS
+         *     API made for a stack, at most [`MODEL_CALL_REPORT_MAX_CALLS`].
+         */
+        ModelCallReportRequest: {
+            calls: components["schemas"]["ModelCallReport"][];
+            stack_id: string;
+        };
+        ModelCallReportResponse: {
+            /**
+             * Format: int64
+             * @description Calls taken into the log's next write; 0 for a stack that is gone or
+             *     being deleted.
+             */
+            accepted: number;
+        };
+        /** @description One row of `GET /v1/models/calls`. */
+        ModelCallRow: {
+            /** Format: int64 */
+            at_ms: number;
+            check?: null | components["schemas"]["ModelCheckBrief"];
+            id: string;
+            job: components["schemas"]["ModelJob"];
+            model: string;
+            ok: boolean;
+            provider: string;
+            sampled: boolean;
+            /** @description `budget`, `refused` or `failed`: sampled but not checked. */
+            skipped?: string | null;
+            /**
+             * @description At most 160 characters: the search text, the question, the stream
+             *     name.
+             */
+            summary: string;
+        };
+        /**
+         * @description The shape of a job's input and output, and so of its check.
+         * @enum {string}
+         */
+        ModelCallShape: "relevance" | "choice" | "generation" | "none";
+        /** @description What one call used. */
+        ModelCallUsage: {
+            /** Format: int64 */
+            cache_read?: number;
+            /** Format: int64 */
+            cache_write?: number;
+            /**
+             * Format: int64
+             * @description In millionths of a US dollar.
+             */
+            cost_micro_usd?: number;
+            /** Format: int64 */
+            ms?: number;
+            /** Format: int64 */
+            tokens_in?: number;
+            /** Format: int64 */
+            tokens_out?: number;
+        };
+        /** @description One check of one call. */
+        ModelCheck: {
+            /** @description The call id. */
+            call: string;
+            /** Format: int64 */
+            call_at_ms: number;
+            graph: string;
+            /** @description Earlier reviews, oldest first. */
+            history?: components["schemas"]["ModelCheckReview"][];
+            job: components["schemas"]["ModelJob"];
+            judge: components["schemas"]["ModelCheckJudge"];
+            model: string;
+            provider: string;
+            review?: null | components["schemas"]["ModelCheckReview"];
+            summary: string;
+            truth: components["schemas"]["ModelCheckTruth"];
+            /** Format: int32 */
+            v: number;
+        };
+        /** @description The check of a call, in a list row. */
+        ModelCheckBrief: {
+            by: components["schemas"]["TruthSource"];
+            reviewed: boolean;
+            /** Format: float */
+            score: number;
+            verdict: components["schemas"]["CheckVerdict"];
+        };
+        /** @description The stack's check budget of one day (UTC). */
+        ModelCheckBudget: {
+            /** Format: int64 */
+            checks: number;
+            /** Format: int64 */
+            cost_micro_usd: number;
+            /** @description `yyyy-mm-dd`. */
+            day: string;
+            /** Format: int64 */
+            limit_micro_usd: number;
+        };
         ModelCheckFile: {
             checks: components["schemas"]["ModelCheckSpec"][];
+        };
+        /** @description What the judge said about a call. */
+        ModelCheckJudge: {
+            /** Format: int64 */
+            at_ms: number;
+            effort?: string | null;
+            model: string;
+            provider: string;
+            reason: string;
+            /** @description The judge's own answer: the grades, its pick, a corrected query. */
+            reference?: unknown;
+            /** @description The rubric and its version (`relevance/1`). */
+            rubric: string;
+            /**
+             * Format: float
+             * @description 0 to 1.
+             */
+            score: number;
+            usage: components["schemas"]["ModelCallUsage"];
+            verdict: components["schemas"]["CheckVerdict"];
+        };
+        /** @description `GET /v1/models/checks`: the checks of a month, newest first. */
+        ModelCheckListResponse: {
+            checks: components["schemas"]["ModelCheck"][];
+            next_after?: string | null;
         };
         ModelCheckResponse: {
             checks: components["schemas"]["ModelCheckResult"][];
@@ -5133,6 +5630,35 @@ export interface components {
             details: string;
             kind: string;
             passed: boolean;
+        };
+        /** @description What a person said about a check. */
+        ModelCheckReview: {
+            /** @description Agrees with the judge. */
+            agree: boolean;
+            /** Format: int64 */
+            at_ms: number;
+            /** @description Who reviewed: `account:<id>`, `key:<key id>`, `token`. */
+            by: string;
+            note?: string | null;
+            /** @description The person's answer (for a relevance check `{grades: {<id>: 0..3}}`). */
+            reference?: unknown;
+            /** Format: float */
+            score?: number | null;
+            verdict?: null | components["schemas"]["CheckVerdict"];
+        };
+        /**
+         * @description `POST /v1/models/checks/review?graph&id`: agree with the check, or
+         *     correct it. With `agree: true` no verdict, score or reference; with
+         *     `agree: false` the verdict is required.
+         */
+        ModelCheckReviewRequest: {
+            agree: boolean;
+            /** @description At most 2,000 characters. */
+            note?: string | null;
+            reference?: unknown;
+            /** Format: float */
+            score?: number | null;
+            verdict?: null | components["schemas"]["CheckVerdict"];
         };
         ModelCheckSpec: {
             entity: components["schemas"]["EntitySelector"];
@@ -5147,6 +5673,35 @@ export interface components {
             /** @enum {string} */
             kind: "temporal_state";
             relation: string;
+        };
+        /**
+         * @description The ground truth of a call: the review when there is one, the judge's
+         *     verdict otherwise.
+         */
+        ModelCheckTruth: {
+            by: components["schemas"]["TruthSource"];
+            /** Format: float */
+            score: number;
+            verdict: components["schemas"]["CheckVerdict"];
+        };
+        /** @description `GET /v1/models/checks/summary`: the graph's checks in one month. */
+        ModelChecksSummary: {
+            /** @description Today's budget. */
+            budget: components["schemas"]["ModelCheckBudget"];
+            /**
+             * Format: int64
+             * @description Model calls logged this month for the graph.
+             */
+            calls: number;
+            /** @description The node can check calls (the checker model is configured). */
+            checker_available: boolean;
+            graph: string;
+            jobs: components["schemas"]["ModelJobQuality"][];
+            judge?: null | components["schemas"]["ModelJudgeQuality"];
+            /** @description `yyyy-mm` (UTC). */
+            month: string;
+            /** @description The months with a summary, oldest first. */
+            months: string[];
         };
         ModelDataLineage: {
             /** Format: int64 */
@@ -5171,6 +5726,54 @@ export interface components {
             metrics: {
                 [key: string]: number;
             };
+        };
+        /**
+         * @description What LBB used a model for. Every call has one job.
+         * @enum {string}
+         */
+        ModelJob: "rerank" | "route" | "rewrite" | "fit" | "propose" | "label" | "embed";
+        /** @description One job and model over a month of checks. */
+        ModelJobQuality: {
+            /** Format: int64 */
+            checks: number;
+            /**
+             * Format: int64
+             * @description Reviews that corrected the judge.
+             */
+            corrected: number;
+            job: components["schemas"]["ModelJob"];
+            /** Format: int64 */
+            last_at_ms?: number | null;
+            model: string;
+            /** Format: int64 */
+            partly: number;
+            provider: string;
+            /** Format: int64 */
+            reviewed: number;
+            /** Format: int64 */
+            right: number;
+            /**
+             * Format: double
+             * @description The mean ground-truth score; 0 when no checks.
+             */
+            score: number;
+            /** Format: int64 */
+            wrong: number;
+        };
+        /** @description The judge over a month of checks. */
+        ModelJudgeQuality: {
+            /**
+             * Format: double
+             * @description `(reviewed - overruled) / reviewed`; absent before any review.
+             */
+            agreement?: number | null;
+            effort?: string | null;
+            model: string;
+            /** Format: int64 */
+            overruled: number;
+            provider: string;
+            /** Format: int64 */
+            reviewed: number;
         };
         /** @description `GET /v1/models/registry` — the runs of one kind, newest first. */
         ModelRegistryResponse: {
@@ -6454,6 +7057,186 @@ export interface components {
             query_lag_commits: number;
             snapshot: components["schemas"]["PublishedReadSnapshotView"];
         };
+        /** @description The graph description the models read. */
+        QueryRewriteGrounding: {
+            /**
+             * Format: int64
+             * @description Milliseconds since the server built it (it keeps one per graph for 10
+             *     minutes).
+             */
+            age_ms: number;
+            /** Format: int32 */
+            classes: number;
+            /**
+             * Format: int64
+             * @description The commit of the published generation the description was read from.
+             */
+            commit_seq: number;
+            /** Format: int32 */
+            embeddings: number;
+            /** Format: int32 */
+            properties: number;
+            /**
+             * @description The description itself, when the request asked for it
+             *     (`include_grounding`).
+             */
+            text?: string | null;
+        };
+        /** @description What a `history` question asks for beyond the query. */
+        QueryRewriteHistory: {
+            /**
+             * @description The date the question names (`YYYY-MM-DD`). The caller resolves it to
+             *     a commit and passes it as `as_of_commit_seq`.
+             */
+            as_of_date?: string | null;
+            /** @description Run the query at that point and now, and compare the rows. */
+            compare: boolean;
+        };
+        /**
+         * @description What the call returns.
+         * @enum {string}
+         */
+        QueryRewriteMode: "rewrite" | "route";
+        /** @description One model call of a rewrite. */
+        QueryRewriteModelCall: {
+            /**
+             * Format: int64
+             * @description Estimate, in millionths of a US dollar.
+             */
+            cost_micro_usd: number;
+            model: string;
+            /** Format: int64 */
+            ms: number;
+            ok: boolean;
+            provider: string;
+            role: components["schemas"]["QueryRewriteModelRole"];
+            /**
+             * Format: int64
+             * @description Input plus output tokens, cache reads and writes included.
+             */
+            tokens: number;
+        };
+        /**
+         * @description Which model a call used.
+         * @enum {string}
+         */
+        QueryRewriteModelRole: "router" | "rewriter";
+        /** @description Turn a question into the query to run (`POST /v1/query/rewrite`). */
+        QueryRewriteRequest: {
+            /**
+             * Format: int64
+             * @description Read the graph at this commit.
+             */
+            as_of_commit_seq?: number | null;
+            /**
+             * @description The app's notes for the model: what the data means, units, names to
+             *     prefer. At most 8,000 characters. Keep it the same across questions,
+             *     so the model provider's prompt cache reads it.
+             */
+            context?: string | null;
+            /**
+             * @description Return the graph description the models read in `grounding.text`:
+             *     to see why a query came out as it did, or to reuse the description
+             *     in an app's own prompt. With `mode: "route"` no rewriter call is made.
+             */
+            include_grounding?: boolean;
+            /**
+             * Format: int32
+             * @description Rows a run returns: 1 to 1,000, default 100.
+             */
+            limit?: number | null;
+            mode?: components["schemas"]["QueryRewriteMode"];
+            /** @description Earlier steps of the same question, oldest first; at most 6. */
+            previous?: components["schemas"]["QueryRewriteStep"][];
+            /** @description The question, 1 to 4,000 characters. */
+            question: string;
+            route?: null | components["schemas"]["QueryRoute"];
+            /**
+             * @description Run the query and return its rows in `result`. A query that fails
+             *     with a client error is corrected once.
+             */
+            run?: boolean;
+            /**
+             * @description Today's date for relative questions ("last 14 days"), `YYYY-MM-DD`.
+             *     Default: the server's UTC date.
+             */
+            today?: string | null;
+        };
+        QueryRewriteResponse: {
+            /**
+             * Format: int32
+             * @description Queries the rewriter wrote: 2 when it corrected one.
+             */
+            attempts: number;
+            /** @description Why the last attempt failed, when the query did not parse or run. */
+            error?: string | null;
+            grounding: components["schemas"]["QueryRewriteGrounding"];
+            history?: null | components["schemas"]["QueryRewriteHistory"];
+            models: components["schemas"]["QueryRewriteModelCall"][];
+            query?: null | components["schemas"]["RewrittenQuery"];
+            /** @description One or two sentences: why this route and this query. */
+            rationale: string;
+            result?: null | components["schemas"]["SparqlTextResponse"];
+            route: components["schemas"]["QueryRouteDecision"];
+            timings: components["schemas"]["QueryRewriteTimings"];
+        };
+        /**
+         * @description One earlier step of the same question: a query the caller ran, and what
+         *     came of it.
+         */
+        QueryRewriteStep: {
+            /** @description The error the query got, when it failed. */
+            error?: string | null;
+            /** @description What the caller concluded ("the amounts are missing"). */
+            note?: string | null;
+            /**
+             * Format: int64
+             * @description Rows it returned.
+             */
+            rows?: number | null;
+            /** @description The first rows as text, for the model to read. */
+            sample?: string | null;
+            /** @description The SPARQL query of the step. */
+            sparql: string;
+        };
+        /** @description Where the time of a rewrite went, in milliseconds. */
+        QueryRewriteTimings: {
+            /** Format: int64 */
+            ground_ms: number;
+            /** Format: int64 */
+            rewrite_ms: number;
+            /** Format: int64 */
+            route_ms: number;
+            /** Format: int64 */
+            run_ms: number;
+            /** Format: int64 */
+            total_ms: number;
+        };
+        /**
+         * @description The kind of query a question needs.
+         * @enum {string}
+         */
+        QueryRoute: "lookup" | "aggregate" | "search" | "history" | "schema" | "unanswerable";
+        /** @description The route of a question and how sure the choice is. */
+        QueryRouteDecision: {
+            by: components["schemas"]["QueryRouteSource"];
+            /**
+             * Format: float
+             * @description 0 to 1: the router's probability of `kind`, 1 for a route the caller
+             *     fixed, the rewriter's own estimate otherwise.
+             */
+            confidence: number;
+            kind: components["schemas"]["QueryRoute"];
+            /** @description The router's probability of each route, when the router answered. */
+            probabilities?: {
+                [key: string]: number;
+            };
+        };
+        /**
+         * @description Who chose the route.
+         * @enum {string}
+         */
+        QueryRouteSource: "caller" | "router" | "rewriter";
         /**
          * @description Read accounting for ranged (block-level) persisted index runs. Reported
          *     when search served from a ranged layout instead of coarse whole objects.
@@ -6768,6 +7551,18 @@ export interface components {
          * @enum {string}
          */
         RetrievalProfileId: "baseline" | "scored_atom_v1" | "graph_aware_v1" | "ndcg_v1";
+        /** @description The query the rewriter wrote. */
+        RewrittenQuery: {
+            /**
+             * Format: int64
+             * @description The commit to read, when the question or the request names one.
+             */
+            as_of_commit_seq?: number | null;
+            /** @description The entailment the query needs; pass it to `POST /v1/query/sparql-text`. */
+            entailment: components["schemas"]["SparqlEntailment"];
+            /** @description A SPARQL `SELECT` or `ASK` query, with its `PREFIX` declarations. */
+            sparql: string;
+        };
         /**
          * @description Final-result row page metadata. `total` is the number of rows after filters,
          *     projection/deduplication, grouping, and ordering but before the requested
@@ -7466,6 +8261,13 @@ export interface components {
             id: string;
             iri: string;
             label: string;
+            /**
+             * Format: float
+             * @description With a rerank: the model's probability (0 to 1) that the hit answers
+             *     the search text. The hits are ordered by it; `score` stays the
+             *     similarity.
+             */
+            relevance?: number | null;
             /** Format: float */
             score: number;
             text?: string | null;
@@ -7546,10 +8348,53 @@ export interface components {
              *     an eval trace and returns its `trace_id`.
              */
             request?: string | null;
+            /**
+             * @description Order the best hits by how well each answers `text`, with the
+             *     managed rerank model (`true`), or keep the similarity order
+             *     (`false`). Without it the graph's search setting decides
+             *     (`GET /v1/search/settings`).
+             */
+            rerank?: boolean | null;
             /** @description The query text; embedded with the serving version's model. */
             text?: string | null;
             top_k?: number | null;
         };
+        /** @description A rerank model: who serves it and its id. */
+        SearchRerankModel: {
+            /** @description `jev-latest`. */
+            id: string;
+            /** @description A name for people (`Jev`). */
+            label: string;
+            /** @description `typesafe`, `mock`. */
+            provider: string;
+        };
+        /** @description The rerank of one search. Absent when the search did not rerank. */
+        SearchRerankReport: {
+            /** @description Answers kept from an earlier search of the same text (no model call). */
+            cached?: number;
+            /**
+             * @description Hits the model read: the best `2·top_k` that passed the graph check,
+             *     at least 20 and at most 40, or the graph's `rerank_depth`.
+             */
+            candidates: number;
+            /** @description Why the rerank failed, in short. */
+            error?: string | null;
+            model?: null | components["schemas"]["SearchRerankModel"];
+            /** @description Hits that moved from their similarity rank. */
+            moved?: number;
+            source: components["schemas"]["SearchRerankSource"];
+            status: components["schemas"]["SearchRerankStatus"];
+        };
+        /**
+         * @description Why a search reranked: the graph's setting or the request's `rerank`.
+         * @enum {string}
+         */
+        SearchRerankSource: "graph" | "request";
+        /**
+         * @description What became of the rerank of one search.
+         * @enum {string}
+         */
+        SearchRerankStatus: "applied" | "failed" | "unavailable" | "limited" | "planned";
         SearchResponse: {
             clusters_probed: number;
             /** @description Candidates the graph check removed (deleted or re-typed entities). */
@@ -7579,10 +8424,72 @@ export interface components {
             not_ready?: string[];
             /** Format: int64 */
             query_ms: number;
+            rerank?: null | components["schemas"]["SearchRerankReport"];
             served_at_seq?: null | components["schemas"]["CommitSeq"];
             timings?: components["schemas"]["SearchTimings"];
             trace_id?: string | null;
             usage: components["schemas"]["EmbeddingUsage"];
+        };
+        /** @description The search settings of a graph (`GET /v1/search/settings`). */
+        SearchSettings: {
+            /**
+             * Format: float
+             * @description How a reranked search orders its candidates, 0 to 1: by
+             *     `blend·relevance + (1 − blend)·similarity`, the similarity scaled to 0
+             *     to 1 over the reranked candidates (min–max). Absent or 1: the rerank
+             *     model's order; 0: the similarity order.
+             */
+            blend?: number | null;
+            /**
+             * Format: float
+             * @description Clusters a search reads across the big runs, as a factor of the
+             *     default (`4·√clusters`, at least 8), 1 to 4. A request's `probe`
+             *     wins. Absent: the default.
+             */
+            probe_factor?: number | null;
+            /**
+             * @description Every search of the graph orders its best hits with the rerank model,
+             *     unless a request sets `rerank`.
+             */
+            rerank: boolean;
+            /**
+             * @description The server has a rerank model. Without one a search keeps the
+             *     similarity order and reports `rerank.status: unavailable`.
+             */
+            rerank_available: boolean;
+            /**
+             * Format: int32
+             * @description Candidates the rerank model reads, 20 to 80. Absent: `2·top_k`, at
+             *     least 20 and at most 40.
+             */
+            rerank_depth?: number | null;
+            rerank_model?: null | components["schemas"]["SearchRerankModel"];
+        };
+        /**
+         * @description `PUT /v1/search/settings`: change some of the graph's search settings.
+         *     A field left out keeps its value; `null` sets it back to its default.
+         *     Unknown fields are refused.
+         */
+        SearchSettingsRequest: {
+            /**
+             * Format: float
+             * @description `blend·relevance + (1 − blend)·similarity`, 0 to 1; `null`: the
+             *     default (the rerank order).
+             */
+            blend?: number | null;
+            /**
+             * Format: float
+             * @description Clusters read, as a factor of the default, 1 to 4; `null`: the
+             *     default.
+             */
+            probe_factor?: number | null;
+            /** @description Turn the rerank on or off for every search of the graph. */
+            rerank?: boolean | null;
+            /**
+             * Format: int32
+             * @description Candidates the rerank model reads, 20 to 80; `null`: the default.
+             */
+            rerank_depth?: number | null;
         };
         SearchSignalWeights: {
             /** Format: float */
@@ -7714,6 +8621,11 @@ export interface components {
             index_ms: number;
             /**
              * Format: int64
+             * @description Asking the rerank model how well each candidate answers the text.
+             */
+            relevance_ms?: number;
+            /**
+             * Format: int64
              * @description Reading the exact vectors of the best candidates and scoring them.
              */
             rerank_ms?: number;
@@ -7722,6 +8634,134 @@ export interface components {
              * @description Reading the embedding, its manifest, and its runs.
              */
             resolve_ms: number;
+        };
+        /** @description `GET /v1/search/tuning?graph`: the sessions, newest first. */
+        SearchTuningListResponse: {
+            sessions: components["schemas"]["SearchTuningSession"][];
+        };
+        /** @description The scores of one variant. */
+        SearchTuningMetrics: {
+            /** Format: int64 */
+            cost_micro_usd_per_search: number;
+            /** Format: int64 */
+            latency_p50_ms: number;
+            /** Format: double */
+            mrr_at_10: number;
+            /** Format: double */
+            ndcg_at_10: number;
+            /** Format: int64 */
+            queries: number;
+            /** Format: double */
+            recall_at_10: number;
+        };
+        /** @description The settings a session proposes. */
+        SearchTuningProposal: {
+            /** Format: int64 */
+            cost_delta_micro_usd_per_search: number;
+            /** Format: int64 */
+            latency_delta_ms: number;
+            settings: components["schemas"]["SearchTuningSettings"];
+            test: components["schemas"]["SearchTuningTest"];
+            variant: string;
+        };
+        /** @description The judge's notes of one round. */
+        SearchTuningRound: {
+            notes: string;
+            /** Format: int32 */
+            round: number;
+        };
+        /** @description One tuning session. */
+        SearchTuningSession: {
+            /** Format: int64 */
+            applied_at_ms?: number | null;
+            applied_by?: string | null;
+            baseline?: null | components["schemas"]["SearchTuningVariant"];
+            /** Format: int64 */
+            created_at_ms: number;
+            error?: string | null;
+            /** Format: int64 */
+            finished_at_ms?: number | null;
+            /** Format: int64 */
+            graded_pairs: number;
+            id: string;
+            /** Format: int64 */
+            judge_cost_micro_usd: number;
+            proposal?: null | components["schemas"]["SearchTuningProposal"];
+            /** Format: int64 */
+            queries_choose: number;
+            /** Format: int64 */
+            queries_test: number;
+            rounds?: components["schemas"]["SearchTuningRound"][];
+            /** Format: int64 */
+            started_at_ms?: number | null;
+            status: components["schemas"]["SearchTuningStatus"];
+            /** @description `queries`, `baseline`, `propose`, `run`, `grade`, `score` or `test`. */
+            step?: string | null;
+            variants?: components["schemas"]["SearchTuningVariant"][];
+            /** Format: int64 */
+            workflow_turn?: number | null;
+        };
+        /** @description The search settings a tuning session changes. */
+        SearchTuningSettings: {
+            /**
+             * Format: float
+             * @description `blend·relevance + (1 - blend)·similarity`, 0 to 1.
+             */
+            blend?: number | null;
+            /**
+             * Format: float
+             * @description Clusters read, as a factor of the default, 1 to 4.
+             */
+            probe_factor?: number | null;
+            rerank: boolean;
+            /**
+             * Format: int32
+             * @description Candidates the rerank model reads, 20 to 80.
+             */
+            rerank_depth?: number | null;
+        };
+        /** @description `POST /v1/search/tuning?graph`: start a session. */
+        SearchTuningStartRequest: {
+            /**
+             * Format: int32
+             * @description At most 40.
+             */
+            queries?: number | null;
+            /**
+             * Format: int32
+             * @description At most 3.
+             */
+            rounds?: number | null;
+        };
+        /** @enum {string} */
+        SearchTuningStatus: "queued" | "running" | "done" | "failed";
+        /** @description The best variant against the baseline on the test queries. */
+        SearchTuningTest: {
+            /** Format: double */
+            baseline_ndcg_at_10: number;
+            /** Format: double */
+            ci_high: number;
+            /**
+             * Format: double
+             * @description The bootstrap 95% interval of `delta`.
+             */
+            ci_low: number;
+            /** Format: double */
+            delta: number;
+            /** Format: double */
+            ndcg_at_10: number;
+            /** Format: int64 */
+            queries: number;
+        };
+        /** @description One set of settings a session ran. */
+        SearchTuningVariant: {
+            hypothesis: string;
+            id: string;
+            metrics?: null | components["schemas"]["SearchTuningMetrics"];
+            name: string;
+            /** Format: int32 */
+            round: number;
+            settings: components["schemas"]["SearchTuningSettings"];
         };
         /** @description One embedding a search read. */
         SearchedEmbedding: {
@@ -9387,6 +10427,11 @@ export interface components {
              */
             total_observed: number;
         };
+        /**
+         * @description Who set a call's ground truth.
+         * @enum {string}
+         */
+        TruthSource: "judge" | "person";
         TypedAskFeedbackV1: {
             ask_id: string;
             note?: string | null;
@@ -17304,6 +18349,986 @@ export interface operations {
             };
         };
     };
+    get_v1_models_calls: {
+        parameters: {
+            query?: {
+                /** @description Graph name (default `main`) */
+                graph?: string;
+                /** @description rerank, route, rewrite, fit, propose, label or embed */
+                job?: string;
+                /** @description yyyy-mm-dd (UTC) to start from; default: today */
+                day?: string;
+                /** @description true: only calls that have a check; false: only calls that have none */
+                checked?: string;
+                /** @description the `next_after` of the previous page */
+                after?: string;
+                /** @description rows, 1 to 100; default 50 */
+                limit?: string;
+            };
+            header?: {
+                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                "Lbb-Version"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ModelCallListResponse"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Rate limit exceeded */
+            429: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Service unavailable */
+            503: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+        };
+    };
+    post_v1_models_calls_check: {
+        parameters: {
+            query?: {
+                /** @description Graph name (default `main`) */
+                graph?: string;
+                /** @description the call id */
+                id?: string;
+            };
+            header?: {
+                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                "Lbb-Version"?: string;
+                /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
+                "Idempotency-Key"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ModelCallCheckResponse"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Rate limit exceeded */
+            429: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Service unavailable */
+            503: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+        };
+    };
+    get_v1_models_calls_get: {
+        parameters: {
+            query?: {
+                /** @description Graph name (default `main`) */
+                graph?: string;
+                /** @description the call id */
+                id?: string;
+            };
+            header?: {
+                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                "Lbb-Version"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ModelCallDetailResponse"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Rate limit exceeded */
+            429: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Service unavailable */
+            503: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+        };
+    };
+    get_v1_models_checks: {
+        parameters: {
+            query?: {
+                /** @description Graph name (default `main`) */
+                graph?: string;
+                /** @description rerank, route, rewrite, fit, propose, label or embed */
+                job?: string;
+                /** @description yyyy-mm (UTC); default: the current month */
+                month?: string;
+                /** @description the ground truth: right, partly or wrong */
+                verdict?: string;
+                /** @description true: only reviewed checks; false: only checks no person reviewed */
+                reviewed?: string;
+                /** @description the `next_after` of the previous page */
+                after?: string;
+                /** @description checks, 1 to 100; default 50 */
+                limit?: string;
+            };
+            header?: {
+                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                "Lbb-Version"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ModelCheckListResponse"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Rate limit exceeded */
+            429: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Service unavailable */
+            503: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+        };
+    };
+    get_v1_models_checks_export: {
+        parameters: {
+            query?: {
+                /** @description Graph name (default `main`) */
+                graph?: string;
+                /** @description rerank, route, rewrite, fit, propose, label or embed */
+                job?: string;
+                /** @description yyyy-mm (UTC); default: the current month */
+                month?: string;
+            };
+            header?: {
+                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                "Lbb-Version"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/x-ndjson": string;
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Rate limit exceeded */
+            429: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Service unavailable */
+            503: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+        };
+    };
+    post_v1_models_checks_review: {
+        parameters: {
+            query?: {
+                /** @description Graph name (default `main`) */
+                graph?: string;
+                /** @description the call id */
+                id?: string;
+            };
+            header?: {
+                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                "Lbb-Version"?: string;
+                /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
+                "Idempotency-Key"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ModelCheckReviewRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ModelCheck"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Rate limit exceeded */
+            429: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Service unavailable */
+            503: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+        };
+    };
+    get_v1_models_checks_summary: {
+        parameters: {
+            query?: {
+                /** @description Graph name (default `main`) */
+                graph?: string;
+                /** @description yyyy-mm (UTC); default: the current month */
+                month?: string;
+            };
+            header?: {
+                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                "Lbb-Version"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ModelChecksSummary"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Rate limit exceeded */
+            429: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Service unavailable */
+            503: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+        };
+    };
     get_v1_models_extractor_dataset: {
         parameters: {
             query?: {
@@ -22586,6 +24611,148 @@ export interface operations {
             };
         };
     };
+    post_v1_query_rewrite: {
+        parameters: {
+            query?: {
+                /** @description Graph name (default `main`) */
+                graph?: string;
+                /** @description eventual (default) reads the last published commit; strong reads the head */
+                consistency?: string;
+            };
+            header?: {
+                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                "Lbb-Version"?: string;
+                /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
+                "Idempotency-Key"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["QueryRewriteRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QueryRewriteResponse"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Rate limit exceeded */
+            429: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Service unavailable */
+            503: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+        };
+    };
     post_v1_query_sparql: {
         parameters: {
             query?: {
@@ -23582,6 +25749,828 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SearchFeedbackSummaryResponse"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Rate limit exceeded */
+            429: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Service unavailable */
+            503: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+        };
+    };
+    get_v1_search_settings: {
+        parameters: {
+            query?: {
+                /** @description Graph name (default `main`) */
+                graph?: string;
+            };
+            header?: {
+                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                "Lbb-Version"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SearchSettings"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Rate limit exceeded */
+            429: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Service unavailable */
+            503: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+        };
+    };
+    put_v1_search_settings: {
+        parameters: {
+            query?: {
+                /** @description Graph name (default `main`) */
+                graph?: string;
+            };
+            header?: {
+                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                "Lbb-Version"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SearchSettingsRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SearchSettings"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Rate limit exceeded */
+            429: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Service unavailable */
+            503: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+        };
+    };
+    get_v1_search_tuning: {
+        parameters: {
+            query?: {
+                /** @description Graph name (default `main`) */
+                graph?: string;
+                /** @description sessions, 1 to 50; default 10 */
+                limit?: string;
+            };
+            header?: {
+                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                "Lbb-Version"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SearchTuningListResponse"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Rate limit exceeded */
+            429: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Service unavailable */
+            503: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+        };
+    };
+    post_v1_search_tuning: {
+        parameters: {
+            query?: {
+                /** @description Graph name (default `main`) */
+                graph?: string;
+            };
+            header?: {
+                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                "Lbb-Version"?: string;
+                /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
+                "Idempotency-Key"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SearchTuningStartRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SearchTuningSession"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Rate limit exceeded */
+            429: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Service unavailable */
+            503: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+        };
+    };
+    post_v1_search_tuning_apply: {
+        parameters: {
+            query?: {
+                /** @description Graph name (default `main`) */
+                graph?: string;
+                /** @description the session id */
+                id?: string;
+            };
+            header?: {
+                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                "Lbb-Version"?: string;
+                /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
+                "Idempotency-Key"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SearchTuningSession"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Rate limit exceeded */
+            429: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Service unavailable */
+            503: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+        };
+    };
+    get_v1_search_tuning_get: {
+        parameters: {
+            query?: {
+                /** @description Graph name (default `main`) */
+                graph?: string;
+                /** @description the session id */
+                id?: string;
+            };
+            header?: {
+                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                "Lbb-Version"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SearchTuningSession"];
                 };
             };
             /** @description Bad request */

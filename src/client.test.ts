@@ -463,6 +463,512 @@ test("modelActivity reads one month of the stack's model activity", async () => 
   assert.equal(second.searchParams.has("month"), false);
 });
 
+test("search reranks on request and reads and writes the graph's search settings", async () => {
+  const settings: Schemas["SearchSettings"] = {
+    rerank: true,
+    rerank_available: true,
+    rerank_model: { provider: "typesafe", id: "jev-latest", label: "Jev" },
+  };
+  const { fetch, calls } = recordingFetch([
+    { body: JSON.stringify({ hits: [] }) },
+    { body: JSON.stringify(settings) },
+    { body: JSON.stringify({ ...settings, rerank: false }) },
+  ]);
+  const client = new LbbClient({ baseUrl: "http://h", graph: "main", fetch });
+  await client.embeddings.search({ text: "who handles refunds", rerank: true });
+  const read = await client.embeddings.searchSettings();
+  assert.equal(read.rerank_model?.label, "Jev");
+  const written = await client.embeddings.setSearchSettings({ rerank: false });
+  assert.equal(written.rerank, false);
+  const routes = calls.map(
+    (call) => `${call.init.method} ${new URL(call.input).pathname}`,
+  );
+  assert.deepEqual(routes, [
+    "POST /v1/search",
+    "GET /v1/search/settings",
+    "PUT /v1/search/settings",
+  ]);
+  assert.deepEqual(JSON.parse(String(calls[0].init.body)), {
+    text: "who handles refunds",
+    rerank: true,
+  });
+  assert.deepEqual(JSON.parse(String(calls[2].init.body)), { rerank: false });
+});
+
+test("setSearchSettings sends the fields it names: a value sets, null resets", async () => {
+  const settings: Schemas["SearchSettings"] = {
+    rerank: true,
+    rerank_depth: 60,
+    probe_factor: 2,
+    rerank_available: true,
+  };
+  const { fetch, calls } = recordingFetch({ body: JSON.stringify(settings) });
+  const client = new LbbClient({ baseUrl: "http://h", graph: "main", fetch });
+  const written = await client.embeddings.setSearchSettings({
+    rerank: true,
+    rerank_depth: 60,
+    blend: null,
+    probe_factor: 2,
+  });
+  assert.equal(written.rerank_depth, 60);
+  assert.equal(written.blend, undefined);
+  await client.embeddings.setSearchSettings({ rerank_depth: undefined });
+  assert.equal(calls[0].init.method, "PUT");
+  assert.equal(new URL(calls[0].input).pathname, "/v1/search/settings");
+  // `null` reaches the wire as JSON null; an undefined field stays off it.
+  assert.equal(
+    stringBody(calls[0].init.body),
+    '{"rerank":true,"rerank_depth":60,"blend":null,"probe_factor":2}',
+  );
+  assert.equal(stringBody(calls[1].init.body), "{}");
+});
+
+function tuningSession(
+  overrides: Partial<Schemas["SearchTuningSession"]> = {},
+): Schemas["SearchTuningSession"] {
+  return {
+    id: "t1",
+    status: "queued",
+    created_at_ms: 1_790_000_000_000,
+    queries_choose: 0,
+    queries_test: 0,
+    graded_pairs: 0,
+    judge_cost_micro_usd: 0,
+    ...overrides,
+  };
+}
+
+test("searchTuning starts, lists, reads and applies the graph's sessions", async () => {
+  const done = tuningSession({
+    status: "done",
+    step: "test",
+    queries_choose: 26,
+    queries_test: 14,
+    proposal: {
+      variant: "r1v1",
+      settings: { rerank: true, rerank_depth: 60 },
+      test: {
+        baseline_ndcg_at_10: 0.7,
+        ndcg_at_10: 0.8,
+        delta: 0.1,
+        ci_low: 0.02,
+        ci_high: 0.18,
+        queries: 14,
+      },
+      latency_delta_ms: 40,
+      cost_delta_micro_usd_per_search: 0,
+    },
+  });
+  const { fetch, calls } = recordingFetch([
+    { body: JSON.stringify(tuningSession()) },
+    { body: JSON.stringify(tuningSession({ id: "t2" })) },
+    { body: JSON.stringify({ sessions: [done] }) },
+    { body: JSON.stringify(done) },
+    {
+      body: JSON.stringify({
+        ...done,
+        applied_at_ms: 1_790_000_100_000,
+        applied_by: "key:k1",
+      }),
+    },
+  ]);
+  const client = new LbbClient({ baseUrl: "http://h", graph: "main", fetch });
+  const queued = await client.embeddings.searchTuning.start();
+  assert.equal(queued.status, "queued");
+  await client.embeddings.searchTuning.start({ queries: 12, rounds: 1 });
+  const listed = await client.embeddings.searchTuning.list({ limit: 5 });
+  assert.equal(listed.sessions[0]?.id, "t1");
+  const session = await client.embeddings.searchTuning.get("t1");
+  assert.equal(session.proposal?.settings.rerank_depth, 60);
+  assert.equal(session.proposal?.test.ci_low, 0.02);
+  const applied = await client.embeddings.searchTuning.apply("t1");
+  assert.equal(applied.applied_by, "key:k1");
+
+  const routes = calls.map((call) => {
+    const url = new URL(call.input);
+    return `${call.init.method} ${url.pathname}${url.search}`;
+  });
+  assert.deepEqual(routes, [
+    "POST /v1/search/tuning?graph=main",
+    "POST /v1/search/tuning?graph=main",
+    "GET /v1/search/tuning?graph=main&limit=5",
+    "GET /v1/search/tuning/get?graph=main&id=t1",
+    "POST /v1/search/tuning/apply?graph=main&id=t1",
+  ]);
+  assert.equal(stringBody(calls[0].init.body), "{}");
+  assert.deepEqual(JSON.parse(stringBody(calls[1].init.body)), {
+    queries: 12,
+    rounds: 1,
+  });
+  assert.equal(calls[4].init.body, undefined);
+});
+
+test("searchTuning.start spends the judge budget: no retry unless asked; apply retries", async () => {
+  const busy = {
+    status: 503,
+    body: JSON.stringify({ error: { code: "api_error", message: "busy" } }),
+  };
+  const { fetch, calls } = recordingFetch([
+    busy,
+    busy,
+    { body: JSON.stringify(tuningSession()) },
+    busy,
+    { body: JSON.stringify(tuningSession({ status: "done" })) },
+  ]);
+  const client = new LbbClient({
+    baseUrl: "http://h",
+    fetch,
+    maxRetries: 1,
+    retryDelayMs: 0,
+  });
+  await assert.rejects(client.embeddings.searchTuning.start(), LbbError);
+  assert.equal(calls.length, 1, "a session spends the judge budget: no retry");
+  await client.embeddings.searchTuning.start({}, { retry: true });
+  assert.equal(calls.length, 3);
+  await client.embeddings.searchTuning.apply("t1");
+  assert.equal(calls.length, 5, "apply sets the same settings again");
+});
+
+function modelCheck(
+  overrides: Partial<Schemas["ModelCheck"]> = {},
+): Schemas["ModelCheck"] {
+  const usage = {
+    tokens_in: 8000,
+    tokens_out: 3000,
+    cache_read: 0,
+    cache_write: 0,
+    cost_micro_usd: 92_000,
+    ms: 41_000,
+  };
+  return {
+    v: 1,
+    call: "00000001790000000000-n1-0000000001-0",
+    job: "rerank",
+    provider: "typesafe",
+    model: "jev-latest",
+    graph: "main",
+    call_at_ms: 1_790_000_000_000,
+    summary: "refund policy",
+    judge: {
+      provider: "anthropic",
+      model: "claude-opus-5-5",
+      effort: "xhigh",
+      rubric: "relevance/1",
+      verdict: "partly",
+      score: 0.62,
+      reason: "two of four hits answer the text",
+      usage,
+      at_ms: 1_790_000_050_000,
+    },
+    history: [],
+    truth: { verdict: "partly", score: 0.62, by: "judge" },
+    ...overrides,
+  };
+}
+
+test("checks reads the call log and one call, and checks a call now", async () => {
+  const call: Schemas["ModelCall"] = {
+    id: "00000001790000000000-n1-0000000001-0",
+    at_ms: 1_790_000_000_000,
+    job: "rerank",
+    provider: "typesafe",
+    model: "jev-latest",
+    graph: "main",
+    origin: { route: "/v1/search" },
+    input: { text: "refund policy", items: [] },
+    output: { scores: [], order: [] },
+    usage: {
+      tokens_in: 120,
+      tokens_out: 30,
+      cache_read: 0,
+      cache_write: 0,
+      cost_micro_usd: 9,
+      ms: 310,
+    },
+    ok: true,
+    sampled: true,
+  };
+  const list: Schemas["ModelCallListResponse"] = {
+    calls: [
+      {
+        id: call.id,
+        at_ms: call.at_ms,
+        job: "rerank",
+        provider: "typesafe",
+        model: "jev-latest",
+        ok: true,
+        sampled: true,
+        summary: "refund policy",
+        check: { verdict: "right", score: 0.9, by: "judge", reviewed: false },
+      },
+    ],
+    next_after: call.id,
+  };
+  const { fetch, calls } = recordingFetch([
+    { body: JSON.stringify(list) },
+    { body: JSON.stringify({ calls: [] }) },
+    { body: JSON.stringify({ call, check: modelCheck() }) },
+    { body: JSON.stringify({ queued: true }) },
+  ]);
+  const client = new LbbClient({ baseUrl: "http://h", graph: "main", fetch });
+  const page = await client.checks.calls({
+    job: "rerank",
+    day: "2026-10-04",
+    checked: false,
+    limit: 20,
+  });
+  assert.equal(page.calls[0]?.check?.verdict, "right");
+  assert.equal(page.next_after, call.id);
+  await client.checks.calls({ after: call.id, checked: true });
+  const detail = await client.checks.call(call.id);
+  assert.equal(detail.call.origin.route, "/v1/search");
+  assert.equal(detail.check?.judge.rubric, "relevance/1");
+  const queued = await client.checks.checkCall(call.id);
+  assert.equal(queued.queued, true);
+
+  const [first, second, third, fourth] = calls.map(
+    (entry) => new URL(entry.input),
+  );
+  assert.deepEqual(
+    calls.map((entry) => entry.init.method),
+    ["GET", "GET", "GET", "POST"],
+  );
+  assert.equal(first.pathname, "/v1/models/calls");
+  assert.deepEqual(Object.fromEntries(first.searchParams), {
+    graph: "main",
+    job: "rerank",
+    day: "2026-10-04",
+    checked: "false",
+    limit: "20",
+  });
+  assert.deepEqual(Object.fromEntries(second.searchParams), {
+    graph: "main",
+    checked: "true",
+    after: call.id,
+  });
+  assert.equal(third.pathname, "/v1/models/calls/get");
+  assert.equal(third.searchParams.get("id"), call.id);
+  assert.equal(fourth.pathname, "/v1/models/calls/check");
+  assert.equal(fourth.searchParams.get("id"), call.id);
+  assert.equal(calls[3].init.body, undefined);
+});
+
+test("checks.checkCall spends the judge budget: no retry unless asked", async () => {
+  const busy = {
+    status: 503,
+    body: JSON.stringify({ error: { code: "api_error", message: "busy" } }),
+  };
+  const { fetch, calls } = recordingFetch([
+    busy,
+    busy,
+    { body: JSON.stringify({ queued: true }) },
+  ]);
+  const client = new LbbClient({
+    baseUrl: "http://h",
+    fetch,
+    maxRetries: 1,
+    retryDelayMs: 0,
+  });
+  await assert.rejects(client.checks.checkCall("c1"), LbbError);
+  assert.equal(calls.length, 1, "a check spends the judge budget: no retry");
+  const queued = await client.checks.checkCall("c1", { retry: true });
+  assert.equal(queued.queued, true);
+  assert.equal(calls.length, 3);
+});
+
+test("checks lists, reviews, summarizes and exports the checks of a month", async () => {
+  const summary: Schemas["ModelChecksSummary"] = {
+    month: "2026-10",
+    months: ["2026-09", "2026-10"],
+    graph: "main",
+    jobs: [
+      {
+        job: "rerank",
+        provider: "typesafe",
+        model: "jev-latest",
+        checks: 4,
+        score: 0.75,
+        right: 2,
+        partly: 1,
+        wrong: 1,
+        reviewed: 1,
+        corrected: 1,
+      },
+    ],
+    judge: {
+      provider: "anthropic",
+      model: "claude-opus-5-5",
+      reviewed: 2,
+      overruled: 1,
+      agreement: 0.5,
+    },
+    budget: {
+      day: "2026-10-04",
+      cost_micro_usd: 92_000,
+      limit_micro_usd: 2_000_000,
+      checks: 1,
+    },
+    checker_available: true,
+    calls: 40,
+  };
+  const corrected = modelCheck({
+    review: {
+      by: "key:k1",
+      at_ms: 1_790_000_100_000,
+      agree: false,
+      verdict: "wrong",
+      note: "the hits are about returns",
+    },
+    truth: { verdict: "wrong", score: 0, by: "person" },
+  });
+  const exported = [
+    { call: null, check: modelCheck() },
+    { call: null, check: corrected },
+  ];
+  const { fetch, calls } = recordingFetch([
+    { body: JSON.stringify({ checks: [corrected], next_after: "c0" }) },
+    {
+      body: JSON.stringify(
+        modelCheck({ review: { by: "key:k1", at_ms: 1, agree: true } }),
+      ),
+    },
+    { body: JSON.stringify(corrected) },
+    { body: JSON.stringify(summary) },
+    {
+      body: `${exported.map((line) => JSON.stringify(line)).join("\n")}\n`,
+      headers: { "content-type": "application/x-ndjson" },
+    },
+    { body: "", headers: { "content-type": "application/x-ndjson" } },
+  ]);
+  const client = new LbbClient({ baseUrl: "http://h", fetch });
+  const scoped = client.graph("crm").checks;
+
+  const listed = await scoped.list({
+    job: "rerank",
+    month: "2026-10",
+    verdict: "wrong",
+    reviewed: true,
+    limit: 10,
+  });
+  assert.equal(listed.checks[0]?.truth.by, "person");
+  const agreed = await scoped.review(corrected.call, { agree: true });
+  assert.equal(agreed.review?.agree, true);
+  const reviewed = await scoped.review(corrected.call, {
+    agree: false,
+    verdict: "wrong",
+    reference: { grades: { "https://x.test/e/a": 0 } },
+    note: "the hits are about returns",
+  });
+  assert.equal(reviewed.truth.verdict, "wrong");
+  const month = await scoped.summary({ month: "2026-10" });
+  assert.equal(month.judge?.agreement, 0.5);
+  assert.equal(month.jobs[0]?.corrected, 1);
+  const lines = await scoped.export({ job: "rerank", month: "2026-10" });
+  assert.equal(lines.length, 2);
+  assert.equal(lines[0]?.call, null);
+  assert.equal(lines[1]?.check.review?.verdict, "wrong");
+  assert.deepEqual(await scoped.export(), [], "an empty month has no lines");
+
+  const urls = calls.map((entry) => new URL(entry.input));
+  assert.deepEqual(
+    calls.map((entry, index) => `${entry.init.method} ${urls[index].pathname}`),
+    [
+      "GET /v1/models/checks",
+      "POST /v1/models/checks/review",
+      "POST /v1/models/checks/review",
+      "GET /v1/models/checks/summary",
+      "GET /v1/models/checks/export",
+      "GET /v1/models/checks/export",
+    ],
+  );
+  assert.deepEqual(Object.fromEntries(urls[0].searchParams), {
+    graph: "crm",
+    job: "rerank",
+    month: "2026-10",
+    verdict: "wrong",
+    reviewed: "true",
+    limit: "10",
+  });
+  assert.equal(urls[1].searchParams.get("id"), corrected.call);
+  assert.equal(urls[1].searchParams.get("graph"), "crm");
+  assert.deepEqual(JSON.parse(stringBody(calls[1].init.body)), { agree: true });
+  assert.deepEqual(JSON.parse(stringBody(calls[2].init.body)), {
+    agree: false,
+    verdict: "wrong",
+    reference: { grades: { "https://x.test/e/a": 0 } },
+    note: "the hits are about returns",
+  });
+  assert.equal(urls[3].searchParams.get("month"), "2026-10");
+  assert.deepEqual(Object.fromEntries(urls[4].searchParams), {
+    graph: "crm",
+    job: "rerank",
+    month: "2026-10",
+  });
+  assert.equal(urls[5].search, "?graph=crm");
+});
+
+test("trainSubmit enqueues a durable trainer job under the caller's key, trainJob polls it", async () => {
+  const queued = {
+    job_id: "train-7",
+    status: "pending",
+    graph: { tenant_id: "acme", graph_id: "main", branch_id: "main" },
+    kind: "train_model",
+    attempts: 0,
+    enqueued_at_micros: 1,
+    updated_at_micros: 1,
+  };
+  const { fetch, calls } = recordingFetch([
+    { body: JSON.stringify(queued) },
+    { body: JSON.stringify({ ...queued, status: "running", attempts: 1 }) },
+  ]);
+  const client = new LbbClient({ baseUrl: "http://h", graph: "main", fetch });
+
+  const accepted = await client.trainSubmit(
+    { kind: "retrieval_fusion" } as never,
+    { idempotencyKey: "nightly-2026-10-03" }, // gitleaks:allow (a test idempotency key)
+  );
+  const running = await client.trainJob(accepted.job_id);
+
+  assert.equal(calls[0].init.method, "POST");
+  assert.equal(calls[0].input, "http://h/v1/models/train-jobs?graph=main");
+  assert.equal(
+    calls[0].init.headers?.["idempotency-key"],
+    "nightly-2026-10-03",
+  );
+  assert.deepEqual(JSON.parse(stringBody(calls[0].init.body)), {
+    kind: "retrieval_fusion",
+  });
+  assert.equal(calls[1].init.method, "GET");
+  assert.equal(
+    calls[1].input,
+    "http://h/v1/models/train-jobs?graph=main&job_id=train-7",
+  );
+  assert.equal(running.status, "running");
+  await assert.rejects(
+    () => client.trainSubmit({} as never, { idempotencyKey: " " }),
+    TypeError,
+  );
+  assert.equal(calls.length, 2);
+});
+
+test("entityDetail pins a commit and sends no valid-time selector", async () => {
+  const { fetch, calls } = recordingFetch({ body: "{}" });
+  const client = new LbbClient({ baseUrl: "http://h", graph: "main", fetch });
+
+  await client.entityDetail({
+    type: "Ticket",
+    key: "4821",
+    edges: 50,
+    asOfCommitSeq: 12,
+  });
+
+  const url = new URL(calls[0].input);
+  assert.equal(url.pathname, "/v1/graph/entity");
+  assert.equal(url.searchParams.get("as_of_commit_seq"), "12");
+  assert.equal(url.searchParams.get("key"), "4821");
+  assert.equal(url.searchParams.has("as_of"), false);
+});
+
 test("namespace facts.create injects auth, scope, version, and idempotency", async () => {
   const { fetch, calls } = recordingFetch({
     body: JSON.stringify({

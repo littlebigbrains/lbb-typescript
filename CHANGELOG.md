@@ -2,6 +2,67 @@
 
 All notable changes to the `@littlebigbrain/client` package are documented here.
 
+## 0.19.0 (2026-10-04)
+
+Adds the server features the client did not cover yet, questions in plain
+words (the server turns a question into a SPARQL query), and the search
+rerank.
+
+- Parsed SPARQL results (`sparqlRows`, `query.sparql`, `parseSparqlResults`)
+  gain `search`, `traceId`, `rowPage` and `nextCursor`. `search` reports how a
+  `search:similarTo` pattern in the query ran: the plan, the hits asked for and
+  bound, `complete` and the lag of the vectors. `traceId` names the eval trace
+  of a query sent with `request`. Each field is present only when the server
+  sends it.
+- Add `query.update(text, opts)` for SPARQL Update on the `/update` endpoint.
+  The server accepts `INSERT DATA`. The client sends an idempotency key, so a
+  retry replays the write.
+- Add `ontology.drafts` with `create()`, `get()`, `validate()`, `promote()`
+  and `reject()` for the `/v1/ontology/drafts` routes. `promote()` sends an
+  idempotency key.
+- Add `trainSubmit(body, { idempotencyKey })` and `trainJob(jobId)` for the
+  durable trainer jobs at `/v1/models/train-jobs`.
+- Remove the deprecated `asOf` option of `entityDetail` and
+  `entities.detail`. The server answers a valid-time `as_of` with 400. Use
+  `asOfCommitSeq` to read a record at a past commit.
+- `embeddings.search()` takes `rerank`: `true` orders the best hits by the
+  managed rerank model (TypeSafe's Jev), and each hit carries its
+  `relevance`; `false` keeps the similarity order. Without it the graph's
+  search setting decides. The response has a `rerank` report.
+- Add `embeddings.searchSettings()` and `setSearchSettings({ rerank })` for
+  `GET` and `PUT /v1/search/settings`: rerank every search of the graph, or
+  none.
+- Add `query.rewrite(body, { consistency })` for `POST /v1/query/rewrite`. A
+  router model selects the kind of query, and a rewriter model writes it from
+  a description of the graph. With `run: true` the server also runs the query
+  and returns the rows in `result`. Each call uses model tokens, so the client
+  does not retry a failed call unless `retry` is set.
+- Add `query.ask(question, options)`. It calls `rewrite` with `run: true` and
+  returns the route, the query, the rationale, the parsed `rows` and `vars`,
+  the `boolean` of an `ASK` query, the `snapshot`, the `error`, the eval
+  `traceId`, and the whole `rewrite` response. Add the `QueryAskOptions` and
+  `QueryAskResult` types.
+- Add `checks` (also on `graph(name)`) for the model checks of a graph:
+  `calls()` and `call(id)` read the log of the model calls LBB makes for its
+  own work, `checkCall(id)` asks the judge to check one call now, `list()`
+  reads a month of checks, `review(id, body)` agrees with the judge or
+  corrects it, `summary()` sums a month per job and model, and `export()`
+  returns a month of checks as parsed JSON lines. `checkCall` spends the
+  platform's judge budget, so the client does not retry a failed call unless
+  `retry` is set. Add the `ModelCallListOptions`, `ModelCheckListOptions` and
+  `ModelCheckExportLine` types.
+- A response of type `application/x-ndjson` parses to a list of the lines'
+  values.
+- `embeddings.setSearchSettings()` documents the merged request of
+  `PUT /v1/search/settings`: `rerank`, `rerank_depth`, `blend` and
+  `probe_factor`. A field left out keeps its value, and `null` sets it back
+  to its default.
+- Add `embeddings.searchTuning` with `start()`, `list()`, `get(id)` and
+  `apply(id)` for the `/v1/search/tuning` routes. A session runs the graph's
+  own searches with other settings and proposes the best. `start()` spends
+  the judge budget and is not retried unless `retry` is set; `apply()` sets
+  the same settings again on a retry.
+
 ## 0.18.0 (2026-10-03)
 
 Adds `client.integrations`: hosted integrations for a developer's end
