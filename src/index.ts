@@ -38,7 +38,14 @@ export type {
   StarterRelationTerm,
   StarterTerms,
 } from "./starters.js";
-export type { OntologyStarterApplyOptions } from "./namespaces.js";
+export type {
+  ModelCallListOptions,
+  ModelCheckExportLine,
+  ModelCheckListOptions,
+  OntologyStarterApplyOptions,
+  QueryAskOptions,
+  QueryAskResult,
+} from "./namespaces.js";
 export type {
   IntegrationsNamespace,
   IntegrationAcceptOptions,

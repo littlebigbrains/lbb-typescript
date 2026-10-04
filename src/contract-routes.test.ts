@@ -27,7 +27,10 @@ function findContract(): string {
   }
 }
 const OPENAPI = findContract();
-const CLIENT = resolve(process.cwd(), "src/client.ts");
+// The namespaces (`client.query`, `client.evals`, ...) issue routes too.
+const CLIENT_SOURCES = ["src/client.ts", "src/namespaces.ts"].map((file) =>
+  resolve(process.cwd(), file),
+);
 
 const HTTP_METHODS = new Set(["get", "post", "put", "patch", "delete"]);
 
@@ -50,7 +53,9 @@ function clientRoutes(): Set<string> {
   // Matches `this.request("POST", "/v1/graph/commit"`; only static string-literal
   // paths are captured (template-literal path-param routes are covered by the
   // methods that build them and are invisible here).
-  const source = readFileSync(CLIENT, "utf8");
+  const source = CLIENT_SOURCES.map((file) => readFileSync(file, "utf8")).join(
+    "\n",
+  );
   const re = /request\(\s*"([A-Z]+)",\s*"([^"]+)"/g;
   const routes = new Set<string>();
   let match: RegExpExecArray | null;

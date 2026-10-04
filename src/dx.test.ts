@@ -198,6 +198,154 @@ test("a refused starter apply exposes its conflicts on the error", async () => {
   });
 });
 
+test("ontology drafts namespace maps each operation to its route", async () => {
+  const { fetch, urls, headers, bodies } = queuedFetch([
+    { body: {} },
+    { body: {} },
+    { status: 503, body: { error: { message: "retry" } } },
+    { body: {} },
+    { body: {} },
+    { body: {} },
+    { body: {} },
+  ]);
+  const client = new LbbClient({
+    baseUrl: "http://h",
+    graph: "crm",
+    fetch,
+    maxRetries: 1,
+    retryDelayMs: 0,
+  });
+
+  await client.ontology.drafts.create({
+    connector_name: "hubspot",
+    samples: [{ name: "Acme", industry: "retail" }],
+  } as never);
+  await client.ontology.drafts.get("d_1");
+  await client.ontology.drafts.validate("d_1");
+  await client.ontology.drafts.promote("d_1");
+  await client.ontology.drafts.promote("d_1", { idempotencyKey: "promote-1" });
+  await client.ontology.drafts.reject("d_1", "too broad");
+
+  assert.deepEqual(urls, [
+    "http://h/v1/ontology/drafts?graph=crm",
+    "http://h/v1/ontology/drafts?graph=crm&draft_id=d_1",
+    // validate is a read: a 503 is retried without an idempotency key.
+    "http://h/v1/ontology/drafts/validate?graph=crm&draft_id=d_1",
+    "http://h/v1/ontology/drafts/validate?graph=crm&draft_id=d_1",
+    "http://h/v1/ontology/drafts/promote?graph=crm&draft_id=d_1",
+    "http://h/v1/ontology/drafts/promote?graph=crm&draft_id=d_1",
+    "http://h/v1/ontology/drafts/reject?graph=crm&draft_id=d_1&reason=too%20broad",
+  ]);
+  assert.equal(JSON.parse(bodies[0] ?? "").connector_name, "hubspot");
+  assert.match(headers[4]["idempotency-key"] ?? "", /^ontology-draft-promote:/);
+  assert.equal(headers[5]["idempotency-key"], "promote-1");
+  assert.equal(headers[6]["idempotency-key"], undefined);
+});
+
+test("query.update sends SPARQL Update text with an idempotency key", async () => {
+  const { fetch, urls, headers, bodies } = queuedFetch([
+    { status: 204, body: undefined },
+    { status: 204, body: undefined },
+  ]);
+  const client = new LbbClient({
+    baseUrl: "http://h",
+    graph: "catalog",
+    fetch,
+  });
+  const update =
+    'INSERT DATA { <https://example.com/sku/2> <http://www.w3.org/2000/01/rdf-schema#label> "Road shoe" }';
+
+  const answer = await client.query.update(update);
+  await client.graph("orders").query.update(update, {
+    idempotencyKey: "catalog-2026-10-03",
+  });
+
+  assert.equal(answer, undefined);
+  assert.deepEqual(urls, [
+    "http://h/update?graph=catalog",
+    "http://h/update?graph=orders",
+  ]);
+  assert.equal(bodies[0], update);
+  assert.equal(headers[0]["content-type"], "application/sparql-update");
+  assert.match(headers[0]["idempotency-key"] ?? "", /^sparql-update:/);
+  assert.equal(headers[1]["idempotency-key"], "catalog-2026-10-03");
+});
+
+test("parsed SPARQL results carry the search report, the eval trace and the cursor", async () => {
+  const search: Schemas["SparqlSearchReport"] = {
+    plan: "filter_first",
+    top: 3,
+    hits: 3,
+    complete: true,
+    allowed: 25,
+    candidates: 25,
+    rounds: 1,
+    clusters_probed: 4,
+    entries_considered: 25,
+    embeddings: ["product"],
+    model_id: "openai/text-embedding-3-small",
+    lag_commits: 0,
+    timings: {
+      resolve_ms: 0,
+      embed_ms: 12,
+      filter_ms: 3,
+      index_ms: 1,
+      rerank_ms: 1,
+      check_ms: 0,
+      total_ms: 17,
+    },
+    usage: { texts: 1, tokens_estimate: 4, cost_usd_estimate: 0 },
+  };
+  const rowPage = {
+    returned: 1,
+    total: 3,
+    offset: 0,
+    limit: 1,
+    has_more: true,
+  };
+  const results = JSON.stringify({
+    head: { vars: ["x", "score"] },
+    results: {
+      bindings: [
+        {
+          x: { type: "uri", value: "https://x.test/e/1" },
+          score: { type: "literal", value: "0.91" },
+        },
+      ],
+    },
+  });
+  const { fetch, bodies } = queuedFetch([
+    {
+      body: {
+        results,
+        row_page: rowPage,
+        search,
+        trace_id: "tr_1",
+        next_cursor: "opaque-2",
+      },
+    },
+    { body: { results, row_page: rowPage } },
+  ]);
+  const client = new LbbClient({ baseUrl: "http://h", fetch });
+  const query =
+    'PREFIX search: <https://littlebigbrain.com/search#> SELECT ?x ?score WHERE { ?x search:similarTo "card payments" ; search:score ?score } LIMIT 3';
+
+  const found = await client.query.sparql({ query, request: "card payments" });
+  const plain = await client.sparqlRows({ query });
+
+  assert.equal(JSON.parse(bodies[0] ?? "").request, "card payments");
+  assert.deepEqual(found.rows, [{ x: "https://x.test/e/1", score: "0.91" }]);
+  assert.equal(found.search?.plan, "filter_first");
+  assert.equal(found.search?.complete, true);
+  assert.equal(found.traceId, "tr_1");
+  assert.equal(found.nextCursor, "opaque-2");
+  assert.deepEqual(found.rowPage, rowPage);
+  assert.equal("search" in plain, false);
+  assert.equal("traceId" in plain, false);
+  assert.equal("nextCursor" in plain, false);
+  assert.equal(plain.rowPage?.total, 3);
+});
+
 test("query namespace covers the parsed and raw SPARQL reads", async () => {
   const sparqlEnvelope = {
     results: JSON.stringify({ head: { vars: [] }, results: { bindings: [] } }),
@@ -221,6 +369,233 @@ test("query namespace covers the parsed and raw SPARQL reads", async () => {
     "http://h/v1/query/sparql-text",
     "http://h/v1/query/sparql",
   ]);
+});
+
+function rewriteResponse(
+  overrides: Partial<Schemas["QueryRewriteResponse"]> = {},
+): Schemas["QueryRewriteResponse"] {
+  return {
+    route: {
+      kind: "lookup",
+      confidence: 0.92,
+      by: "router",
+      probabilities: { lookup: 0.92, search: 0.08 },
+    },
+    query: {
+      sparql:
+        "SELECT ?name WHERE { ?s <http://www.w3.org/2000/01/rdf-schema#label> ?name }",
+      entailment: "none",
+    },
+    rationale: "The question names services by a condition.",
+    attempts: 1,
+    grounding: {
+      commit_seq: 7,
+      classes: 3,
+      properties: 5,
+      embeddings: 0,
+      age_ms: 10,
+    },
+    models: [],
+    timings: {
+      ground_ms: 1,
+      route_ms: 2,
+      rewrite_ms: 3,
+      run_ms: 4,
+      total_ms: 10,
+    },
+    ...overrides,
+  };
+}
+
+test("query rewrite posts the question with consistency on the URL and no retry", async () => {
+  const { fetch, urls, bodies } = queuedFetch([
+    {
+      status: 503,
+      body: {
+        error: {
+          code: "rewrite_model_unavailable",
+          message: "the query rewriter model did not answer; try again",
+        },
+      },
+    },
+    { body: rewriteResponse() },
+  ]);
+  const client = new LbbClient({ baseUrl: "http://h", fetch, retryDelayMs: 0 });
+
+  await assert.rejects(
+    client.query.rewrite({ question: "Which services exist?" }),
+    (error) => {
+      assert.ok(error instanceof LbbError);
+      assert.equal(error.status, 503);
+      assert.equal(error.code, "rewrite_model_unavailable");
+      return true;
+    },
+  );
+  assert.equal(urls.length, 1, "a rewrite spends model tokens: no retry");
+
+  const response = await client.query.rewrite(
+    { question: "Which services exist?", mode: "route" },
+    { consistency: "strong" },
+  );
+  assert.equal(response.route.kind, "lookup");
+  assert.deepEqual(urls, [
+    "http://h/v1/query/rewrite",
+    "http://h/v1/query/rewrite?consistency=strong",
+  ]);
+  assert.deepEqual(JSON.parse(bodies[1] ?? "{}"), {
+    question: "Which services exist?",
+    mode: "route",
+  });
+});
+
+test("query rewrite retries when the caller asks for it", async () => {
+  const { fetch, urls } = queuedFetch([
+    { status: 503, body: { error: { code: "rewrite_model_unavailable" } } },
+    { body: rewriteResponse() },
+  ]);
+  const client = new LbbClient({
+    baseUrl: "http://h",
+    graph: "main",
+    fetch,
+    retryDelayMs: 0,
+    defaultConsistency: "eventual",
+  });
+
+  await client.query.rewrite(
+    { question: "Which services exist?" },
+    { retry: true },
+  );
+  assert.deepEqual(urls, [
+    "http://h/v1/query/rewrite?graph=main&consistency=eventual",
+    "http://h/v1/query/rewrite?graph=main&consistency=eventual",
+  ]);
+});
+
+test("query ask runs the rewrite and parses its rows", async () => {
+  const response = rewriteResponse({
+    result: {
+      results: JSON.stringify({
+        head: { vars: ["name"] },
+        results: {
+          bindings: [
+            { name: { type: "literal", value: "Auth Service" } },
+            { name: { type: "literal", value: "Billing" } },
+          ],
+        },
+      }),
+      row_page: {
+        returned: 2,
+        total: 2,
+        offset: 0,
+        limit: 50,
+        has_more: false,
+      },
+      snapshot: { commit_seq: 7, compacted_seq: 7, served_at_seq: 7 },
+      trace_id: "tr_1",
+    },
+  });
+  const { fetch, urls, bodies } = queuedFetch([{ body: response }]);
+  const client = new LbbClient({ baseUrl: "http://h", fetch });
+
+  const answer = await client.query.ask("Which services exist?", {
+    context: "Services of the platform team.",
+    previous: [{ sparql: "SELECT * WHERE { ?s ?p ?o }", note: "too wide" }],
+    limit: 50,
+    asOfCommitSeq: 7,
+    today: "2026-10-04",
+    consistency: "strong",
+  });
+
+  assert.equal(urls[0], "http://h/v1/query/rewrite?consistency=strong");
+  assert.deepEqual(JSON.parse(bodies[0] ?? "{}"), {
+    question: "Which services exist?",
+    run: true,
+    context: "Services of the platform team.",
+    previous: [{ sparql: "SELECT * WHERE { ?s ?p ?o }", note: "too wide" }],
+    limit: 50,
+    as_of_commit_seq: 7,
+    today: "2026-10-04",
+  });
+  assert.equal(answer.route.kind, "lookup");
+  assert.equal(answer.route.by, "router");
+  assert.equal(answer.query?.entailment, "none");
+  assert.equal(answer.rationale, "The question names services by a condition.");
+  assert.deepEqual(answer.vars, ["name"]);
+  assert.deepEqual(answer.rows, [
+    { name: "Auth Service" },
+    { name: "Billing" },
+  ]);
+  assert.equal(answer.boolean, null);
+  assert.equal(answer.snapshot?.served_at_seq, 7);
+  assert.equal(answer.error, null);
+  assert.equal(answer.traceId, "tr_1");
+  assert.equal(answer.rewrite.attempts, 1);
+});
+
+test("query ask without a run keeps the route, the rationale and the error", async () => {
+  const { fetch, bodies } = queuedFetch([
+    {
+      body: rewriteResponse({
+        route: { kind: "unanswerable", confidence: 0.8, by: "rewriter" },
+        query: null,
+        rationale: "The graph holds no salaries.",
+      }),
+    },
+    {
+      body: rewriteResponse({
+        attempts: 2,
+        error: "unknown prefix ex",
+      }),
+    },
+  ]);
+  const client = new LbbClient({ baseUrl: "http://h", fetch });
+
+  const unanswerable = await client.query.ask("What does Ada earn?");
+  assert.deepEqual(JSON.parse(bodies[0] ?? "{}"), {
+    question: "What does Ada earn?",
+    run: true,
+  });
+  assert.equal(unanswerable.route.kind, "unanswerable");
+  assert.equal(unanswerable.query, null);
+  assert.equal(unanswerable.rationale, "The graph holds no salaries.");
+  assert.deepEqual(unanswerable.rows, []);
+  assert.deepEqual(unanswerable.vars, []);
+  assert.equal(unanswerable.traceId, null);
+
+  const failed = await client.query.ask("Which services exist?", {
+    route: "lookup",
+  });
+  assert.equal(JSON.parse(bodies[1] ?? "{}").route, "lookup");
+  assert.equal(failed.error, "unknown prefix ex");
+  assert.equal(failed.rewrite.attempts, 2);
+  assert.deepEqual(failed.rows, []);
+});
+
+test("query ask returns the answer of an ASK query", async () => {
+  const { fetch } = queuedFetch([
+    {
+      body: rewriteResponse({
+        query: { sparql: "ASK { ?s ?p ?o }", entailment: "rdfs" },
+        result: {
+          results: JSON.stringify({ head: {}, boolean: true }),
+          row_page: {
+            returned: 0,
+            total: 0,
+            offset: 0,
+            limit: 100,
+            has_more: false,
+          },
+        },
+      }),
+    },
+  ]);
+  const client = new LbbClient({ baseUrl: "http://h", fetch });
+
+  const answer = await client.query.ask("Is there any fact?");
+  assert.equal(answer.boolean, true);
+  assert.deepEqual(answer.rows, []);
+  assert.equal(answer.query?.entailment, "rdfs");
+  assert.equal(answer.traceId, null);
 });
 
 test("query profile option asks for the server's measurements", async () => {

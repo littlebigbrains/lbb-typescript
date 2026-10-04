@@ -61,6 +61,7 @@ export class GraphNamespace {
   readonly schema: SchemaNamespace;
   readonly search: SearchNamespace;
   readonly evals: EvalsNamespace;
+  readonly checks: ChecksNamespace;
   readonly embeddings: EmbeddingsNamespace;
   readonly workflows: WorkflowNamespace;
 
@@ -72,6 +73,7 @@ export class GraphNamespace {
     this.schema = client.schema;
     this.search = client.search;
     this.evals = client.evals;
+    this.checks = client.checks;
     this.embeddings = client.embeddings;
     this.workflows = client.workflows;
   }
@@ -305,7 +307,12 @@ export class EntityNamespace {
  * one graph snapshot.
  */
 export class EmbeddingsNamespace {
-  constructor(private readonly client: LbbClient) {}
+  /** Sessions that test search settings on the graph's own searches. */
+  readonly searchTuning: SearchTuningNamespace;
+
+  constructor(private readonly client: LbbClient) {
+    this.searchTuning = new SearchTuningNamespace(client);
+  }
 
   /** Every embedding of the graph with its status. */
   list(opts: CallOptions = {}): Promise<Schemas["EmbeddingListResponse"]> {
@@ -390,7 +397,9 @@ export class EmbeddingsNamespace {
    * `{ via: "calls", to: "payment-service", direction?: "in" }` (`to` an IRI
    * or a name). Every hit carries its class and is checked against one
    * graph snapshot; `include: ["text"]` returns the embedded text of each
-   * hit; `explain: true` plans without running.
+   * hit; `explain: true` plans without running. `rerank: true` orders the
+   * best hits by the managed rerank model (each hit then carries its
+   * `relevance`); without it the graph's search setting decides.
    */
   search(
     body: Schemas["SearchRequest"],
@@ -400,6 +409,104 @@ export class EmbeddingsNamespace {
       ...opts,
       retry: opts.retry ?? true,
       body,
+    });
+  }
+
+  /**
+   * The graph's search settings: whether every search reranks its best
+   * hits, `rerank_depth`, `blend` and `probe_factor` when they are set, and
+   * the rerank model the server has (`rerank_available`).
+   */
+  searchSettings(opts: CallOptions = {}): Promise<Schemas["SearchSettings"]> {
+    return this.client.request("GET", "/v1/search/settings", opts);
+  }
+
+  /**
+   * Change the graph's search settings. `rerank` turns the rerank on or off
+   * for every search; `rerank_depth` (20 to 80) is the hits the rerank model
+   * reads; `blend` (0 to 1) mixes the rerank order and the similarity order;
+   * `probe_factor` (1 to 4) widens the vector search over big runs. A field
+   * left out keeps its value, and `null` sets it back to its default
+   * (`{ blend: null }`). Returns the settings after the change.
+   */
+  setSearchSettings(
+    body: Schemas["SearchSettingsRequest"],
+    opts: CallOptions = {},
+  ): Promise<Schemas["SearchSettings"]> {
+    return this.client.request("PUT", "/v1/search/settings", {
+      ...opts,
+      body,
+    });
+  }
+}
+
+/**
+ * Search tuning: a session runs the graph's own searches with other search
+ * settings, grades the hits with the platform's judge, and proposes the
+ * settings that rank best. A person applies the proposal; a session never
+ * changes a setting by itself.
+ */
+export class SearchTuningNamespace {
+  constructor(private readonly client: LbbClient) {}
+
+  /**
+   * Start a session (`queries` 6 to 40, default 40; `rounds` 1 to 3, default
+   * 3). Returns the session, `queued`; read it with {@link get} until its
+   * `status` is `done` or `failed`. One session per graph runs at a time
+   * (`409 tuning_running`).
+   *
+   * A session spends the platform's judge budget, so a failed call is not
+   * retried unless `retry` is set.
+   */
+  start(
+    body: Schemas["SearchTuningStartRequest"] = {},
+    opts: CallOptions = {},
+  ): Promise<Schemas["SearchTuningSession"]> {
+    return this.client.request("POST", "/v1/search/tuning", {
+      ...opts,
+      retry: opts.retry ?? false,
+      body,
+    });
+  }
+
+  /** The graph's sessions, newest first (`limit` 1 to 50, default 10). */
+  list(
+    options: { limit?: number } & CallOptions = {},
+  ): Promise<Schemas["SearchTuningListResponse"]> {
+    const { limit, ...opts } = options;
+    return this.client.request("GET", "/v1/search/tuning", {
+      ...opts,
+      query: { limit },
+    });
+  }
+
+  /** One session: its step, the baseline, the variants with their scores,
+   * the rounds with the judge's notes, and the proposal. */
+  get(
+    sessionId: string,
+    opts: CallOptions = {},
+  ): Promise<Schemas["SearchTuningSession"]> {
+    return this.client.request("GET", "/v1/search/tuning/get", {
+      ...opts,
+      query: { id: sessionId },
+    });
+  }
+
+  /**
+   * Set the graph's search settings to the session's proposal: exactly the
+   * settings the session tested. A setting the proposal leaves unset goes
+   * back to its default. Returns the session with `applied_at_ms` and
+   * `applied_by`. `409 tuning_no_proposal` when the session has none. A
+   * retry sets the same settings, so it is safe.
+   */
+  apply(
+    sessionId: string,
+    opts: CallOptions = {},
+  ): Promise<Schemas["SearchTuningSession"]> {
+    return this.client.request("POST", "/v1/search/tuning/apply", {
+      ...opts,
+      retry: opts.retry ?? true,
+      query: { id: sessionId },
     });
   }
 }
@@ -522,6 +629,162 @@ export class EvalsNamespace {
     opts: CallOptions = {},
   ): Promise<Schemas["EvalSettings"]> {
     return this.client.request("PUT", "/v1/evals/settings", { ...opts, body });
+  }
+}
+
+/** Options of {@link ChecksNamespace.calls}. */
+export interface ModelCallListOptions extends CallOptions {
+  /** Only the calls of one job. */
+  job?: Schemas["ModelJob"];
+  /** The newest day of the page, `yyyy-mm-dd` (UTC). Default: today, or the
+   * day of `after`. A page reads back at most 31 days. */
+  day?: string;
+  /** `true` keeps the calls that have a check, `false` those without one. */
+  checked?: boolean;
+  /** The `next_after` of the previous page. */
+  after?: string;
+  /** Rows per page: 1 to 100, default 50. */
+  limit?: number;
+}
+
+/** Options of {@link ChecksNamespace.list}. */
+export interface ModelCheckListOptions extends CallOptions {
+  /** Only the checks of one job. */
+  job?: Schemas["ModelJob"];
+  /** `yyyy-mm` (UTC). Default: the current month. */
+  month?: string;
+  /** Only the checks whose ground truth has this verdict. */
+  verdict?: Schemas["CheckVerdict"];
+  /** `true` keeps the checks a person reviewed, `false` the others. */
+  reviewed?: boolean;
+  /** The `next_after` of the previous page. */
+  after?: string;
+  /** Rows per page: 1 to 100, default 50. */
+  limit?: number;
+}
+
+/** One line of {@link ChecksNamespace.export}. */
+export interface ModelCheckExportLine {
+  /** The call, or `null` when the log no longer holds it. Its groundings
+   * stay named by their hash. */
+  call: Schemas["ModelCall"] | null;
+  check: Schemas["ModelCheck"];
+}
+
+/**
+ * Model checks: the log of the model calls LBB makes for its own work on the
+ * graph (rerank, route, rewrite, fit, propose, label, embed), the checks a
+ * judge model makes of a sample of them, and the reviews people make of the
+ * checks. A review is the call's ground truth.
+ *
+ * Reading calls and checks and reviewing a check use no model. `checkCall`
+ * spends the platform's judge budget.
+ */
+export class ChecksNamespace {
+  constructor(private readonly client: LbbClient) {}
+
+  /**
+   * One month of checks (`yyyy-mm`, UTC; the current month by default): per
+   * job and model the checks, the mean score, right, partly and wrong, the
+   * reviews and corrections; the judge's agreement with people; today's
+   * budget; whether the server has a checker; the month's model calls.
+   */
+  summary(
+    options: { month?: string } & CallOptions = {},
+  ): Promise<Schemas["ModelChecksSummary"]> {
+    const { month, ...opts } = options;
+    return this.client.request("GET", "/v1/models/checks/summary", {
+      ...opts,
+      query: { month },
+    });
+  }
+
+  /** The checks of a month, newest first. Each carries the judge's verdict,
+   * the review when there is one, and the ground truth (`truth`). */
+  list(
+    options: ModelCheckListOptions = {},
+  ): Promise<Schemas["ModelCheckListResponse"]> {
+    const { job, month, verdict, reviewed, after, limit, ...opts } = options;
+    return this.client.request("GET", "/v1/models/checks", {
+      ...opts,
+      query: { job, month, verdict, reviewed, after, limit },
+    });
+  }
+
+  /**
+   * Agree with the judge (`{ agree: true }`, with an optional `note`), or
+   * correct it (`{ agree: false, verdict, score?, reference?, note? }`). The
+   * review becomes the call's ground truth and replaces an earlier review,
+   * which moves to `history`. A rerank or label correction may grade the
+   * hits: `reference: { grades: { "<hit id>": 0..3 } }`. Returns the check.
+   */
+  review(
+    callId: string,
+    body: Schemas["ModelCheckReviewRequest"],
+    opts: CallOptions = {},
+  ): Promise<Schemas["ModelCheck"]> {
+    return this.client.request("POST", "/v1/models/checks/review", {
+      ...opts,
+      query: { id: callId },
+      body,
+    });
+  }
+
+  /** The checks of a month as parsed JSON lines, oldest first: the call and
+   * its check, at most 10,000 lines. */
+  async export(
+    options: { job?: Schemas["ModelJob"]; month?: string } & CallOptions = {},
+  ): Promise<ModelCheckExportLine[]> {
+    const { job, month, ...opts } = options;
+    const lines = await this.client.request<ModelCheckExportLine[] | undefined>(
+      "GET",
+      "/v1/models/checks/export",
+      { ...opts, query: { job, month } },
+    );
+    return lines ?? [];
+  }
+
+  /** The call log, newest first. Each row names the job and the model, a
+   * short summary, and the check's verdict when there is one. */
+  calls(
+    options: ModelCallListOptions = {},
+  ): Promise<Schemas["ModelCallListResponse"]> {
+    const { job, day, checked, after, limit, ...opts } = options;
+    return this.client.request("GET", "/v1/models/calls", {
+      ...opts,
+      query: { job, day, checked, after, limit },
+    });
+  }
+
+  /** One call: its input and output, its groundings as text, and its check. */
+  call(
+    callId: string,
+    opts: CallOptions = {},
+  ): Promise<Schemas["ModelCallDetailResponse"]> {
+    return this.client.request("GET", "/v1/models/calls/get", {
+      ...opts,
+      query: { id: callId },
+    });
+  }
+
+  /**
+   * Ask the judge to check one call now. The call goes to the graph's checks
+   * workflow; a call that has a check is checked again, and its review stays.
+   * Returns `{ queued: true }`. `400 model_call_not_checkable` for an `embed`
+   * call or a failed call; `503` without a checker.
+   *
+   * A check spends the platform's judge budget, so a failed call is not
+   * retried unless `retry` is set.
+   */
+  checkCall(
+    callId: string,
+    opts: CallOptions = {},
+  ): Promise<Schemas["ModelCallCheckResponse"]> {
+    return this.client.request("POST", "/v1/models/calls/check", {
+      ...opts,
+      retry: opts.retry ?? false,
+      query: { id: callId },
+    });
   }
 }
 
@@ -764,16 +1027,99 @@ export class OntologyStartersNamespace {
   }
 }
 
+/**
+ * Ontology drafts: a proposed ontology built from 1 to 100 sample records at
+ * one commit. The samples are not written to the graph. Validate a draft,
+ * then promote it (the ontology changes) or reject it.
+ */
+export class OntologyDraftsNamespace {
+  constructor(private readonly client: LbbClient) {}
+
+  /**
+   * Build a draft from `samples`: the proposed operations, an analysis per
+   * competency question, coverage, structural pitfalls and confidence. The
+   * samples are evidence only; no fact is written.
+   */
+  create(
+    body: Schemas["OntologyDraftCreateRequest"],
+    opts: CallOptions = {},
+  ): Promise<Schemas["OntologyDraft"]> {
+    return this.client.request("POST", "/v1/ontology/drafts", {
+      ...opts,
+      body,
+    });
+  }
+
+  /** One draft with its status: `draft`, `validated`, `promoted` or `rejected`. */
+  get(
+    draftId: string,
+    opts: CallOptions = {},
+  ): Promise<Schemas["OntologyDraft"]> {
+    return this.client.request("GET", "/v1/ontology/drafts", {
+      ...opts,
+      query: { draft_id: draftId },
+    });
+  }
+
+  /**
+   * Check the proposed operations again at the draft's commit and ontology
+   * version. A draft whose ontology has moved on fails; it is not rebased.
+   */
+  validate(
+    draftId: string,
+    opts: CallOptions = {},
+  ): Promise<Schemas["OntologyDraft"]> {
+    return this.client.request("POST", "/v1/ontology/drafts/validate", {
+      ...opts,
+      retry: opts.retry ?? true,
+      query: { draft_id: draftId },
+    });
+  }
+
+  /**
+   * Apply a validated draft to the ontology in one version. The route needs
+   * an idempotency key; the client makes one per call unless you pass
+   * `idempotencyKey`. A retry returns the promoted draft.
+   */
+  promote(
+    draftId: string,
+    opts: CallOptions = {},
+  ): Promise<Schemas["OntologyDraft"]> {
+    return this.client.request("POST", "/v1/ontology/drafts/promote", {
+      ...opts,
+      idempotencyKey:
+        opts.idempotencyKey ??
+        this.client.idempotencyKey("ontology-draft-promote"),
+      query: { draft_id: draftId },
+    });
+  }
+
+  /** Record why the draft is rejected. The ontology does not change. */
+  reject(
+    draftId: string,
+    reason: string,
+    opts: CallOptions = {},
+  ): Promise<Schemas["OntologyDraft"]> {
+    return this.client.request("POST", "/v1/ontology/drafts/reject", {
+      ...opts,
+      query: { draft_id: draftId, reason },
+    });
+  }
+}
+
 /** Ontology discovery and lifecycle operations. */
 export class OntologyNamespace {
   /** Reviewable change suggestions from every producer. */
   readonly suggestions: OntologySuggestionsNamespace;
   /** Base ontologies a graph starts from. */
   readonly starters: OntologyStartersNamespace;
+  /** Proposed ontologies built from sample records. */
+  readonly drafts: OntologyDraftsNamespace;
 
   constructor(private readonly client: LbbClient) {
     this.suggestions = new OntologySuggestionsNamespace(client);
     this.starters = new OntologyStartersNamespace(client);
+    this.drafts = new OntologyDraftsNamespace(client);
   }
 
   view(
@@ -853,9 +1199,120 @@ export class OntologyNamespace {
   }
 }
 
-/** Structured and SPARQL-text query operations. */
+/** Options of {@link QueryNamespace.ask}. */
+export interface QueryAskOptions
+  extends CallOptions, Pick<ReadConsistencyOptions, "consistency"> {
+  /**
+   * The app's notes for the model: what the data means, units, names to
+   * prefer. At most 8,000 characters. Keep it the same across questions, so
+   * the model provider's prompt cache reads it.
+   */
+  context?: string;
+  /** Earlier steps of the same question, oldest first; at most 6. */
+  previous?: Schemas["QueryRewriteStep"][];
+  /** Fix the kind of query. Without it, the router model selects it. */
+  route?: Schemas["QueryRoute"];
+  /** Rows the run returns: 1 to 1,000, default 100. */
+  limit?: number;
+  /** Read the graph at this commit. */
+  asOfCommitSeq?: number;
+  /** Today's date for relative questions, `YYYY-MM-DD`. Default: the server's UTC date. */
+  today?: string;
+}
+
+/** What {@link QueryNamespace.ask} returns. */
+export interface QueryAskResult {
+  /** The kind of query, who chose it, and how sure the choice is. */
+  route: Schemas["QueryRouteDecision"];
+  /** The checked query, or `null` when the graph does not hold the answer. */
+  query: Schemas["RewrittenQuery"] | null;
+  /** One or two sentences: why this route and this query. */
+  rationale: string;
+  /** The rows as `{ variable: lexicalValue }`; empty when the query did not run. */
+  rows: Record<string, string>[];
+  /** The projected variables. */
+  vars: string[];
+  /** The answer of an `ASK` query, `null` for a `SELECT`. */
+  boolean: boolean | null;
+  /** The snapshot the rows were read from, when the server names it. */
+  snapshot: Schemas["SnapshotView"] | null;
+  /** Why the last attempt failed, when the query did not parse or run. */
+  error: string | null;
+  /** The eval trace of the run. Label its rows with `evals.label`. */
+  traceId: string | null;
+  /** The whole response of `POST /v1/query/rewrite`. */
+  rewrite: Schemas["QueryRewriteResponse"];
+}
+
+/** Questions in plain words, and structured and SPARQL-text queries. */
 export class QueryNamespace {
   constructor(private readonly client: LbbClient) {}
+
+  /**
+   * Turn a question into a SPARQL query (`POST /v1/query/rewrite`). A router
+   * model selects the kind of query (the route), and a rewriter model writes
+   * the query from a description of the graph. The server checks the query.
+   * With `run: true` the server also runs it, returns the rows in `result`,
+   * and corrects a query that fails once. `mode: "route"` returns only the
+   * route.
+   *
+   * Each call uses model tokens, so a failed call is not retried unless
+   * `retry` is set. A `429 rewrite_limit` means the stack used its rewrites
+   * of the day.
+   */
+  rewrite(
+    body: Schemas["QueryRewriteRequest"],
+    opts: CallOptions & Pick<ReadConsistencyOptions, "consistency"> = {},
+  ): Promise<Schemas["QueryRewriteResponse"]> {
+    return this.client.request("POST", "/v1/query/rewrite", {
+      ...opts,
+      retry: opts.retry ?? false,
+      body,
+      query: {
+        consistency: opts.consistency ?? this.client.defaultConsistency,
+      },
+    });
+  }
+
+  /**
+   * Answer a question in plain words: {@link rewrite} with `run: true`, and
+   * the rows of the run parsed as {@link sparql} parses them.
+   */
+  async ask(
+    question: string,
+    options: QueryAskOptions = {},
+  ): Promise<QueryAskResult> {
+    const { context, previous, route, limit, asOfCommitSeq, today, ...opts } =
+      options;
+    const rewrite = await this.rewrite(
+      {
+        question,
+        run: true,
+        context,
+        previous,
+        route,
+        limit,
+        as_of_commit_seq: asOfCommitSeq,
+        today,
+      },
+      opts,
+    );
+    const parsed = rewrite.result
+      ? parseSparqlResults(rewrite.result)
+      : undefined;
+    return {
+      route: rewrite.route,
+      query: rewrite.query ?? null,
+      rationale: rewrite.rationale,
+      rows: parsed?.rows ?? [],
+      vars: parsed?.vars ?? [],
+      boolean: parsed?.boolean ?? null,
+      snapshot: parsed?.snapshot ?? null,
+      error: rewrite.error ?? null,
+      traceId: rewrite.result?.trace_id ?? null,
+      rewrite,
+    };
+  }
 
   structured(
     body: Schemas["SparqlSelectRequest"],
@@ -907,6 +1364,28 @@ export class QueryNamespace {
         consistency: opts.consistency ?? this.client.defaultConsistency,
         min_indexed_seq: opts.minIndexedSeq,
       },
+    });
+  }
+
+  /**
+   * Run a SPARQL 1.1 Update on the native `/update` endpoint. The server
+   * accepts `INSERT DATA` and answers every other form with 400; one request
+   * is one commit. A graph whose first write comes through this route is
+   * RDF-native, and an RDF-native graph refuses the JSON write routes with
+   * `400 rdf_native_graph`. Under `reject`-mode SHACL shapes, a write that
+   * breaks them fails with 400 and writes nothing.
+   *
+   * The client sends an idempotency key (a new one per call unless you pass
+   * `idempotencyKey`), so a retry replays the write. The answer has no body:
+   * read the write back with a `strong` read.
+   */
+  async update(update: string, opts: CallOptions = {}): Promise<void> {
+    await this.client.request<void>("POST", "/update", {
+      ...opts,
+      idempotencyKey:
+        opts.idempotencyKey ?? this.client.idempotencyKey("sparql-update"),
+      rawBody: update,
+      contentType: "application/sparql-update",
     });
   }
 }

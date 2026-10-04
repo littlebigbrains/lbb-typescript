@@ -28,6 +28,7 @@ import {
   errorCodeFromBody,
   fullJitterBackoffMs,
   parseLbbError,
+  parseNdjson,
   parseResponseJson,
   retriesNetworkFailure,
   retriesStatus,
@@ -47,6 +48,7 @@ import {
   SchemaNamespace,
   SearchNamespace,
   EvalsNamespace,
+  ChecksNamespace,
   EmbeddingsNamespace,
 } from "./namespaces.js";
 
@@ -231,6 +233,8 @@ export class LbbClient {
   readonly ontology: OntologyNamespace;
   readonly query: QueryNamespace;
   readonly evals: EvalsNamespace;
+  /** Model checks: the call log, the judge's checks, and reviews. */
+  readonly checks: ChecksNamespace;
   readonly embeddings: EmbeddingsNamespace;
   readonly workflows: WorkflowNamespace;
   /** Hosted integrations for your end customers, at `integrationsUrl`. */
@@ -284,6 +288,7 @@ export class LbbClient {
     this.ontology = new OntologyNamespace(this);
     this.query = new QueryNamespace(this);
     this.evals = new EvalsNamespace(this);
+    this.checks = new ChecksNamespace(this);
     this.embeddings = new EmbeddingsNamespace(this);
     this.workflows = new WorkflowNamespace(this);
     this.integrations = new IntegrationsNamespace(this);
@@ -591,12 +596,16 @@ export class LbbClient {
       responseContentType.includes("application/n-triples") ||
       responseContentType.includes("application/trig") ||
       responseContentType.includes("application/n-quads");
+    // JSON lines (`application/x-ndjson`) parse to a list of the lines' values.
+    const isNdjson = responseContentType.includes("application/x-ndjson");
     return {
-      data: text
-        ? isRdfText
-          ? (text as T)
-          : parseResponseJson<T>(text, response.status, requestId)
-        : (undefined as T),
+      data: isNdjson
+        ? (parseNdjson(text, response.status, requestId) as T)
+        : text
+          ? isRdfText
+            ? (text as T)
+            : parseResponseJson<T>(text, response.status, requestId)
+          : (undefined as T),
       status: response.status,
       requestId,
       version,
@@ -1070,6 +1079,36 @@ export class LbbClient {
     return this.request("POST", "/v1/models/train-tick", { body });
   }
 
+  /**
+   * Run {@link trainTick} as a durable background job and return its status
+   * at once. The idempotency key names the job: submitting again with the
+   * same key for the same graph returns the same `job_id`, so a caller that
+   * lost the connection submits again instead of starting a second run.
+   */
+  async trainSubmit(
+    body: Schemas["TrainModelRequest"],
+    opts: { idempotencyKey: string },
+  ): Promise<Schemas["TrainModelJobStatusResponse"]> {
+    if (!opts?.idempotencyKey?.trim()) {
+      throw new TypeError("trainSubmit requires a non-empty idempotencyKey");
+    }
+    return this.request("POST", "/v1/models/train-jobs", {
+      body,
+      idempotencyKey: opts.idempotencyKey,
+    });
+  }
+
+  /**
+   * A trainer job's state: `progress` while it runs, `terminal_error` when it
+   * failed, and the complete `result` (the gate evidence and the recorded run)
+   * when it succeeded.
+   */
+  trainJob(jobId: string): Promise<Schemas["TrainModelJobStatusResponse"]> {
+    return this.request("GET", "/v1/models/train-jobs", {
+      query: { job_id: jobId },
+    });
+  }
+
   /** The graph's automatic-training configuration (default: off). */
   trainingConfig(): Promise<Schemas["ModelTrainingConfig"]> {
     return this.request("GET", "/v1/models/training-config", {});
@@ -1190,7 +1229,8 @@ export class LbbClient {
   /**
    * Read projected attributes and current relationships from one RDF snapshot.
    * Inspect `unavailable_sections` before interpreting legacy provenance arrays.
-   * Use strong consistency for read-after-write, or a retained commit sequence.
+   * Use strong consistency for read-after-write, or `asOfCommitSeq` for the
+   * record at a retained commit.
    */
   entityDetail(opts: {
     id?: string;
@@ -1199,8 +1239,6 @@ export class LbbClient {
     key?: string;
     consistency?: "strong" | "eventual";
     edges?: number;
-    /** @deprecated Valid-time reads are unsupported; use asOfCommitSeq. */
-    asOf?: string;
     asOfCommitSeq?: number;
   }): Promise<Schemas["EntityDetailResponse"]> {
     return this.request("GET", "/v1/graph/entity", {
@@ -1211,7 +1249,6 @@ export class LbbClient {
         key: opts.key,
         consistency: opts.consistency,
         edges: opts.edges,
-        as_of: opts.asOf,
         as_of_commit_seq: opts.asOfCommitSeq,
       },
     });

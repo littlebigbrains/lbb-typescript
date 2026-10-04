@@ -176,6 +176,26 @@ export interface SparqlResults {
    * `profile: true`.
    */
   profile?: Schemas["SparqlQueryProfile"];
+  /**
+   * How the search by meaning in the query ran: the plan (`nearest`,
+   * `filter_first` or `search_first`), the hits asked for and bound,
+   * `complete`, and how far the vectors trail the read. Present only when the
+   * query holds a `search:similarTo` triple.
+   */
+  search?: Schemas["SparqlSearchReport"];
+  /**
+   * The eval trace the server recorded for the query. Present only when the
+   * request carried `request`, the user's words. Label the rows with
+   * `evals.label(traceId, …)`.
+   */
+  traceId?: string;
+  /** The server's row window: `returned`, `total`, `has_more` and the offsets. */
+  rowPage?: Schemas["RowPage"];
+  /**
+   * The cursor of the next page on the same commit, when the request asked for
+   * cursor pages (`cursor: ""`) and more rows exist.
+   */
+  nextCursor?: string;
 }
 
 /**
@@ -204,7 +224,14 @@ export function parseSparqlResults(
   const doc = JSON.parse(response.results) as SparqlResultsJson;
   const vars = doc.head?.vars ?? [];
   const snapshot = response.snapshot ?? null;
-  const profile = response.profile ? { profile: response.profile } : {};
+  // Fields the server sends only for some requests stay absent otherwise.
+  const extras = {
+    ...(response.profile ? { profile: response.profile } : {}),
+    ...(response.search ? { search: response.search } : {}),
+    ...(response.trace_id ? { traceId: response.trace_id } : {}),
+    ...(response.row_page ? { rowPage: response.row_page } : {}),
+    ...(response.next_cursor ? { nextCursor: response.next_cursor } : {}),
+  };
   if (typeof doc.boolean === "boolean") {
     return {
       vars,
@@ -212,7 +239,7 @@ export function parseSparqlResults(
       bindings: [],
       rows: [],
       snapshot,
-      ...profile,
+      ...extras,
     };
   }
   const bindings = doc.results?.bindings ?? [];
@@ -221,7 +248,7 @@ export function parseSparqlResults(
       Object.entries(binding).map(([name, term]) => [name, term.value]),
     ),
   );
-  return { vars, boolean: null, bindings, rows, snapshot, ...profile };
+  return { vars, boolean: null, bindings, rows, snapshot, ...extras };
 }
 
 export function firstPatternVariable(
