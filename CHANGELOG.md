@@ -6,6 +6,32 @@ All notable changes to the `@littlebigbrain/client` package are documented here.
 
 - The `search` report of a SPARQL query gains `rerank` and
   `timings.relevance_ms`, for a query with `search:rerank true`.
+- Add `query.rewriteStream(body, opts)`. It sends `POST /v1/query/rewrite`
+  with `Accept: text/event-stream` and yields one event per step: `grounding`,
+  `route`, `query`, `run`, `rows` and `repair`. The last event, `done`, holds
+  the same response as `query.rewrite`. The type of an event is
+  `QueryRewriteStreamEvent`.
+- An `error` event throws the same `LbbError` as `query.rewrite`. An error
+  before the stream starts throws as `query.rewrite` does. The client never
+  retries a stream, and it skips event names it does not know.
+- Abort `opts.signal` to stop the request and the server's work. Leaving the
+  loop early closes the response too. `timeoutMs` bounds the whole stream.
+- A body that ends before `done` or `error` throws an error. A server without
+  streams answers with JSON, and the stream then yields only `done`.
+- Add `requestEventStream(method, path, opts)`, the low-level call that yields
+  the server-sent events of one request. `FetchLike` responses may carry
+  `body`, the stream it reads.
+- `query.ask(question, { anchor })` sends entity IRIs the user picked, at
+  most 10. The server reads each one, and the query uses the IRIs directly
+  instead of matching their names.
+- `query.ask` returns `linked`: the names of the question the server linked
+  to entities (`text`, `iri`, `label`, `class`, `score`, `by`), for a "Did you
+  mean …?". It also returns `anchors`, what the server read about each
+  anchored IRI, with a `note` when an IRI is not in the graph.
+- The generated types add `QueryRewriteRequest.anchor`,
+  `QueryRewriteResponse.linked` and `anchors`, `QueryRewriteLink`,
+  `QueryRewriteAnchor`, `QueryLinkMethod`, `grounding.names`, and
+  `timings.link_ms` and `anchor_ms`.
 
 ## 0.19.0 (2026-10-04)
 

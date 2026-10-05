@@ -532,6 +532,46 @@ test("query ask runs the rewrite and parses its rows", async () => {
   assert.equal(answer.rewrite.attempts, 1);
 });
 
+test("query ask sends the anchors and returns the linked names", async () => {
+  const link: Schemas["QueryRewriteLink"] = {
+    text: "Quelmann",
+    iri: "https://x.test/e/quellmann",
+    label: "Quellmann Fenstertechnik GmbH",
+    class: "https://x.test/class/firm",
+    score: 0.82,
+    by: "fuzzy",
+  };
+  const anchor: Schemas["QueryRewriteAnchor"] = {
+    iri: "https://x.test/e/nope",
+    found: false,
+    note: "not in the graph at the latest commit",
+  };
+  const { fetch, bodies } = queuedFetch([
+    { body: rewriteResponse({ linked: [link], anchors: [anchor] }) },
+    { body: rewriteResponse() },
+  ]);
+  const client = new LbbClient({ baseUrl: "http://h", fetch });
+
+  const answer = await client.query.ask("Show me everything about Quelmann.", {
+    anchor: ["https://x.test/e/nope"],
+  });
+  assert.deepEqual(JSON.parse(bodies[0] ?? "{}"), {
+    question: "Show me everything about Quelmann.",
+    run: true,
+    anchor: ["https://x.test/e/nope"],
+  });
+  assert.deepEqual(answer.linked, [link]);
+  assert.deepEqual(answer.anchors, [anchor]);
+
+  const bare = await client.query.ask("Which services exist?", { anchor: [] });
+  assert.deepEqual(JSON.parse(bodies[1] ?? "{}"), {
+    question: "Which services exist?",
+    run: true,
+  });
+  assert.deepEqual(bare.linked, []);
+  assert.deepEqual(bare.anchors, []);
+});
+
 test("query ask without a run keeps the route, the rationale and the error", async () => {
   const { fetch, bodies } = queuedFetch([
     {

@@ -126,6 +126,32 @@ names the eval trace of the run, so you can label its rows. `query.rewrite`
 returns the query without a run, and `mode: "route"` returns only the kind of
 query. Each call uses model tokens, so the client does not retry a failed call.
 
+The server finds the names in the question ("Quelmann", "TU Dresden") in the
+graph, and the query uses the IRIs it found. `answer.linked` lists them, so you
+can show "Did you mean …?". When the user has a record open, pass its IRI in
+`anchor` (`{ anchor: [iri] }`, at most 10).
+
+### Show progress
+
+`query.rewriteStream` sends the same request and yields an event for each step.
+The last event, `done`, holds the same response as `query.rewrite`.
+
+```ts
+const controller = new AbortController();
+for await (const event of lbb.query.rewriteStream(
+  { question: "Which services write to the user database?", run: true },
+  { signal: controller.signal },
+)) {
+  if (event.event === "route") console.log("route", event.data.kind);
+  if (event.event === "rows") console.log(event.data.count, "rows");
+  if (event.event === "done") console.log(event.data.result);
+}
+```
+
+The steps are `grounding`, `route`, `query`, `run`, `rows` and `repair`. An
+error event throws the same `LbbError` as `query.rewrite`. Abort the signal to
+stop the server's work. The client skips event names it does not know.
+
 ## Next steps
 
 - [Search by meaning](https://docs.littlebigbrain.com/guides/search-by-meaning/): choose which facts to embed, find records from a text description, and search inside a SPARQL query with `search:similarTo`.

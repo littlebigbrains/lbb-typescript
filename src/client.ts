@@ -41,6 +41,12 @@ import {
 } from "./transport.js";
 import { LbbCapabilityError } from "./transport.js";
 import {
+  bodyChunkReader,
+  ServerSentEventParser,
+  type BodyChunkReader,
+  type ServerSentEvent,
+} from "./sse.js";
+import {
   EntityNamespace,
   GraphNamespace,
   OntologyNamespace,
@@ -89,6 +95,7 @@ export type {
   SchemaView,
   Snapshot,
 } from "./types.js";
+export type { ServerSentEvent } from "./sse.js";
 export { LbbCapabilityError, LbbError } from "./transport.js";
 export type {
   CallOptions,
@@ -200,6 +207,15 @@ async function durableImportBody(
       }
     },
   };
+}
+
+/** The body a request sends: `rawBody` as is, else `body` as JSON. */
+function requestBody(opts: RequestOptions): unknown {
+  return opts.rawBody !== undefined
+    ? opts.rawBody
+    : opts.body !== undefined
+      ? JSON.stringify(opts.body)
+      : undefined;
 }
 
 /**
@@ -420,27 +436,32 @@ export class LbbClient {
     return response.data;
   }
 
-  private async send<T>(
-    method: string,
-    url: string,
+  /** The headers of a request: the SDK defaults, then the caller's. */
+  private requestHeaders(
     opts: RequestOptions,
-  ): Promise<RawLbbResponse<T>> {
+    defaults: Record<string, string> = {},
+  ): Record<string, string> {
     const headers: Record<string, string> = {
       "content-type": opts.contentType ?? "application/json",
       "lbb-version": this.apiVersion,
+      ...defaults,
     };
     if (this.apiKey !== undefined)
       headers["authorization"] = `Bearer ${this.apiKey}`;
     if (opts.idempotencyKey !== undefined)
       headers["idempotency-key"] = opts.idempotencyKey;
     Object.assign(headers, opts.headers ?? {});
+    return headers;
+  }
+
+  private async send<T>(
+    method: string,
+    url: string,
+    opts: RequestOptions,
+  ): Promise<RawLbbResponse<T>> {
+    const headers = this.requestHeaders(opts);
     const retry = opts.retry ?? retryAllowed(method, opts.idempotencyKey);
-    const body =
-      opts.rawBody !== undefined
-        ? opts.rawBody
-        : opts.body !== undefined
-          ? JSON.stringify(opts.body)
-          : undefined;
+    const body = requestBody(opts);
     const init = {
       method,
       headers,
@@ -623,6 +644,151 @@ export class LbbClient {
   ): Promise<T> {
     const response = await this.rawRequest<T>(method, path, opts);
     return response.data;
+  }
+
+  /**
+   * Send one request with `Accept: text/event-stream` and yield its
+   * server-sent events as they arrive. The request is sent once and never
+   * retried. A non-2xx answer throws {@link LbbError}, as {@link request}
+   * does. `timeoutMs` bounds the whole stream (0 disables it), and
+   * `signal` stops the request and the read. Leaving the loop early closes
+   * the response.
+   *
+   * A 2xx answer that is not an event stream (a server without streams)
+   * becomes one event named `jsonEvent`, with the whole body as its data.
+   * `onOpen` receives the status and request id when the answer starts.
+   */
+  async *requestEventStream(
+    method: string,
+    path: string,
+    opts: RequestOptions & {
+      jsonEvent?: string;
+      onOpen?: (response: { status: number; requestId?: string }) => void;
+    } = {},
+  ): AsyncGenerator<ServerSentEvent, void, undefined> {
+    const signal = opts.signal;
+    if (signal?.aborted) throw signal.reason ?? new Error("request aborted");
+    const url = this.buildUrl(path, opts.query);
+    const upperMethod = method.toUpperCase();
+    const headers = this.requestHeaders(opts, { accept: "text/event-stream" });
+    const timeoutMs = opts.timeoutMs ?? this.timeoutMs;
+    const controller =
+      typeof AbortController !== "undefined"
+        ? new AbortController()
+        : undefined;
+    let reader: BodyChunkReader | undefined;
+    let timedOut = false;
+    const stop = (reason?: unknown) => {
+      controller?.abort(reason);
+      reader?.cancel(reason).catch(() => undefined);
+    };
+    const abortFromCaller = () => stop(signal?.reason);
+    signal?.addEventListener("abort", abortFromCaller, { once: true });
+    const timer =
+      timeoutMs > 0
+        ? setTimeout(() => {
+            timedOut = true;
+            stop();
+          }, timeoutMs)
+        : undefined;
+    // The error to throw once the caller or the timeout stopped the stream.
+    const stopped = (cause?: unknown): unknown => {
+      if (signal?.aborted)
+        return signal.reason ?? cause ?? new Error("request aborted");
+      if (timedOut)
+        return Object.assign(
+          new Error(`Little Big Brain stream timed out after ${timeoutMs}ms`, {
+            cause,
+          }),
+          { name: "TimeoutError" },
+        );
+      return cause;
+    };
+    const startedAt = Date.now();
+    let finished = false;
+    try {
+      this.onRequest?.({
+        method: upperMethod,
+        url,
+        attempt: 1,
+        maxAttempts: 1,
+        idempotencyKey: opts.idempotencyKey,
+      });
+      let response: Awaited<ReturnType<FetchLike>>;
+      try {
+        const streamingFetch = this.fetchImpl as unknown as (
+          input: string,
+          init: Record<string, unknown>,
+        ) => ReturnType<FetchLike>;
+        response = await streamingFetch(url, {
+          method,
+          headers,
+          body: requestBody(opts),
+          signal: controller?.signal ?? signal,
+        });
+      } catch (error) {
+        throw stopped(error);
+      }
+      const requestId = response.headers?.get("x-request-id") ?? undefined;
+      this.onResponse?.({
+        method: upperMethod,
+        url,
+        status: response.status,
+        requestId,
+        attempts: 1,
+        retryCount: 0,
+        elapsedMs: Math.max(0, Date.now() - startedAt),
+      });
+      opts.onOpen?.({ status: response.status, requestId });
+      const contentType =
+        response.headers?.get("content-type")?.toLowerCase() ?? "";
+      if (!response.ok || !contentType.includes("text/event-stream")) {
+        let text: string;
+        try {
+          text = await response.text();
+        } catch (error) {
+          throw stopped(error);
+        }
+        if (!response.ok)
+          throw parseLbbError(
+            response.status,
+            text.trim(),
+            requestId,
+            response.headers?.get("retry-after"),
+          );
+        finished = true;
+        if (opts.jsonEvent !== undefined && text.trim() !== "")
+          yield { event: opts.jsonEvent, data: text };
+        return;
+      }
+      reader = bodyChunkReader(response);
+      const decoder = new TextDecoder();
+      const parser = new ServerSentEventParser();
+      for (;;) {
+        let chunk: Awaited<ReturnType<BodyChunkReader["read"]>>;
+        try {
+          chunk = await reader.read();
+        } catch (error) {
+          throw stopped(error);
+        }
+        if (signal?.aborted || timedOut) throw stopped();
+        if (chunk.done) break;
+        const text =
+          typeof chunk.value === "string"
+            ? chunk.value
+            : chunk.value
+              ? decoder.decode(chunk.value, { stream: true })
+              : "";
+        for (const event of parser.push(text)) yield event;
+      }
+      finished = true;
+      // An event the body did not end with a blank line is dropped.
+      for (const event of parser.push(decoder.decode())) yield event;
+    } finally {
+      if (timer !== undefined) clearTimeout(timer);
+      signal?.removeEventListener("abort", abortFromCaller);
+      if (!finished) stop();
+    }
   }
 
   private mutationKey(prefix: string): string {

@@ -139,6 +139,12 @@ export type FetchLike = (
   status: number;
   headers?: { get(name: string): string | null };
   text(): Promise<string>;
+  /**
+   * The body as a stream (`ReadableStream` or an async iterable of bytes).
+   * `query.rewriteStream` reads it as events arrive; without it, the stream
+   * is read whole with `text()`.
+   */
+  body?: unknown;
 }>;
 
 /** One term in a SPARQL result binding (the standard results-JSON term object). */
