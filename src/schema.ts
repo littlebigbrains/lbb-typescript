@@ -9706,6 +9706,7 @@ export interface components {
             lag_commits: number;
             model_id: string;
             plan: components["schemas"]["SparqlSearchPlan"];
+            rerank?: null | components["schemas"]["SearchRerankReport"];
             /**
              * Format: int32
              * @description Search rounds (a search-first plan widens until it has `top`).
@@ -9743,6 +9744,11 @@ export interface components {
              * @description Cluster probes over the 4-bit codes.
              */
             index_ms: number;
+            /**
+             * Format: int64
+             * @description The rerank model's step (`search:rerank true`).
+             */
+            relevance_ms?: number;
             /**
              * Format: int64
              * @description The exact rescoring of the candidates.

@@ -2,6 +2,11 @@
 
 All notable changes to the `@littlebigbrain/client` package are documented here.
 
+## Unreleased
+
+- The `search` report of a SPARQL query gains `rerank` and
+  `timings.relevance_ms`, for a query with `search:rerank true`.
+
 ## 0.19.0 (2026-10-04)
 
 Adds the server features the client did not cover yet, questions in plain
