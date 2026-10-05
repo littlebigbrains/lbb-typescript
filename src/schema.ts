@@ -5568,6 +5568,11 @@ export interface components {
             job: components["schemas"]["ModelJob"];
             judge: components["schemas"]["ModelCheckJudge"];
             model: string;
+            /**
+             * @description The model's answer in a few words, when it has a short one: the
+             *     options a decision model picked (`lookup`). Absent on older checks.
+             */
+            model_answer?: string | null;
             provider: string;
             review?: null | components["schemas"]["ModelCheckReview"];
             summary: string;
