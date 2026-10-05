@@ -183,10 +183,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** The golden suite: every frozen query and its expected rows */
+        /** The golden suite: questions, searches and stored queries, with their golden queries and judged results */
         get: operations["get_v1_evals_goldens"];
         put?: never;
-        /** Freeze a query and the rows it returns now as a golden */
+        /** Freeze a stored query or a search and the results it returns now as a golden; a question becomes a golden through a label */
         post: operations["post_v1_evals_goldens"];
         /** Delete a golden */
         delete: operations["delete_v1_evals_goldens"];
@@ -204,7 +204,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Accept the rows a golden returns now as its new reference */
+        /** Accept what a golden returns now as its new reference; a question is asked again and the query Ask writes becomes its golden query */
         post: operations["post_v1_evals_goldens_accept"];
         delete?: never;
         options?: never;
@@ -238,7 +238,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Label results of a trace relevant or not (thumbs up or down per result); the labels become the golden's ground truth */
+        /** Label results of a trace relevant or not (thumbs up or down per result), or, on a question, its answer as a whole (`valid` alone; `valid: false` with `sparql` gives the right query); the labels become the golden's ground truth */
         post: operations["post_v1_evals_label"];
         delete?: never;
         options?: never;
@@ -272,7 +272,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Replay every golden at the current commit and record the verdicts */
+        /** Check every golden at the current commit and record the verdicts; a question is asked again through Ask and checked for its type, its rows against the golden query, and its judged results */
         post: operations["post_v1_evals_run"];
         delete?: never;
         options?: never;
@@ -3656,10 +3656,30 @@ export interface components {
             name: string;
             type: string;
         };
+        /**
+         * @description The inputs of an Ask request that shape its answer, kept on an `ask`
+         *     trace and its golden so a run asks the same way. Every field is optional.
+         */
+        EvalAskInput: {
+            /** @description The entity IRIs the user picked (`anchor`). */
+            anchor?: string[];
+            /** @description The app's notes for the model (`context`). */
+            context?: string | null;
+            /** @description The earlier steps of the question (`previous`). */
+            previous?: components["schemas"]["QueryRewriteStep"][];
+            route?: null | components["schemas"]["QueryRoute"];
+            /**
+             * @description The date the question was asked (`YYYY-MM-DD`), so a relative
+             *     question reads the same window on every run.
+             */
+            today?: string | null;
+        };
         /** @description One result of a query: a hit of a search, or a row of a SPARQL query. */
         EvalItem: {
             /**
-             * @description Stable id of the result: the term id of a hit; the blake3 of the
+             * @description Stable id of the result: the term id of a hit; on the `ask` surface
+             *     `e:` + the blake3 of the entity IRI the row names, or `v:` + the
+             *     blake3 of its values; on the `sparql` surface the blake3 of the
              *     canonical row; `ask:true` / `ask:false` for an ASK answer.
              */
             id: string;
@@ -3723,7 +3743,11 @@ export interface components {
         };
         /**
          * @description Thumbs up or down on results of a trace: one result as `item` + `valid`,
-         *     or several in `items`.
+         *     or several in `items`. On an `ask` trace, `valid` without `item` or
+         *     `items` labels the answer as a whole: `true` makes the trace's query the
+         *     golden query of the question; `false` with `sparql` makes that query the
+         *     golden query (the server checks and runs it once); `false` alone marks
+         *     the answer wrong.
          */
         EvalLabelRequest: {
             by?: string | null;
@@ -3731,6 +3755,8 @@ export interface components {
             items?: components["schemas"]["EvalItemLabelInput"][];
             note?: string | null;
             source?: null | components["schemas"]["EvalLabelSource"];
+            /** @description With `valid: false` and no `item`: the right query for the question. */
+            sparql?: string | null;
             valid?: boolean | null;
         };
         EvalLabelResponse: {
@@ -3751,8 +3777,32 @@ export interface components {
          * @enum {string}
          */
         EvalMode: "off" | "advisory";
+        /**
+         * @description The query check of an `ask` golden: the rows of the query Ask wrote
+         *     against the rows of the golden query, both read at the same commit. It
+         *     passes when `missing` and `extra` are 0.
+         */
+        EvalQueryCheck: {
+            /** @description Rows only the written query returns. */
+            extra: number;
+            /** @description Rows only the golden query returns. */
+            missing: number;
+            /** @description Rows both queries return. */
+            same: number;
+        };
+        /**
+         * @description The type of a question's query.
+         * @enum {string}
+         */
+        EvalQueryType: "sparql" | "hybrid" | "search";
         /** @description One run of the suite at one commit of the graph. One object per commit. */
         EvalResults: {
+            /**
+             * Format: int64
+             * @description What the models of the run's Ask replays cost together, in
+             *     millionths of a US dollar; absent when the run asked nothing.
+             */
+            cost_micro_usd?: number | null;
             /** Format: int64 */
             elapsed_ms: number;
             errors: number;
@@ -3856,8 +3906,10 @@ export interface components {
          * @description Which surface a trace or a golden belongs to.
          * @enum {string}
          */
-        EvalSurface: "sparql" | "search";
+        EvalSurface: "sparql" | "search" | "ask";
         EvalTrace: {
+            answer?: null | components["schemas"]["EvalLabel"];
+            ask?: null | components["schemas"]["EvalAskInput"];
             /** @description The embedding name, for `surface: search`. */
             embedding?: string | null;
             entailment: components["schemas"]["SparqlEntailment"];
@@ -3869,6 +3921,7 @@ export interface components {
             labels?: {
                 [key: string]: components["schemas"]["EvalLabel"];
             };
+            query_type?: null | components["schemas"]["EvalQueryType"];
             /** @description The user's words, as the caller passed them in `request`. */
             request: string;
             results: components["schemas"]["EvalItems"];
@@ -3902,6 +3955,13 @@ export interface components {
         /** @enum {string} */
         EvalVerdict: "pass" | "fail" | "error" | "skipped";
         EvalVerdictDetail: {
+            /**
+             * Format: int64
+             * @description What the models of the replay cost, in millionths of a US dollar
+             *     (`via: ask`).
+             */
+            cost_micro_usd?: number | null;
+            expected_type?: null | components["schemas"]["EvalQueryType"];
             /** @description Results the query returned now. */
             item_count?: number | null;
             message?: string | null;
@@ -3911,6 +3971,8 @@ export interface components {
              *     judged results that came back.
              */
             precision?: number | null;
+            query_check?: null | components["schemas"]["EvalQueryCheck"];
+            query_type?: null | components["schemas"]["EvalQueryType"];
             /**
              * Format: float
              * @description `relevant_returned / relevant`, over the known-relevant results.
@@ -3922,12 +3984,21 @@ export interface components {
             relevant_returned?: number;
             /** @description The trace opened for the unknown results (the review queue). */
             review_trace_id?: string | null;
+            route?: null | components["schemas"]["QueryRoute"];
+            /** @description The query Ask wrote this time (`via: ask`). */
+            sparql?: string | null;
             /** @description Returned results nobody judged yet. */
             unknown_returned?: number;
             verdict: components["schemas"]["EvalVerdict"];
+            via?: null | components["schemas"]["EvalVia"];
             /** @description Known-wrong results that came back. */
             wrong_returned?: number;
         };
+        /**
+         * @description How a run tested a golden.
+         * @enum {string}
+         */
+        EvalVia: "ask" | "query" | "search";
         EvidenceInput: string | {
             /**
              * @description Stable observation id used by full-fidelity export/import. Ordinary
@@ -4174,6 +4245,8 @@ export interface components {
             accepted_at?: string | null;
             /** @description Who accepted the last change: `user` or the judge provider. */
             accepted_by?: string | null;
+            answer?: null | components["schemas"]["EvalLabel"];
+            ask?: null | components["schemas"]["EvalAskInput"];
             /** @description RFC 3339. */
             created_at: string;
             embedding?: string | null;
@@ -4183,7 +4256,9 @@ export interface components {
             /**
              * @description blake3 of the request words, the query text and entailment (plus
              *     embedding and `top_k` for a search), so a regenerated or
-             *     re-added golden keeps its identity and its trend.
+             *     re-added golden keeps its identity and its trend. An `ask` golden
+             *     keys on the question alone: its words, its sorted anchors and a
+             *     digest of its earlier steps.
              */
             id: string;
             /** @description The judged results by id: the ground truth. */
@@ -4192,6 +4267,7 @@ export interface components {
             };
             label_source?: null | components["schemas"]["EvalLabelSource"];
             origin: components["schemas"]["GoldenOrigin"];
+            query_type?: null | components["schemas"]["EvalQueryType"];
             request?: string | null;
             sparql: string;
             surface?: components["schemas"]["EvalSurface"];
@@ -4208,7 +4284,11 @@ export interface components {
             embedding?: string | null;
             entailment?: components["schemas"]["SparqlEntailment"];
             request?: string | null;
-            /** @description The SPARQL query, or the query text for `surface: vector`. */
+            /**
+             * @description The SPARQL query, or the query text for `surface: search`. Freezes a
+             *     `sparql` or a `search` golden; a question becomes an `ask` golden
+             *     through a label on its trace.
+             */
             sparql: string;
             surface?: components["schemas"]["EvalSurface"];
             top_k?: number | null;

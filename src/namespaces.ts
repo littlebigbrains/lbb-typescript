@@ -540,9 +540,12 @@ export class EvalsNamespace {
     });
   }
 
-  /** Thumbs up or down on results of a trace: one result as `item` +
-   * `valid`, or several in `items`. The labels become the golden's ground
-   * truth. */
+  /** Thumbs up or down on a trace. One result as `item` + `valid`, or
+   * several in `items`: each label judges one result, a citation of the
+   * answer. On a question's trace, `valid` alone judges the whole answer:
+   * `true` makes the trace's query the golden query of the question;
+   * `false` with `sparql` gives the right query, which becomes the golden
+   * query; `false` alone marks the answer wrong. */
   label(
     traceId: string,
     body: Schemas["EvalLabelRequest"],
@@ -600,7 +603,11 @@ export class EvalsNamespace {
     });
   }
 
-  /** Replay every golden at the current commit. */
+  /** Check every golden at the current commit. A question is asked again
+   * through the query rewriter: the run compares the type of the query it
+   * wrote with the expected type, its rows with the rows of the golden query
+   * at the same commit (`query_check`), and its results with the judged
+   * results. A search is done again; a stored query is replayed. */
   run(
     opts: CallOptions & Pick<ReadConsistencyOptions, "consistency"> = {},
   ): Promise<Schemas["EvalRunResponse"]> {

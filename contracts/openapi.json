@@ -3736,11 +3736,56 @@
         ],
         "type": "object"
       },
+      "EvalAskInput": {
+        "description": "The inputs of an Ask request that shape its answer, kept on an `ask`\ntrace and its golden so a run asks the same way. Every field is optional.",
+        "properties": {
+          "anchor": {
+            "description": "The entity IRIs the user picked (`anchor`).",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "context": {
+            "description": "The app's notes for the model (`context`).",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "previous": {
+            "description": "The earlier steps of the question (`previous`).",
+            "items": {
+              "$ref": "#/components/schemas/QueryRewriteStep"
+            },
+            "type": "array"
+          },
+          "route": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/QueryRoute",
+                "description": "The route the caller fixed (`route`)."
+              }
+            ]
+          },
+          "today": {
+            "description": "The date the question was asked (`YYYY-MM-DD`), so a relative\nquestion reads the same window on every run.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "type": "object"
+      },
       "EvalItem": {
         "description": "One result of a query: a hit of a search, or a row of a SPARQL query.",
         "properties": {
           "id": {
-            "description": "Stable id of the result: the term id of a hit; the blake3 of the\ncanonical row; `ask:true` / `ask:false` for an ASK answer.",
+            "description": "Stable id of the result: the term id of a hit; on the `ask` surface\n`e:` + the blake3 of the entity IRI the row names, or `v:` + the\nblake3 of its values; on the `sparql` surface the blake3 of the\ncanonical row; `ask:true` / `ask:false` for an ASK answer.",
             "type": "string"
           },
           "iri": {
@@ -3923,7 +3968,7 @@
         "type": "object"
       },
       "EvalLabelRequest": {
-        "description": "Thumbs up or down on results of a trace: one result as `item` + `valid`,\nor several in `items`.",
+        "description": "Thumbs up or down on results of a trace: one result as `item` + `valid`,\nor several in `items`. On an `ask` trace, `valid` without `item` or\n`items` labels the answer as a whole: `true` makes the trace's query the\ngolden query of the question; `false` with `sparql` makes that query the\ngolden query (the server checks and runs it once); `false` alone marks\nthe answer wrong.",
         "properties": {
           "by": {
             "type": [
@@ -3958,6 +4003,13 @@
                 "$ref": "#/components/schemas/EvalLabelSource",
                 "description": "`explicit` (default) or `implicit`. `judge` is reserved for the server."
               }
+            ]
+          },
+          "sparql": {
+            "description": "With `valid: false` and no `item`: the right query for the question.",
+            "type": [
+              "string",
+              "null"
             ]
           },
           "valid": {
@@ -4013,9 +4065,53 @@
         ],
         "type": "string"
       },
+      "EvalQueryCheck": {
+        "description": "The query check of an `ask` golden: the rows of the query Ask wrote\nagainst the rows of the golden query, both read at the same commit. It\npasses when `missing` and `extra` are 0.",
+        "properties": {
+          "extra": {
+            "description": "Rows only the written query returns.",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "missing": {
+            "description": "Rows only the golden query returns.",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "same": {
+            "description": "Rows both queries return.",
+            "minimum": 0,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "same",
+          "missing",
+          "extra"
+        ],
+        "type": "object"
+      },
+      "EvalQueryType": {
+        "description": "The type of a question's query.",
+        "enum": [
+          "sparql",
+          "hybrid",
+          "search"
+        ],
+        "type": "string"
+      },
       "EvalResults": {
         "description": "One run of the suite at one commit of the graph. One object per commit.",
         "properties": {
+          "cost_micro_usd": {
+            "description": "What the models of the run's Ask replays cost together, in\nmillionths of a US dollar; absent when the run asked nothing.",
+            "format": "int64",
+            "minimum": 0,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
           "elapsed_ms": {
             "format": "int64",
             "minimum": 0,
@@ -4293,12 +4389,35 @@
         "description": "Which surface a trace or a golden belongs to.",
         "enum": [
           "sparql",
-          "search"
+          "search",
+          "ask"
         ],
         "type": "string"
       },
       "EvalTrace": {
         "properties": {
+          "answer": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/EvalLabel",
+                "description": "The answer label of an `ask` trace: its query is right for the\nquestion (`valid: true`), or it is wrong."
+              }
+            ]
+          },
+          "ask": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/EvalAskInput",
+                "description": "The inputs of the Ask request, for an `ask` trace of\n`POST /v1/query/rewrite`."
+              }
+            ]
+          },
           "embedding": {
             "description": "The embedding name, for `surface: search`.",
             "type": [
@@ -4332,6 +4451,17 @@
               "type": "string"
             },
             "type": "object"
+          },
+          "query_type": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/EvalQueryType",
+                "description": "The type of the query, for an `ask` trace."
+              }
+            ]
           },
           "request": {
             "description": "The user's words, as the caller passed them in `request`.",
@@ -4425,6 +4555,26 @@
       },
       "EvalVerdictDetail": {
         "properties": {
+          "cost_micro_usd": {
+            "description": "What the models of the replay cost, in millionths of a US dollar\n(`via: ask`).",
+            "format": "int64",
+            "minimum": 0,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "expected_type": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/EvalQueryType",
+                "description": "The type the golden expects (`ask` goldens)."
+              }
+            ]
+          },
           "item_count": {
             "description": "Results the query returned now.",
             "minimum": 0,
@@ -4445,6 +4595,28 @@
             "type": [
               "number",
               "null"
+            ]
+          },
+          "query_check": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/EvalQueryCheck",
+                "description": "The query check (`ask` goldens of type `sparql` or `hybrid` with a\ngolden query). The result counts above are the result check against\nthe judged results."
+              }
+            ]
+          },
+          "query_type": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/EvalQueryType",
+                "description": "The type of the query that ran this time (`ask` goldens)."
+              }
             ]
           },
           "recall": {
@@ -4472,6 +4644,24 @@
               "null"
             ]
           },
+          "route": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/QueryRoute",
+                "description": "The route of the question this time (`via: ask`)."
+              }
+            ]
+          },
+          "sparql": {
+            "description": "The query Ask wrote this time (`via: ask`).",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "unknown_returned": {
             "description": "Returned results nobody judged yet.",
             "minimum": 0,
@@ -4479,6 +4669,17 @@
           },
           "verdict": {
             "$ref": "#/components/schemas/EvalVerdict"
+          },
+          "via": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/EvalVia",
+                "description": "How the run tested the golden; absent when it was skipped."
+              }
+            ]
           },
           "wrong_returned": {
             "description": "Known-wrong results that came back.",
@@ -4490,6 +4691,15 @@
           "verdict"
         ],
         "type": "object"
+      },
+      "EvalVia": {
+        "description": "How a run tested a golden.",
+        "enum": [
+          "ask",
+          "query",
+          "search"
+        ],
+        "type": "string"
       },
       "EvidenceInput": {
         "oneOf": [
@@ -5371,6 +5581,28 @@
               "null"
             ]
           },
+          "answer": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/EvalLabel",
+                "description": "The answer label that made `sparql` the golden query of an `ask`\ngolden (who, when). Absent: `sparql` is the query of the newest\nlabeled trace, and the run checks the judged results."
+              }
+            ]
+          },
+          "ask": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/EvalAskInput",
+                "description": "The inputs a run asks an `ask` golden's question with, from the\nnewest labeled trace."
+              }
+            ]
+          },
           "created_at": {
             "description": "RFC 3339.",
             "type": "string"
@@ -5389,7 +5621,7 @@
             "description": "The commit the judgments were last changed at."
           },
           "id": {
-            "description": "blake3 of the request words, the query text and entailment (plus\nembedding and `top_k` for a search), so a regenerated or\nre-added golden keeps its identity and its trend.",
+            "description": "blake3 of the request words, the query text and entailment (plus\nembedding and `top_k` for a search), so a regenerated or\nre-added golden keeps its identity and its trend. An `ask` golden\nkeys on the question alone: its words, its sorted anchors and a\ndigest of its earlier steps.",
             "type": "string"
           },
           "judgments": {
@@ -5414,6 +5646,17 @@
           },
           "origin": {
             "$ref": "#/components/schemas/GoldenOrigin"
+          },
+          "query_type": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/EvalQueryType",
+                "description": "The type of query an `ask` golden expects: the type of its golden\nquery, else of the newest labeled trace's query."
+              }
+            ]
           },
           "request": {
             "type": [
@@ -5477,7 +5720,7 @@
             ]
           },
           "sparql": {
-            "description": "The SPARQL query, or the query text for `surface: vector`.",
+            "description": "The SPARQL query, or the query text for `surface: search`. Freezes a\n`sparql` or a `search` golden; a question becomes an `ask` golden\nthrough a label on its trace.",
             "type": "string"
           },
           "surface": {
@@ -28293,7 +28536,7 @@
             "bearer": []
           }
         ],
-        "summary": "The golden suite: every frozen query and its expected rows",
+        "summary": "The golden suite: questions, searches and stored queries, with their golden queries and judged results",
         "tags": [
           "system"
         ]
@@ -28562,7 +28805,7 @@
             "bearer": []
           }
         ],
-        "summary": "Freeze a query and the rows it returns now as a golden",
+        "summary": "Freeze a stored query or a search and the results it returns now as a golden; a question becomes a golden through a label",
         "tags": [
           "system"
         ]
@@ -28841,7 +29084,7 @@
             "bearer": []
           }
         ],
-        "summary": "Accept the rows a golden returns now as its new reference",
+        "summary": "Accept what a golden returns now as its new reference; a question is asked again and the query Ask writes becomes its golden query",
         "tags": [
           "system"
         ]
@@ -29400,7 +29643,7 @@
             "bearer": []
           }
         ],
-        "summary": "Label results of a trace relevant or not (thumbs up or down per result); the labels become the golden's ground truth",
+        "summary": "Label results of a trace relevant or not (thumbs up or down per result), or, on a question, its answer as a whole (`valid` alone; `valid: false` with `sparql` gives the right query); the labels become the golden's ground truth",
         "tags": [
           "system"
         ]
@@ -29931,7 +30174,7 @@
             "bearer": []
           }
         ],
-        "summary": "Replay every golden at the current commit and record the verdicts",
+        "summary": "Check every golden at the current commit and record the verdicts; a question is asked again through Ask and checked for its type, its rows against the golden query, and its judged results",
         "tags": [
           "system"
         ]
