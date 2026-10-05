@@ -570,6 +570,36 @@ test("query ask sends the anchors and returns the linked names", async () => {
   });
   assert.deepEqual(bare.linked, []);
   assert.deepEqual(bare.anchors, []);
+  assert.equal(bare.history, null);
+});
+
+test("query ask sends a timeline and returns the history of a comparison", async () => {
+  const history: Schemas["QueryRewriteHistory"] = {
+    as_of_date: "2026-06-05",
+    compare: true,
+    as_of_commit_seq: 1,
+    resolved_by: "timeline",
+    label: "Tender",
+    added: [{ t: { type: "uri", value: "https://x.test/e/c" } }],
+    removed: [],
+  };
+  const { fetch, bodies } = queuedFetch([
+    { body: rewriteResponse({ history }) },
+  ]);
+  const client = new LbbClient({ baseUrl: "http://h", fetch });
+  const timeline: Schemas["QueryRewriteTimelinePoint"][] = [
+    { date: "2026-05-20", as_of_commit_seq: 1, label: "Tender" },
+  ];
+
+  const answer = await client.query.ask("What changed since 5 June?", {
+    timeline,
+  });
+  assert.deepEqual(JSON.parse(bodies[0] ?? "{}"), {
+    question: "What changed since 5 June?",
+    run: true,
+    timeline,
+  });
+  assert.deepEqual(answer.history, history);
 });
 
 test("query ask without a run keeps the route, the rationale and the error", async () => {

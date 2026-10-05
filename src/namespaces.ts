@@ -1224,6 +1224,14 @@ export interface QueryAskOptions
    * their names.
    */
   anchor?: string[];
+  /**
+   * Dated points that stand for the graph's commits, at most 200: a question
+   * about a date reads the commit of the latest point on or before it. For
+   * graphs whose commits stand for other dates than the days they were
+   * written (a demo's milestones, an import of old records). Without it, the
+   * server maps a date to the last commit written by the end of that day.
+   */
+  timeline?: Schemas["QueryRewriteTimelinePoint"][];
 }
 
 /** What {@link QueryNamespace.ask} returns. */
@@ -1253,6 +1261,12 @@ export interface QueryAskResult {
   linked: Schemas["QueryRewriteLink"][];
   /** What the server read about each anchored IRI, with a note when it was not found. */
   anchors: Schemas["QueryRewriteAnchor"][];
+  /**
+   * For a history question: the date, the commit it resolved to and how,
+   * and for a comparison both runs and the rows `added` and `removed`.
+   * `null` for other questions.
+   */
+  history: Schemas["QueryRewriteHistory"] | null;
   /** The whole response of `POST /v1/query/rewrite`. */
   rewrite: Schemas["QueryRewriteResponse"];
 }
@@ -1337,7 +1351,9 @@ export class QueryNamespace {
    * and the last event, `done`, holds the same response as `rewrite`. The
    * order is `grounding`, `route`, then `query`, `run` and `rows` per
    * attempt, with `repair` before a second attempt. A second `route` comes
-   * when the rewriter chose another route.
+   * when the rewriter chose another route. A comparison runs twice: `run`
+   * (with `point: "before"`) and `rows`, then `run` (`point: "after"`) and
+   * `rows`.
    *
    * An `error` event throws {@link LbbError} with the status, code and
    * message that `rewrite` throws. An error before the stream starts (a 400,
@@ -1405,6 +1421,7 @@ export class QueryNamespace {
       asOfCommitSeq,
       today,
       anchor,
+      timeline,
       ...opts
     } = options;
     const rewrite = await this.rewrite(
@@ -1418,6 +1435,7 @@ export class QueryNamespace {
         as_of_commit_seq: asOfCommitSeq,
         today,
         anchor: anchor?.length ? anchor : undefined,
+        timeline: timeline?.length ? timeline : undefined,
       },
       opts,
     );
@@ -1436,8 +1454,41 @@ export class QueryNamespace {
       traceId: rewrite.result?.trace_id ?? null,
       linked: rewrite.linked ?? [],
       anchors: rewrite.anchors ?? [],
+      history: rewrite.history ?? null,
       rewrite,
     };
+  }
+
+  /**
+   * The graph's rewrite profile (`GET /v1/query/rewrite/profile`): the notes
+   * and worked examples the rewriter reads for every question of the graph.
+   * `version` is 0 when the graph has none.
+   */
+  rewriteProfile(
+    opts: CallOptions = {},
+  ): Promise<Schemas["QueryRewriteProfile"]> {
+    return this.client.request("GET", "/v1/query/rewrite/profile", opts);
+  }
+
+  /**
+   * Store the graph's rewrite profile (`PUT /v1/query/rewrite/profile`):
+   * `notes` (at most 8,000 characters) and up to 20 `examples`, each a
+   * question and the `SELECT` or `ASK` query that answers it. The server
+   * parses each query. Pass the `version` you read as `expected_version`:
+   * when another write came first, the call throws `409 conflict` and
+   * stores nothing. `dryRun` checks the profile and stores nothing. Empty
+   * notes and no examples clear it. The rewriter reads the profile for every
+   * question; a call's `context` still adds notes.
+   */
+  setRewriteProfile(
+    body: Schemas["QueryRewriteProfileRequest"],
+    opts: CallOptions & { dryRun?: boolean } = {},
+  ): Promise<Schemas["QueryRewriteProfile"]> {
+    return this.client.request("PUT", "/v1/query/rewrite/profile", {
+      ...opts,
+      query: { dry_run: opts.dryRun },
+      body,
+    });
   }
 
   structured(

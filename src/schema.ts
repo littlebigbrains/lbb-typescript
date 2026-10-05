@@ -1479,6 +1479,24 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/query/rewrite/profile": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read the graph's rewrite profile: the notes and worked examples the rewriter reads for every question of the graph, and its version (0 when the graph has none) */
+        get: operations["get_v1_query_rewrite_profile"];
+        /** Store the graph's rewrite profile: `notes` (at most 8,000 characters) and up to 20 `examples` of a question and the SELECT or ASK query that answers it (32,000 characters together); each query must parse. `expected_version` makes the write conditional: another stored version answers 409 conflict. Each write adds 1 to the version; empty notes and no examples clear the profile. The rewriter reads it as a cached block after the graph description; a request's `context` still adds notes per call */
+        put: operations["put_v1_query_rewrite_profile"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/query/sparql": {
         parameters: {
             query?: never;
@@ -7063,6 +7081,11 @@ export interface components {
             snapshot: components["schemas"]["PublishedReadSnapshotView"];
         };
         /**
+         * @description How the server found the commit of a `history` question.
+         * @enum {string}
+         */
+        QueryHistoryResolution: "commit_time" | "timeline" | "request";
+        /**
          * @description How a name of the question matched the name of an entity.
          * @enum {string}
          */
@@ -7084,8 +7107,9 @@ export interface components {
          * @description One event of a streamed rewrite: `POST /v1/query/rewrite` with
          *     `Accept: text/event-stream`. On the wire each event is
          *     `event: <event>\ndata: <data as JSON>\n\n`. The order: `grounding`,
-         *     `route`, then per attempt `query`, `run` and `rows`, with `repair` before
-         *     a second attempt; `done` or `error` ends the stream. A second `route`
+         *     `route`, then per attempt `query`, `run` and `rows` (a comparison runs
+         *     twice: `run` and `rows` at the earlier point, then at the later point),
+         *     with `repair` before a second attempt; `done` or `error` ends the stream. A second `route`
          *     comes when the rewriter chose another route. Clients ignore an event name
          *     they do not know: later versions add events.
          */
@@ -7164,6 +7188,21 @@ export interface components {
              */
             event: "run";
         };
+        /**
+         * @description One worked example of a profile: a question and the query that answers
+         *     it on this graph.
+         */
+        QueryRewriteExample: {
+            /** @description Why the query is written so; at most 1,000 characters. */
+            note?: string | null;
+            /** @description The question as a person asks it; at most 1,000 characters. */
+            question: string;
+            /**
+             * @description A SPARQL `SELECT` or `ASK` query with its `PREFIX` declarations; at
+             *     most 4,000 characters. The server parses it on write.
+             */
+            sparql: string;
+        };
         /** @description The graph description the models read. */
         QueryRewriteGrounding: {
             /**
@@ -7183,15 +7222,35 @@ export interface components {
             embeddings: number;
             /**
              * Format: int32
+             * @description Classes in the part of the description written for this question:
+             *     the classes whose names match the question and that the rest of the
+             *     description leaves out or cuts short.
+             */
+            focus_classes?: number;
+            /**
+             * Format: int32
+             * @description Properties in the part of the description written for this question.
+             */
+            focus_properties?: number;
+            /**
+             * Format: int32
              * @description Names in the name index the linking read; absent when no index was
              *     ready (the linking was skipped).
              */
             names?: number | null;
+            /**
+             * Format: int64
+             * @description The version of the graph's stored profile (`PUT
+             *     /v1/query/rewrite/profile`) the rewriter read; absent when the graph
+             *     has no profile, or an empty one.
+             */
+            profile_version?: number | null;
             /** Format: int32 */
             properties: number;
             /**
              * @description The description itself, when the request asked for it
-             *     (`include_grounding`).
+             *     (`include_grounding`): the part every question reads, then the part
+             *     for this question.
              */
             text?: string | null;
         };
@@ -7210,15 +7269,49 @@ export interface components {
              */
             classes: number;
         };
-        /** @description What a `history` question asks for beyond the query. */
+        /**
+         * @description What a `history` question asks for beyond the query, and where the
+         *     server read it.
+         */
         QueryRewriteHistory: {
             /**
-             * @description The date the question names (`YYYY-MM-DD`). The caller resolves it to
-             *     a commit and passes it as `as_of_commit_seq`.
+             * @description A comparison's rows that `after` has and `before` has not, keyed by
+             *     all their projected values; at most 500.
              */
+            added?: {
+                [key: string]: components["schemas"]["QueryRewriteTerm"];
+            }[] | null;
+            after?: null | components["schemas"]["SparqlTextResponse"];
+            /**
+             * Format: int64
+             * @description The commit of the question's point: the commit of `as_of_date`, or
+             *     the commit the question or the request names. For a comparison, the
+             *     earlier point. Absent when the server could not resolve the date.
+             */
+            as_of_commit_seq?: number | null;
+            /** @description The date the question names (`YYYY-MM-DD`). */
             as_of_date?: string | null;
-            /** @description Run the query at that point and now, and compare the rows. */
+            before?: null | components["schemas"]["SparqlTextResponse"];
+            /**
+             * @description The question asks what changed: the server runs the query at the
+             *     earlier point and at the later one, and compares the rows.
+             */
             compare: boolean;
+            /** @description The label of the timeline point the date resolved to. */
+            label?: string | null;
+            /**
+             * @description A comparison's rows that `before` has and `after` has not; at most
+             *     500. A changed value shows as a removed row and an added row.
+             */
+            removed?: {
+                [key: string]: components["schemas"]["QueryRewriteTerm"];
+            }[] | null;
+            resolved_by?: null | components["schemas"]["QueryHistoryResolution"];
+            /**
+             * @description The difference is not complete: a run returned only its first rows
+             *     (`row_page.has_more`), or more than 500 rows were added or removed.
+             */
+            truncated?: boolean;
         };
         /**
          * @description One name of the question that the server linked to an entity of the
@@ -7269,6 +7362,49 @@ export interface components {
          * @enum {string}
          */
         QueryRewriteModelRole: "router" | "rewriter";
+        /**
+         * @description Which run of a comparison.
+         * @enum {string}
+         */
+        QueryRewritePoint: "before" | "after";
+        /** @description The graph's rewrite profile. */
+        QueryRewriteProfile: {
+            /**
+             * @description A preview (`dry_run=true`): the profile a write would store, with the
+             *     version it would get. Nothing was stored.
+             */
+            dry_run?: boolean;
+            examples: components["schemas"]["QueryRewriteExample"][];
+            notes: string;
+            /** @description When this version was written (RFC 3339); absent for version 0. */
+            updated_at?: string | null;
+            /**
+             * Format: int64
+             * @description 0 when the graph has no profile; each write adds 1.
+             */
+            version: number;
+        };
+        /**
+         * @description Store the graph's rewrite profile (`PUT /v1/query/rewrite/profile`):
+         *     notes and examples the rewriter reads for every question of the graph.
+         */
+        QueryRewriteProfileRequest: {
+            /** @description At most 20 worked examples, 32,000 characters together. */
+            examples?: components["schemas"]["QueryRewriteExample"][];
+            /**
+             * Format: int64
+             * @description The version this write replaces: the `version` a read returned, 0
+             *     when the graph has no profile yet. When the stored version differs,
+             *     the write answers `409 conflict` and stores nothing. Without it, the
+             *     write replaces any version.
+             */
+            expected_version?: number | null;
+            /**
+             * @description What the data means, which property holds the current state, what
+             *     "me" or "my" means: at most 8,000 characters.
+             */
+            notes?: string;
+        };
         /** @description The rewriter wrote a query (one per attempt). */
         QueryRewriteQueryEvent: {
             /**
@@ -7311,7 +7447,8 @@ export interface components {
             /**
              * @description The app's notes for the model: what the data means, units, names to
              *     prefer. At most 8,000 characters. Keep it the same across questions,
-             *     so the model provider's prompt cache reads it.
+             *     so the model provider's prompt cache reads it. The graph's stored
+             *     profile (`PUT /v1/query/rewrite/profile`) is read as well.
              */
             context?: string | null;
             /**
@@ -7336,6 +7473,14 @@ export interface components {
              *     with a client error is corrected once.
              */
             run?: boolean;
+            /**
+             * @description Dated points that stand for the graph's commits, at most 200. A
+             *     history question about a date reads the commit of the latest point
+             *     on or before that date, instead of the commit written last on or
+             *     before the end of that day (UTC). For graphs whose commits stand for
+             *     other dates (a demo's milestones, an import of old records).
+             */
+            timeline?: components["schemas"]["QueryRewriteTimelinePoint"][];
             /**
              * @description Today's date for relative questions ("last 14 days"), `YYYY-MM-DD`.
              *     Default: the server's UTC date.
@@ -7390,6 +7535,7 @@ export interface components {
              * @description The commit the run reads; `null` for the latest.
              */
             as_of_commit_seq?: number | null;
+            point?: null | components["schemas"]["QueryRewritePoint"];
         };
         /**
          * @description One earlier step of the same question: a query the caller ran, and what
@@ -7409,6 +7555,36 @@ export interface components {
             sample?: string | null;
             /** @description The SPARQL query of the step. */
             sparql: string;
+        };
+        /**
+         * @description One value of a row of a comparison, as SPARQL 1.1 Query Results JSON
+         *     writes it.
+         */
+        QueryRewriteTerm: {
+            datatype?: string | null;
+            /** @description `uri`, `literal` or `bnode`. */
+            type: string;
+            value: string;
+            "xml:lang"?: string | null;
+        };
+        /**
+         * @description One dated point of an app's own timeline: the commit that stands for a
+         *     date. For a graph whose commits stand for other dates than the days they
+         *     were written (a demo's milestones, an import of old records).
+         */
+        QueryRewriteTimelinePoint: {
+            /**
+             * Format: int64
+             * @description The commit that holds the graph as it was on that date.
+             */
+            as_of_commit_seq: number;
+            /** @description `YYYY-MM-DD`. */
+            date: string;
+            /**
+             * @description A name for the point ("Tender"), at most 200 characters. The
+             *     response's `history.label` repeats it.
+             */
+            label?: string | null;
         };
         /** @description Where the time of a rewrite went, in milliseconds. */
         QueryRewriteTimings: {
@@ -24888,6 +25064,280 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["QueryRewriteResponse"];
                     "text/event-stream": string;
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Rate limit exceeded */
+            429: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Service unavailable */
+            503: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+        };
+    };
+    get_v1_query_rewrite_profile: {
+        parameters: {
+            query?: {
+                /** @description Graph name (default `main`) */
+                graph?: string;
+            };
+            header?: {
+                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                "Lbb-Version"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QueryRewriteProfile"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Rate limit exceeded */
+            429: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Service unavailable */
+            503: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+        };
+    };
+    put_v1_query_rewrite_profile: {
+        parameters: {
+            query?: {
+                /** @description Graph name (default `main`) */
+                graph?: string;
+                /** @description true checks the profile and answers what a write would store, without storing it */
+                dry_run?: string;
+            };
+            header?: {
+                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                "Lbb-Version"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["QueryRewriteProfileRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QueryRewriteProfile"];
                 };
             };
             /** @description Bad request */
