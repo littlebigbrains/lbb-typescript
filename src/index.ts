@@ -26,6 +26,7 @@ export type {
   GraphMetadata,
   GraphSummary,
   SchemaView,
+  ServerSentEvent,
   Snapshot,
 } from "./client.js";
 export type { components, paths, operations } from "./schema.js";
@@ -45,6 +46,7 @@ export type {
   OntologyStarterApplyOptions,
   QueryAskOptions,
   QueryAskResult,
+  QueryRewriteStreamEvent,
 } from "./namespaces.js";
 export type {
   IntegrationsNamespace,

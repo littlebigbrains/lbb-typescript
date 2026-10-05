@@ -1,6 +1,6 @@
 import type { WorkflowNamespace } from "./workflows.js";
 import type { LbbClient } from "./client.js";
-import type { CallOptions } from "./transport.js";
+import { parseLbbError, type CallOptions, type LbbError } from "./transport.js";
 import {
   attributeFilter,
   firstPatternVariable,
@@ -1218,6 +1218,12 @@ export interface QueryAskOptions
   asOfCommitSeq?: number;
   /** Today's date for relative questions, `YYYY-MM-DD`. Default: the server's UTC date. */
   today?: string;
+  /**
+   * Entity IRIs the user picked in your app, at most 10. The server reads
+   * each one, and the rewriter uses the IRIs directly instead of matching
+   * their names.
+   */
+  anchor?: string[];
 }
 
 /** What {@link QueryNamespace.ask} returns. */
@@ -1240,8 +1246,60 @@ export interface QueryAskResult {
   error: string | null;
   /** The eval trace of the run. Label its rows with `evals.label`. */
   traceId: string | null;
+  /**
+   * The names of the question the server linked to entities, for a "Did you
+   * mean …?"; empty when nothing linked.
+   */
+  linked: Schemas["QueryRewriteLink"][];
+  /** What the server read about each anchored IRI, with a note when it was not found. */
+  anchors: Schemas["QueryRewriteAnchor"][];
   /** The whole response of `POST /v1/query/rewrite`. */
   rewrite: Schemas["QueryRewriteResponse"];
+}
+
+/**
+ * One event of {@link QueryNamespace.rewriteStream}: `grounding`, `route`,
+ * `query`, `run`, `rows`, `repair`, and last `done` with the whole response.
+ * The stream throws an `error` event as {@link LbbError}; it never yields one.
+ */
+export type QueryRewriteStreamEvent = Exclude<
+  Schemas["QueryRewriteEvent"],
+  { event: "error" }
+>;
+
+/** The event names of a streamed rewrite. A client skips any other name. */
+const REWRITE_STREAM_EVENTS: ReadonlySet<string> = new Set([
+  "grounding",
+  "route",
+  "query",
+  "run",
+  "rows",
+  "repair",
+  "done",
+  "error",
+]);
+
+/** The `type` the server's JSON error carries for a status. */
+function errorTypeForStatus(status: number): string {
+  if (status === 400) return "invalid_request_error";
+  if (status === 401 || status === 403) return "auth_error";
+  if (status === 404) return "not_found_error";
+  if (status === 409) return "conflict_error";
+  if (status === 429) return "rate_limit_error";
+  return "api_error";
+}
+
+/** The {@link LbbError} of an `error` event: the status, code and message of
+ * the JSON error the same request without a stream gets. */
+function streamError(data: unknown, requestId?: string): LbbError {
+  const event = (data ?? {}) as Partial<Schemas["StreamErrorEvent"]>;
+  const status = typeof event.status === "number" ? event.status : 500;
+  const error = {
+    type: errorTypeForStatus(status),
+    code: event.code,
+    message: event.message,
+  };
+  return parseLbbError(status, JSON.stringify({ error }), requestId);
 }
 
 /** Questions in plain words, and structured and SPARQL-text queries. */
@@ -1275,6 +1333,63 @@ export class QueryNamespace {
   }
 
   /**
+   * {@link rewrite} with progress: the server sends an event for each step,
+   * and the last event, `done`, holds the same response as `rewrite`. The
+   * order is `grounding`, `route`, then `query`, `run` and `rows` per
+   * attempt, with `repair` before a second attempt. A second `route` comes
+   * when the rewriter chose another route.
+   *
+   * An `error` event throws {@link LbbError} with the status, code and
+   * message that `rewrite` throws. An error before the stream starts (a 400,
+   * a `429 rewrite_limit`) throws as `rewrite` does. The call is never
+   * retried. Abort `signal` to stop the server's work; leaving the loop
+   * early closes the stream too. `timeoutMs` bounds the whole stream.
+   *
+   * ```ts
+   * for await (const event of client.query.rewriteStream({ question, run: true })) {
+   *   if (event.event === "done") console.log(event.data.result);
+   *   else console.log(event.event);
+   * }
+   * ```
+   */
+  async *rewriteStream(
+    body: Schemas["QueryRewriteRequest"],
+    opts: CallOptions & Pick<ReadConsistencyOptions, "consistency"> = {},
+  ): AsyncGenerator<QueryRewriteStreamEvent, void, undefined> {
+    let requestId: string | undefined;
+    const events = this.client.requestEventStream("POST", "/v1/query/rewrite", {
+      ...opts,
+      body,
+      query: {
+        consistency: opts.consistency ?? this.client.defaultConsistency,
+      },
+      // A server without streams answers with the response itself.
+      jsonEvent: "done",
+      onOpen: (response) => {
+        requestId = response.requestId;
+      },
+    });
+    for await (const { event, data } of events) {
+      if (!REWRITE_STREAM_EVENTS.has(event)) continue;
+      let parsed: unknown;
+      try {
+        parsed = JSON.parse(data);
+      } catch (error) {
+        throw new SyntaxError(
+          `Little Big Brain sent invalid JSON in a "${event}" event`,
+          { cause: error },
+        );
+      }
+      if (event === "error") throw streamError(parsed, requestId);
+      yield { event, data: parsed } as QueryRewriteStreamEvent;
+      if (event === "done") return;
+    }
+    throw new Error(
+      "Little Big Brain rewrite stream ended before its done or error event",
+    );
+  }
+
+  /**
    * Answer a question in plain words: {@link rewrite} with `run: true`, and
    * the rows of the run parsed as {@link sparql} parses them.
    */
@@ -1282,8 +1397,16 @@ export class QueryNamespace {
     question: string,
     options: QueryAskOptions = {},
   ): Promise<QueryAskResult> {
-    const { context, previous, route, limit, asOfCommitSeq, today, ...opts } =
-      options;
+    const {
+      context,
+      previous,
+      route,
+      limit,
+      asOfCommitSeq,
+      today,
+      anchor,
+      ...opts
+    } = options;
     const rewrite = await this.rewrite(
       {
         question,
@@ -1294,6 +1417,7 @@ export class QueryNamespace {
         limit,
         as_of_commit_seq: asOfCommitSeq,
         today,
+        anchor: anchor?.length ? anchor : undefined,
       },
       opts,
     );
@@ -1310,6 +1434,8 @@ export class QueryNamespace {
       snapshot: parsed?.snapshot ?? null,
       error: rewrite.error ?? null,
       traceId: rewrite.result?.trace_id ?? null,
+      linked: rewrite.linked ?? [],
+      anchors: rewrite.anchors ?? [],
       rewrite,
     };
   }

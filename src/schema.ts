@@ -1471,7 +1471,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Turn a question into the SPARQL query to run: the router model picks the kind of query (lookup, aggregate, search, history, schema, unanswerable), the rewriter model writes it from a description of the graph, and the server checks it. `run: true` also runs it (the question becomes the eval trace's request) and corrects a query that fails once */
+        /** Turn a question into the SPARQL query to run: the router model picks the kind of query (lookup, aggregate, search, history, schema, unanswerable), the rewriter model writes it from a description of the graph, and the server checks it. `run: true` also runs it (the question becomes the eval trace's request) and corrects a query that fails once. With `Accept: text/event-stream` the answer is a stream of progress events (`QueryRewriteEvent`) that ends with `done` (the same response) or `error` */
         post: operations["post_v1_query_rewrite"];
         delete?: never;
         options?: never;
@@ -7062,6 +7062,108 @@ export interface components {
             query_lag_commits: number;
             snapshot: components["schemas"]["PublishedReadSnapshotView"];
         };
+        /**
+         * @description How a name of the question matched the name of an entity.
+         * @enum {string}
+         */
+        QueryLinkMethod: "exact" | "partial" | "fuzzy" | "acronym";
+        /** @description What the server read about one anchored IRI. */
+        QueryRewriteAnchor: {
+            /** @description The IRI has statements at the read commit. */
+            found: boolean;
+            iri: string;
+            label?: string | null;
+            /**
+             * @description Why the IRI did not reach the rewriter as an entity: it is not in
+             *     the graph, or its read failed or ran out of time.
+             */
+            note?: string | null;
+            types?: string[];
+        };
+        /**
+         * @description One event of a streamed rewrite: `POST /v1/query/rewrite` with
+         *     `Accept: text/event-stream`. On the wire each event is
+         *     `event: <event>\ndata: <data as JSON>\n\n`. The order: `grounding`,
+         *     `route`, then per attempt `query`, `run` and `rows`, with `repair` before
+         *     a second attempt; `done` or `error` ends the stream. A second `route`
+         *     comes when the rewriter chose another route. Clients ignore an event name
+         *     they do not know: later versions add events.
+         */
+        QueryRewriteEvent: components["schemas"]["QueryRewriteEventGrounding"] | components["schemas"]["QueryRewriteEventRoute"] | components["schemas"]["QueryRewriteEventQuery"] | components["schemas"]["QueryRewriteEventRun"] | components["schemas"]["QueryRewriteEventRows"] | components["schemas"]["QueryRewriteEventRepair"] | components["schemas"]["QueryRewriteEventDone"] | components["schemas"]["QueryRewriteEventError"];
+        /** @description The whole response: the same JSON as the response without a stream. */
+        QueryRewriteEventDone: {
+            /** @description The whole response: the same JSON as the response without a stream. */
+            data: components["schemas"]["QueryRewriteResponse"];
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            event: "done";
+        };
+        QueryRewriteEventError: {
+            data: components["schemas"]["StreamErrorEvent"];
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            event: "error";
+        };
+        QueryRewriteEventGrounding: {
+            data: components["schemas"]["QueryRewriteGroundingEvent"];
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            event: "grounding";
+        };
+        QueryRewriteEventQuery: {
+            data: components["schemas"]["QueryRewriteQueryEvent"];
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            event: "query";
+        };
+        QueryRewriteEventRepair: {
+            data: components["schemas"]["QueryRewriteRepairEvent"];
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            event: "repair";
+        };
+        /**
+         * @description The router's route as soon as it answers, the caller's route at once,
+         *     or the rewriter's route when it decides.
+         */
+        QueryRewriteEventRoute: {
+            /**
+             * @description The router's route as soon as it answers, the caller's route at once,
+             *     or the rewriter's route when it decides.
+             */
+            data: components["schemas"]["QueryRouteDecision"];
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            event: "route";
+        };
+        QueryRewriteEventRows: {
+            data: components["schemas"]["QueryRewriteRowsEvent"];
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            event: "rows";
+        };
+        QueryRewriteEventRun: {
+            data: components["schemas"]["QueryRewriteRunEvent"];
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            event: "run";
+        };
         /** @description The graph description the models read. */
         QueryRewriteGrounding: {
             /**
@@ -7079,6 +7181,12 @@ export interface components {
             commit_seq: number;
             /** Format: int32 */
             embeddings: number;
+            /**
+             * Format: int32
+             * @description Names in the name index the linking read; absent when no index was
+             *     ready (the linking was skipped).
+             */
+            names?: number | null;
             /** Format: int32 */
             properties: number;
             /**
@@ -7086,6 +7194,21 @@ export interface components {
              *     (`include_grounding`).
              */
             text?: string | null;
+        };
+        /** @description The graph description is ready (the first event of a streamed rewrite). */
+        QueryRewriteGroundingEvent: {
+            /**
+             * Format: int64
+             * @description Milliseconds since the server built the description.
+             */
+            age_ms: number;
+            /** @description The node had the description in its cache. */
+            cached: boolean;
+            /**
+             * Format: int32
+             * @description Classes the description names.
+             */
+            classes: number;
         };
         /** @description What a `history` question asks for beyond the query. */
         QueryRewriteHistory: {
@@ -7096,6 +7219,26 @@ export interface components {
             as_of_date?: string | null;
             /** @description Run the query at that point and now, and compare the rows. */
             compare: boolean;
+        };
+        /**
+         * @description One name of the question that the server linked to an entity of the
+         *     graph. A name with several close candidates has up to three entries with
+         *     the same `text`, the best first; an app can show "Did you mean …?".
+         */
+        QueryRewriteLink: {
+            by: components["schemas"]["QueryLinkMethod"];
+            /** @description The class the entity's name was read under. */
+            class: string;
+            iri: string;
+            /** @description The entity's label or name. */
+            label?: string | null;
+            /**
+             * Format: float
+             * @description 0 to 1: how well the words match the name.
+             */
+            score: number;
+            /** @description The words of the question, as written. */
+            text: string;
         };
         /**
          * @description What the call returns.
@@ -7126,8 +7269,40 @@ export interface components {
          * @enum {string}
          */
         QueryRewriteModelRole: "router" | "rewriter";
+        /** @description The rewriter wrote a query (one per attempt). */
+        QueryRewriteQueryEvent: {
+            /**
+             * Format: int32
+             * @description 1 for the first query, 2 for the correction.
+             */
+            attempt: number;
+            entailment: components["schemas"]["SparqlEntailment"];
+            /**
+             * @description The query: the checked text with its `PREFIX` lines, or the model's
+             *     text when it did not pass the check.
+             */
+            sparql: string;
+        };
+        /** @description The query failed with a client error, and the rewriter corrects it. */
+        QueryRewriteRepairEvent: {
+            /**
+             * Format: int32
+             * @description The attempt that comes next (2).
+             */
+            attempt: number;
+            /** @description The error the rewriter reads. */
+            error: string;
+        };
         /** @description Turn a question into the query to run (`POST /v1/query/rewrite`). */
         QueryRewriteRequest: {
+            /**
+             * @description Entity IRIs the user picked in the app, at most 10. The server reads
+             *     each one at the read commit (its types, its label, and a summary of
+             *     its links) and tells the rewriter to use these IRIs directly instead
+             *     of matching their names. An IRI that is not in the graph gets a note
+             *     in `anchors`, not an error.
+             */
+            anchor?: string[];
             /**
              * Format: int64
              * @description Read the graph at this commit.
@@ -7169,6 +7344,11 @@ export interface components {
         };
         QueryRewriteResponse: {
             /**
+             * @description What the server read about each anchored IRI (`anchor`), in the
+             *     request's order.
+             */
+            anchors?: components["schemas"]["QueryRewriteAnchor"][];
+            /**
              * Format: int32
              * @description Queries the rewriter wrote: 2 when it corrected one.
              */
@@ -7177,6 +7357,11 @@ export interface components {
             error?: string | null;
             grounding: components["schemas"]["QueryRewriteGrounding"];
             history?: null | components["schemas"]["QueryRewriteHistory"];
+            /**
+             * @description Names of the question linked to entities of the graph before the
+             *     rewriter wrote the query; the rewriter uses their IRIs directly.
+             */
+            linked?: components["schemas"]["QueryRewriteLink"][];
             models: components["schemas"]["QueryRewriteModelCall"][];
             query?: null | components["schemas"]["RewrittenQuery"];
             /** @description One or two sentences: why this route and this query. */
@@ -7184,6 +7369,27 @@ export interface components {
             result?: null | components["schemas"]["SparqlTextResponse"];
             route: components["schemas"]["QueryRouteDecision"];
             timings: components["schemas"]["QueryRewriteTimings"];
+        };
+        /** @description The run of the query ended with rows. */
+        QueryRewriteRowsEvent: {
+            /**
+             * Format: int64
+             * @description Rows the run returned.
+             */
+            count: number;
+            /**
+             * Format: int64
+             * @description Milliseconds the run took.
+             */
+            ms: number;
+        };
+        /** @description The run of the query started. */
+        QueryRewriteRunEvent: {
+            /**
+             * Format: int64
+             * @description The commit the run reads; `null` for the latest.
+             */
+            as_of_commit_seq?: number | null;
         };
         /**
          * @description One earlier step of the same question: a query the caller ran, and what
@@ -7206,8 +7412,19 @@ export interface components {
         };
         /** @description Where the time of a rewrite went, in milliseconds. */
         QueryRewriteTimings: {
+            /**
+             * Format: int64
+             * @description The reads of the anchored IRIs, beside the route.
+             */
+            anchor_ms?: number;
             /** Format: int64 */
             ground_ms: number;
+            /**
+             * Format: int64
+             * @description The name linking, beside the route (the wait for a name index that
+             *     is not built yet included).
+             */
+            link_ms?: number;
             /** Format: int64 */
             rewrite_ms: number;
             /** Format: int64 */
@@ -10006,6 +10223,20 @@ export interface components {
             relation: components["schemas"]["RelationView"];
             target: components["schemas"]["EntityView"];
             valid_time: components["schemas"]["ValidTime"];
+        };
+        /**
+         * @description A streamed response ended with an error: the status, code and message of
+         *     the JSON error that the same request without a stream gets. The text of a
+         *     `5xx` is redacted the same way.
+         */
+        StreamErrorEvent: {
+            code: string;
+            message: string;
+            /**
+             * Format: int32
+             * @description The HTTP status of the same error without a stream.
+             */
+            status: number;
         };
         /**
          * @description Endpoint types for [`SearchSuggestRequest::context`]. Both optional; supplying
@@ -24656,6 +24887,7 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["QueryRewriteResponse"];
+                    "text/event-stream": string;
                 };
             };
             /** @description Bad request */
