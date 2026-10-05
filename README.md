@@ -143,6 +143,34 @@ demo's milestones, an import of old records), pass `timeline`:
 `{ timeline: [{ date: "2026-06-18", as_of_commit_seq: 5, label: "Addendum" }] }`.
 A question that asks what changed runs at both points, and
 `answer.history.added` and `answer.history.removed` hold the rows that differ.
+When the first variable holds entities, the rows are paired by it:
+`answer.history.changed` holds the entities whose values changed, and
+`answer.history.totals` counts each list.
+
+### Tools for your own agent
+
+When your app runs its own agent loop, four calls give it what only the
+server knows. None calls a model.
+
+```ts
+// The IRI of a name, the person before a document with the name.
+const { candidates } = await lbb.query.names({ text: "Summarize David Korn's deals" });
+// The classes and properties a question needs: how many instances hold each
+// property, and the values of small classes such as stages.
+const { text } = await lbb.query.describe({ question: "Which deals moved stage?" });
+// The commit of a date.
+const { as_of_commit_seq } = await lbb.query.commitAt({ date: "2026-06-18" });
+// What changed between two points, paired by entity.
+const diff = await lbb.query.compare({
+  query: "SELECT ?deal ?stage WHERE { ?deal <https://x.test/p/stage> ?stage }",
+  before: { date: "2026-06-01" },
+  key: ["deal"],
+});
+console.log(diff.totals, diff.changed, diff.next_cursor);
+```
+
+`compare` reads up to 20,000 rows per point and pages each list: pass
+`next_cursor` back as `cursor` with the same request.
 
 ### Show progress
 

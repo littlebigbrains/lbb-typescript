@@ -366,6 +366,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/graph/commit-at": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The commit of a date or a moment: the last commit written by the end of `date` (UTC), or at or before `moment`, by the times the commits record. Absent with a note when the moment is before the first commit or the commits record no time */
+        get: operations["get_v1_graph_commit_at"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/graph/compact": {
         parameters: {
             query?: never;
@@ -1456,6 +1473,57 @@ export interface paths {
         put?: never;
         /** Dry-run the suggestion's change against the current ontology and store the impact */
         post: operations["post_v1_ontology_suggestions_validate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/query/compare": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Run one SELECT at two points (a commit, a date or a moment; the later point defaults to the latest commit), in turn, page by page within `max_rows` per point, and report what differs: with `key` the rows are paired by those variables into `added`, `removed` and `changed` (the key with its rows at both points), without a key whole rows are compared. Each list is paged (`limit`, `next_cursor`) with its total; `truncated` says a point was not read whole */
+        post: operations["post_v1_query_compare"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/query/describe": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Describe the classes and properties a question needs, or the ones named by IRI: each class with how many of its sampled instances hold each property (a filter on a property few hold returns few rows), the instances and values of small classes (at most 30 instances: stages, statuses), each property with the classes that use it, examples, and the OWL and RDFS statements about them; as JSON and as compact text. No model call */
+        post: operations["post_v1_query_describe"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/query/names": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Find the entities a question or a list of names names, from the graph's name index: per name up to `limit` candidates (default 5) with their class, label, score and how they matched, the one to prefer first (a person or an organization before a document that mentions the name). A word that asks ("Summarize") and a lone acronym or short word that is not an entity's whole name link to nothing. `index_ready: false` means the index is still building: ask again in a few seconds */
+        post: operations["post_v1_query_names"];
         delete?: never;
         options?: never;
         head?: never;
@@ -4286,6 +4354,30 @@ export interface components {
             snapshot_token: string;
             types: components["schemas"]["CardType"][];
         };
+        /** @description The commit of a moment (`GET /v1/graph/commit-at`). */
+        GraphCommitAtResponse: {
+            /**
+             * Format: int64
+             * @description The last commit written at or before the moment. Absent when the
+             *     server cannot place it: `note` says why.
+             */
+            as_of_commit_seq?: number | null;
+            /**
+             * @description When that commit was written, RFC 3339; absent when it records no
+             *     time.
+             */
+            committed_at?: string | null;
+            /**
+             * @description The moment is before the graph's first commit: when that commit was
+             *     written (or the graph created), RFC 3339.
+             */
+            first_commit_at?: string | null;
+            /** @description The moment asked about, RFC 3339 UTC: the end of `date`, or `moment`. */
+            moment: string;
+            /** @description Why there is no commit, or what to know about the one found. */
+            note?: string | null;
+            resolved_by?: null | components["schemas"]["GraphCommitResolution"];
+        };
         /**
          * @description The result of a validate-only commit (`POST /v1/graph/commit?dry_run=true`):
          *     the request is fully validated against the ontology and the active schema and
@@ -4311,6 +4403,11 @@ export interface components {
              */
             written_properties?: components["schemas"]["EntityFieldsWritten"][];
         };
+        /**
+         * @description How `GET /v1/graph/commit-at` placed the moment.
+         * @enum {string}
+         */
+        GraphCommitResolution: "commit_time" | "head_write";
         GraphCommitResponse: {
             commit: components["schemas"]["CommitResponse"];
             commit_seq: components["schemas"]["CommitSeq"];
@@ -7080,6 +7177,299 @@ export interface components {
             query_lag_commits: number;
             snapshot: components["schemas"]["PublishedReadSnapshotView"];
         };
+        /** @description One key whose rows differ between the two points. */
+        QueryCompareChange: {
+            /** @description Its rows at the later point, without the key; at most 20. */
+            after: {
+                [key: string]: components["schemas"]["QueryRewriteTerm"];
+            }[];
+            /** @description Its rows at the earlier point, without the key; at most 20. */
+            before: {
+                [key: string]: components["schemas"]["QueryRewriteTerm"];
+            }[];
+            /** @description The key's values. */
+            key: {
+                [key: string]: components["schemas"]["QueryRewriteTerm"];
+            };
+        };
+        /** @description One point of a comparison: exactly one of a commit, a date, or a moment. */
+        QueryComparePoint: {
+            /**
+             * Format: int64
+             * @description This commit.
+             */
+            as_of_commit_seq?: number | null;
+            /** @description `YYYY-MM-DD`: the last commit written by the end of that day, UTC. */
+            date?: string | null;
+            /** @description RFC 3339: the last commit written at or before it. */
+            moment?: string | null;
+        };
+        /** @description Where one point of a comparison read, and how much. */
+        QueryComparePointResult: {
+            /**
+             * Format: int64
+             * @description The commit read; absent only when the latest read named none.
+             */
+            as_of_commit_seq?: number | null;
+            /** @description When the commit was written, RFC 3339, when the server knows it. */
+            committed_at?: string | null;
+            /** @description Every row was read. */
+            complete: boolean;
+            /** Format: int64 */
+            ms: number;
+            /**
+             * Format: int32
+             * @description Pages the server read.
+             */
+            pages: number;
+            resolved_by: components["schemas"]["QueryCompareResolution"];
+            /**
+             * Format: int64
+             * @description Rows the server read.
+             */
+            rows: number;
+            /**
+             * Format: int64
+             * @description Rows the query has at this point.
+             */
+            total: number;
+        };
+        /**
+         * @description Run one `SELECT` at two points and pair the rows
+         *     (`POST /v1/query/compare`).
+         */
+        QueryCompareRequest: {
+            after?: null | components["schemas"]["QueryComparePoint"];
+            /** @description The earlier point. */
+            before: components["schemas"]["QueryComparePoint"];
+            /**
+             * @description `next_cursor` of the page before, with the same request otherwise.
+             *     It pins both commits.
+             */
+            cursor?: string | null;
+            entailment?: components["schemas"]["SparqlEntailment"];
+            /**
+             * @description Variables that identify a row's entity, at most 8 (for example
+             *     `["contact"]`). With a key the server pairs the rows by it: `added`
+             *     and `removed` hold the rows of keys at one point only, and `changed`
+             *     the keys whose rows differ. Without a key whole rows are compared.
+             */
+            key?: string[];
+            /**
+             * Format: int32
+             * @description Entries of each list per page: 1 to 1,000, default 100.
+             */
+            limit?: number | null;
+            /**
+             * Format: int32
+             * @description Rows the server reads per point: 1 to 50,000, default 20,000. Past
+             *     it the comparison is `truncated`.
+             */
+            max_rows?: number | null;
+            /**
+             * @description A SPARQL `SELECT`, at most 20,000 characters. Leave out `LIMIT`: the
+             *     server pages through the rows itself.
+             */
+            query: string;
+        };
+        /**
+         * @description How a point of a comparison was found.
+         * @enum {string}
+         */
+        QueryCompareResolution: "request" | "commit_time" | "head_write" | "latest";
+        /** @description The rows that differ between two points of one query. */
+        QueryCompareResponse: {
+            /** @description This page of each list. */
+            added: {
+                [key: string]: components["schemas"]["QueryRewriteTerm"];
+            }[];
+            after: components["schemas"]["QueryComparePointResult"];
+            before: components["schemas"]["QueryComparePointResult"];
+            changed: components["schemas"]["QueryCompareChange"][];
+            /** @description The key the rows were paired by; empty when whole rows were compared. */
+            key?: string[];
+            /** Format: int64 */
+            ms: number;
+            /** @description Pass it as `cursor`, with the same request, for the next page. */
+            next_cursor?: string | null;
+            /** @description What to know about the result: a cut, blank nodes, a `LIMIT`. */
+            notes?: string[];
+            /**
+             * Format: int64
+             * @description The index of the first entry of this page in each list.
+             */
+            offset: number;
+            removed: {
+                [key: string]: components["schemas"]["QueryRewriteTerm"];
+            }[];
+            totals: components["schemas"]["QueryCompareTotals"];
+            /**
+             * @description A point was not read whole (`max_rows`, or the time ran out), so the
+             *     difference is not complete.
+             */
+            truncated?: boolean;
+            /** @description The query's variables. */
+            vars: string[];
+        };
+        /** @description The size of each list of a comparison, over all pages. */
+        QueryCompareTotals: {
+            /**
+             * Format: int64
+             * @description Rows of the later point that the earlier one has not (of keys only at
+             *     the later point, with a key).
+             */
+            added: number;
+            /**
+             * Format: int64
+             * @description Keys whose rows differ; 0 without a key.
+             */
+            changed: number;
+            /**
+             * Format: int64
+             * @description Rows of the earlier point that the later one has not.
+             */
+            removed: number;
+            /**
+             * Format: int64
+             * @description Keys (or rows, without a key) that are the same at both points.
+             */
+            unchanged: number;
+        };
+        /** @description One class of a description. */
+        QueryDescribeClass: {
+            comment?: string | null;
+            /**
+             * Format: int64
+             * @description Instances in the graph.
+             */
+            instances: number;
+            iri: string;
+            label?: string | null;
+            /** @description `prefix:local`, as `text` writes it. */
+            name: string;
+            /**
+             * @description The properties its sampled instances use, the most used first, with
+             *     their coverage. Empty when the class was not sampled yet.
+             */
+            properties?: components["schemas"]["QueryDescribeCoverage"][];
+            /**
+             * @description A small class (at most 30 instances): its instances with their label
+             *     and literal values. Absent for a larger class, or when the background
+             *     sample has not read it yet (`partial`).
+             */
+            values?: components["schemas"]["QueryDescribeInstance"][] | null;
+        };
+        /** @description How many sampled instances of a class hold one property. */
+        QueryDescribeCoverage: {
+            /** @description A short example value (a literal, with its datatype). */
+            example?: string | null;
+            /**
+             * Format: int64
+             * @description Sampled instances that have the property.
+             */
+            instances: number;
+            /** @description `prefix:local`, as `text` writes it. */
+            name: string;
+            /**
+             * Format: int64
+             * @description Instances sampled: the class's instances, at most 100. A filter on a
+             *     property that few instances hold returns few rows.
+             */
+            of: number;
+            property: string;
+            /** @description The class of the linked entities, when the values are entities. */
+            target?: string | null;
+        };
+        /** @description One instance of a small class, with its label and literal values. */
+        QueryDescribeInstance: {
+            iri: string;
+            label?: string | null;
+            /** @description Property IRI → its literal value (the first one), as written. */
+            values?: {
+                [key: string]: string;
+            };
+        };
+        /** @description One property of a description. */
+        QueryDescribeProperty: {
+            comment?: string | null;
+            example?: string | null;
+            iri: string;
+            label?: string | null;
+            /** @description `true` when its values are entities, `false` for literal values. */
+            links?: boolean | null;
+            name: string;
+            /**
+             * Format: int64
+             * @description Statements in the graph, from the schema summary.
+             */
+            statements?: number | null;
+            target?: string | null;
+            /** @description The classes whose sample has it, the most instances first; at most 3. */
+            used_by?: components["schemas"]["QueryDescribeUse"][];
+        };
+        /**
+         * @description Describe the parts of the graph a question needs
+         *     (`POST /v1/query/describe`). With neither `question`, `classes` nor
+         *     `properties`, the largest described classes.
+         */
+        QueryDescribeRequest: {
+            /** @description Class IRIs to describe, at most 20. */
+            classes?: string[];
+            /** @description Property IRIs to describe, at most 50. */
+            properties?: string[];
+            /**
+             * @description A question: the classes and properties whose names, labels or
+             *     comments match its words. At most 4,000 characters.
+             */
+            question?: string | null;
+        };
+        /** @description The parts of the graph a question needs, as JSON and as compact text. */
+        QueryDescribeResponse: {
+            /**
+             * Format: int64
+             * @description Milliseconds since the server built the description it read.
+             */
+            age_ms: number;
+            classes: components["schemas"]["QueryDescribeClass"][];
+            /**
+             * Format: int64
+             * @description The commit of the published generation the description was read from.
+             */
+            commit_seq: number;
+            /**
+             * @description The background sample has not read every class yet: coverage and the
+             *     values of small classes can be missing. Ask again in a minute.
+             */
+            partial: boolean;
+            /** @description `PREFIX` name → namespace, for the names `text` uses. */
+            prefixes: {
+                [key: string]: string;
+            };
+            properties: components["schemas"]["QueryDescribeProperty"][];
+            statements: components["schemas"]["QueryDescribeStatement"][];
+            /** @description The same description as compact text, for a model's prompt. */
+            text: string;
+            /** @description IRIs of the request that the graph has no class or property for. */
+            unknown?: string[];
+        };
+        /** @description One OWL or RDFS statement about a described class or property. */
+        QueryDescribeStatement: {
+            /** @description An IRI, or a literal's text. */
+            object: string;
+            predicate: string;
+            subject: string;
+        };
+        /**
+         * @description One class that uses a property, and how many of its sampled instances
+         *     hold it.
+         */
+        QueryDescribeUse: {
+            class: string;
+            /** Format: int64 */
+            instances: number;
+            /** Format: int64 */
+            of: number;
+        };
         /**
          * @description How the server found the commit of a `history` question.
          * @enum {string}
@@ -7090,6 +7480,48 @@ export interface components {
          * @enum {string}
          */
         QueryLinkMethod: "exact" | "partial" | "fuzzy" | "acronym";
+        /**
+         * @description Find the entities a question or a list of names names
+         *     (`POST /v1/query/names`).
+         */
+        QueryNamesRequest: {
+            /**
+             * Format: int32
+             * @description Candidates per name: 1 to 10, default 5.
+             */
+            limit?: number | null;
+            /** @description A question, or names: 1 to 4,000 characters. */
+            text: string;
+        };
+        /** @description The names of a text and the entities each may mean. */
+        QueryNamesResponse: {
+            /**
+             * @description Each candidate of each name found, in the order of the text; the
+             *     candidates of one name share its `text`, the one to prefer first.
+             *     Empty when no name linked, or when the index was not ready.
+             */
+            candidates: components["schemas"]["QueryRewriteLink"][];
+            /**
+             * Format: int64
+             * @description The commit of the graph description the index was built from.
+             */
+            commit_seq: number;
+            /**
+             * Format: int32
+             * @description Names in the index the matching read.
+             */
+            index_names?: number | null;
+            /**
+             * @description The graph's name index was ready. When `false` the server builds it
+             *     in the background: ask again in a few seconds.
+             */
+            index_ready: boolean;
+            /**
+             * Format: int64
+             * @description Milliseconds the call took.
+             */
+            ms: number;
+        };
         /** @description What the server read about one anchored IRI. */
         QueryRewriteAnchor: {
             /** @description The IRI has statements at the read commit. */
@@ -7275,8 +7707,8 @@ export interface components {
          */
         QueryRewriteHistory: {
             /**
-             * @description A comparison's rows that `after` has and `before` has not, keyed by
-             *     all their projected values; at most 500.
+             * @description A comparison's rows that `after` has and `before` has not; with a
+             *     `key`, the rows of the entities only `after` has. At most 500.
              */
             added?: {
                 [key: string]: components["schemas"]["QueryRewriteTerm"];
@@ -7293,23 +7725,36 @@ export interface components {
             as_of_date?: string | null;
             before?: null | components["schemas"]["SparqlTextResponse"];
             /**
+             * @description With a `key`: the entities whose rows differ, with their rows at both
+             *     points. At most 500.
+             */
+            changed?: components["schemas"]["QueryCompareChange"][] | null;
+            /**
              * @description The question asks what changed: the server runs the query at the
              *     earlier point and at the later one, and compares the rows.
              */
             compare: boolean;
+            /**
+             * @description The variable the rows of a comparison were paired by: the first
+             *     variable when its values are entities. Empty when whole rows were
+             *     compared.
+             */
+            key?: string[];
             /** @description The label of the timeline point the date resolved to. */
             label?: string | null;
             /**
-             * @description A comparison's rows that `before` has and `after` has not; at most
-             *     500. A changed value shows as a removed row and an added row.
+             * @description A comparison's rows that `before` has and `after` has not; with a
+             *     `key`, the rows of the entities only `before` has. At most 500.
+             *     Without a key a changed value shows as a removed row and an added row.
              */
             removed?: {
                 [key: string]: components["schemas"]["QueryRewriteTerm"];
             }[] | null;
             resolved_by?: null | components["schemas"]["QueryHistoryResolution"];
+            totals?: null | components["schemas"]["QueryCompareTotals"];
             /**
-             * @description The difference is not complete: a run returned only its first rows
-             *     (`row_page.has_more`), or more than 500 rows were added or removed.
+             * @description The difference is not complete: a run did not read all its rows, or
+             *     a list holds more than 500 entries (`totals` has their number).
              */
             truncated?: boolean;
         };
@@ -14901,6 +15346,144 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["GraphCommitResponse"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Rate limit exceeded */
+            429: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Service unavailable */
+            503: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+        };
+    };
+    get_v1_graph_commit_at: {
+        parameters: {
+            query?: {
+                /** @description Graph name (default `main`) */
+                graph?: string;
+                /** @description YYYY-MM-DD: the last commit written by the end of that day, UTC */
+                date?: string;
+                /** @description RFC 3339: the last commit written at or before it */
+                moment?: string;
+            };
+            header?: {
+                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                "Lbb-Version"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GraphCommitAtResponse"];
                 };
             };
             /** @description Bad request */
@@ -24921,6 +25504,428 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["OntologyChangeSuggestion"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Rate limit exceeded */
+            429: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Service unavailable */
+            503: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+        };
+    };
+    post_v1_query_compare: {
+        parameters: {
+            query?: {
+                /** @description Graph name (default `main`) */
+                graph?: string;
+                /** @description eventual (default) reads the last published commit; strong reads the head */
+                consistency?: string;
+            };
+            header?: {
+                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                "Lbb-Version"?: string;
+                /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
+                "Idempotency-Key"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["QueryCompareRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QueryCompareResponse"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Rate limit exceeded */
+            429: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Service unavailable */
+            503: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+        };
+    };
+    post_v1_query_describe: {
+        parameters: {
+            query?: {
+                /** @description Graph name (default `main`) */
+                graph?: string;
+            };
+            header?: {
+                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                "Lbb-Version"?: string;
+                /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
+                "Idempotency-Key"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["QueryDescribeRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QueryDescribeResponse"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Rate limit exceeded */
+            429: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Service unavailable */
+            503: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+        };
+    };
+    post_v1_query_names: {
+        parameters: {
+            query?: {
+                /** @description Graph name (default `main`) */
+                graph?: string;
+            };
+            header?: {
+                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                "Lbb-Version"?: string;
+                /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
+                "Idempotency-Key"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["QueryNamesRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QueryNamesResponse"];
                 };
             };
             /** @description Bad request */
