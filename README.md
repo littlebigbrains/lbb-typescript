@@ -121,6 +121,11 @@ console.log(answer.route.kind, answer.query?.sparql);
 for (const row of answer.rows) console.log(row);
 ```
 
+The graph can keep notes and worked examples that the rewriter reads for every
+question. Store them with `query.setRewriteProfile({ notes, examples,
+expected_version })` and read them with `query.rewriteProfile()`. A call's
+`context` still adds notes for that call.
+
 `answer.error` holds the error when the query did not run. `answer.traceId`
 names the eval trace of the run, so you can label its rows. `query.rewrite`
 returns the query without a run, and `mode: "route"` returns only the kind of
@@ -130,6 +135,14 @@ The server finds the names in the question ("Quelmann", "TU Dresden") in the
 graph, and the query uses the IRIs it found. `answer.linked` lists them, so you
 can show "Did you mean …?". When the user has a record open, pass its IRI in
 `anchor` (`{ anchor: [iri] }`, at most 10).
+
+A question about a date ("Which findings were open on 18 June?") reads the
+last commit written by the end of that day. `answer.history` names the commit
+and how the server found it. When your commits stand for other dates (a
+demo's milestones, an import of old records), pass `timeline`:
+`{ timeline: [{ date: "2026-06-18", as_of_commit_seq: 5, label: "Addendum" }] }`.
+A question that asks what changed runs at both points, and
+`answer.history.added` and `answer.history.removed` hold the rows that differ.
 
 ### Show progress
 
