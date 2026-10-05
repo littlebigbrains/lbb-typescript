@@ -1460,6 +1460,87 @@ export class QueryNamespace {
   }
 
   /**
+   * The entities a question or a list of names names
+   * (`POST /v1/query/names`): per name up to `limit` candidates (default 5)
+   * with their class, label, score and how they matched, the one to prefer
+   * first. Use it in your own agent before you write a query: put the IRI
+   * in the query instead of matching the name with `CONTAINS`.
+   * `index_ready: false` means the name index is still building; ask again
+   * in a few seconds. No model call.
+   */
+  names(
+    body: Schemas["QueryNamesRequest"],
+    opts: CallOptions = {},
+  ): Promise<Schemas["QueryNamesResponse"]> {
+    return this.client.request("POST", "/v1/query/names", {
+      ...opts,
+      retry: opts.retry ?? true,
+      body,
+    });
+  }
+
+  /**
+   * The classes and properties a question needs, or the ones you name by
+   * IRI (`POST /v1/query/describe`): how many sampled instances hold each
+   * property, the instances and values of small classes (stages, statuses),
+   * examples, and the OWL and RDFS statements about them. `text` holds the
+   * same description for a model's prompt. `partial: true` means the
+   * server is still sampling. No model call.
+   */
+  describe(
+    body: Schemas["QueryDescribeRequest"] = {},
+    opts: CallOptions = {},
+  ): Promise<Schemas["QueryDescribeResponse"]> {
+    return this.client.request("POST", "/v1/query/describe", {
+      ...opts,
+      retry: opts.retry ?? true,
+      body,
+    });
+  }
+
+  /**
+   * The commit of a date or a moment (`GET /v1/graph/commit-at`): the last
+   * commit written by the end of `date` (UTC), or at or before `moment`
+   * (RFC 3339). Pass the commit as `asOfCommitSeq` to read the graph as it
+   * was. `as_of_commit_seq` is absent, with a `note`, when the moment is
+   * before the first commit or the commits record no time.
+   */
+  commitAt(
+    at: { date: string; moment?: never } | { moment: string; date?: never },
+    opts: CallOptions = {},
+  ): Promise<Schemas["GraphCommitAtResponse"]> {
+    return this.client.request("GET", "/v1/graph/commit-at", {
+      ...opts,
+      retry: opts.retry ?? true,
+      query: { date: at.date, moment: at.moment },
+    });
+  }
+
+  /**
+   * Run one `SELECT` at two points and pair the rows
+   * (`POST /v1/query/compare`). `before` and `after` are each a commit, a
+   * date or a moment; `after` defaults to the latest commit. With `key`
+   * (for example `["contact"]`) the rows are paired by those variables into
+   * `added`, `removed` and `changed`; without it whole rows are compared.
+   * The server reads up to `max_rows` per point (default 20,000) and pages
+   * the lists: pass `next_cursor` back as `cursor` with the same request.
+   * `truncated` means a point was not read whole.
+   */
+  compare(
+    body: Schemas["QueryCompareRequest"],
+    opts: CallOptions & Pick<ReadConsistencyOptions, "consistency"> = {},
+  ): Promise<Schemas["QueryCompareResponse"]> {
+    return this.client.request("POST", "/v1/query/compare", {
+      ...opts,
+      retry: opts.retry ?? true,
+      body,
+      query: {
+        consistency: opts.consistency ?? this.client.defaultConsistency,
+      },
+    });
+  }
+
+  /**
    * The graph's rewrite profile (`GET /v1/query/rewrite/profile`): the notes
    * and worked examples the rewriter reads for every question of the graph.
    * `version` is 0 when the graph has none.
