@@ -785,7 +785,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** The graph's model call log, newest first: every call LBB made for its own work (rerank, route, rewrite, fit, propose, label, embed) with its model, whether it was sampled for a check, and the brief of its check. Walks back day by day from `day` (or the day of `after`), up to 31 days, until the page fills */
+        /** The graph's model call log, newest first: every call LBB made for its own work (rerank, route, rewrite, fit, propose, label, embed, answer, ask) with its model, whether it was sampled for a check, and the brief of its check. Walks back day by day from `day` (or the day of `after`), up to 31 days, until the page fills */
         get: operations["get_v1_models_calls"];
         put?: never;
         post?: never;
@@ -5941,7 +5941,7 @@ export interface components {
          * @description What LBB used a model for. Every call has one job.
          * @enum {string}
          */
-        ModelJob: "rerank" | "route" | "rewrite" | "fit" | "propose" | "label" | "embed" | "answer";
+        ModelJob: "rerank" | "route" | "rewrite" | "fit" | "propose" | "label" | "embed" | "answer" | "ask";
         /** @description One job and model over a month of checks. */
         ModelJobQuality: {
             /** Format: int64 */
@@ -19424,7 +19424,7 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
-                /** @description rerank, route, rewrite, fit, propose, label or embed */
+                /** @description rerank, route, rewrite, fit, propose, label, embed, answer or ask */
                 job?: string;
                 /** @description yyyy-mm-dd (UTC) to start from; default: today */
                 day?: string;
@@ -19842,7 +19842,7 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
-                /** @description rerank, route, rewrite, fit, propose, label or embed */
+                /** @description rerank, route, rewrite, fit, propose, label, embed, answer or ask */
                 job?: string;
                 /** @description yyyy-mm (UTC); default: the current month */
                 month?: string;
@@ -19988,7 +19988,7 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
-                /** @description rerank, route, rewrite, fit, propose, label or embed */
+                /** @description rerank, route, rewrite, fit, propose, label, embed, answer or ask */
                 job?: string;
                 /** @description yyyy-mm (UTC); default: the current month */
                 month?: string;

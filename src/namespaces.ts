@@ -680,9 +680,9 @@ export interface ModelCheckExportLine {
 
 /**
  * Model checks: the log of the model calls LBB makes for its own work on the
- * graph (rerank, route, rewrite, fit, propose, label, embed), the checks a
- * judge model makes of a sample of them, and the reviews people make of the
- * checks. A review is the call's ground truth.
+ * graph (rerank, route, rewrite, fit, propose, label, embed, answer, ask),
+ * the checks a judge model makes of a sample of them, and the reviews people
+ * make of the checks. A review is the call's ground truth.
  *
  * Reading calls and checks and reviewing a check use no model. `checkCall`
  * spends the platform's judge budget.
