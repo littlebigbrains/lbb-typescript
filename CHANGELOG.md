@@ -2,7 +2,7 @@
 
 All notable changes to the `@littlebigbrain/client` package are documented here.
 
-## Unreleased
+## 0.21.0 (2026-10-06)
 
 Breaking: the server moved questions to `POST /v1/query/ask` and removed the
 one-shot rewrite. `POST /v1/query/rewrite` answers 404. Every question now
