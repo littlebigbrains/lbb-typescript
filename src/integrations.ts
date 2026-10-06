@@ -209,6 +209,191 @@ export interface IntegrationGraphOptions extends CallOptions {
   graph: string;
 }
 
+export type IntegrationCdcAction =
+  | "pause_capture"
+  | "resume_capture"
+  | "pause_apply"
+  | "resume_apply"
+  | "retire";
+export interface IntegrationCdcOperation {
+  id: string;
+  action: IntegrationCdcAction;
+  requested_at_ms: number;
+  status: "pending" | "applied" | "failed";
+  error?: string;
+}
+export interface IntegrationCdcOverview {
+  ok: true;
+  graph: string;
+  enabled: boolean;
+  discovery: IntegrationCdcDiscoveryAnswer | null;
+  connection: IntegrationCdcStatusAnswer | null;
+}
+export interface IntegrationCdcStatusAnswer {
+  ok: true;
+  id: string;
+  graph: string;
+  state:
+    | "retired"
+    | "blocked"
+    | "capture_paused"
+    | "apply_paused"
+    | "initial_load_incomplete"
+    | "catching_up"
+    | "streaming"
+    | "source_status_unknown";
+  progress: Schemas["CdcBindingStatus"];
+  health: {
+    state: "unknown" | "starting" | "running" | "stopped" | "failed";
+    code?: string;
+    observed_at_ms?: number;
+    captured_sequence?: number;
+    source?: {
+      state: "unknown" | "reachable" | "unreachable";
+      ageMs: number;
+      slot: {
+        state:
+          | "missing"
+          | "unknown"
+          | "reserved"
+          | "extended"
+          | "unreserved"
+          | "lost";
+        active: boolean;
+        retainedWalBytes: string | null;
+        unconfirmedWalBytes: string | null;
+        safeWalBytes: string | null;
+      } | null;
+    };
+    snapshot?: {
+      attempt: string;
+      complete: boolean;
+      tables: { relationId: string; capturedRows: string | null }[];
+    };
+    /** Advisory process/cgroup sample; counters reset when the reader restarts. */
+    resources?: {
+      cpuNanos: string | null;
+      cgroupMemoryBytes: string | null;
+      cgroupPeakBytes: string | null;
+      heapUsedBytes: string | null;
+    };
+  };
+  operations: IntegrationCdcOperation[];
+  /** Optional when reading a server predating durable CDC alerts. */
+  alerts?: IntegrationCdcAlerts;
+}
+export type IntegrationCdcAlertCode =
+  | "capture_capacity"
+  | "source_unavailable"
+  | "source_wal_risk"
+  | "source_wal_backlog"
+  | "apply_stalled";
+export interface IntegrationCdcAlerts {
+  settings_revision: number;
+  muted: boolean;
+  evaluated_at_ms: number | null;
+  stale: boolean;
+  active: { code: IntegrationCdcAlertCode; since_ms: number }[];
+  notifications: {
+    id: number;
+    code: IntegrationCdcAlertCode;
+    transition: "firing" | "resolved";
+    at_ms: number;
+  }[];
+}
+export interface IntegrationCdcMuteAlertsOptions extends IntegrationGraphOptions {
+  expectedRevision: number;
+  muted: boolean;
+}
+export interface IntegrationCdcAlertsAnswer {
+  ok: true;
+  id: string;
+  graph: string;
+  alerts: IntegrationCdcAlerts;
+}
+export interface IntegrationCdcControlOptions extends IntegrationGraphOptions {
+  /** Keep this id when retrying across processes; 1–100 letters, digits, `_`, `-`, `.`. */
+  operationId: string;
+  action: IntegrationCdcAction;
+  /** Retirement requires the connection id again. */
+  confirm?: string;
+}
+export interface IntegrationCdcControlAnswer {
+  ok: true;
+  id: string;
+  graph: string;
+  operation: IntegrationCdcOperation;
+}
+
+export interface IntegrationCdcDiscoveryAnswer {
+  ok: true;
+  id: string;
+  graph: string;
+  job: {
+    id: string;
+    graph_epoch: number;
+    revision: number;
+    attempts: number;
+    created_at_ms: number;
+    expires_at_ms: number;
+    state:
+      | "queued"
+      | "discovering"
+      | "retrying"
+      | "ready"
+      | "approved"
+      | "failed"
+      | "cancelled"
+      | "expired";
+    error?: Schemas["DiscoveryFailure"] | "discovery_attempts_exhausted";
+  };
+  source: Schemas["DiscoverySource"];
+  catalog: Schemas["PostgresCatalog"] | null;
+  catalog_digest: string | null;
+  approval: {
+    intent: string;
+    prepared: boolean;
+    scope: Schemas["CaptureScope"];
+    mapping: Schemas["MappingPlan"];
+    max_capture_bytes: number;
+  } | null;
+  activation: {
+    state:
+      "unknown" | "preparing" | "activating" | "starting" | "ready" | "failed";
+    code?: string;
+    observed_at_ms?: number;
+  } | null;
+}
+export interface IntegrationCdcApprovalOptions extends IntegrationCdcCancelDiscoveryOptions {
+  catalogDigest: string;
+  mapping: Schemas["DiscoveryMapping"];
+  maxCaptureBytes: number;
+}
+export interface IntegrationCdcReviewAnswer {
+  ok: true;
+  id: string;
+  graph: string;
+  job_id: string;
+  graph_epoch: number;
+  expected_revision: number;
+  catalog_digest: string;
+  scope: Schemas["CaptureScope"];
+  mapping: Schemas["MappingPlan"];
+  max_capture_bytes: number;
+}
+export interface IntegrationCdcDiscoverOptions extends IntegrationGraphOptions {
+  /** Stable across retries. A changed request requires a new job id. */
+  jobId: string;
+  expectedRevision: number;
+  source: Schemas["DiscoverySource"];
+  credentials: { username: string; password: string; rootCertificate?: string };
+}
+export interface IntegrationCdcCancelDiscoveryOptions extends IntegrationGraphOptions {
+  jobId: string;
+  graphEpoch: number;
+  expectedRevision: number;
+}
+
 /** The body of {@link IntegrationsNamespace.create}. */
 export interface IntegrationCreateInput extends IntegrationGraphOptions {
   /** The connection id: 1 to 128 letters, digits, `_`, `-` or `.`. */
@@ -290,6 +475,175 @@ function syncKey(): string {
  */
 export class IntegrationsNamespace {
   constructor(private readonly client: LbbClient) {}
+
+  /** Discover the graph's setup/connection without storing its id in the browser. */
+  cdcOverview(
+    options: IntegrationGraphOptions,
+  ): Promise<IntegrationCdcOverview> {
+    const { graph, ...opts } = options;
+    return this.client.integrationsRequest("GET", `${BASE}/cdc`, {
+      ...opts,
+      query: { graph },
+    });
+  }
+
+  cdcDiscovery(
+    id: string,
+    options: IntegrationGraphOptions,
+  ): Promise<IntegrationCdcDiscoveryAnswer> {
+    const { graph, ...opts } = options;
+    return this.client.integrationsRequest(
+      "GET",
+      `${connectionPath(id)}/cdc/discovery`,
+      { ...opts, query: { graph } },
+    );
+  }
+
+  /** Persist discovery intent on an existing graph; capture still needs mapping approval. */
+  cdcDiscover(
+    id: string,
+    options: IntegrationCdcDiscoverOptions,
+  ): Promise<IntegrationCdcDiscoveryAnswer & { created: boolean }> {
+    const { graph, jobId, expectedRevision, source, credentials, ...opts } =
+      options;
+    return this.client.integrationsRequest(
+      "POST",
+      `${connectionPath(id)}/cdc/discovery`,
+      {
+        ...opts,
+        retry: opts.retry ?? true,
+        body: {
+          graph,
+          job_id: jobId,
+          expected_revision: expectedRevision,
+          source,
+          credentials,
+        },
+      },
+    );
+  }
+
+  /** Validate and normalize the exact catalog/mapping without starting capture. */
+  cdcReviewDiscovery(
+    id: string,
+    options: IntegrationCdcApprovalOptions,
+  ): Promise<IntegrationCdcReviewAnswer> {
+    return this.cdcApprovalRequest("review", id, options);
+  }
+
+  /** Keep the entire reviewed body when retrying, including its original revision. */
+  cdcApproveDiscovery(
+    id: string,
+    options: IntegrationCdcApprovalOptions,
+  ): Promise<IntegrationCdcDiscoveryAnswer> {
+    return this.cdcApprovalRequest("approve", id, options);
+  }
+
+  private cdcApprovalRequest<T>(
+    action: "review" | "approve",
+    id: string,
+    options: IntegrationCdcApprovalOptions,
+  ): Promise<T> {
+    const {
+      graph,
+      jobId,
+      graphEpoch,
+      expectedRevision,
+      catalogDigest,
+      mapping,
+      maxCaptureBytes,
+      ...opts
+    } = options;
+    return this.client.integrationsRequest(
+      "POST",
+      `${connectionPath(id)}/cdc/discovery/${action}`,
+      {
+        ...opts,
+        retry: opts.retry ?? true,
+        body: {
+          graph,
+          job_id: jobId,
+          graph_epoch: graphEpoch,
+          expected_revision: expectedRevision,
+          catalog_digest: catalogDigest,
+          mapping,
+          max_capture_bytes: maxCaptureBytes,
+        },
+      },
+    );
+  }
+
+  cdcCancelDiscovery(
+    id: string,
+    options: IntegrationCdcCancelDiscoveryOptions,
+  ): Promise<IntegrationCdcDiscoveryAnswer> {
+    const { graph, jobId, graphEpoch, expectedRevision, ...opts } = options;
+    return this.client.integrationsRequest(
+      "POST",
+      `${connectionPath(id)}/cdc/discovery/cancel`,
+      {
+        ...opts,
+        retry: opts.retry ?? true,
+        body: {
+          graph,
+          job_id: jobId,
+          graph_epoch: graphEpoch,
+          expected_revision: expectedRevision,
+        },
+      },
+    );
+  }
+
+  /** Experimental: independent captured/applied/published counters and expiring source health. */
+  cdcStatus(
+    id: string,
+    options: IntegrationGraphOptions,
+  ): Promise<IntegrationCdcStatusAnswer> {
+    const { graph, ...opts } = options;
+    return this.client.integrationsRequest("GET", `${connectionPath(id)}/cdc`, {
+      ...opts,
+      query: { graph },
+    });
+  }
+
+  /** Version-fenced notification preferences; health remains visible while muted. */
+  cdcMuteAlerts(
+    id: string,
+    options: IntegrationCdcMuteAlertsOptions,
+  ): Promise<IntegrationCdcAlertsAnswer> {
+    const { graph, expectedRevision, muted, ...opts } = options;
+    return this.client.integrationsRequest(
+      "POST",
+      `${connectionPath(id)}/cdc/alerts`,
+      {
+        ...opts,
+        retry: opts.retry ?? true,
+        body: { graph, expected_revision: expectedRevision, muted },
+      },
+    );
+  }
+
+  /** Experimental: acknowledge durable intent; pending work is reconciled by the CDC host. */
+  cdcControl(
+    id: string,
+    options: IntegrationCdcControlOptions,
+  ): Promise<IntegrationCdcControlAnswer> {
+    const { graph, operationId, action, confirm, ...opts } = options;
+    return this.client.integrationsRequest(
+      "POST",
+      `${connectionPath(id)}/cdc/control`,
+      {
+        ...opts,
+        retry: opts.retry ?? true,
+        body: {
+          graph,
+          operation_id: operationId,
+          action,
+          ...(confirm === undefined ? {} : { confirm }),
+        },
+      },
+    );
+  }
 
   /** The connector catalog: credential fields, settings and starter per kind. */
   connectors(opts: CallOptions = {}): Promise<IntegrationConnectorsAnswer> {
