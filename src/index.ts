@@ -31,6 +31,7 @@ export type {
 } from "./client.js";
 export type { components, paths, operations } from "./schema.js";
 export * as starters from "./starters.js";
+export type { CdcNamespace } from "./cdc.js";
 export * as googleDrive from "./google-drive.js";
 export type {
   StarterClassTerm,
@@ -50,6 +51,21 @@ export type {
 } from "./namespaces.js";
 export type {
   IntegrationsNamespace,
+  IntegrationCdcAction,
+  IntegrationCdcAlertCode,
+  IntegrationCdcAlerts,
+  IntegrationCdcAlertsAnswer,
+  IntegrationCdcMuteAlertsOptions,
+  IntegrationCdcApprovalOptions,
+  IntegrationCdcReviewAnswer,
+  IntegrationCdcDiscoveryAnswer,
+  IntegrationCdcDiscoverOptions,
+  IntegrationCdcCancelDiscoveryOptions,
+  IntegrationCdcControlAnswer,
+  IntegrationCdcControlOptions,
+  IntegrationCdcOperation,
+  IntegrationCdcOverview,
+  IntegrationCdcStatusAnswer,
   IntegrationAcceptOptions,
   IntegrationAcceptResult,
   IntegrationConfig,

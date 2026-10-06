@@ -1,4 +1,5 @@
 import { WorkflowNamespace } from "./workflows.js";
+import { CdcNamespace } from "./cdc.js";
 import {
   DEFAULT_INTEGRATIONS_URL,
   IntegrationsNamespace,
@@ -253,6 +254,7 @@ export class LbbClient {
   readonly checks: ChecksNamespace;
   readonly embeddings: EmbeddingsNamespace;
   readonly workflows: WorkflowNamespace;
+  readonly cdc: CdcNamespace;
   /** Hosted integrations for your end customers, at `integrationsUrl`. */
   readonly integrations: IntegrationsNamespace;
 
@@ -307,6 +309,7 @@ export class LbbClient {
     this.checks = new ChecksNamespace(this);
     this.embeddings = new EmbeddingsNamespace(this);
     this.workflows = new WorkflowNamespace(this);
+    this.cdc = new CdcNamespace(this);
     this.integrations = new IntegrationsNamespace(this);
   }
 

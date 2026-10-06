@@ -531,6 +531,58 @@ test("every integrations route matches contracts/integrations-openapi.json", asy
   const { fetch, calls } = fakeFetch();
   const api = client(fetch).integrations;
   await api.connectors();
+  await api.cdcStatus("postgres", { graph: GRAPH });
+  await api.cdcMuteAlerts("postgres", {
+    graph: GRAPH,
+    expectedRevision: 0,
+    muted: true,
+  });
+  await api.cdcOverview({ graph: GRAPH });
+  await api.cdcDiscovery("postgres", { graph: GRAPH });
+  await api.cdcDiscover("postgres", {
+    graph: GRAPH,
+    jobId: "job_1",
+    expectedRevision: 0,
+    source: {
+      hostname: "db.example.test",
+      port: 5432,
+      database: "source",
+      publication: "lbb",
+      slot: "lbb",
+      tables: [{ schema: "public", table: "items" }],
+    },
+    credentials: { username: "cdc", password: "fixture" },
+  });
+  for (const method of ["cdcReviewDiscovery", "cdcApproveDiscovery"] as const)
+    await api[method]("postgres", {
+      graph: GRAPH,
+      jobId: "job_1",
+      graphEpoch: 1,
+      expectedRevision: 2,
+      catalogDigest: "a".repeat(64),
+      mapping: {
+        tables: {
+          pg_42: {
+            class_iri: "https://example.test/Item",
+            properties: {},
+            foreign_keys: [],
+          },
+        },
+      },
+      maxCaptureBytes: 1_000_000,
+    });
+  await api.cdcCancelDiscovery("postgres", {
+    graph: GRAPH,
+    jobId: "job_1",
+    graphEpoch: 1,
+    expectedRevision: 2,
+  });
+  await api.cdcControl("postgres", {
+    graph: GRAPH,
+    operationId: "retire",
+    action: "retire",
+    confirm: "postgres",
+  });
   await api.create({
     graph: GRAPH,
     id: "hubspot",
@@ -594,4 +646,132 @@ test("every integrations route matches contracts/integrations-openapi.json", asy
     [...called].sort(),
     operations.map((operation) => operation.key).sort(),
   );
+});
+
+test("CDC controls retry one durable operation at the integrations host without inheriting graph scope", async () => {
+  const { fetch, calls } = fakeFetch([
+    { status: 503 },
+    { body: { ok: true, operation: { id: "pause", status: "pending" } } },
+  ]);
+  const result = await client(fetch).integrations.cdcControl("source/one", {
+    graph: GRAPH,
+    operationId: "pause",
+    action: "pause_capture",
+  });
+  assert.equal(result.operation.status, "pending");
+  assert.equal(calls.length, 2);
+  for (const call of calls) {
+    assert.equal(call.url.origin, API);
+    assert.equal(
+      call.url.pathname,
+      "/v1/integrations/connections/source%2Fone/cdc/control",
+    );
+    assert.equal(call.url.search, "");
+    assert.equal(call.headers.authorization, `Bearer ${KEY}`);
+    assert.deepEqual(call.body, {
+      graph: GRAPH,
+      operation_id: "pause",
+      action: "pause_capture",
+    });
+  }
+  await client(fetch).integrations.cdcStatus("postgres", { graph: GRAPH });
+  assert.equal(
+    calls[2].url.href,
+    `${API}/v1/integrations/connections/postgres/cdc?graph=${GRAPH}`,
+  );
+});
+
+test("CDC discovery retries the exact job and credentials, then cancels under its graph epoch", async () => {
+  const { fetch, calls } = fakeFetch([
+    { status: 503 },
+    { body: { ok: true, created: false } },
+  ]);
+  const source = {
+    hostname: "db.example.test",
+    port: 5432,
+    database: "source",
+    publication: "lbb",
+    slot: "lbb",
+    tables: [{ schema: "public", table: "items" }],
+  };
+  const credentials = { username: "cdc", password: "fixture" };
+  await client(fetch).integrations.cdcDiscover("postgres", {
+    graph: GRAPH,
+    jobId: "job_1",
+    expectedRevision: 0,
+    source,
+    credentials,
+  });
+  assert.equal(calls.length, 2);
+  for (const call of calls) {
+    assert.equal(
+      call.url.href,
+      `${API}/v1/integrations/connections/postgres/cdc/discovery`,
+    );
+    assert.equal(call.headers.authorization, `Bearer ${KEY}`);
+    assert.deepEqual(call.body, {
+      graph: GRAPH,
+      job_id: "job_1",
+      expected_revision: 0,
+      source,
+      credentials,
+    });
+  }
+  await client(fetch).integrations.cdcCancelDiscovery("postgres", {
+    graph: GRAPH,
+    jobId: "job_1",
+    graphEpoch: 4,
+    expectedRevision: 2,
+  });
+  assert.deepEqual(calls[2].body, {
+    graph: GRAPH,
+    job_id: "job_1",
+    graph_epoch: 4,
+    expected_revision: 2,
+  });
+});
+
+test("CDC approval retries the unchanged reviewed body with the stack key at the integrations host", async () => {
+  const { fetch, calls } = fakeFetch([{ status: 503 }, { body: { ok: true } }]);
+  const input = {
+    graph: GRAPH,
+    jobId: "job",
+    graphEpoch: 3,
+    expectedRevision: 4,
+    catalogDigest: "a".repeat(64),
+    mapping: {
+      tables: {
+        pg_42: {
+          class_iri: "https://example.test/Item",
+          properties: {},
+          foreign_keys: [],
+        },
+      },
+    },
+    maxCaptureBytes: 1_000_000,
+  };
+  await client(fetch).integrations.cdcApproveDiscovery("postgres", input);
+  assert.equal(calls.length, 2);
+  for (const call of calls) {
+    assert.equal(
+      call.url.href,
+      `${API}/v1/integrations/connections/postgres/cdc/discovery/approve`,
+    );
+    assert.equal(call.headers.authorization, `Bearer ${KEY}`);
+    assert.deepEqual(call.body, {
+      graph: GRAPH,
+      job_id: "job",
+      graph_epoch: 3,
+      expected_revision: 4,
+      catalog_digest: input.catalogDigest,
+      mapping: input.mapping,
+      max_capture_bytes: 1_000_000,
+    });
+  }
+  await client(fetch).integrations.cdcReviewDiscovery("postgres", input);
+  assert.equal(
+    calls[2].url.pathname,
+    "/v1/integrations/connections/postgres/cdc/discovery/review",
+  );
+  assert.deepEqual(calls[2].body, calls[0].body);
 });
