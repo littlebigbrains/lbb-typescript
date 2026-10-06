@@ -371,7 +371,7 @@ test("query namespace covers the parsed and raw SPARQL reads", async () => {
   ]);
 });
 
-function rewriteResponse(
+function askResponse(
   overrides: Partial<Schemas["QueryRewriteResponse"]> = {},
 ): Schemas["QueryRewriteResponse"] {
   return {
@@ -407,7 +407,7 @@ function rewriteResponse(
   };
 }
 
-test("query rewrite posts the question with consistency on the URL and no retry", async () => {
+test("query ask posts the question with consistency on the URL and no retry", async () => {
   const { fetch, urls, bodies } = queuedFetch([
     {
       status: 503,
@@ -418,40 +418,40 @@ test("query rewrite posts the question with consistency on the URL and no retry"
         },
       },
     },
-    { body: rewriteResponse() },
+    { body: askResponse() },
   ]);
   const client = new LbbClient({ baseUrl: "http://h", fetch, retryDelayMs: 0 });
 
-  await assert.rejects(
-    client.query.rewrite({ question: "Which services exist?" }),
-    (error) => {
-      assert.ok(error instanceof LbbError);
-      assert.equal(error.status, 503);
-      assert.equal(error.code, "rewrite_model_unavailable");
-      return true;
-    },
-  );
-  assert.equal(urls.length, 1, "a rewrite spends model tokens: no retry");
+  await assert.rejects(client.query.ask("Which services exist?"), (error) => {
+    assert.ok(error instanceof LbbError);
+    assert.equal(error.status, 503);
+    assert.equal(error.code, "rewrite_model_unavailable");
+    return true;
+  });
+  assert.equal(urls.length, 1, "a question spends model tokens: no retry");
 
-  const response = await client.query.rewrite(
-    { question: "Which services exist?", mode: "route" },
-    { consistency: "strong" },
-  );
-  assert.equal(response.route.kind, "lookup");
+  const routed = await client.query.ask("Which services exist?", {
+    mode: "route",
+    consistency: "strong",
+  });
+  assert.equal(routed.route.kind, "lookup");
   assert.deepEqual(urls, [
-    "http://h/v1/query/rewrite",
-    "http://h/v1/query/rewrite?consistency=strong",
+    "http://h/v1/query/ask",
+    "http://h/v1/query/ask?consistency=strong",
   ]);
+  assert.deepEqual(JSON.parse(bodies[0] ?? "{}"), {
+    question: "Which services exist?",
+  });
   assert.deepEqual(JSON.parse(bodies[1] ?? "{}"), {
     question: "Which services exist?",
     mode: "route",
   });
 });
 
-test("query rewrite retries when the caller asks for it", async () => {
+test("query ask retries when the caller asks for it", async () => {
   const { fetch, urls } = queuedFetch([
     { status: 503, body: { error: { code: "rewrite_model_unavailable" } } },
-    { body: rewriteResponse() },
+    { body: askResponse() },
   ]);
   const client = new LbbClient({
     baseUrl: "http://h",
@@ -461,18 +461,15 @@ test("query rewrite retries when the caller asks for it", async () => {
     defaultConsistency: "eventual",
   });
 
-  await client.query.rewrite(
-    { question: "Which services exist?" },
-    { retry: true },
-  );
+  await client.query.ask("Which services exist?", { retry: true });
   assert.deepEqual(urls, [
-    "http://h/v1/query/rewrite?graph=main&consistency=eventual",
-    "http://h/v1/query/rewrite?graph=main&consistency=eventual",
+    "http://h/v1/query/ask?graph=main&consistency=eventual",
+    "http://h/v1/query/ask?graph=main&consistency=eventual",
   ]);
 });
 
-test("query ask runs the rewrite and parses its rows", async () => {
-  const response = rewriteResponse({
+test("query ask sends its options and parses the rows of the answer's query", async () => {
+  const response = askResponse({
     result: {
       results: JSON.stringify({
         head: { vars: ["name"] },
@@ -499,22 +496,21 @@ test("query ask runs the rewrite and parses its rows", async () => {
 
   const answer = await client.query.ask("Which services exist?", {
     context: "Services of the platform team.",
-    previous: [{ sparql: "SELECT * WHERE { ?s ?p ?o }", note: "too wide" }],
     limit: 50,
     asOfCommitSeq: 7,
     today: "2026-10-04",
+    includeGrounding: true,
     consistency: "strong",
   });
 
-  assert.equal(urls[0], "http://h/v1/query/rewrite?consistency=strong");
+  assert.equal(urls[0], "http://h/v1/query/ask?consistency=strong");
   assert.deepEqual(JSON.parse(bodies[0] ?? "{}"), {
     question: "Which services exist?",
-    run: true,
     context: "Services of the platform team.",
-    previous: [{ sparql: "SELECT * WHERE { ?s ?p ?o }", note: "too wide" }],
     limit: 50,
     as_of_commit_seq: 7,
     today: "2026-10-04",
+    include_grounding: true,
   });
   assert.equal(answer.route.kind, "lookup");
   assert.equal(answer.route.by, "router");
@@ -529,7 +525,47 @@ test("query ask runs the rewrite and parses its rows", async () => {
   assert.equal(answer.snapshot?.served_at_seq, 7);
   assert.equal(answer.error, null);
   assert.equal(answer.traceId, "tr_1");
-  assert.equal(answer.rewrite.attempts, 1);
+  assert.deepEqual(answer.response, response);
+  assert.equal(answer.response.attempts, 1);
+});
+
+test("query ask returns the answer, its citations and the steps", async () => {
+  const steps: Schemas["QueryAnswerStep"][] = [
+    {
+      n: 1,
+      tool: "sparql",
+      input: { query: "SELECT ?name WHERE { ?s ?p ?name }" },
+      ok: true,
+      rows: 2,
+      ms: 12,
+    },
+  ];
+  const { fetch, bodies } = queuedFetch([
+    {
+      body: askResponse({
+        answer: { text: "Two services.", citations: ["https://x.test/e/a"] },
+        steps,
+      }),
+    },
+    { body: askResponse() },
+  ]);
+  const client = new LbbClient({ baseUrl: "http://h", fetch });
+
+  const answer = await client.query.ask("Which services exist?");
+  assert.deepEqual(JSON.parse(bodies[0] ?? "{}"), {
+    question: "Which services exist?",
+  });
+  assert.equal(answer.answer, "Two services.");
+  assert.deepEqual(answer.citations, ["https://x.test/e/a"]);
+  assert.deepEqual(answer.steps, steps);
+
+  const routed = await client.query.ask("Which services exist?", {
+    mode: "route",
+  });
+  assert.equal(JSON.parse(bodies[1] ?? "{}").mode, "route");
+  assert.equal(routed.answer, null);
+  assert.deepEqual(routed.citations, []);
+  assert.deepEqual(routed.steps, []);
 });
 
 test("query ask sends the anchors and returns the linked names", async () => {
@@ -547,8 +583,8 @@ test("query ask sends the anchors and returns the linked names", async () => {
     note: "not in the graph at the latest commit",
   };
   const { fetch, bodies } = queuedFetch([
-    { body: rewriteResponse({ linked: [link], anchors: [anchor] }) },
-    { body: rewriteResponse() },
+    { body: askResponse({ linked: [link], anchors: [anchor] }) },
+    { body: askResponse() },
   ]);
   const client = new LbbClient({ baseUrl: "http://h", fetch });
 
@@ -557,7 +593,6 @@ test("query ask sends the anchors and returns the linked names", async () => {
   });
   assert.deepEqual(JSON.parse(bodies[0] ?? "{}"), {
     question: "Show me everything about Quelmann.",
-    run: true,
     anchor: ["https://x.test/e/nope"],
   });
   assert.deepEqual(answer.linked, [link]);
@@ -566,7 +601,6 @@ test("query ask sends the anchors and returns the linked names", async () => {
   const bare = await client.query.ask("Which services exist?", { anchor: [] });
   assert.deepEqual(JSON.parse(bodies[1] ?? "{}"), {
     question: "Which services exist?",
-    run: true,
   });
   assert.deepEqual(bare.linked, []);
   assert.deepEqual(bare.anchors, []);
@@ -580,11 +614,23 @@ test("query ask sends a timeline and returns the history of a comparison", async
     as_of_commit_seq: 1,
     resolved_by: "timeline",
     label: "Tender",
+    key: ["t"],
     added: [{ t: { type: "uri", value: "https://x.test/e/c" } }],
     removed: [],
+    changed: [],
+    totals: { added: 1, removed: 0, changed: 0, unchanged: 4 },
   };
   const { fetch, bodies } = queuedFetch([
-    { body: rewriteResponse({ history }) },
+    {
+      body: askResponse({
+        query: {
+          sparql: "SELECT ?t WHERE { ?t a <https://x.test/class/task> }",
+          entailment: "none",
+          as_of_commit_seq: 3,
+        },
+        history,
+      }),
+    },
   ]);
   const client = new LbbClient({ baseUrl: "http://h", fetch });
   const timeline: Schemas["QueryRewriteTimelinePoint"][] = [
@@ -596,25 +642,28 @@ test("query ask sends a timeline and returns the history of a comparison", async
   });
   assert.deepEqual(JSON.parse(bodies[0] ?? "{}"), {
     question: "What changed since 5 June?",
-    run: true,
     timeline,
   });
   assert.deepEqual(answer.history, history);
+  assert.equal(answer.query?.as_of_commit_seq, 3, "the later point");
+  assert.deepEqual(answer.rows, [], "a comparison has no result rows");
 });
 
-test("query ask without a run keeps the route, the rationale and the error", async () => {
+test("query ask keeps the route, the rationale and why the loop stopped", async () => {
   const { fetch, bodies } = queuedFetch([
     {
-      body: rewriteResponse({
+      body: askResponse({
         route: { kind: "unanswerable", confidence: 0.8, by: "rewriter" },
         query: null,
         rationale: "The graph holds no salaries.",
+        answer: { text: "The graph holds no salaries.", citations: [] },
       }),
     },
     {
-      body: rewriteResponse({
+      body: askResponse({
         attempts: 2,
-        error: "unknown prefix ex",
+        error:
+          "The answer loop stopped at its time limit before it answered; the result holds the best rows it read.",
       }),
     },
   ]);
@@ -623,28 +672,29 @@ test("query ask without a run keeps the route, the rationale and the error", asy
   const unanswerable = await client.query.ask("What does Ada earn?");
   assert.deepEqual(JSON.parse(bodies[0] ?? "{}"), {
     question: "What does Ada earn?",
-    run: true,
   });
   assert.equal(unanswerable.route.kind, "unanswerable");
   assert.equal(unanswerable.query, null);
   assert.equal(unanswerable.rationale, "The graph holds no salaries.");
+  assert.equal(unanswerable.answer, "The graph holds no salaries.");
   assert.deepEqual(unanswerable.rows, []);
   assert.deepEqual(unanswerable.vars, []);
   assert.equal(unanswerable.traceId, null);
 
-  const failed = await client.query.ask("Which services exist?", {
+  const stopped = await client.query.ask("Which services exist?", {
     route: "lookup",
   });
   assert.equal(JSON.parse(bodies[1] ?? "{}").route, "lookup");
-  assert.equal(failed.error, "unknown prefix ex");
-  assert.equal(failed.rewrite.attempts, 2);
-  assert.deepEqual(failed.rows, []);
+  assert.match(stopped.error ?? "", /stopped at its time limit/);
+  assert.equal(stopped.answer, null);
+  assert.equal(stopped.response.attempts, 2);
+  assert.deepEqual(stopped.rows, []);
 });
 
 test("query ask returns the answer of an ASK query", async () => {
   const { fetch } = queuedFetch([
     {
-      body: rewriteResponse({
+      body: askResponse({
         query: { sparql: "ASK { ?s ?p ?o }", entailment: "rdfs" },
         result: {
           results: JSON.stringify({ head: {}, boolean: true }),

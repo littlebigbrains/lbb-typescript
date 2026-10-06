@@ -46,7 +46,7 @@ export type {
   OntologyStarterApplyOptions,
   QueryAskOptions,
   QueryAskResult,
-  QueryRewriteStreamEvent,
+  QueryAskStreamEvent,
 } from "./namespaces.js";
 export type {
   IntegrationsNamespace,

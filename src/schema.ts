@@ -1479,6 +1479,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/query/ask": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Answer a question about the graph. The router model picks the kind of question (lookup, aggregate, search, history, schema, unanswerable); the rewriter model runs a bounded loop of tool calls (queries, name lookups, the description, the commit of a date, a comparison of two points), reads the rows, and answers in plain words with citations and the query whose rows hold the answer. `mode: "route"` returns the route alone, with no rewriter call. With `Accept: text/event-stream` the answer is a stream of progress events (`QueryRewriteEvent`) that ends with `done` (the same response) or `error`. Replaces `POST /v1/query/rewrite`, removed on 2026-10-05 */
+        post: operations["post_v1_query_ask"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/query/compare": {
         parameters: {
             query?: never;
@@ -1530,23 +1547,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/query/rewrite": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Turn a question into the SPARQL query to run: the router model picks the kind of query (lookup, aggregate, search, history, schema, unanswerable), the rewriter model writes it from a description of the graph, and the server checks it. `run: true` also runs it (the question becomes the eval trace's request) and corrects a query that fails once. With `Accept: text/event-stream` the answer is a stream of progress events (`QueryRewriteEvent`) that ends with `done` (the same response) or `error` */
-        post: operations["post_v1_query_rewrite"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/v1/query/rewrite/profile": {
         parameters: {
             query?: never;
@@ -1554,9 +1554,9 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Read the graph's rewrite profile: the notes and worked examples the rewriter reads for every question of the graph, and its version (0 when the graph has none) */
+        /** Read the graph's rewrite profile: the notes and worked examples the model of `POST /v1/query/ask` reads for every question of the graph, and its version (0 when the graph has none) */
         get: operations["get_v1_query_rewrite_profile"];
-        /** Store the graph's rewrite profile: `notes` (at most 8,000 characters) and up to 20 `examples` of a question and the SELECT or ASK query that answers it (32,000 characters together); each query must parse. `expected_version` makes the write conditional: another stored version answers 409 conflict. Each write adds 1 to the version; empty notes and no examples clear the profile. The rewriter reads it as a cached block after the graph description; a request's `context` still adds notes per call */
+        /** Store the graph's rewrite profile: `notes` (at most 8,000 characters) and up to 20 `examples` of a question and the SELECT or ASK query that answers it (32,000 characters together); each query must parse. `expected_version` makes the write conditional: another stored version answers 409 conflict. Each write adds 1 to the version; empty notes and no examples clear the profile. `POST /v1/query/ask` reads it as a cached block after the graph description; a request's `context` still adds notes per call */
         put: operations["put_v1_query_rewrite_profile"];
         post?: never;
         delete?: never;
@@ -3657,17 +3657,25 @@ export interface components {
             type: string;
         };
         /**
-         * @description The inputs of an Ask request that shape its answer, kept on an `ask`
-         *     trace and its golden so a run asks the same way. Every field is optional.
+         * @description The inputs of an Ask request (`POST /v1/query/ask`) that shape its
+         *     answer, kept on an `ask` trace and its golden so a run asks the same way.
+         *     Every field is optional. An object stored before 2026-10-06 may hold
+         *     `previous`, the earlier steps of the removed one-shot rewrite: they read
+         *     as notes at the end of `context` (the loop reads what the app knows
+         *     there), so a follow-up question keeps its meaning when a run asks it
+         *     again.
          */
         EvalAskInput: {
             /** @description The entity IRIs the user picked (`anchor`). */
             anchor?: string[];
             /** @description The app's notes for the model (`context`). */
             context?: string | null;
-            /** @description The earlier steps of the question (`previous`). */
-            previous?: components["schemas"]["QueryRewriteStep"][];
             route?: null | components["schemas"]["QueryRoute"];
+            /**
+             * @description The app's own dated points (`timeline`), so a history question finds
+             *     the same commits on every run.
+             */
+            timeline?: components["schemas"]["QueryRewriteTimelinePoint"][];
             /**
              * @description The date the question was asked (`YYYY-MM-DD`), so a relative
              *     question reads the same window on every run.
@@ -3922,6 +3930,7 @@ export interface components {
                 [key: string]: components["schemas"]["EvalLabel"];
             };
             query_type?: null | components["schemas"]["EvalQueryType"];
+            reply?: null | components["schemas"]["QueryAnswer"];
             /** @description The user's words, as the caller passed them in `request`. */
             request: string;
             results: components["schemas"]["EvalItems"];
@@ -3982,6 +3991,7 @@ export interface components {
             relevant_missing?: number;
             /** @description Known-relevant results that came back. */
             relevant_returned?: number;
+            reply?: null | components["schemas"]["QueryAnswer"];
             /** @description The trace opened for the unknown results (the review queue). */
             review_trace_id?: string | null;
             route?: null | components["schemas"]["QueryRoute"];
@@ -5931,7 +5941,7 @@ export interface components {
          * @description What LBB used a model for. Every call has one job.
          * @enum {string}
          */
-        ModelJob: "rerank" | "route" | "rewrite" | "fit" | "propose" | "label" | "embed";
+        ModelJob: "rerank" | "route" | "rewrite" | "fit" | "propose" | "label" | "embed" | "answer";
         /** @description One job and model over a month of checks. */
         ModelJobQuality: {
             /** Format: int64 */
@@ -7257,6 +7267,55 @@ export interface components {
             query_lag_commits: number;
             snapshot: components["schemas"]["PublishedReadSnapshotView"];
         };
+        /** @description The answer in plain words. */
+        QueryAnswer: {
+            /**
+             * @description IRIs of the entities the answer names, at most 20. Each one appeared
+             *     in the rows the loop read; the server removes any other.
+             */
+            citations?: string[];
+            /** @description A short answer in plain words. */
+            text: string;
+        };
+        /** @description One tool call of the answer loop. */
+        QueryAnswerStep: {
+            /** @description Why the step failed. */
+            error?: string | null;
+            /** @description The model's input to the tool, a JSON object; long texts are cut. */
+            input: unknown;
+            /** Format: int64 */
+            ms: number;
+            /**
+             * Format: int32
+             * @description 1 for the first call.
+             */
+            n: number;
+            /** @description The tool answered; `false` when it failed (the model read the error). */
+            ok: boolean;
+            /**
+             * Format: int64
+             * @description Rows a `sparql` step returned; for a `compare` step, the entries that
+             *     differ (added, removed and changed).
+             */
+            rows?: number | null;
+            tool: components["schemas"]["QueryAnswerTool"];
+        };
+        /** @description One tool call of a streamed answer loop ended. */
+        QueryAnswerStepEvent: {
+            /** @description What the tool was asked, in one line of at most 200 characters. */
+            input: string;
+            /** Format: int32 */
+            n: number;
+            ok: boolean;
+            /** Format: int64 */
+            rows?: number | null;
+            tool: components["schemas"]["QueryAnswerTool"];
+        };
+        /**
+         * @description A tool the answer loop can call.
+         * @enum {string}
+         */
+        QueryAnswerTool: "sparql" | "find_entities" | "describe" | "commit_for_date" | "compare";
         /** @description One key whose rows differ between the two points. */
         QueryCompareChange: {
             /** @description Its rows at the later point, without the key; at most 20. */
@@ -7551,7 +7610,7 @@ export interface components {
             of: number;
         };
         /**
-         * @description How the server found the commit of a `history` question.
+         * @description How the loop found the commit of a `history` answer.
          * @enum {string}
          */
         QueryHistoryResolution: "commit_time" | "timeline" | "request";
@@ -7616,16 +7675,26 @@ export interface components {
             types?: string[];
         };
         /**
-         * @description One event of a streamed rewrite: `POST /v1/query/rewrite` with
+         * @description One event of a streamed question: `POST /v1/query/ask` with
          *     `Accept: text/event-stream`. On the wire each event is
          *     `event: <event>\ndata: <data as JSON>\n\n`. The order: `grounding`,
-         *     `route`, then per attempt `query`, `run` and `rows` (a comparison runs
-         *     twice: `run` and `rows` at the earlier point, then at the later point),
-         *     with `repair` before a second attempt; `done` or `error` ends the stream. A second `route`
-         *     comes when the rewriter chose another route. Clients ignore an event name
-         *     they do not know: later versions add events.
+         *     `route`, a `step` per tool call of the loop, `answer`, then `done`; a
+         *     second `route` comes before `answer` when the loop chose another route.
+         *     `mode: "route"` sends `grounding`, `route` and `done`. `error` ends a
+         *     stream that failed. Clients ignore an event name they do not know: later
+         *     versions add events.
          */
-        QueryRewriteEvent: components["schemas"]["QueryRewriteEventGrounding"] | components["schemas"]["QueryRewriteEventRoute"] | components["schemas"]["QueryRewriteEventQuery"] | components["schemas"]["QueryRewriteEventRun"] | components["schemas"]["QueryRewriteEventRows"] | components["schemas"]["QueryRewriteEventRepair"] | components["schemas"]["QueryRewriteEventDone"] | components["schemas"]["QueryRewriteEventError"];
+        QueryRewriteEvent: components["schemas"]["QueryRewriteEventGrounding"] | components["schemas"]["QueryRewriteEventRoute"] | components["schemas"]["QueryRewriteEventStep"] | components["schemas"]["QueryRewriteEventAnswer"] | components["schemas"]["QueryRewriteEventDone"] | components["schemas"]["QueryRewriteEventError"];
+        /** @description The answer, before `done`. */
+        QueryRewriteEventAnswer: {
+            /** @description The answer, before `done`. */
+            data: components["schemas"]["QueryAnswer"];
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            event: "answer";
+        };
         /** @description The whole response: the same JSON as the response without a stream. */
         QueryRewriteEventDone: {
             /** @description The whole response: the same JSON as the response without a stream. */
@@ -7652,30 +7721,14 @@ export interface components {
              */
             event: "grounding";
         };
-        QueryRewriteEventQuery: {
-            data: components["schemas"]["QueryRewriteQueryEvent"];
-            /**
-             * @description discriminator enum property added by openapi-typescript
-             * @enum {string}
-             */
-            event: "query";
-        };
-        QueryRewriteEventRepair: {
-            data: components["schemas"]["QueryRewriteRepairEvent"];
-            /**
-             * @description discriminator enum property added by openapi-typescript
-             * @enum {string}
-             */
-            event: "repair";
-        };
         /**
          * @description The router's route as soon as it answers, the caller's route at once,
-         *     or the rewriter's route when it decides.
+         *     or the loop's route when it answers.
          */
         QueryRewriteEventRoute: {
             /**
              * @description The router's route as soon as it answers, the caller's route at once,
-             *     or the rewriter's route when it decides.
+             *     or the loop's route when it answers.
              */
             data: components["schemas"]["QueryRouteDecision"];
             /**
@@ -7684,21 +7737,15 @@ export interface components {
              */
             event: "route";
         };
-        QueryRewriteEventRows: {
-            data: components["schemas"]["QueryRewriteRowsEvent"];
+        /** @description One tool call of the loop ended. */
+        QueryRewriteEventStep: {
+            /** @description One tool call of the loop ended. */
+            data: components["schemas"]["QueryAnswerStepEvent"];
             /**
              * @description discriminator enum property added by openapi-typescript
              * @enum {string}
              */
-            event: "rows";
-        };
-        QueryRewriteEventRun: {
-            data: components["schemas"]["QueryRewriteRunEvent"];
-            /**
-             * @description discriminator enum property added by openapi-typescript
-             * @enum {string}
-             */
-            event: "run";
+            event: "step";
         };
         /**
          * @description One worked example of a profile: a question and the query that answers
@@ -7753,7 +7800,7 @@ export interface components {
             /**
              * Format: int64
              * @description The version of the graph's stored profile (`PUT
-             *     /v1/query/rewrite/profile`) the rewriter read; absent when the graph
+             *     /v1/query/rewrite/profile`) the model read; absent when the graph
              *     has no profile, or an empty one.
              */
             profile_version?: number | null;
@@ -7766,7 +7813,7 @@ export interface components {
              */
             text?: string | null;
         };
-        /** @description The graph description is ready (the first event of a streamed rewrite). */
+        /** @description The graph description is ready (the first event of a stream). */
         QueryRewriteGroundingEvent: {
             /**
              * Format: int64
@@ -7782,49 +7829,50 @@ export interface components {
             classes: number;
         };
         /**
-         * @description What a `history` question asks for beyond the query, and where the
-         *     server read it.
+         * @description Where a `history` answer read the graph: the commit of a date, or the
+         *     two points of a comparison and what differs between them.
          */
         QueryRewriteHistory: {
             /**
-             * @description A comparison's rows that `after` has and `before` has not; with a
-             *     `key`, the rows of the entities only `after` has. At most 500.
+             * @description A comparison's rows that the later point has and the earlier one has
+             *     not; with a `key`, the rows of the entities only the later point has.
+             *     At most 500.
              */
             added?: {
                 [key: string]: components["schemas"]["QueryRewriteTerm"];
             }[] | null;
-            after?: null | components["schemas"]["SparqlTextResponse"];
             /**
              * Format: int64
-             * @description The commit of the question's point: the commit of `as_of_date`, or
-             *     the commit the question or the request names. For a comparison, the
-             *     earlier point. Absent when the server could not resolve the date.
+             * @description The commit the query read; for a comparison, the earlier point.
              */
             as_of_commit_seq?: number | null;
-            /** @description The date the question names (`YYYY-MM-DD`). */
+            /**
+             * @description The date the loop resolved (`YYYY-MM-DD`): of the query's commit, or
+             *     of a comparison's earlier point.
+             */
             as_of_date?: string | null;
-            before?: null | components["schemas"]["SparqlTextResponse"];
             /**
              * @description With a `key`: the entities whose rows differ, with their rows at both
              *     points. At most 500.
              */
             changed?: components["schemas"]["QueryCompareChange"][] | null;
             /**
-             * @description The question asks what changed: the server runs the query at the
-             *     earlier point and at the later one, and compares the rows.
+             * @description The answer comes from the loop's `compare` tool: the query ran at the
+             *     earlier point and at the later one (`query.as_of_commit_seq`), and
+             *     the lists below hold what differs.
              */
             compare: boolean;
             /**
-             * @description The variable the rows of a comparison were paired by: the first
-             *     variable when its values are entities. Empty when whole rows were
-             *     compared.
+             * @description The variables the rows of a comparison were paired by. Empty when
+             *     whole rows were compared.
              */
             key?: string[];
             /** @description The label of the timeline point the date resolved to. */
             label?: string | null;
             /**
-             * @description A comparison's rows that `before` has and `after` has not; with a
-             *     `key`, the rows of the entities only `before` has. At most 500.
+             * @description A comparison's rows that the earlier point has and the later one has
+             *     not; with a `key`, the rows of the entities only the earlier point
+             *     has. At most 500.
              *     Without a key a changed value shows as a removed row and an added row.
              */
             removed?: {
@@ -7859,11 +7907,11 @@ export interface components {
             text: string;
         };
         /**
-         * @description What the call returns.
+         * @description What `POST /v1/query/ask` returns.
          * @enum {string}
          */
-        QueryRewriteMode: "rewrite" | "route";
-        /** @description One model call of a rewrite. */
+        QueryRewriteMode: "answer" | "route";
+        /** @description One model call of a question. */
         QueryRewriteModelCall: {
             /**
              * Format: int64
@@ -7887,11 +7935,6 @@ export interface components {
          * @enum {string}
          */
         QueryRewriteModelRole: "router" | "rewriter";
-        /**
-         * @description Which run of a comparison.
-         * @enum {string}
-         */
-        QueryRewritePoint: "before" | "after";
         /** @description The graph's rewrite profile. */
         QueryRewriteProfile: {
             /**
@@ -7911,7 +7954,8 @@ export interface components {
         };
         /**
          * @description Store the graph's rewrite profile (`PUT /v1/query/rewrite/profile`):
-         *     notes and examples the rewriter reads for every question of the graph.
+         *     notes and examples the model of `POST /v1/query/ask` reads for every
+         *     question of the graph.
          */
         QueryRewriteProfileRequest: {
             /** @description At most 20 worked examples, 32,000 characters together. */
@@ -7930,38 +7974,17 @@ export interface components {
              */
             notes?: string;
         };
-        /** @description The rewriter wrote a query (one per attempt). */
-        QueryRewriteQueryEvent: {
-            /**
-             * Format: int32
-             * @description 1 for the first query, 2 for the correction.
-             */
-            attempt: number;
-            entailment: components["schemas"]["SparqlEntailment"];
-            /**
-             * @description The query: the checked text with its `PREFIX` lines, or the model's
-             *     text when it did not pass the check.
-             */
-            sparql: string;
-        };
-        /** @description The query failed with a client error, and the rewriter corrects it. */
-        QueryRewriteRepairEvent: {
-            /**
-             * Format: int32
-             * @description The attempt that comes next (2).
-             */
-            attempt: number;
-            /** @description The error the rewriter reads. */
-            error: string;
-        };
-        /** @description Turn a question into the query to run (`POST /v1/query/rewrite`). */
+        /**
+         * @description Answer a question about the graph (`POST /v1/query/ask`). An unknown
+         *     field answers `400`: the one-shot rewrite's `run` and `previous` are gone.
+         */
         QueryRewriteRequest: {
             /**
              * @description Entity IRIs the user picked in the app, at most 10. The server reads
              *     each one at the read commit (its types, its label, and a summary of
              *     its links) and tells the rewriter to use these IRIs directly instead
              *     of matching their names. An IRI that is not in the graph gets a note
-             *     in `anchors`, not an error.
+             *     in `anchors`, not an error. `mode: "route"` reads no anchors.
              */
             anchor?: string[];
             /**
@@ -7978,32 +8001,26 @@ export interface components {
             context?: string | null;
             /**
              * @description Return the graph description the models read in `grounding.text`:
-             *     to see why a query came out as it did, or to reuse the description
-             *     in an app's own prompt. With `mode: "route"` no rewriter call is made.
+             *     to see why an answer came out as it did, or to reuse the description
+             *     in an app's own prompt.
              */
             include_grounding?: boolean;
             /**
              * Format: int32
-             * @description Rows a run returns: 1 to 1,000, default 100.
+             * @description Rows each query of the loop returns: 1 to 1,000, default 100.
              */
             limit?: number | null;
             mode?: components["schemas"]["QueryRewriteMode"];
-            /** @description Earlier steps of the same question, oldest first; at most 6. */
-            previous?: components["schemas"]["QueryRewriteStep"][];
             /** @description The question, 1 to 4,000 characters. */
             question: string;
             route?: null | components["schemas"]["QueryRoute"];
             /**
-             * @description Run the query and return its rows in `result`. A query that fails
-             *     with a client error is corrected once.
-             */
-            run?: boolean;
-            /**
-             * @description Dated points that stand for the graph's commits, at most 200. A
-             *     history question about a date reads the commit of the latest point
-             *     on or before that date, instead of the commit written last on or
-             *     before the end of that day (UTC). For graphs whose commits stand for
-             *     other dates (a demo's milestones, an import of old records).
+             * @description Dated points that stand for the graph's commits, at most 200. The
+             *     loop's `commit_for_date` and `compare` read a date as the commit of
+             *     the latest point on or before it, instead of the commit written last
+             *     on or before the end of that day (UTC). For graphs whose commits
+             *     stand for other dates (a demo's milestones, an import of old
+             *     records).
              */
             timeline?: components["schemas"]["QueryRewriteTimelinePoint"][];
             /**
@@ -8012,74 +8029,40 @@ export interface components {
              */
             today?: string | null;
         };
+        /** @description The answer of `POST /v1/query/ask`. */
         QueryRewriteResponse: {
             /**
              * @description What the server read about each anchored IRI (`anchor`), in the
              *     request's order.
              */
             anchors?: components["schemas"]["QueryRewriteAnchor"][];
+            answer?: null | components["schemas"]["QueryAnswer"];
             /**
              * Format: int32
-             * @description Queries the rewriter wrote: 2 when it corrected one.
+             * @description Queries the loop ran (its `sparql` and `compare` steps).
              */
             attempts: number;
-            /** @description Why the last attempt failed, when the query did not parse or run. */
+            /** @description Why the loop stopped before it answered. */
             error?: string | null;
             grounding: components["schemas"]["QueryRewriteGrounding"];
             history?: null | components["schemas"]["QueryRewriteHistory"];
             /**
              * @description Names of the question linked to entities of the graph before the
-             *     rewriter wrote the query; the rewriter uses their IRIs directly.
+             *     loop started; the model uses their IRIs directly.
              */
             linked?: components["schemas"]["QueryRewriteLink"][];
             models: components["schemas"]["QueryRewriteModelCall"][];
             query?: null | components["schemas"]["RewrittenQuery"];
-            /** @description One or two sentences: why this route and this query. */
+            /**
+             * @description One sentence: which rows answer the question, or why the loop
+             *     stopped. For `mode: "route"`, who chose the route.
+             */
             rationale: string;
             result?: null | components["schemas"]["SparqlTextResponse"];
             route: components["schemas"]["QueryRouteDecision"];
+            /** @description The tool calls of the loop, in order. */
+            steps?: components["schemas"]["QueryAnswerStep"][];
             timings: components["schemas"]["QueryRewriteTimings"];
-        };
-        /** @description The run of the query ended with rows. */
-        QueryRewriteRowsEvent: {
-            /**
-             * Format: int64
-             * @description Rows the run returned.
-             */
-            count: number;
-            /**
-             * Format: int64
-             * @description Milliseconds the run took.
-             */
-            ms: number;
-        };
-        /** @description The run of the query started. */
-        QueryRewriteRunEvent: {
-            /**
-             * Format: int64
-             * @description The commit the run reads; `null` for the latest.
-             */
-            as_of_commit_seq?: number | null;
-            point?: null | components["schemas"]["QueryRewritePoint"];
-        };
-        /**
-         * @description One earlier step of the same question: a query the caller ran, and what
-         *     came of it.
-         */
-        QueryRewriteStep: {
-            /** @description The error the query got, when it failed. */
-            error?: string | null;
-            /** @description What the caller concluded ("the amounts are missing"). */
-            note?: string | null;
-            /**
-             * Format: int64
-             * @description Rows it returned.
-             */
-            rows?: number | null;
-            /** @description The first rows as text, for the model to read. */
-            sample?: string | null;
-            /** @description The SPARQL query of the step. */
-            sparql: string;
         };
         /**
          * @description One value of a row of a comparison, as SPARQL 1.1 Query Results JSON
@@ -8111,7 +8094,7 @@ export interface components {
              */
             label?: string | null;
         };
-        /** @description Where the time of a rewrite went, in milliseconds. */
+        /** @description Where the time of a question went, in milliseconds. */
         QueryRewriteTimings: {
             /**
              * Format: int64
@@ -8126,11 +8109,17 @@ export interface components {
              *     is not built yet included).
              */
             link_ms?: number;
-            /** Format: int64 */
+            /**
+             * Format: int64
+             * @description The rewriter model's turns of the loop.
+             */
             rewrite_ms: number;
             /** Format: int64 */
             route_ms: number;
-            /** Format: int64 */
+            /**
+             * Format: int64
+             * @description The loop's tool calls.
+             */
             run_ms: number;
             /** Format: int64 */
             total_ms: number;
@@ -8474,11 +8463,11 @@ export interface components {
          * @enum {string}
          */
         RetrievalProfileId: "baseline" | "scored_atom_v1" | "graph_aware_v1" | "ndcg_v1";
-        /** @description The query the rewriter wrote. */
+        /** @description The query whose rows hold the answer. */
         RewrittenQuery: {
             /**
              * Format: int64
-             * @description The commit to read, when the question or the request names one.
+             * @description The commit the query read; for a comparison, the later point.
              */
             as_of_commit_seq?: number | null;
             /** @description The entailment the query needs; pass it to `POST /v1/query/sparql-text`. */
@@ -25692,6 +25681,149 @@ export interface operations {
             };
         };
     };
+    post_v1_query_ask: {
+        parameters: {
+            query?: {
+                /** @description Graph name (default `main`) */
+                graph?: string;
+                /** @description eventual (default) reads the last published commit; strong reads the head */
+                consistency?: string;
+            };
+            header?: {
+                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                "Lbb-Version"?: string;
+                /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
+                "Idempotency-Key"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["QueryRewriteRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QueryRewriteResponse"];
+                    "text/event-stream": string;
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Rate limit exceeded */
+            429: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Service unavailable */
+            503: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+        };
+    };
     post_v1_query_compare: {
         parameters: {
             query?: {
@@ -26006,149 +26138,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["QueryNamesResponse"];
-                };
-            };
-            /** @description Bad request */
-            400: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Forbidden */
-            403: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Not found */
-            404: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Conflict */
-            409: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Rate limit exceeded */
-            429: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Internal server error */
-            500: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Service unavailable */
-            503: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-        };
-    };
-    post_v1_query_rewrite: {
-        parameters: {
-            query?: {
-                /** @description Graph name (default `main`) */
-                graph?: string;
-                /** @description eventual (default) reads the last published commit; strong reads the head */
-                consistency?: string;
-            };
-            header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
-                "Lbb-Version"?: string;
-                /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
-                "Idempotency-Key"?: string;
-            };
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["QueryRewriteRequest"];
-            };
-        };
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["QueryRewriteResponse"];
-                    "text/event-stream": string;
                 };
             };
             /** @description Bad request */

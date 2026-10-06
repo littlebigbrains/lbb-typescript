@@ -107,45 +107,73 @@ for retention and evidence handling.
 
 ## Ask a question in plain words
 
-`query.ask` turns a question into a SPARQL query, runs it, and returns the rows.
-A router model selects the kind of query. A rewriter model writes the query from
-a description of the graph. The server checks the query before it runs it.
+`query.ask` answers a question about the graph in plain words. A router model
+picks the kind of question. A reasoning model then runs queries in a loop,
+reads their rows, and answers. The loop is bounded: a question takes about
+8 s.
 
 ```ts
-const answer = await lbb.query.ask(
+const result = await lbb.query.ask(
   "Which services write to the user database?",
   { context: "Services and databases of the platform team." },
 );
 
-console.log(answer.route.kind, answer.query?.sparql);
-for (const row of answer.rows) console.log(row);
+console.log(result.answer);
+console.log(result.citations); // the IRIs the answer names
+for (const row of result.rows) console.log(row);
 ```
 
-The graph can keep notes and worked examples that the rewriter reads for every
+`citations` holds the IRIs the answer names; each one is in the rows the loop
+read. `steps` lists the tool calls of the loop. `query` is the query whose rows
+hold the answer, and `rows` hold its rows. `traceId` names the eval
+trace of those rows, so you can label them. When the loop runs out of time,
+`answer` is `null`, `error` says why, and `rows` hold the best rows it read.
+
+`{ mode: "route" }` returns only the kind of question, in about 0.25 s. No
+query runs. Each call uses model tokens, so the client does not retry a failed
+call.
+
+The graph can keep notes and worked examples that the model reads for every
 question. Store them with `query.setRewriteProfile({ notes, examples,
 expected_version })` and read them with `query.rewriteProfile()`. A call's
 `context` still adds notes for that call.
 
-`answer.error` holds the error when the query did not run. `answer.traceId`
-names the eval trace of the run, so you can label its rows. `query.rewrite`
-returns the query without a run, and `mode: "route"` returns only the kind of
-query. Each call uses model tokens, so the client does not retry a failed call.
-
 The server finds the names in the question ("Quelmann", "TU Dresden") in the
-graph, and the query uses the IRIs it found. `answer.linked` lists them, so you
-can show "Did you mean …?". When the user has a record open, pass its IRI in
-`anchor` (`{ anchor: [iri] }`, at most 10).
+graph, and the queries use the IRIs it found. `result.linked` lists them, so
+you can show "Did you mean …?". When the user has a record open, pass its IRI
+in `anchor` (`{ anchor: [iri] }`, at most 10).
 
 A question about a date ("Which findings were open on 18 June?") reads the
-last commit written by the end of that day. `answer.history` names the commit
+last commit written by the end of that day. `result.history` names the commit
 and how the server found it. When your commits stand for other dates (a
 demo's milestones, an import of old records), pass `timeline`:
 `{ timeline: [{ date: "2026-06-18", as_of_commit_seq: 5, label: "Addendum" }] }`.
-A question that asks what changed runs at both points, and
-`answer.history.added` and `answer.history.removed` hold the rows that differ.
-When the first variable holds entities, the rows are paired by it:
-`answer.history.changed` holds the entities whose values changed, and
-`answer.history.totals` counts each list.
+A question that asks what changed compares two points.
+`result.history.added`, `removed` and `changed` hold what differs, and
+`result.history.totals` counts each list. `query` is then the compared query,
+read at the later point.
+
+### Show progress
+
+`query.askStream` takes the same arguments and yields an event for each stage.
+The last event, `done`, holds the whole response.
+
+```ts
+const controller = new AbortController();
+for await (const event of lbb.query.askStream(
+  "Which services write to the user database?",
+  { signal: controller.signal },
+)) {
+  if (event.event === "route") console.log("route", event.data.kind);
+  if (event.event === "step") console.log(event.data.tool, event.data.rows);
+  if (event.event === "done") console.log(event.data.answer?.text);
+}
+```
+
+The events are `grounding`, `route`, a `step` per tool call, `answer` and
+`done`. An error event throws the same `LbbError` as `query.ask`. Abort the
+signal to stop the server's work. The client skips event names it does not
+know.
 
 ### Tools for your own agent
 
@@ -171,27 +199,6 @@ console.log(diff.totals, diff.changed, diff.next_cursor);
 
 `compare` reads up to 20,000 rows per point and pages each list: pass
 `next_cursor` back as `cursor` with the same request.
-
-### Show progress
-
-`query.rewriteStream` sends the same request and yields an event for each step.
-The last event, `done`, holds the same response as `query.rewrite`.
-
-```ts
-const controller = new AbortController();
-for await (const event of lbb.query.rewriteStream(
-  { question: "Which services write to the user database?", run: true },
-  { signal: controller.signal },
-)) {
-  if (event.event === "route") console.log("route", event.data.kind);
-  if (event.event === "rows") console.log(event.data.count, "rows");
-  if (event.event === "done") console.log(event.data.result);
-}
-```
-
-The steps are `grounding`, `route`, `query`, `run`, `rows` and `repair`. An
-error event throws the same `LbbError` as `query.rewrite`. Abort the signal to
-stop the server's work. The client skips event names it does not know.
 
 ## Next steps
 

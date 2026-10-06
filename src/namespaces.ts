@@ -1206,7 +1206,7 @@ export class OntologyNamespace {
   }
 }
 
-/** Options of {@link QueryNamespace.ask}. */
+/** Options of {@link QueryNamespace.ask} and {@link QueryNamespace.askStream}. */
 export interface QueryAskOptions
   extends CallOptions, Pick<ReadConsistencyOptions, "consistency"> {
   /**
@@ -1215,11 +1215,9 @@ export interface QueryAskOptions
    * the model provider's prompt cache reads it.
    */
   context?: string;
-  /** Earlier steps of the same question, oldest first; at most 6. */
-  previous?: Schemas["QueryRewriteStep"][];
-  /** Fix the kind of query. Without it, the router model selects it. */
+  /** Fix the kind of question. Without it, the router model picks it. */
   route?: Schemas["QueryRoute"];
-  /** Rows the run returns: 1 to 1,000, default 100. */
+  /** Rows each query of the loop returns: 1 to 1,000, default 100. */
   limit?: number;
   /** Read the graph at this commit. */
   asOfCommitSeq?: number;
@@ -1227,7 +1225,7 @@ export interface QueryAskOptions
   today?: string;
   /**
    * Entity IRIs the user picked in your app, at most 10. The server reads
-   * each one, and the rewriter uses the IRIs directly instead of matching
+   * each one, and the model uses the IRIs directly instead of matching
    * their names.
    */
   anchor?: string[];
@@ -1239,17 +1237,32 @@ export interface QueryAskOptions
    * server maps a date to the last commit written by the end of that day.
    */
   timeline?: Schemas["QueryRewriteTimelinePoint"][];
+  /** Return the graph description the models read, in `grounding.text`. */
+  includeGrounding?: boolean;
+  /**
+   * `"answer"` (default): the model runs queries in a bounded loop, reads
+   * their rows, and answers in plain words. `"route"`: only the kind of
+   * question, from the router model (about 0.25 s). No query runs.
+   */
+  mode?: "answer" | "route";
 }
 
 /** What {@link QueryNamespace.ask} returns. */
 export interface QueryAskResult {
-  /** The kind of query, who chose it, and how sure the choice is. */
+  /** The kind of question, who chose it, and how sure the choice is. */
   route: Schemas["QueryRouteDecision"];
-  /** The checked query, or `null` when the graph does not hold the answer. */
+  /**
+   * The query whose rows hold the answer, or `null` when no query ran. For
+   * a comparison, the compared query; its `as_of_commit_seq` is the later
+   * point.
+   */
   query: Schemas["RewrittenQuery"] | null;
-  /** One or two sentences: why this route and this query. */
+  /** One sentence: which rows answer the question, or why the loop stopped. */
   rationale: string;
-  /** The rows as `{ variable: lexicalValue }`; empty when the query did not run. */
+  /**
+   * The rows of `query` as `{ variable: lexicalValue }`. Empty for a
+   * comparison and in route mode.
+   */
   rows: Record<string, string>[];
   /** The projected variables. */
   vars: string[];
@@ -1257,9 +1270,12 @@ export interface QueryAskResult {
   boolean: boolean | null;
   /** The snapshot the rows were read from, when the server names it. */
   snapshot: Schemas["SnapshotView"] | null;
-  /** Why the last attempt failed, when the query did not parse or run. */
+  /**
+   * Why the loop stopped before it answered. `rows` then hold the best rows
+   * it read.
+   */
   error: string | null;
-  /** The eval trace of the run. Label its rows with `evals.label`. */
+  /** The eval trace of the rows. Label them with `evals.label`. */
   traceId: string | null;
   /**
    * The names of the question the server linked to entities, for a "Did you
@@ -1269,33 +1285,42 @@ export interface QueryAskResult {
   /** What the server read about each anchored IRI, with a note when it was not found. */
   anchors: Schemas["QueryRewriteAnchor"][];
   /**
-   * For a history question: the date, the commit it resolved to and how,
-   * and for a comparison both runs and the rows `added` and `removed`.
-   * `null` for other questions.
+   * For a history question: the date, the commit it resolved to, and how.
+   * For a comparison, also the rows `added`, `removed` and `changed`
+   * between the two points. `null` for other questions.
    */
   history: Schemas["QueryRewriteHistory"] | null;
-  /** The whole response of `POST /v1/query/rewrite`. */
-  rewrite: Schemas["QueryRewriteResponse"];
+  /**
+   * The answer in plain words. `null` when the loop stopped before it
+   * answered (`error` says why), and in route mode.
+   */
+  answer: string | null;
+  /** The IRIs the answer names. Each one appeared in the rows the loop read. */
+  citations: string[];
+  /** The tool calls of the loop, in order. Empty in route mode. */
+  steps: Schemas["QueryAnswerStep"][];
+  /** The whole response of `POST /v1/query/ask`. */
+  response: Schemas["QueryRewriteResponse"];
 }
 
 /**
- * One event of {@link QueryNamespace.rewriteStream}: `grounding`, `route`,
- * `query`, `run`, `rows`, `repair`, and last `done` with the whole response.
- * The stream throws an `error` event as {@link LbbError}; it never yields one.
+ * One event of {@link QueryNamespace.askStream}: `grounding`, `route`, a
+ * `step` per tool call, `answer`, and last `done` with the whole response.
+ * A second `route` comes before `answer` when the loop chose another route.
+ * Route mode sends `grounding`, `route` and `done`. The stream throws an
+ * `error` event as {@link LbbError}; it never yields one.
  */
-export type QueryRewriteStreamEvent = Exclude<
+export type QueryAskStreamEvent = Exclude<
   Schemas["QueryRewriteEvent"],
   { event: "error" }
 >;
 
-/** The event names of a streamed rewrite. A client skips any other name. */
-const REWRITE_STREAM_EVENTS: ReadonlySet<string> = new Set([
+/** The event names of a streamed question. A client skips any other name. */
+const ASK_STREAM_EVENTS: ReadonlySet<string> = new Set([
   "grounding",
   "route",
-  "query",
-  "run",
-  "rows",
-  "repair",
+  "step",
+  "answer",
   "done",
   "error",
 ]);
@@ -1323,27 +1348,97 @@ function streamError(data: unknown, requestId?: string): LbbError {
   return parseLbbError(status, JSON.stringify({ error }), requestId);
 }
 
+/** The body of `POST /v1/query/ask`, and the call options left over. */
+function askRequest(
+  question: string,
+  options: QueryAskOptions,
+): {
+  body: Schemas["QueryRewriteRequest"];
+  opts: CallOptions & Pick<ReadConsistencyOptions, "consistency">;
+} {
+  const {
+    context,
+    route,
+    limit,
+    asOfCommitSeq,
+    today,
+    anchor,
+    timeline,
+    includeGrounding,
+    mode,
+    ...opts
+  } = options;
+  return {
+    body: {
+      question,
+      mode,
+      context,
+      route,
+      limit,
+      as_of_commit_seq: asOfCommitSeq,
+      today,
+      anchor: anchor?.length ? anchor : undefined,
+      timeline: timeline?.length ? timeline : undefined,
+      include_grounding: includeGrounding ? true : undefined,
+    },
+    opts,
+  };
+}
+
 /** Questions in plain words, and structured and SPARQL-text queries. */
 export class QueryNamespace {
   constructor(private readonly client: LbbClient) {}
 
   /**
-   * Turn a question into a SPARQL query (`POST /v1/query/rewrite`). A router
-   * model selects the kind of query (the route), and a rewriter model writes
-   * the query from a description of the graph. The server checks the query.
-   * With `run: true` the server also runs it, returns the rows in `result`,
-   * and corrects a query that fails once. `mode: "route"` returns only the
-   * route.
+   * Answer a question about the graph in plain words (`POST /v1/query/ask`).
+   * A router model picks the kind of question. A reasoning model then runs
+   * queries in a bounded loop, reads their rows, and answers with
+   * citations. The result also holds the query whose rows hold the answer,
+   * with its rows parsed as {@link sparql} parses them.
    *
-   * Each call uses model tokens, so a failed call is not retried unless
-   * `retry` is set. A `429 rewrite_limit` means the stack used its rewrites
-   * of the day.
+   * `mode: "route"` returns only the kind of question. Each call uses model
+   * tokens, so a failed call is not retried unless `retry` is set. A
+   * `429 rewrite_limit` means the stack used its questions of the day.
+   *
+   * ```ts
+   * const { answer, citations } = await lbb.query.ask(question);
+   * ```
    */
-  rewrite(
+  async ask(
+    question: string,
+    options: QueryAskOptions = {},
+  ): Promise<QueryAskResult> {
+    const { body, opts } = askRequest(question, options);
+    const response = await this.askResponse(body, opts);
+    const parsed = response.result
+      ? parseSparqlResults(response.result)
+      : undefined;
+    return {
+      route: response.route,
+      query: response.query ?? null,
+      rationale: response.rationale,
+      rows: parsed?.rows ?? [],
+      vars: parsed?.vars ?? [],
+      boolean: parsed?.boolean ?? null,
+      snapshot: parsed?.snapshot ?? null,
+      error: response.error ?? null,
+      traceId: response.result?.trace_id ?? null,
+      linked: response.linked ?? [],
+      anchors: response.anchors ?? [],
+      history: response.history ?? null,
+      answer: response.answer?.text ?? null,
+      citations: response.answer?.citations ?? [],
+      steps: response.steps ?? [],
+      response,
+    };
+  }
+
+  /** One `POST /v1/query/ask` call, not retried unless `retry` is set. */
+  private askResponse(
     body: Schemas["QueryRewriteRequest"],
-    opts: CallOptions & Pick<ReadConsistencyOptions, "consistency"> = {},
+    opts: CallOptions & Pick<ReadConsistencyOptions, "consistency">,
   ): Promise<Schemas["QueryRewriteResponse"]> {
-    return this.client.request("POST", "/v1/query/rewrite", {
+    return this.client.request("POST", "/v1/query/ask", {
       ...opts,
       retry: opts.retry ?? false,
       body,
@@ -1354,33 +1449,32 @@ export class QueryNamespace {
   }
 
   /**
-   * {@link rewrite} with progress: the server sends an event for each step,
-   * and the last event, `done`, holds the same response as `rewrite`. The
-   * order is `grounding`, `route`, then `query`, `run` and `rows` per
-   * attempt, with `repair` before a second attempt. A second `route` comes
-   * when the rewriter chose another route. A comparison runs twice: `run`
-   * (with `point: "before"`) and `rows`, then `run` (`point: "after"`) and
-   * `rows`.
+   * {@link ask} with progress. It takes the same options and yields one
+   * event per stage: `grounding`, `route`, a `step` per tool call of the
+   * loop, `answer`, then `done`. `done` holds the same response as `ask`
+   * gets from the server. A second `route` comes before `answer` when the
+   * loop chose another route.
    *
    * An `error` event throws {@link LbbError} with the status, code and
-   * message that `rewrite` throws. An error before the stream starts (a 400,
-   * a `429 rewrite_limit`) throws as `rewrite` does. The call is never
-   * retried. Abort `signal` to stop the server's work; leaving the loop
-   * early closes the stream too. `timeoutMs` bounds the whole stream.
+   * message that `ask` throws. An error before the stream starts (a 400, a
+   * `429 rewrite_limit`) throws as `ask` does. The call is never retried.
+   * Abort `signal` to stop the server's work; leaving the loop early closes
+   * the stream too. `timeoutMs` bounds the whole stream.
    *
    * ```ts
-   * for await (const event of client.query.rewriteStream({ question, run: true })) {
-   *   if (event.event === "done") console.log(event.data.result);
-   *   else console.log(event.event);
+   * for await (const event of lbb.query.askStream(question)) {
+   *   if (event.event === "step") console.log(event.data.tool);
+   *   if (event.event === "done") console.log(event.data.answer?.text);
    * }
    * ```
    */
-  async *rewriteStream(
-    body: Schemas["QueryRewriteRequest"],
-    opts: CallOptions & Pick<ReadConsistencyOptions, "consistency"> = {},
-  ): AsyncGenerator<QueryRewriteStreamEvent, void, undefined> {
+  async *askStream(
+    question: string,
+    options: QueryAskOptions = {},
+  ): AsyncGenerator<QueryAskStreamEvent, void, undefined> {
+    const { body, opts } = askRequest(question, options);
     let requestId: string | undefined;
-    const events = this.client.requestEventStream("POST", "/v1/query/rewrite", {
+    const events = this.client.requestEventStream("POST", "/v1/query/ask", {
       ...opts,
       body,
       query: {
@@ -1393,7 +1487,7 @@ export class QueryNamespace {
       },
     });
     for await (const { event, data } of events) {
-      if (!REWRITE_STREAM_EVENTS.has(event)) continue;
+      if (!ASK_STREAM_EVENTS.has(event)) continue;
       let parsed: unknown;
       try {
         parsed = JSON.parse(data);
@@ -1404,66 +1498,12 @@ export class QueryNamespace {
         );
       }
       if (event === "error") throw streamError(parsed, requestId);
-      yield { event, data: parsed } as QueryRewriteStreamEvent;
+      yield { event, data: parsed } as QueryAskStreamEvent;
       if (event === "done") return;
     }
     throw new Error(
-      "Little Big Brain rewrite stream ended before its done or error event",
+      "Little Big Brain answer stream ended before its done or error event",
     );
-  }
-
-  /**
-   * Answer a question in plain words: {@link rewrite} with `run: true`, and
-   * the rows of the run parsed as {@link sparql} parses them.
-   */
-  async ask(
-    question: string,
-    options: QueryAskOptions = {},
-  ): Promise<QueryAskResult> {
-    const {
-      context,
-      previous,
-      route,
-      limit,
-      asOfCommitSeq,
-      today,
-      anchor,
-      timeline,
-      ...opts
-    } = options;
-    const rewrite = await this.rewrite(
-      {
-        question,
-        run: true,
-        context,
-        previous,
-        route,
-        limit,
-        as_of_commit_seq: asOfCommitSeq,
-        today,
-        anchor: anchor?.length ? anchor : undefined,
-        timeline: timeline?.length ? timeline : undefined,
-      },
-      opts,
-    );
-    const parsed = rewrite.result
-      ? parseSparqlResults(rewrite.result)
-      : undefined;
-    return {
-      route: rewrite.route,
-      query: rewrite.query ?? null,
-      rationale: rewrite.rationale,
-      rows: parsed?.rows ?? [],
-      vars: parsed?.vars ?? [],
-      boolean: parsed?.boolean ?? null,
-      snapshot: parsed?.snapshot ?? null,
-      error: rewrite.error ?? null,
-      traceId: rewrite.result?.trace_id ?? null,
-      linked: rewrite.linked ?? [],
-      anchors: rewrite.anchors ?? [],
-      history: rewrite.history ?? null,
-      rewrite,
-    };
   }
 
   /**
@@ -1549,7 +1589,7 @@ export class QueryNamespace {
 
   /**
    * The graph's rewrite profile (`GET /v1/query/rewrite/profile`): the notes
-   * and worked examples the rewriter reads for every question of the graph.
+   * and worked examples the model of {@link ask} reads for every question.
    * `version` is 0 when the graph has none.
    */
   rewriteProfile(
@@ -1565,8 +1605,8 @@ export class QueryNamespace {
    * parses each query. Pass the `version` you read as `expected_version`:
    * when another write came first, the call throws `409 conflict` and
    * stores nothing. `dryRun` checks the profile and stores nothing. Empty
-   * notes and no examples clear it. The rewriter reads the profile for every
-   * question; a call's `context` still adds notes.
+   * notes and no examples clear it. The model of {@link ask} reads the
+   * profile for every question; a call's `context` still adds notes.
    */
   setRewriteProfile(
     body: Schemas["QueryRewriteProfileRequest"],

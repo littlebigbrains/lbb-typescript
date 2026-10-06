@@ -141,7 +141,7 @@ export type FetchLike = (
   text(): Promise<string>;
   /**
    * The body as a stream (`ReadableStream` or an async iterable of bytes).
-   * `query.rewriteStream` reads it as events arrive; without it, the stream
+   * `query.askStream` reads it as events arrive; without it, the stream
    * is read whole with `text()`.
    */
   body?: unknown;

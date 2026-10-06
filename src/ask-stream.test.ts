@@ -7,17 +7,22 @@ import {
   type LbbResponseEvent,
   type Schemas,
 } from "./client.js";
-import type { QueryRewriteStreamEvent } from "./namespaces.js";
+import type { QueryAskStreamEvent } from "./namespaces.js";
 import { ServerSentEventParser } from "./sse.js";
 
 const SPARQL =
   "SELECT ?name WHERE { ?s <http://www.w3.org/2000/01/rdf-schema#label> ?name }";
 
-function rewriteResponse(): Schemas["QueryRewriteResponse"] {
+const ANSWER = {
+  text: "Two services in Zürich: Auth and Billing.",
+  citations: ["https://x.test/e/auth"],
+};
+
+function askResponse(): Schemas["QueryRewriteResponse"] {
   return {
     route: { kind: "lookup", confidence: 0.92, by: "router" },
     query: { sparql: SPARQL, entailment: "none" },
-    rationale: "The question names services in Zürich — by name.",
+    rationale: "The rows of step 2 name the services in Zürich.",
     attempts: 2,
     grounding: {
       commit_seq: 7,
@@ -34,6 +39,24 @@ function rewriteResponse(): Schemas["QueryRewriteResponse"] {
       run_ms: 4,
       total_ms: 10,
     },
+    answer: ANSWER,
+    steps: [
+      {
+        n: 1,
+        tool: "find_entities",
+        input: { text: "Zürich" },
+        ok: true,
+        ms: 3,
+      },
+      {
+        n: 2,
+        tool: "sparql",
+        input: { query: SPARQL },
+        ok: true,
+        rows: 2,
+        ms: 9,
+      },
+    ],
   };
 }
 
@@ -41,21 +64,29 @@ function frame(event: string, data: unknown, lineEnd = "\n"): string {
   return `event: ${event}${lineEnd}data: ${JSON.stringify(data)}${lineEnd}${lineEnd}`;
 }
 
-/** The events of a rewrite with one correction, as the server sends them. */
+/** The events of a question whose loop chose another route, as the server sends them. */
 function serverStream(): string {
   return [
     ": keep-alive\n\n",
     frame("grounding", { cached: true, age_ms: 5, classes: 3 }),
-    frame("route", { kind: "lookup", confidence: 0.92, by: "router" }),
+    frame("route", { kind: "search", confidence: 0.55, by: "router" }),
     frame("answer.delta", { text: "a later event" }),
-    frame("query", { sparql: "SELECT ?x", entailment: "none", attempt: 1 }),
-    frame("run", { as_of_commit_seq: null }, "\r\n"),
+    frame(
+      "step",
+      { n: 1, tool: "find_entities", input: "Zürich", ok: true },
+      "\r\n",
+    ),
     ": keep-alive\r\n\r\n",
-    frame("repair", { error: "unknown prefix ex", attempt: 2 }, "\r\n"),
-    frame("query", { sparql: SPARQL, entailment: "none", attempt: 2 }),
-    frame("run", { as_of_commit_seq: 7 }),
-    frame("rows", { count: 12, ms: 85 }),
-    frame("done", rewriteResponse()),
+    frame("step", {
+      n: 2,
+      tool: "sparql",
+      input: "SELECT ?name",
+      ok: true,
+      rows: 2,
+    }),
+    frame("route", { kind: "lookup", confidence: 0.92, by: "rewriter" }),
+    frame("answer", ANSWER),
+    frame("done", askResponse()),
   ].join("");
 }
 
@@ -130,14 +161,14 @@ function streamingFetch(
 }
 
 async function collect(
-  events: AsyncIterable<QueryRewriteStreamEvent>,
-): Promise<QueryRewriteStreamEvent[]> {
-  const seen: QueryRewriteStreamEvent[] = [];
+  events: AsyncIterable<QueryAskStreamEvent>,
+): Promise<QueryAskStreamEvent[]> {
+  const seen: QueryAskStreamEvent[] = [];
   for await (const event of events) seen.push(event);
   return seen;
 }
 
-test("rewriteStream yields the events in order from a body split at any byte", async () => {
+test("askStream yields the events in order from a body split at any byte", async () => {
   const { fetch, calls } = streamingFetch(split(serverStream()));
   const responses: LbbResponseEvent[] = [];
   const client = new LbbClient({
@@ -149,38 +180,36 @@ test("rewriteStream yields the events in order from a body split at any byte", a
   });
 
   const events = await collect(
-    client.query.rewriteStream(
-      { question: "Which services exist?", run: true },
-      { consistency: "strong" },
-    ),
+    client.query.askStream("Which services exist?", { consistency: "strong" }),
   );
 
   assert.deepEqual(
     events.map((event) => event.event),
-    [
-      "grounding",
-      "route",
-      "query",
-      "run",
-      "repair",
-      "query",
-      "run",
-      "rows",
-      "done",
-    ],
+    ["grounding", "route", "step", "step", "route", "answer", "done"],
     "comments and the unknown event are skipped",
   );
   assert.deepEqual(events[0].data, { cached: true, age_ms: 5, classes: 3 });
-  assert.deepEqual(events[4].data, { error: "unknown prefix ex", attempt: 2 });
-  assert.deepEqual(events[7].data, { count: 12, ms: 85 });
-  const done = events[8];
+  assert.deepEqual(events[3].data, {
+    n: 2,
+    tool: "sparql",
+    input: "SELECT ?name",
+    ok: true,
+    rows: 2,
+  });
+  assert.deepEqual(events[4].data, {
+    kind: "lookup",
+    confidence: 0.92,
+    by: "rewriter",
+  });
+  assert.deepEqual(events[5].data, ANSWER);
+  const done = events[6];
   assert.equal(done.event, "done");
-  if (done.event === "done") assert.deepEqual(done.data, rewriteResponse());
+  if (done.event === "done") assert.deepEqual(done.data, askResponse());
 
   assert.equal(calls.length, 1);
   assert.equal(
     calls[0].input,
-    "http://h/v1/query/rewrite?graph=main&consistency=strong",
+    "http://h/v1/query/ask?graph=main&consistency=strong",
   );
   assert.equal(calls[0].init.method, "POST");
   assert.equal(calls[0].init.headers?.accept, "text/event-stream");
@@ -189,7 +218,6 @@ test("rewriteStream yields the events in order from a body split at any byte", a
   assert.equal(calls[0].init.headers?.["lbb-version"], "2026-07-23");
   assert.deepEqual(JSON.parse(calls[0].init.body ?? "{}"), {
     question: "Which services exist?",
-    run: true,
   });
   assert.equal(responses.length, 1);
   assert.equal(responses[0].status, 200);
@@ -200,12 +228,58 @@ test("rewriteStream yields the events in order from a body split at any byte", a
     new LbbClient({
       baseUrl: "http://h",
       fetch: streamingFetch(split(serverStream(), [1])).fetch,
-    }).query.rewriteStream({ question: "Which services exist?" }),
+    }).query.askStream("Which services exist?"),
   );
   assert.deepEqual(bytewise, events);
 });
 
-test("rewriteStream throws an error event as the LbbError that rewrite throws", async () => {
+test("askStream sends the options of ask, and route mode ends after the route", async () => {
+  const route = { kind: "lookup", confidence: 0.92, by: "router" };
+  const body = [
+    frame("grounding", { cached: true, age_ms: 5, classes: 3 }),
+    frame("route", route),
+    frame("done", { ...askResponse(), answer: null, steps: [] }),
+  ].join("");
+  const { fetch, calls } = streamingFetch(split(body));
+  const client = new LbbClient({ baseUrl: "http://h", fetch });
+  const timeline: Schemas["QueryRewriteTimelinePoint"][] = [
+    { date: "2026-05-20", as_of_commit_seq: 1, label: "Tender" },
+  ];
+
+  const events = await collect(
+    client.query.askStream("Which services exist?", {
+      mode: "route",
+      context: "Services of the platform team.",
+      route: "lookup",
+      limit: 50,
+      asOfCommitSeq: 7,
+      today: "2026-10-05",
+      anchor: ["https://x.test/e/auth"],
+      timeline,
+      includeGrounding: true,
+    }),
+  );
+  assert.deepEqual(
+    events.map((event) => event.event),
+    ["grounding", "route", "done"],
+  );
+  assert.deepEqual(events[1].data, route);
+  assert.equal(calls[0].input, "http://h/v1/query/ask");
+  assert.deepEqual(JSON.parse(calls[0].init.body ?? "{}"), {
+    question: "Which services exist?",
+    mode: "route",
+    context: "Services of the platform team.",
+    route: "lookup",
+    limit: 50,
+    as_of_commit_seq: 7,
+    today: "2026-10-05",
+    anchor: ["https://x.test/e/auth"],
+    timeline,
+    include_grounding: true,
+  });
+});
+
+test("askStream throws an error event as the LbbError that ask throws", async () => {
   const text =
     frame("grounding", { cached: false, age_ms: 0, classes: 3 }) +
     frame("route", { kind: "lookup", confidence: 0.9, by: "router" }) +
@@ -220,7 +294,7 @@ test("rewriteStream throws an error event as the LbbError that rewrite throws", 
   const seen: string[] = [];
   await assert.rejects(
     (async () => {
-      for await (const event of client.query.rewriteStream({ question: "q" }))
+      for await (const event of client.query.askStream("q"))
         seen.push(event.event);
     })(),
     (error) => {
@@ -239,12 +313,12 @@ test("rewriteStream throws an error event as the LbbError that rewrite throws", 
   assert.deepEqual(seen, ["grounding", "route"]);
 });
 
-test("rewriteStream throws a JSON error before the stream as rewrite does, once", async () => {
+test("askStream throws a JSON error before the stream as ask does, once", async () => {
   const body = JSON.stringify({
     error: {
       type: "rate_limit_error",
       code: "rewrite_limit",
-      message: "rewrite_limit: the stack used its 200 rewrites of the day",
+      message: "rewrite_limit: the stack used its 200 questions of the day",
       retryable: false,
     },
   });
@@ -277,14 +351,11 @@ test("rewriteStream throws a JSON error before the stream as rewrite does, once"
   };
   const streamed = await caught(() =>
     collect(
-      client.query.rewriteStream(
-        { question: "q" },
-        { retry: "rate_limited", maxRetries: 3 },
-      ),
+      client.query.askStream("q", { retry: "rate_limited", maxRetries: 3 }),
     ),
   );
   assert.equal(calls.length, 1, "a stream is never retried");
-  const plain = await caught(() => client.query.rewrite({ question: "q" }));
+  const plain = await caught(() => client.query.ask("q"));
   for (const key of [
     "status",
     "code",
@@ -300,7 +371,7 @@ test("rewriteStream throws a JSON error before the stream as rewrite does, once"
   assert.equal(streamed.code, "rewrite_limit");
 });
 
-test("rewriteStream throws when the body ends before done or error", async () => {
+test("askStream throws when the body ends before done or error", async () => {
   const text =
     frame("grounding", { cached: true, age_ms: 5, classes: 3 }) +
     'event: done\ndata: {"attempts":1}';
@@ -310,7 +381,7 @@ test("rewriteStream throws when the body ends before done or error", async () =>
   const seen: string[] = [];
   await assert.rejects(
     (async () => {
-      for await (const event of client.query.rewriteStream({ question: "q" }))
+      for await (const event of client.query.askStream("q"))
         seen.push(event.event);
     })(),
     (error) => {
@@ -322,7 +393,7 @@ test("rewriteStream throws when the body ends before done or error", async () =>
   assert.deepEqual(seen, ["grounding"], "an unfinished event is dropped");
 });
 
-test("rewriteStream stops on abort and cancels the request and the body", async () => {
+test("askStream stops on abort and cancels the request and the body", async () => {
   let cancelled = false;
   const { fetch, calls } = streamingFetch(
     split(frame("grounding", { cached: true, age_ms: 5, classes: 3 })),
@@ -335,10 +406,9 @@ test("rewriteStream stops on abort and cancels the request and the body", async 
   const seen: string[] = [];
   await assert.rejects(
     (async () => {
-      for await (const event of client.query.rewriteStream(
-        { question: "q" },
-        { signal: controller.signal },
-      )) {
+      for await (const event of client.query.askStream("q", {
+        signal: controller.signal,
+      })) {
         seen.push(event.event);
         controller.abort(reason);
       }
@@ -353,18 +423,13 @@ test("rewriteStream stops on abort and cancels the request and the body", async 
   assert.equal(calls[0].init.signal?.aborted, true, "the fetch was aborted");
 
   await assert.rejects(
-    collect(
-      client.query.rewriteStream(
-        { question: "q" },
-        { signal: controller.signal },
-      ),
-    ),
+    collect(client.query.askStream("q", { signal: controller.signal })),
     (error) => error === reason,
   );
   assert.equal(calls.length, 1, "an aborted signal sends no request");
 });
 
-test("rewriteStream closes the body when the loop ends early", async () => {
+test("askStream closes the body when the loop ends early", async () => {
   let cancelled = false;
   const { fetch } = streamingFetch(split(serverStream()), {
     hang: true,
@@ -372,13 +437,13 @@ test("rewriteStream closes the body when the loop ends early", async () => {
   });
   const client = new LbbClient({ baseUrl: "http://h", fetch });
 
-  for await (const event of client.query.rewriteStream({ question: "q" })) {
+  for await (const event of client.query.askStream("q")) {
     if (event.event === "route") break;
   }
   assert.equal(cancelled, true);
 });
 
-test("rewriteStream reads a body without a stream and a server without streams", async () => {
+test("askStream reads a body without a stream and a server without streams", async () => {
   const textOnly: FetchLike = async () => ({
     ok: true,
     status: 200,
@@ -389,11 +454,11 @@ test("rewriteStream reads a body without a stream and a server without streams",
     text: async () => serverStream(),
   });
   const fromText = await collect(
-    new LbbClient({ baseUrl: "http://h", fetch: textOnly }).query.rewriteStream(
-      { question: "q" },
+    new LbbClient({ baseUrl: "http://h", fetch: textOnly }).query.askStream(
+      "q",
     ),
   );
-  assert.equal(fromText.length, 9);
+  assert.equal(fromText.length, 7);
 
   // A Node stream body is an async iterable of byte chunks.
   const nodeStream: FetchLike = async () => ({
@@ -412,7 +477,7 @@ test("rewriteStream reads a body without a stream and a server without streams",
     new LbbClient({
       baseUrl: "http://h",
       fetch: nodeStream,
-    }).query.rewriteStream({ question: "q" }),
+    }).query.askStream("q"),
   );
   assert.deepEqual(fromNodeStream, fromText);
 
@@ -423,14 +488,12 @@ test("rewriteStream reads a body without a stream and a server without streams",
       get: (name: string) =>
         name.toLowerCase() === "content-type" ? "application/json" : null,
     },
-    text: async () => JSON.stringify(rewriteResponse()),
+    text: async () => JSON.stringify(askResponse()),
   });
   const fromJson = await collect(
-    new LbbClient({ baseUrl: "http://h", fetch: json }).query.rewriteStream({
-      question: "q",
-    }),
+    new LbbClient({ baseUrl: "http://h", fetch: json }).query.askStream("q"),
   );
-  assert.deepEqual(fromJson, [{ event: "done", data: rewriteResponse() }]);
+  assert.deepEqual(fromJson, [{ event: "done", data: askResponse() }]);
 });
 
 test("the event parser joins data lines, splits every line end and bounds an event", () => {
