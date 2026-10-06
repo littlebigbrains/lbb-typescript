@@ -4,6 +4,44 @@ All notable changes to the `@littlebigbrain/client` package are documented here.
 
 ## Unreleased
 
+Breaking: the server moved questions to `POST /v1/query/ask` and removed the
+one-shot rewrite. `POST /v1/query/rewrite` answers 404. Every question now
+runs the server's answer loop.
+
+- Remove `query.rewrite` and `query.rewriteStream`. Use
+  `query.ask(question, options)` and `query.askStream(question, options)`.
+  Both call `POST /v1/query/ask`.
+- `query.ask` answers in plain words by default. The model runs queries in a
+  bounded loop, reads their rows, and answers. The result holds `answer` (the
+  text, or `null` when the loop stopped first), `citations` (IRIs from the
+  rows the loop read) and `steps`. `query` and `rows` are the query whose
+  rows hold the answer.
+- `mode` takes `"answer"` (the default) or `"route"`. `"route"` returns only
+  the kind of question, from the router model. The `"rewrite"` mode is gone.
+- Remove the `previous` option of `query.ask`: the loop corrects its own
+  queries. The server answers `run`, `previous` and `mode: "rewrite"` with
+  `400 invalid_ask_request`, which replaces `invalid_rewrite_request`.
+- Rename `QueryAskResult.rewrite` to `QueryAskResult.response`.
+- `query.ask` takes `includeGrounding`. The response then holds the graph
+  description the models read, in `grounding.text`.
+- Add `query.askStream(question, options)` with the options of `ask`. It
+  yields `grounding`, `route`, a `step` per tool call, `answer`, and last
+  `done` with the whole response. A second `route` comes when the loop chose
+  another route. An `error` event throws the same `LbbError` as `ask`. The
+  `query`, `run`, `rows` and `repair` events are gone.
+- Rename the type `QueryRewriteStreamEvent` to `QueryAskStreamEvent`.
+- `QueryRewriteHistory` loses `before` and `after`, and gains `key`,
+  `changed` and `totals`. A comparison comes from the loop's `compare` step:
+  `added`, `removed` and `changed` hold what differs, and
+  `query.as_of_commit_seq` is the later point. `result` is absent for a
+  comparison.
+- The generated types drop `QueryRewriteStep`, `QueryRewritePoint`,
+  `QueryRewriteQueryEvent`, `QueryRewriteRunEvent`, `QueryRewriteRowsEvent`
+  and `QueryRewriteRepairEvent`. New types: `QueryAnswer`, `QueryAnswerStep`,
+  `QueryAnswerTool`, `QueryAnswerStepEvent`. `QueryRewriteMode` is `answer` or
+  `route`. `ModelJob` gains `answer`, the turns of the loop in the model call
+  log. A `compare` step's `rows` counts the entries that differ.
+- To run your own loop instead, use the four tools below with `query.sparql`.
 - Add four tools for an app's own agent, none of which calls a model:
   `query.names({ text, limit })` (`POST /v1/query/names`) finds the entities
   a text names, with the candidates of each name, the one to prefer first;
@@ -15,9 +53,10 @@ All notable changes to the `@littlebigbrain/client` package are documented here.
   `query.compare({ query, before, after, key })` (`POST /v1/query/compare`)
   runs one `SELECT` at two points and pairs the rows into `added`, `removed`
   and `changed`, with `totals` and a `cursor` for the next page.
-- `QueryRewriteHistory` gains `key`, `changed` and `totals`. A comparison of
-  the rewriter reads every row of both points; `limit` only cuts the rows it
-  shows. When the first variable holds entities, the rows are paired by it.
+- Evals ask a question again through the answer loop. The generated
+  `EvalAskInput` drops `previous` and gains `timeline`. `EvalTrace` and
+  `EvalVerdictDetail` gain `reply`: the loop's answer in words and the IRIs
+  it cites (`QueryAnswer`).
 
 ## 0.20.0 (2026-10-05)
 
