@@ -1080,7 +1080,7 @@ export class LbbClient {
    * The copy runs as a durable background job (`confirm` is fixed to `dst`, which
    * the route requires to authorize the fork); the destination must not already
    * exist, so the create-only CAS on the server side makes the call safe to
-   * retry. The response only acknowledges the enqueue — poll the destination
+   * retry. The id of a deleted graph is refused with 409: fork into a new id. The response only acknowledges the enqueue — poll the destination
    * graph's metadata (see `response.poll`) to observe the fork completing: the
    * destination becomes readable once its head is published.
    */
