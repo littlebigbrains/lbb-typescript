@@ -1297,6 +1297,13 @@ export interface QueryAskResult {
   answer: string | null;
   /** The IRIs the answer names. Each one appeared in the rows the loop read. */
   citations: string[];
+  /**
+   * How to draw `rows`: `kind` (`bar`, `line`, `scatter` or `table`) and the
+   * columns `x`, `y` and `series`. The server checked the hint against the
+   * rows: the columns exist, and `y` holds numbers for `bar` and `line` (`x`
+   * and `y` for `scatter`). `null` when the rows make no chart.
+   */
+  chart: Schemas["QueryAnswerChart"] | null;
   /** The tool calls of the loop, in order. Empty in route mode. */
   steps: Schemas["QueryAnswerStep"][];
   /** The whole response of `POST /v1/query/ask`. */
@@ -1428,6 +1435,7 @@ export class QueryNamespace {
       history: response.history ?? null,
       answer: response.answer?.text ?? null,
       citations: response.answer?.citations ?? [],
+      chart: response.answer?.chart ?? null,
       steps: response.steps ?? [],
       response,
     };

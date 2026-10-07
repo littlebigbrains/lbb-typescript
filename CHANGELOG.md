@@ -2,6 +2,14 @@
 
 All notable changes to the `@littlebigbrain/client` package are documented here.
 
+## Unreleased
+
+- `query.ask` returns `chart`: how to draw `rows` (`kind` `bar`, `line`,
+  `scatter` or `table`, and the columns `x`, `y` and `series`), or `null`.
+  The server checked the hint against the rows. New types
+  `QueryAnswerChart` and `QueryAnswerChartKind`; `QueryAnswer` has `chart`,
+  and so does the stream's `answer` event.
+
 ## 0.21.0 (2026-10-06)
 
 Breaking: the server moved questions to `POST /v1/query/ask` and removed the

@@ -543,7 +543,11 @@ test("query ask returns the answer, its citations and the steps", async () => {
   const { fetch, bodies } = queuedFetch([
     {
       body: askResponse({
-        answer: { text: "Two services.", citations: ["https://x.test/e/a"] },
+        answer: {
+          text: "Two services.",
+          citations: ["https://x.test/e/a"],
+          chart: { kind: "bar", x: "team", y: "n" },
+        },
         steps,
       }),
     },
@@ -557,6 +561,7 @@ test("query ask returns the answer, its citations and the steps", async () => {
   });
   assert.equal(answer.answer, "Two services.");
   assert.deepEqual(answer.citations, ["https://x.test/e/a"]);
+  assert.deepEqual(answer.chart, { kind: "bar", x: "team", y: "n" });
   assert.deepEqual(answer.steps, steps);
 
   const routed = await client.query.ask("Which services exist?", {
@@ -565,6 +570,7 @@ test("query ask returns the answer, its citations and the steps", async () => {
   assert.equal(JSON.parse(bodies[1] ?? "{}").mode, "route");
   assert.equal(routed.answer, null);
   assert.deepEqual(routed.citations, []);
+  assert.equal(routed.chart, null);
   assert.deepEqual(routed.steps, []);
 });
 

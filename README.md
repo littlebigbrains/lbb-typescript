@@ -129,6 +129,18 @@ hold the answer, and `rows` hold its rows. `traceId` names the eval
 trace of those rows, so you can label them. When the loop runs out of time,
 `answer` is `null`, `error` says why, and `rows` hold the best rows it read.
 
+`chart` says how to draw `rows`, or is `null`: `kind` is `bar`, `line`,
+`scatter` or `table`, and `x`, `y` and `series` name columns of the rows. The
+server checked the hint: the columns exist, and `y` holds numbers for `bar`
+and `line` (`x` and `y` for `scatter`).
+
+```ts
+if (result.chart?.kind === "bar") {
+  const { x, y } = result.chart;
+  drawBars(result.rows.map((row) => [row[x!], Number(row[y!])]));
+}
+```
+
 `{ mode: "route" }` returns only the kind of question, in about 0.25 s. No
 query runs. Each call uses model tokens, so the client does not retry a failed
 call.
