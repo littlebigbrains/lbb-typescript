@@ -8943,6 +8943,7 @@ export interface components {
         };
         /** @description The answer in plain words. */
         QueryAnswer: {
+            chart?: null | components["schemas"]["QueryAnswerChart"];
             /**
              * @description IRIs of the entities the answer names, at most 20. Each one appeared
              *     in the rows the loop read; the server removes any other.
@@ -8951,6 +8952,36 @@ export interface components {
             /** @description A short answer in plain words. */
             text: string;
         };
+        /**
+         * @description A chart hint: which columns of the response's `result` an app can draw,
+         *     and how. The server checked it against those rows: every column it
+         *     names is a column of `result`, and `y` holds numbers for `bar` and
+         *     `line` (`x` and `y` for `scatter`).
+         */
+        QueryAnswerChart: {
+            kind: components["schemas"]["QueryAnswerChartKind"];
+            /**
+             * @description A column that splits the rows into groups: a bar color or a line
+             *     each.
+             */
+            series?: string | null;
+            /**
+             * @description The column of the categories or of the x axis, a variable of
+             *     `result` without its `?`. Always present for `bar`, `line` and
+             *     `scatter`.
+             */
+            x?: string | null;
+            /**
+             * @description The column of the numbers. Always present for `bar`, `line` and
+             *     `scatter`.
+             */
+            y?: string | null;
+        };
+        /**
+         * @description The kind of chart that fits the rows of an answer.
+         * @enum {string}
+         */
+        QueryAnswerChartKind: "bar" | "line" | "scatter" | "table";
         /** @description One tool call of the answer loop. */
         QueryAnswerStep: {
             /** @description Why the step failed. */
