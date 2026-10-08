@@ -10238,6 +10238,17 @@ export interface components {
          */
         QueryLinkMethod: "exact" | "partial" | "fuzzy" | "acronym";
         /**
+         * @description Why the name index lacks names of a class.
+         * @enum {string}
+         */
+        QueryNamesGapReason: "read_failed" | "time_budget" | "name_bound" | "instance_bound";
+        /** @description A class the name index did not read in full. */
+        QueryNamesIndexGap: {
+            /** @description The class IRI. */
+            class: string;
+            reason: components["schemas"]["QueryNamesGapReason"];
+        };
+        /**
          * @description Find the entities a question or a list of names names
          *     (`POST /v1/query/names`).
          */
@@ -10263,6 +10274,22 @@ export interface components {
              * @description The commit of the graph description the index was built from.
              */
             commit_seq: number;
+            /**
+             * Format: int32
+             * @description Classes the index read, in full or in part. People and organizations
+             *     are read first, then other entities, then records.
+             */
+            index_classes_read?: number | null;
+            /**
+             * @description Every class of the graph description was read in full. Absent when
+             *     the index was not ready.
+             */
+            index_complete?: boolean | null;
+            /**
+             * @description The classes the index did not read in full, and why, in the order it
+             *     reads them. Empty when the index is complete.
+             */
+            index_gaps?: components["schemas"]["QueryNamesIndexGap"][];
             /**
              * Format: int32
              * @description Names in the index the matching read.
