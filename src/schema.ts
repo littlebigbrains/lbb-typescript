@@ -1972,6 +1972,41 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/models/switches": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The graph's switched tasks: per task the model it uses on this graph, the model before, the trial that met the bar with its report, who switched and when. A task without a switch uses the catalog's model */
+        get: operations["get_v1_models_switches"];
+        put?: never;
+        /** Switch a task of the graph to the candidate of a trial that meets the bar: from the next call on, the task uses that model (and effort) on this graph. `ask` switches to a Claude model, `route` to a Jev model. 409 `trial_not_qualified` when the trial does not meet the bar, 409 `switch_unsupported` when the task cannot run on the candidate's provider, 409 `trial_outdated` when the trial compared the candidate with another model than the one the task uses now (test it again). A switch or a revert ends the task's open trials that compare with another model */
+        post: operations["post_v1_models_switches"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/models/switches/revert": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Revert a task's switch: the task uses the catalog's model again on this graph. Answers the switches left */
+        post: operations["post_v1_models_switches_revert"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/models/synthetic-eval": {
         parameters: {
             query?: never;
@@ -2036,6 +2071,92 @@ export interface paths {
         put?: never;
         /** Set the automatic-training configuration (auto_train toggle + trainable kinds) */
         post: operations["post_v1_models_training_config"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/models/trials": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The graph's model trials, newest first, each with its report (calls compared, right share, mean score, cost per call and median latency of both models, the difference with its bootstrap 95% interval, the outcome, and whether the candidate meets the quality threshold); without their calls */
+        get: operations["get_v1_models_trials"];
+        put?: never;
+        /** Test a candidate model: one trial per job (`jobs`, default every job it can do that has checked calls). A trial answers the job's checked calls with the candidate, newest first, scores each answer against the call's ground truth (a decision and an order without a model, an `ask` answer by the checker with the ground truth as reference) beside the current model's score, and adds each new check of the job until it has `target` calls (default 40) or its `days` end (default 14). It runs on the graph's `lbb.model-trials` workflow and changes no model. An open trial of the same job and candidate is answered as it is; `skipped` names the jobs left out. 503 when workflows are off or the catalog has no checker */
+        post: operations["post_v1_models_trials"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/models/trials/call": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** One call a trial compared: the logged call (the current model's input and output), its check, and the candidate's output */
+        get: operations["get_v1_models_trials_call"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/models/trials/get": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** One model trial with its report and its compared calls: per call the ground truth, the current model's and the candidate's verdict, score, cost and latency */
+        get: operations["get_v1_models_trials_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/models/trials/options": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** What a model trial can test on the graph: per job (route, fit, rerank, label, ask) the model it uses now, its checked calls of the last three months, and the candidate models with their efforts, prices and whether this server holds their key; whether trials can run here (workflows and a checker) and the budget of one trial */
+        get: operations["get_v1_models_trials_options"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/models/trials/stop": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Stop a running or collecting trial; it keeps the calls it compared and its report */
+        post: operations["post_v1_models_trials_stop"];
         delete?: never;
         options?: never;
         head?: never;
@@ -7473,7 +7594,7 @@ export interface components {
          * @description The feature a model call served.
          * @enum {string}
          */
-        ModelActivityFeature: "index" | "search" | "fit" | "judge" | "training" | "rerank" | "rewrite";
+        ModelActivityFeature: "index" | "search" | "fit" | "judge" | "training" | "rerank" | "rewrite" | "trial";
         /**
          * @description One feature and model on one graph over the month. `graph` is `*` for
          *     the graphs past the ledger's bound ("other graphs").
@@ -8151,6 +8272,34 @@ export interface components {
             trained_at_commit_seq: number;
         };
         /**
+         * @description A task whose model a person switched on one graph, after a trial of the
+         *     model met the bar.
+         */
+        ModelSwitch: {
+            /** Format: int64 */
+            at_ms: number;
+            /** @description Who switched: `account:<id>`, `key:<key id>`, `token`. */
+            by: string;
+            job: components["schemas"]["ModelJob"];
+            /** @description The model the task uses on the graph. */
+            model: components["schemas"]["ModelTrialModel"];
+            previous?: null | components["schemas"]["ModelTrialModel"];
+            report: components["schemas"]["ModelTrialReport"];
+            /** @description The trial that met the bar, and its report at the switch. */
+            trial: string;
+        };
+        /** @description `GET /v1/models/switches?graph`: the graph's switched tasks. */
+        ModelSwitchListResponse: {
+            switches: components["schemas"]["ModelSwitch"][];
+        };
+        /**
+         * @description `POST /v1/models/switches?graph`: switch a task to the candidate of a
+         *     trial that meets the bar.
+         */
+        ModelSwitchRequest: {
+            trial: string;
+        };
+        /**
          * @description Per-graph automatic-training configuration, stored as one small CAS
          *     object under the graph prefix (purged with the tenant). **[PIN]** field
          *     names. Default: off — training never starts without an explicit opt-in.
@@ -8169,6 +8318,305 @@ export interface components {
              */
             v: number;
         };
+        /** @description One trial. */
+        ModelTrial: {
+            /**
+             * Format: int64
+             * @description The candidate's, the current model's (on calls another model made)
+             *     and the checker's cost the trial may spend.
+             */
+            budget_micro_usd: number;
+            /** @description Who started it: `account:<id>`, `key:<key id>`, `token`. */
+            by: string;
+            /** @description The compared calls, newest call first. Empty in a list. */
+            calls?: components["schemas"]["ModelTrialCall"][];
+            candidate: components["schemas"]["ModelTrialModel"];
+            /** Format: int64 */
+            candidate_cost_micro_usd: number;
+            /** Format: int64 */
+            created_at_ms: number;
+            current?: null | components["schemas"]["ModelTrialModel"];
+            /**
+             * Format: int64
+             * @description The current model's cost on the calls it answered again.
+             */
+            current_cost_micro_usd?: number;
+            error?: string | null;
+            /** Format: int64 */
+            finished_at_ms?: number | null;
+            /** @description `<created_ms:020>-<8 hex>`. */
+            id: string;
+            job: components["schemas"]["ModelJob"];
+            /** Format: int64 */
+            judge_cost_micro_usd: number;
+            report: components["schemas"]["ModelTrialReport"];
+            /**
+             * Format: int64
+             * @description Checked calls the trial could not compare: no usable ground truth, an
+             *     input the candidate cannot answer.
+             */
+            skipped?: number;
+            status: components["schemas"]["ModelTrialStatus"];
+            stopped_by?: string | null;
+            /**
+             * Format: int32
+             * @description Calls to compare.
+             */
+            target: number;
+            /**
+             * Format: int64
+             * @description The trial collects new checks until this time.
+             */
+            until_ms: number;
+            /** Format: int64 */
+            workflow_turn?: number | null;
+        };
+        /** @description One model's answer to a compared call. */
+        ModelTrialAnswer: {
+            /**
+             * @description The answer in a few words: a decision's picks, the first items of an
+             *     order, the first words of an answer.
+             */
+            brief?: string | null;
+            /** Format: int64 */
+            cost_micro_usd: number;
+            /** @description Why there is no answer: `refused`, `failed`, `no answer`. */
+            error?: string | null;
+            model: string;
+            /** Format: int64 */
+            ms: number;
+            provider: string;
+            /**
+             * Format: float
+             * @description 0 to 1; absent when the model did not answer.
+             */
+            score?: number | null;
+            verdict?: null | components["schemas"]["CheckVerdict"];
+        };
+        /** @description One call a trial compared. */
+        ModelTrialCall: {
+            /**
+             * Format: int64
+             * @description When the trial compared it.
+             */
+            at_ms: number;
+            /** @description The call id. */
+            call: string;
+            /** Format: int64 */
+            call_at_ms: number;
+            candidate: components["schemas"]["ModelTrialAnswer"];
+            /**
+             * @description The model the task uses: the call's own answer when that model made
+             *     the call, else its answer to the call again (`replayed`).
+             */
+            current: components["schemas"]["ModelTrialAnswer"];
+            /**
+             * Format: int64
+             * @description The checker's cost for the candidate's answer, and for the current
+             *     model's when it answered again (`ask`).
+             */
+            judge_cost_micro_usd?: number;
+            /** @description `ask`: the candidate's queries read the commit the original read. */
+            pinned?: boolean | null;
+            /** @description The checker's reason about the candidate's answer (`ask`). */
+            reason?: string | null;
+            /**
+             * @description Another model made the call (before a switch, say), so the model the
+             *     task uses answered it again for this comparison.
+             */
+            replayed?: boolean;
+            summary: string;
+            /** @description The ground truth of the call's check when the trial compared it. */
+            truth: components["schemas"]["ModelCheckTruth"];
+        };
+        /**
+         * @description `GET /v1/models/trials/call?graph&id&call`: one compared call with the
+         *     call itself, its check and the candidate's answer.
+         */
+        ModelTrialCallResponse: {
+            /**
+             * @description The candidate's answer: `output` in the shape of the call's output,
+             *     `steps` for `ask`, and `current` (its own `output` and `steps`) when
+             *     the model the task uses answered the call again.
+             */
+            answer?: unknown;
+            call?: null | components["schemas"]["ModelCall"];
+            check?: null | components["schemas"]["ModelCheck"];
+            compared: components["schemas"]["ModelTrialCall"];
+            job: components["schemas"]["ModelJob"];
+            trial: string;
+        };
+        /** @description A model a trial can test on a job. */
+        ModelTrialCandidate: {
+            /** @description This server holds the provider's key. */
+            available: boolean;
+            default_effort?: string | null;
+            /** @description The efforts it takes, lowest first; empty for a model without one. */
+            efforts?: string[];
+            label: string;
+            model: string;
+            note?: string | null;
+            /**
+             * Format: double
+             * @description USD per million input and output tokens, when known.
+             */
+            price_in_per_million_usd?: number | null;
+            /** Format: double */
+            price_out_per_million_usd?: number | null;
+            provider: string;
+            /**
+             * @description A trial of it that meets the bar can switch the task to it: the task
+             *     can run on this provider (`ask`: Claude; `route`: Jev).
+             */
+            switchable?: boolean;
+        };
+        /** @description One job a trial can run on. */
+        ModelTrialJobOption: {
+            candidates: components["schemas"]["ModelTrialCandidate"][];
+            /**
+             * Format: int64
+             * @description Checked calls of the last three months a trial can compare.
+             */
+            checked: number;
+            current?: null | components["schemas"]["ModelTrialModel"];
+            default?: null | components["schemas"]["ModelTrialModel"];
+            job: components["schemas"]["ModelJob"];
+            switched?: null | components["schemas"]["ModelSwitch"];
+        };
+        /** @description `GET /v1/models/trials?graph`: trials, newest first, without their calls. */
+        ModelTrialListResponse: {
+            trials: components["schemas"]["ModelTrial"][];
+        };
+        /** @description A model: the candidate of a trial, or the model a job uses now. */
+        ModelTrialModel: {
+            /**
+             * @description The reasoning effort sent with each call (`low` … `max`), for a model
+             *     that takes one.
+             */
+            effort?: string | null;
+            /** @description The provider's model id (`claude-haiku-5-5`, `jev-latest`). */
+            model: string;
+            /** @description `anthropic`, `typesafe` or `mock`. */
+            provider: string;
+        };
+        /** @description `GET /v1/models/trials/options?graph`. */
+        ModelTrialOptionsResponse: {
+            /** @description Trials can run here: workflows are on and the catalog has a checker. */
+            available: boolean;
+            /**
+             * Format: int64
+             * @description The budget of one trial (`LBB_MODEL_TRIAL_USD`).
+             */
+            budget_micro_usd: number;
+            jobs: components["schemas"]["ModelTrialJobOption"][];
+            reason?: string | null;
+            /** Format: int32 */
+            target_default: number;
+            /** Format: int32 */
+            target_max: number;
+        };
+        /**
+         * @description What the comparison shows.
+         * @enum {string}
+         */
+        ModelTrialOutcome: "too_few" | "better" | "same" | "worse";
+        /** @description The comparison of a trial. */
+        ModelTrialReport: {
+            /**
+             * Format: int64
+             * @description Calls both models answered and the trial scored.
+             */
+            calls: number;
+            candidate: components["schemas"]["ModelTrialSide"];
+            /** Format: double */
+            ci_high: number;
+            /**
+             * Format: double
+             * @description The bootstrap 95% interval of `delta`.
+             */
+            ci_low: number;
+            /**
+             * Format: double
+             * @description The candidate's cost per call over the current model's; absent when
+             *     the current model's cost is 0.
+             */
+            cost_ratio?: number | null;
+            current: components["schemas"]["ModelTrialSide"];
+            /**
+             * Format: double
+             * @description Mean of candidate score − current score.
+             */
+            delta: number;
+            outcome: components["schemas"]["ModelTrialOutcome"];
+            /**
+             * @description The candidate meets the quality threshold: at least 20 calls, `ci_low`
+             *     at or above −0.05, a failure share at most 0.05 above the current
+             *     model's, and cheaper per call or `better`.
+             */
+            qualifies: boolean;
+        };
+        /** @description One model's figures over the compared calls. */
+        ModelTrialSide: {
+            /**
+             * Format: int64
+             * @description The mean model cost of one call, in millionths of a US dollar.
+             */
+            cost_micro_usd_per_call: number;
+            /**
+             * Format: int64
+             * @description Calls the model did not answer (an error, a refusal, no answer).
+             */
+            failed: number;
+            /**
+             * Format: int64
+             * @description The median latency of one call.
+             */
+            ms_p50: number;
+            /**
+             * Format: double
+             * @description The share of calls whose answer is right, 0 to 1.
+             */
+            right: number;
+            /**
+             * Format: double
+             * @description The mean score, 0 to 1.
+             */
+            score: number;
+        };
+        /** @description A job a start did not test, and why. */
+        ModelTrialSkippedJob: {
+            job: components["schemas"]["ModelJob"];
+            reason: string;
+        };
+        /** @description `POST /v1/models/trials?graph`: test a candidate model. */
+        ModelTrialStartRequest: {
+            candidate: components["schemas"]["ModelTrialModel"];
+            /**
+             * Format: int32
+             * @description Days to collect new checks, 1 to 30; default 14.
+             */
+            days?: number | null;
+            /**
+             * @description The jobs to test it on; absent: every job it can do that has checked
+             *     calls.
+             */
+            jobs?: components["schemas"]["ModelJob"][] | null;
+            /**
+             * Format: int32
+             * @description Calls to compare per trial, 1 to 100; default 40.
+             */
+            target?: number | null;
+        };
+        /**
+         * @description The answer to a start: the trials (an open trial of the same job and
+         *     candidate is answered as it is), and the jobs left out.
+         */
+        ModelTrialStartResponse: {
+            skipped?: components["schemas"]["ModelTrialSkippedJob"][];
+            trials: components["schemas"]["ModelTrial"][];
+        };
+        /** @enum {string} */
+        ModelTrialStatus: "running" | "collecting" | "done" | "stopped" | "failed";
         /**
          * @description Whether entity names look like natural language (embeddings will carry) or
          *     opaque identifiers (a hash/lexical approach fits better).
@@ -32169,6 +32617,418 @@ export interface operations {
             };
         };
     };
+    get_v1_models_switches: {
+        parameters: {
+            query?: {
+                /** @description Graph name (default `main`) */
+                graph?: string;
+            };
+            header?: {
+                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                "Lbb-Version"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ModelSwitchListResponse"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Rate limit exceeded */
+            429: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Service unavailable */
+            503: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+        };
+    };
+    post_v1_models_switches: {
+        parameters: {
+            query?: {
+                /** @description Graph name (default `main`) */
+                graph?: string;
+            };
+            header?: {
+                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                "Lbb-Version"?: string;
+                /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
+                "Idempotency-Key"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ModelSwitchRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ModelSwitch"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Rate limit exceeded */
+            429: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Service unavailable */
+            503: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+        };
+    };
+    post_v1_models_switches_revert: {
+        parameters: {
+            query?: {
+                /** @description Graph name (default `main`) */
+                graph?: string;
+                /** @description the task: ask or route */
+                job?: string;
+            };
+            header?: {
+                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                "Lbb-Version"?: string;
+                /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
+                "Idempotency-Key"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ModelSwitchListResponse"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Rate limit exceeded */
+            429: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Service unavailable */
+            503: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+        };
+    };
     get_v1_models_synthetic_eval: {
         parameters: {
             query?: {
@@ -32887,6 +33747,830 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ModelTrainingConfig"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Rate limit exceeded */
+            429: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Service unavailable */
+            503: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+        };
+    };
+    get_v1_models_trials: {
+        parameters: {
+            query?: {
+                /** @description Graph name (default `main`) */
+                graph?: string;
+                /** @description route, fit, rerank, label or ask */
+                job?: string;
+                /** @description trials, 1 to 50; default 20 */
+                limit?: string;
+            };
+            header?: {
+                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                "Lbb-Version"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ModelTrialListResponse"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Rate limit exceeded */
+            429: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Service unavailable */
+            503: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+        };
+    };
+    post_v1_models_trials: {
+        parameters: {
+            query?: {
+                /** @description Graph name (default `main`) */
+                graph?: string;
+            };
+            header?: {
+                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                "Lbb-Version"?: string;
+                /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
+                "Idempotency-Key"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ModelTrialStartRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ModelTrialStartResponse"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Rate limit exceeded */
+            429: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Service unavailable */
+            503: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+        };
+    };
+    get_v1_models_trials_call: {
+        parameters: {
+            query?: {
+                /** @description Graph name (default `main`) */
+                graph?: string;
+                /** @description the trial id */
+                id?: string;
+                /** @description the call id */
+                call?: string;
+            };
+            header?: {
+                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                "Lbb-Version"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ModelTrialCallResponse"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Rate limit exceeded */
+            429: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Service unavailable */
+            503: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+        };
+    };
+    get_v1_models_trials_get: {
+        parameters: {
+            query?: {
+                /** @description Graph name (default `main`) */
+                graph?: string;
+                /** @description the trial id */
+                id?: string;
+            };
+            header?: {
+                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                "Lbb-Version"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ModelTrial"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Rate limit exceeded */
+            429: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Service unavailable */
+            503: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+        };
+    };
+    get_v1_models_trials_options: {
+        parameters: {
+            query?: {
+                /** @description Graph name (default `main`) */
+                graph?: string;
+            };
+            header?: {
+                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                "Lbb-Version"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ModelTrialOptionsResponse"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Rate limit exceeded */
+            429: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Service unavailable */
+            503: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+        };
+    };
+    post_v1_models_trials_stop: {
+        parameters: {
+            query?: {
+                /** @description Graph name (default `main`) */
+                graph?: string;
+                /** @description the trial id */
+                id?: string;
+            };
+            header?: {
+                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                "Lbb-Version"?: string;
+                /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
+                "Idempotency-Key"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ModelTrial"];
                 };
             };
             /** @description Bad request */
