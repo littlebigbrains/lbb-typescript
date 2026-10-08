@@ -13,6 +13,11 @@ export type Snapshot = Schemas["SnapshotView"];
 export type CommitRequest = Schemas["TripletCommitFile"];
 export type CommitResponse = Schemas["GraphCommitResponse"];
 export type SchemaView = Schemas["SchemaBundleView"];
+export type ModelJob = Schemas["ModelJob"];
+export type ModelTrial = Schemas["ModelTrial"];
+export type ModelTrialModel = Schemas["ModelTrialModel"];
+export type ModelTrialReport = Schemas["ModelTrialReport"];
+export type ModelSwitch = Schemas["ModelSwitch"];
 
 /**
  * Cursor-based list envelope used by bounded collection reads.

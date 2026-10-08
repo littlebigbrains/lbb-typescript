@@ -2,8 +2,18 @@
 
 All notable changes to the `@littlebigbrain/client` package are documented here.
 
-## Unreleased
+## 0.22.0 (2026-10-08)
 
+- New `models.trials` and `models.switches`: test another model on a use of
+  a model on the graph (`ask`, `route`, `rerank`, `fit`, `label`) against
+  the ground truth of its checked calls, then switch the use to it.
+  `trials.options`, `create`, `list`, `get`, `call` and `stop` call
+  `/v1/models/trials*`; `trials.wait(id, { until, onUpdate, timeoutMs })`
+  reads the trial until it compared the checked calls (or ended).
+  `switches.create({ trial })`, `list` and `revert(job)` call
+  `/v1/models/switches*`. Also on `graph(name).models`. New type aliases
+  `ModelTrial`, `ModelTrialReport`, `ModelTrialModel`, `ModelSwitch` and
+  `ModelJob`.
 - New `ontology.fitSources` for fit from text: `list`, `get`, `declare`,
   `preview`, `refresh` and `delete` call `/v1/ontology/fit-sources*`. A fit
   source names the properties of a class that hold text (transcripts,
