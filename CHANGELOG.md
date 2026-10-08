@@ -4,6 +4,8 @@ All notable changes to the `@littlebigbrain/client` package are documented here.
 
 ## 0.22.0 (2026-10-08)
 
+- The `ModelJob` type gains `ask`: the checked answer of one question
+  (model checks and the call log, #1107).
 - New `models.trials` and `models.switches`: test another model on a use of
   a model on the graph (`ask`, `route`, `rerank`, `fit`, `label`) against
   the ground truth of its checked calls, then switch the use to it.
