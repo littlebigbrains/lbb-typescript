@@ -1363,7 +1363,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Native entity attributes and relationships from the graph-owned RDF view; unavailable provenance sections are explicitly listed */
+        /** Native entity attributes and relationships from the graph-owned RDF view, each relationship with its evidence; unavailable provenance sections are explicitly listed */
         get: operations["get_v1_graph_entity"];
         put?: never;
         post?: never;
@@ -5248,6 +5248,7 @@ export interface components {
             };
             current_state: components["schemas"]["StateEntry"][];
             entity: components["schemas"]["EntityView"];
+            evidence?: null | components["schemas"]["EvidenceCompleteness"];
             history: components["schemas"]["EdgeEventRow"][];
             incoming: components["schemas"]["GraphEdgeRow"][];
             metadata: components["schemas"]["EntityMetadataResponse"];
@@ -5268,6 +5269,12 @@ export interface components {
          */
         EntityDetailTruncation: {
             edges?: null | components["schemas"]["TruncatedCollection"];
+            /**
+             * @description True when the per-response cap on evidence statement lookups stopped
+             *     the evidence read: some relationships may show fewer evidence entries
+             *     than they have, without `evidence_truncated`.
+             */
+            evidence_lookups?: boolean;
             history?: null | components["schemas"]["TruncatedCollection"];
             observations?: null | components["schemas"]["TruncatedCollection"];
             /**
@@ -5790,6 +5797,11 @@ export interface components {
          * @enum {string}
          */
         EvalVia: "ask" | "query" | "search";
+        /**
+         * @description Whether the evidence a read returns is complete.
+         * @enum {string}
+         */
+        EvidenceCompleteness: "complete" | "partial";
         EvidenceInput: string | {
             /**
              * @description Stable observation id used by full-fidelity export/import. Ordinary
@@ -5799,6 +5811,23 @@ export interface components {
             region?: null | components["schemas"]["RegionAnchorInput"];
             source_id?: string | null;
             text?: string | null;
+        };
+        /**
+         * @description A page region of a piece of evidence: a 0-based page and a box in
+         *     coordinates normalized to the page (`[0, 1]`, origin top-left, y down),
+         *     on the grid the commit quantized them to.
+         */
+        EvidenceRegion: {
+            /** Format: int32 */
+            page: number;
+            /** Format: double */
+            x0: number;
+            /** Format: double */
+            x1: number;
+            /** Format: double */
+            y0: number;
+            /** Format: double */
+            y1: number;
         };
         ExpandedConceptView: {
             from: string;
@@ -10780,6 +10809,17 @@ export interface components {
         };
         RdfEntityRelation: {
             entity: components["schemas"]["EntityView"];
+            /**
+             * @description The evidence of this relationship, newest commit first: one entry per
+             *     piece of evidence on a current assert event of the edge
+             *     (`docs/architecture/evidence-in-rdf.md`). At most `evidence` entries
+             *     (query parameter, default 5). Empty when the edge has no evidence, or
+             *     when the response's `evidence` is `partial` and the edge predates
+             *     evidence projection.
+             */
+            evidence?: components["schemas"]["RelationEvidence"][];
+            /** @description True when this relationship has more evidence than `evidence` holds. */
+            evidence_truncated?: boolean;
             relation: components["schemas"]["RelationView"];
         };
         /**
@@ -10872,6 +10912,31 @@ export interface components {
             relation: string;
             source_type: string;
             target_type: string;
+        };
+        /** @description One piece of evidence on a relationship, read from its RDF statement node. */
+        RelationEvidence: {
+            /**
+             * Format: int64
+             * @description The commit of that assert event.
+             */
+            commit_seq: number;
+            /**
+             * Format: double
+             * @description The confidence of the assert event that carries the evidence.
+             */
+            confidence: number;
+            /** @description The observation that holds the full evidence text (32 hex characters). */
+            observation_id: string;
+            region?: null | components["schemas"]["EvidenceRegion"];
+            /** @description The caller's evidence source id, or `inline:<request>:<index>`. */
+            source_id: string;
+            /** @description The evidence text, at most 4,096 bytes; see `text_truncated`. */
+            text: string;
+            /**
+             * @description True when the stored text was cut at 4,096 bytes. The full text stays
+             *     in the observation.
+             */
+            text_truncated?: boolean;
         };
         RelationSearchResult: {
             name: string;
@@ -27062,6 +27127,8 @@ export interface operations {
                 as_of_commit_seq?: string;
                 /** @description Maximum RDF relationships per direction (default 1000, ceiling 10000) */
                 edges?: string;
+                /** @description Evidence entries per relationship, newest commit first (default 5, 0 to 20; 0 reads none) */
+                evidence?: string;
             };
             header?: {
                 /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
