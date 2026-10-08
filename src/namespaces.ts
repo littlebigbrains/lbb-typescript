@@ -833,6 +833,83 @@ export interface OntologySuggestionListOptions extends CallOptions {
 }
 
 /**
+ * Fit from text: a fit source is declared on a class, like an embedding,
+ * and names the properties that hold the text (transcripts, documents). A
+ * job reads the text of every instance, proposes ontology changes with
+ * verified quotes, and files them as suggestions (origin id
+ * `fit:<name>`). Nothing changes the ontology until one is accepted.
+ */
+export class FitSourcesNamespace {
+  constructor(private readonly client: LbbClient) {}
+
+  /** Every fit source of the graph with its status, and the stack's budget. */
+  list(opts: CallOptions = {}): Promise<Schemas["FitSourceListResponse"]> {
+    return this.client.request("GET", "/v1/ontology/fit-sources", opts);
+  }
+
+  /** One fit source: progress, lag, counters, spend, suggestions, last error. */
+  get(
+    name: string,
+    opts: CallOptions = {},
+  ): Promise<Schemas["FitSourceStatus"]> {
+    return this.client.request("GET", "/v1/ontology/fit-sources", {
+      ...opts,
+      query: { name },
+    });
+  }
+
+  /**
+   * Declare or change the fit source of a class. `from` takes the paths of
+   * an embedding (`transcript`, `label`, `about/label`); without it the
+   * server picks the long text facts. `context` is one sentence about the
+   * text. The same declaration again is a no-op.
+   */
+  declare(
+    body: Schemas["FitSourceDeclareRequest"],
+    opts: CallOptions = {},
+  ): Promise<Schemas["FitSourceStatus"]> {
+    return this.client.request("PUT", "/v1/ontology/fit-sources", {
+      ...opts,
+      body,
+    });
+  }
+
+  /**
+   * The text the fit would read for a few instances. With `propose: true`
+   * the models run on up to 3 instances and the proposals come back with
+   * their checks; nothing is filed.
+   */
+  preview(
+    body: Schemas["FitSourcePreviewRequest"],
+    opts: CallOptions = {},
+  ): Promise<Schemas["FitSourcePreviewResponse"]> {
+    return this.client.request("POST", "/v1/ontology/fit-sources/preview", {
+      ...opts,
+      body,
+    });
+  }
+
+  /** Ask the fit job to run now; returns the status at once (`queued`). */
+  refresh(
+    name: string,
+    opts: CallOptions = {},
+  ): Promise<Schemas["FitSourceRefreshResponse"]> {
+    return this.client.request("POST", "/v1/ontology/fit-sources/refresh", {
+      ...opts,
+      query: { name },
+    });
+  }
+
+  /** Remove a fit source. Its suggestions stay in the inbox. */
+  delete(name: string, opts: CallOptions = {}): Promise<unknown> {
+    return this.client.request("DELETE", "/v1/ontology/fit-sources", {
+      ...opts,
+      query: { name, confirm: name },
+    });
+  }
+}
+
+/**
  * Ontology change suggestions: durable proposals from integrations,
  * agents and people. People accept or dismiss them; accepting
  * applies the change to the current ontology.
@@ -1122,11 +1199,14 @@ export class OntologyNamespace {
   readonly starters: OntologyStartersNamespace;
   /** Proposed ontologies built from sample records. */
   readonly drafts: OntologyDraftsNamespace;
+  /** Fit from text: suggestions made from the text of a class's instances. */
+  readonly fitSources: FitSourcesNamespace;
 
   constructor(private readonly client: LbbClient) {
     this.suggestions = new OntologySuggestionsNamespace(client);
     this.starters = new OntologyStartersNamespace(client);
     this.drafts = new OntologyDraftsNamespace(client);
+    this.fitSources = new FitSourcesNamespace(client);
   }
 
   view(

@@ -4,6 +4,13 @@ All notable changes to the `@littlebigbrain/client` package are documented here.
 
 ## Unreleased
 
+- New `ontology.fitSources` for fit from text: `list`, `get`, `declare`,
+  `preview`, `refresh` and `delete` call `/v1/ontology/fit-sources*`. A fit
+  source names the properties of a class that hold text (transcripts,
+  documents); the server reads every instance and files ontology change
+  suggestions with verified quotes. `preview({ ..., propose: true })` runs
+  the models on up to 3 instances without filing anything. New types
+  `FitSource*` and `FitProposal*`.
 - `query.ask` returns `chart`: how to draw `rows` (`kind` `bar`, `line`,
   `scatter` or `table`, and the columns `x`, `y` and `series`), or `null`.
   The server checked the hint against the rows. New types

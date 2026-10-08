@@ -135,6 +135,43 @@ test("ontology suggestions namespace maps each operation to its route", async ()
   assert.deepEqual(JSON.parse(bodies[5] ?? ""), { reason: "not now" });
 });
 
+test("fit sources namespace maps each operation to its route", async () => {
+  const { fetch, urls, bodies } = queuedFetch([]);
+  const client = new LbbClient({ baseUrl: "http://h", fetch });
+
+  await client.ontology.fitSources.list();
+  await client.ontology.fitSources.get("interview");
+  await client.ontology.fitSources.declare({
+    class: "https://example.org/class/interview",
+    from: ["transcript"],
+    context: "employee interviews",
+  });
+  await client.ontology.fitSources.preview({
+    class: "https://example.org/class/interview",
+    propose: true,
+  });
+  await client.ontology.fitSources.refresh("interview");
+  await client.ontology.fitSources.delete("interview");
+
+  assert.deepEqual(urls, [
+    "http://h/v1/ontology/fit-sources",
+    "http://h/v1/ontology/fit-sources?name=interview",
+    "http://h/v1/ontology/fit-sources",
+    "http://h/v1/ontology/fit-sources/preview",
+    "http://h/v1/ontology/fit-sources/refresh?name=interview",
+    "http://h/v1/ontology/fit-sources?name=interview&confirm=interview",
+  ]);
+  assert.deepEqual(JSON.parse(bodies[2] ?? ""), {
+    class: "https://example.org/class/interview",
+    from: ["transcript"],
+    context: "employee interviews",
+  });
+  assert.deepEqual(JSON.parse(bodies[3] ?? ""), {
+    class: "https://example.org/class/interview",
+    propose: true,
+  });
+});
+
 test("ontology starters namespace maps each operation to its route and body", async () => {
   const { fetch, urls, bodies } = queuedFetch([]);
   const client = new LbbClient({ baseUrl: "http://h", graph: "crm", fetch });
