@@ -1,6 +1,11 @@
 import type { WorkflowNamespace } from "./workflows.js";
 import type { LbbClient } from "./client.js";
-import { parseLbbError, type CallOptions, type LbbError } from "./transport.js";
+import {
+  parseLbbError,
+  sleep,
+  type CallOptions,
+  type LbbError,
+} from "./transport.js";
 import {
   attributeFilter,
   firstPatternVariable,
@@ -62,6 +67,7 @@ export class GraphNamespace {
   readonly search: SearchNamespace;
   readonly evals: EvalsNamespace;
   readonly checks: ChecksNamespace;
+  readonly models: ModelsNamespace;
   readonly embeddings: EmbeddingsNamespace;
   readonly workflows: WorkflowNamespace;
 
@@ -74,6 +80,7 @@ export class GraphNamespace {
     this.search = client.search;
     this.evals = client.evals;
     this.checks = client.checks;
+    this.models = client.models;
     this.embeddings = client.embeddings;
     this.workflows = client.workflows;
   }
@@ -792,6 +799,251 @@ export class ChecksNamespace {
       retry: opts.retry ?? false,
       query: { id: callId },
     });
+  }
+}
+
+/** The options of {@link ModelTrialsNamespace.list}. */
+export interface ModelTrialListOptions extends CallOptions {
+  /** Only the trials of this use: `ask`, `route`, `rerank`, `fit` or `label`. */
+  job?: Schemas["ModelJob"];
+  /** Trials to return, newest first: 1 to 50, default 20. */
+  limit?: number;
+}
+
+/** The options of {@link ModelTrialsNamespace.wait}. */
+export interface ModelTrialWaitOptions extends CallOptions {
+  /**
+   * `"compared"` (the default) returns when the trial no longer runs: it
+   * compared every checked call it can now (`collecting`), or it ended
+   * (`done`, `stopped`, `failed`). `"ended"` waits until it ended; a
+   * collecting trial takes each new check of its use for up to its `days`.
+   */
+  until?: "compared" | "ended";
+  /** Time between two reads of the trial. Default 5,000 ms. */
+  pollIntervalMs?: number;
+  /** Throw after this long. 0 (the default) waits without a limit. */
+  timeoutMs?: number;
+  /** Called with the trial after each read, e.g. to show `report.calls`. */
+  onUpdate?: (trial: Schemas["ModelTrial"]) => void;
+}
+
+const TRIAL_ENDED: ReadonlySet<Schemas["ModelTrialStatus"]> = new Set([
+  "done",
+  "stopped",
+  "failed",
+]);
+
+/**
+ * Model trials: test another model on one use of a model on the graph
+ * (question answers `ask`, query routing `route`, search rerank `rerank`,
+ * ontology fit `fit`, eval labels `label`). The candidate answers the use's
+ * checked calls again, and both models are scored against the same ground
+ * truth (a person's review, else the judge's verdict). The model the use
+ * runs now is the one compared; when another model made a call (before a
+ * switch), the model in use answers it again too.
+ *
+ * A trial runs by itself on the server: the checked calls newest first, then
+ * each new check of the use, until its target, its `days` or its budget.
+ * It changes no model. When `report.qualifies` (it meets the bar), switch
+ * with {@link ModelSwitchesNamespace.create}.
+ *
+ * ```ts
+ * const { trials: [trial] } = await lbb.models.trials.create({
+ *   candidate: { provider: "anthropic", model: "claude-haiku-5-5", effort: "low" },
+ *   jobs: ["ask"],
+ * });
+ * const result = await lbb.models.trials.wait(trial.id, {
+ *   onUpdate: (t) => console.log(`${t.report.calls} calls compared`),
+ * });
+ * if (result.report.qualifies) {
+ *   await lbb.models.switches.create({ trial: result.id });
+ * }
+ * ```
+ */
+export class ModelTrialsNamespace {
+  constructor(private readonly client: LbbClient) {}
+
+  /**
+   * What you can test, per use: the model it runs now (`current`), the
+   * catalog's model (`default`), a switch (`switched`), its checked calls,
+   * and the candidates with their efforts, prices and whether this server
+   * holds their key. `available: false` with a `reason` when trials cannot
+   * run here (they need the model workflows and a checker).
+   */
+  options(
+    opts: CallOptions = {},
+  ): Promise<Schemas["ModelTrialOptionsResponse"]> {
+    return this.client.request("GET", "/v1/models/trials/options", opts);
+  }
+
+  /**
+   * Start a trial of `candidate` on each use in `jobs` (without `jobs`, on
+   * every use it can do that has checked calls). An open trial of the same
+   * use and candidate comes back as it is, so this is safe to call again.
+   * A use the candidate cannot do, or that runs it now, is in `skipped` with
+   * the reason. `target` is the calls to compare (default 40, at most 100);
+   * `days` how long the trial takes new checks (default 14, at most 30).
+   *
+   * Errors: `503 trials_unavailable` without workflows or a checker;
+   * `409 trial_candidate_unavailable` when the server has no key for the
+   * candidate's provider.
+   */
+  create(
+    params: Schemas["ModelTrialStartRequest"],
+    opts: CallOptions = {},
+  ): Promise<Schemas["ModelTrialStartResponse"]> {
+    return this.client.request("POST", "/v1/models/trials", {
+      ...opts,
+      body: params,
+    });
+  }
+
+  /** The graph's trials, newest first, with their reports and without
+   * their calls. */
+  list(
+    options: ModelTrialListOptions = {},
+  ): Promise<Schemas["ModelTrialListResponse"]> {
+    const { job, limit, ...opts } = options;
+    return this.client.request("GET", "/v1/models/trials", {
+      ...opts,
+      query: { job, limit },
+    });
+  }
+
+  /** One trial with its report and every compared call (both models'
+   * verdicts, scores, costs and times). */
+  get(trialId: string, opts: CallOptions = {}): Promise<Schemas["ModelTrial"]> {
+    return this.client.request("GET", "/v1/models/trials/get", {
+      ...opts,
+      query: { id: trialId },
+    });
+  }
+
+  /** One compared call: the logged call, its check (the ground truth) and
+   * the candidate's answer. `answer.current` is the answer of the model in
+   * use when it answered the call again. */
+  call(
+    trialId: string,
+    callId: string,
+    opts: CallOptions = {},
+  ): Promise<Schemas["ModelTrialCallResponse"]> {
+    return this.client.request("GET", "/v1/models/trials/call", {
+      ...opts,
+      query: { id: trialId, call: callId },
+    });
+  }
+
+  /** Stop a running or collecting trial. It keeps what it compared. */
+  stop(
+    trialId: string,
+    opts: CallOptions = {},
+  ): Promise<Schemas["ModelTrial"]> {
+    return this.client.request("POST", "/v1/models/trials/stop", {
+      ...opts,
+      query: { id: trialId },
+    });
+  }
+
+  /**
+   * Read the trial until it compared what it can (`until: "compared"`, the
+   * default) or until it ended (`until: "ended"`), and return it. A trial
+   * of question answers takes about 10 to 30 s per call; one of a decision
+   * or an order, about 1 s.
+   */
+  async wait(
+    trialId: string,
+    options: ModelTrialWaitOptions = {},
+  ): Promise<Schemas["ModelTrial"]> {
+    const {
+      until = "compared",
+      pollIntervalMs = 5_000,
+      timeoutMs = 0,
+      onUpdate,
+      ...opts
+    } = options;
+    if (!Number.isFinite(pollIntervalMs) || pollIntervalMs < 0) {
+      throw new RangeError("pollIntervalMs must be a non-negative number");
+    }
+    if (!Number.isFinite(timeoutMs) || timeoutMs < 0) {
+      throw new RangeError("timeoutMs must be a non-negative number");
+    }
+    const deadline = timeoutMs > 0 ? Date.now() + timeoutMs : undefined;
+    for (;;) {
+      if (opts.signal?.aborted) {
+        throw opts.signal.reason ?? new Error("request aborted");
+      }
+      const trial = await this.get(trialId, opts);
+      onUpdate?.(trial);
+      const ended = TRIAL_ENDED.has(trial.status);
+      if (ended || (until === "compared" && trial.status !== "running")) {
+        return trial;
+      }
+      if (deadline !== undefined && Date.now() >= deadline) {
+        throw new Error(
+          `timed out waiting for model trial ${trialId} (${trial.status}, ${trial.report.calls} calls compared)`,
+        );
+      }
+      await sleep(pollIntervalMs);
+    }
+  }
+}
+
+/**
+ * Switches: the use of a model on the graph runs a trial's candidate from
+ * the next call on. Only a trial that meets the bar and compared its
+ * candidate with the model the use runs now switches; `revert` goes back to
+ * the catalog's model. Question answers (`ask`) switch to a Claude model
+ * with its effort, query routing (`route`) to a Jev model.
+ */
+export class ModelSwitchesNamespace {
+  constructor(private readonly client: LbbClient) {}
+
+  /** The graph's switched uses: the model, the one before, the trial and
+   * its report at the switch, who switched and when. */
+  list(opts: CallOptions = {}): Promise<Schemas["ModelSwitchListResponse"]> {
+    return this.client.request("GET", "/v1/models/switches", opts);
+  }
+
+  /**
+   * Switch the trial's use to its candidate. The same switch again returns
+   * the existing one.
+   *
+   * Errors (`409`): `trial_not_qualified` when the trial does not meet the
+   * bar; `trial_outdated` when it compared the candidate with another model
+   * than the one the use runs now (start a new trial); `switch_unsupported`
+   * when the use cannot run on the candidate's provider;
+   * `trial_candidate_unavailable` without the provider's key.
+   */
+  create(
+    params: Schemas["ModelSwitchRequest"],
+    opts: CallOptions = {},
+  ): Promise<Schemas["ModelSwitch"]> {
+    return this.client.request("POST", "/v1/models/switches", {
+      ...opts,
+      body: params,
+    });
+  }
+
+  /** Put the use back on the catalog's model. Returns the switches left. */
+  revert(
+    job: Schemas["ModelJob"],
+    opts: CallOptions = {},
+  ): Promise<Schemas["ModelSwitchListResponse"]> {
+    return this.client.request("POST", "/v1/models/switches/revert", {
+      ...opts,
+      query: { job },
+    });
+  }
+}
+
+/** The models of the graph's uses: trials of other models, and switches. */
+export class ModelsNamespace {
+  readonly trials: ModelTrialsNamespace;
+  readonly switches: ModelSwitchesNamespace;
+
+  constructor(client: LbbClient) {
+    this.trials = new ModelTrialsNamespace(client);
+    this.switches = new ModelSwitchesNamespace(client);
   }
 }
 

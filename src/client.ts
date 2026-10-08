@@ -56,6 +56,7 @@ import {
   SearchNamespace,
   EvalsNamespace,
   ChecksNamespace,
+  ModelsNamespace,
   EmbeddingsNamespace,
 } from "./namespaces.js";
 
@@ -93,6 +94,11 @@ export type {
   EntitySelector,
   GraphMetadata,
   GraphSummary,
+  ModelJob,
+  ModelSwitch,
+  ModelTrial,
+  ModelTrialModel,
+  ModelTrialReport,
   SchemaView,
   Snapshot,
 } from "./types.js";
@@ -252,6 +258,8 @@ export class LbbClient {
   readonly evals: EvalsNamespace;
   /** Model checks: the call log, the judge's checks, and reviews. */
   readonly checks: ChecksNamespace;
+  /** Model trials of other models on the graph's uses, and switches. */
+  readonly models: ModelsNamespace;
   readonly embeddings: EmbeddingsNamespace;
   readonly workflows: WorkflowNamespace;
   readonly cdc: CdcNamespace;
@@ -307,6 +315,7 @@ export class LbbClient {
     this.query = new QueryNamespace(this);
     this.evals = new EvalsNamespace(this);
     this.checks = new ChecksNamespace(this);
+    this.models = new ModelsNamespace(this);
     this.embeddings = new EmbeddingsNamespace(this);
     this.workflows = new WorkflowNamespace(this);
     this.cdc = new CdcNamespace(this);

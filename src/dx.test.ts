@@ -172,6 +172,95 @@ test("fit sources namespace maps each operation to its route", async () => {
   });
 });
 
+test("model trials and switches map each operation to its route", async () => {
+  const { fetch, urls, bodies } = queuedFetch([]);
+  const client = new LbbClient({ baseUrl: "http://h", graph: "crm", fetch });
+  const id = "00000001791454313946-18f056c7";
+
+  await client.models.trials.options();
+  await client.models.trials.create({
+    candidate: {
+      provider: "anthropic",
+      model: "claude-haiku-5-5",
+      effort: "low",
+    },
+    jobs: ["ask"],
+    target: 20,
+  });
+  await client.models.trials.list({ job: "ask", limit: 5 });
+  await client.models.trials.get(id);
+  await client.models.trials.call(id, "c1");
+  await client.models.trials.stop(id);
+  await client.models.switches.list();
+  await client.models.switches.create({ trial: id });
+  await client.models.switches.revert("ask");
+  await client.graph("sales").models.trials.list();
+
+  assert.deepEqual(urls, [
+    "http://h/v1/models/trials/options?graph=crm",
+    "http://h/v1/models/trials?graph=crm",
+    "http://h/v1/models/trials?graph=crm&job=ask&limit=5",
+    `http://h/v1/models/trials/get?graph=crm&id=${id}`,
+    `http://h/v1/models/trials/call?graph=crm&id=${id}&call=c1`,
+    `http://h/v1/models/trials/stop?graph=crm&id=${id}`,
+    "http://h/v1/models/switches?graph=crm",
+    "http://h/v1/models/switches?graph=crm",
+    "http://h/v1/models/switches/revert?graph=crm&job=ask",
+    "http://h/v1/models/trials?graph=sales",
+  ]);
+  assert.deepEqual(JSON.parse(bodies[1] ?? ""), {
+    candidate: {
+      provider: "anthropic",
+      model: "claude-haiku-5-5",
+      effort: "low",
+    },
+    jobs: ["ask"],
+    target: 20,
+  });
+  assert.deepEqual(JSON.parse(bodies[7] ?? ""), { trial: id });
+});
+
+test("models.trials.wait reads the trial until it compared what it can", async () => {
+  const trial = (status: string, calls: number) => ({
+    body: { id: "t1", status, report: { calls, qualifies: calls >= 20 } },
+  });
+  const { fetch, urls } = queuedFetch([
+    trial("running", 0),
+    trial("running", 12),
+    trial("collecting", 24),
+  ]);
+  const client = new LbbClient({ baseUrl: "http://h", fetch });
+  const seen: number[] = [];
+  const result = await client.models.trials.wait("t1", {
+    pollIntervalMs: 0,
+    onUpdate: (t) => seen.push(t.report.calls),
+  });
+  assert.equal(result.status, "collecting");
+  assert.equal(result.report.qualifies, true);
+  assert.deepEqual(seen, [0, 12, 24]);
+  assert.equal(urls.length, 3);
+
+  // until "ended" reads on while the trial collects new checks.
+  const ended = queuedFetch([trial("collecting", 24), trial("done", 40)]);
+  const later = new LbbClient({ baseUrl: "http://h", fetch: ended.fetch });
+  const done = await later.models.trials.wait("t1", {
+    until: "ended",
+    pollIntervalMs: 0,
+  });
+  assert.equal(done.status, "done");
+  assert.equal(ended.urls.length, 2);
+
+  // A time limit throws with what the trial did so far.
+  const stuck = queuedFetch(
+    Array.from({ length: 5 }, () => trial("running", 3)),
+  );
+  const slow = new LbbClient({ baseUrl: "http://h", fetch: stuck.fetch });
+  await assert.rejects(
+    slow.models.trials.wait("t1", { pollIntervalMs: 5, timeoutMs: 1 }),
+    /timed out waiting for model trial t1 \(running, 3 calls compared\)/,
+  );
+});
+
 test("ontology starters namespace maps each operation to its route and body", async () => {
   const { fetch, urls, bodies } = queuedFetch([]);
   const client = new LbbClient({ baseUrl: "http://h", graph: "crm", fetch });
