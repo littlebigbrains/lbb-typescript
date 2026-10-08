@@ -2179,6 +2179,59 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/ontology/fit-sources": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The fit sources of the graph with their status: the resolved fields, the watermark and lag, backfill progress, changed instances still to read, counters, this month's spend, the suggestions filed per status, and the last error; `name` for one */
+        get: operations["get_v1_ontology_fit_sources"];
+        /** Declare or change the fit source of a class: the fields whose text the fit reads (the path syntax of embeddings, or long text chosen automatically) and a sentence about the text. A job reads every instance and files ontology change suggestions; nothing changes the ontology until one is accepted */
+        put: operations["put_v1_ontology_fit_sources"];
+        post?: never;
+        /** Remove a fit source; the suggestions it filed stay in the inbox */
+        delete: operations["delete_v1_ontology_fit_sources"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/ontology/fit-sources/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** What a declaration would read: the resolved fields, every candidate fact of the class, the instance count, and the text of sample instances. With `propose: true`, the models also run on the first chunk of up to 3 instances, within 60 s (`truncated` when an instance did not finish), and every proposal comes back with what the checks made of it; nothing is filed */
+        post: operations["post_v1_ontology_fit_sources_preview"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/ontology/fit-sources/refresh": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Ask the fit job to run now (`queued: true`) and return the source's status at once; it calls no model. 429 `fit_budget_exceeded` when the stack's monthly fit budget is spent, 503 `fit_models_unavailable` without the models */
+        post: operations["post_v1_ontology_fit_sources_refresh"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/ontology/resolve": {
         parameters: {
             query?: never;
@@ -5746,6 +5799,389 @@ export interface components {
             field: string;
             missing: number;
         };
+        /** @description One change the reasoning model proposed, and what the checks made of it. */
+        FitProposal: {
+            /** @description The evolve operations the suggestion would carry. */
+            change: components["schemas"]["OntologyEvolveOp"][];
+            /** @description Why a proposal was dropped, when the check says more. */
+            detail?: string | null;
+            /** @description The instance whose text the proposal came from. */
+            entity: string;
+            /**
+             * @description The suggestion key: `fit:<source>/<kind>/<normalised names>`. The
+             *     same change from many instances is one suggestion.
+             */
+            key: string;
+            kind: components["schemas"]["FitProposalKind"];
+            /** @description The class, property or relation the change adds or widens. */
+            name: string;
+            outcome: components["schemas"]["FitProposalOutcome"];
+            /**
+             * @description The sentence of the text that supports the change, as the model
+             *     quoted it.
+             */
+            quote: string;
+            /** @description The model's reason, one sentence. */
+            reason?: string;
+            /**
+             * Format: float
+             * @description The decision model's probability that the quote supports the change.
+             */
+            support?: number | null;
+            title: string;
+        };
+        /**
+         * @description What kind of change a proposal is.
+         * @enum {string}
+         */
+        FitProposalKind: "add_class" | "add_property" | "add_relation" | "widen_relation";
+        /**
+         * @description What became of a proposal.
+         * @enum {string}
+         */
+        FitProposalOutcome: "kept" | "quote_not_found" | "invalid" | "already_covered" | "weak_support";
+        /**
+         * @description The persisted fit source
+         *     (`…/ontology/fit-sources/epoch=<e>/<name>/source.json`, CAS).
+         */
+        FitSource: {
+            backfill?: null | components["schemas"]["FitSourceBackfill"];
+            counters?: components["schemas"]["FitSourceCounters"];
+            created_at: string;
+            /** @description Why the last step stopped, until a later step succeeds. */
+            last_error?: string | null;
+            last_error_at?: string | null;
+            name: string;
+            /** @description Changed instances still to read, oldest first. */
+            pending?: string[];
+            processed_through_seq?: null | components["schemas"]["CommitSeq"];
+            recipe: components["schemas"]["FitSourceRecipe"];
+            /**
+             * Format: int64
+             * @description Every write increments it.
+             */
+            revision: number;
+            /**
+             * @description This month's spend (the month rolls over at the first step of the
+             *     next month).
+             */
+            spend?: components["schemas"]["FitSourceSpend"];
+            state: components["schemas"]["FitSourceState"];
+            updated_at: string;
+            /**
+             * Format: int32
+             * @description Format version. Currently `1`.
+             */
+            v: number;
+        };
+        /**
+         * @description A pass over every instance of the class: the first pass of a source, or a
+         *     new pass when the commit deltas are not available.
+         */
+        FitSourceBackfill: {
+            /** @description The last instance IRI done; the next page starts after it. */
+            cursor?: string | null;
+            /**
+             * Format: int64
+             * @description Instances the pass has read.
+             */
+            scanned: number;
+            /** @description The published commit the pass reads. */
+            target_seq: components["schemas"]["CommitSeq"];
+        };
+        /** @description What a fit source has done since it was declared. */
+        FitSourceCounters: {
+            /**
+             * Format: int64
+             * @description Dropped: the ontology has the change already.
+             */
+            already_covered?: number;
+            /**
+             * Format: int64
+             * @description Chunks sent to the reasoning model.
+             */
+            chunks?: number;
+            /**
+             * Format: int64
+             * @description Chunks the reasoning model gave no usable answer for (a refusal, an
+             *     answer cut at its token limit, or text that is not JSON), read as no
+             *     proposal so that one text cannot stop the source.
+             */
+            failed_chunks?: number;
+            /**
+             * Format: int64
+             * @description Suggestions this source filed.
+             */
+            filed?: number;
+            /**
+             * Format: int64
+             * @description Instances read (an instance read again after a change counts again).
+             */
+            instances?: number;
+            /**
+             * Format: int64
+             * @description Dropped: the change is not valid against the ontology.
+             */
+            invalid?: number;
+            /**
+             * Format: int64
+             * @description Proposals that support a suggestion (new or existing).
+             */
+            kept?: number;
+            /**
+             * Format: int64
+             * @description Changes the reasoning model proposed.
+             */
+            proposals?: number;
+            /**
+             * Format: int64
+             * @description Dropped: the quote is not in the text.
+             */
+            quote_not_found?: number;
+            /**
+             * Format: int64
+             * @description Dismissed suggestions reopened by new evidence.
+             */
+            reopened?: number;
+            /**
+             * Format: int64
+             * @description Changed instances not read: more changed in one window than the job
+             *     keeps (5,000).
+             */
+            skipped?: number;
+            /**
+             * Format: int64
+             * @description Updates of open suggestions with new evidence.
+             */
+            updated?: number;
+            /**
+             * Format: int64
+             * @description Dropped: the decision model scored the support below 0.5.
+             */
+            weak_support?: number;
+        };
+        /** @description Declare or change a fit source (`PUT /v1/ontology/fit-sources`). */
+        FitSourceDeclareRequest: {
+            /** @description The class IRI whose instances the fit reads. */
+            class: string;
+            /**
+             * @description One sentence about what the text is, for the model ("employee
+             *     interviews about their work processes"). At most 500 characters.
+             *     Absent on an existing source: its context stays.
+             */
+            context?: string | null;
+            /** @description Names or IRIs to drop from the automatic choice. */
+            exclude?: string[];
+            /**
+             * @description The fields in text order, with the path syntax of embeddings
+             *     (`transcript`, `label`, `rdfs:label`, `about/label`, `<https://…>`).
+             *     Absent: the server picks the text facts of a sample of the class,
+             *     longest text first, and stores the result.
+             */
+            from?: components["schemas"]["EmbeddingFieldSpec"][] | null;
+            /** @description `[a-z0-9][a-z0-9-]{0,62}`; defaults to the class's local name. */
+            name?: string | null;
+        };
+        FitSourceListResponse: {
+            fit_sources: components["schemas"]["FitSourceStatus"][];
+            /**
+             * Format: int64
+             * @description The stack's fit spend this month, in millionths of a US dollar.
+             */
+            month_cost_micro_usd?: number;
+            /**
+             * Format: double
+             * @description The stack's monthly budget for fit from text in US dollars (every
+             *     source of every graph together); absent when there is no limit.
+             */
+            monthly_budget_usd?: number | null;
+        };
+        /**
+         * @description Preview a declaration (`POST /v1/ontology/fit-sources/preview`): the text
+         *     the fit would read. With `propose`, the models also run on at most 3
+         *     instances and the proposals come back; nothing is filed or stored.
+         */
+        FitSourcePreviewRequest: components["schemas"]["FitSourceDeclareRequest"] & {
+            /** @description Show these instances instead of the first ones. */
+            iris?: string[];
+            /** @description Run the models on the first 3 sample instances (a dry run). */
+            propose?: boolean;
+            /** @description Sample instances to show (default 3, at most 20). */
+            sample?: number | null;
+        };
+        FitSourcePreviewResponse: {
+            /**
+             * @description Every field the class could give the text: the recipe's fields first,
+             *     then the others by coverage.
+             */
+            candidates?: components["schemas"]["EmbeddingCandidate"][];
+            /**
+             * Format: int64
+             * @description With `propose`: the spend of the dry run, in millionths of a US
+             *     dollar.
+             */
+            cost_micro_usd?: number;
+            /**
+             * Format: int64
+             * @description Instances of the class at the published generation.
+             */
+            instances: number;
+            name: string;
+            /**
+             * @description With `propose`: every proposal of the sample instances, the dropped
+             *     ones included.
+             */
+            proposals?: components["schemas"]["FitProposal"][];
+            read_at_seq?: null | components["schemas"]["CommitSeq"];
+            recipe: components["schemas"]["FitSourceRecipe"];
+            /**
+             * Format: int64
+             * @description Instances the candidates were measured on (up to 1,000).
+             */
+            sampled?: number;
+            samples: components["schemas"]["FitSourceSample"][];
+            /**
+             * @description With `propose`: the dry run reached its time limit (60 s), and the
+             *     proposals of the instances that did not finish are left out.
+             */
+            truncated?: boolean;
+        };
+        /**
+         * @description What a fit source reads. A change of fields or context applies to the
+         *     instances read after it; the job does not read the earlier ones again.
+         */
+        FitSourceRecipe: {
+            /**
+             * @description The class IRI whose instances (`?s a <class>`, subclasses included)
+             *     the fit reads.
+             */
+            class: string;
+            context?: string | null;
+            fields: components["schemas"]["EmbeddingField"][];
+        };
+        FitSourceRefreshResponse: {
+            fit_source: components["schemas"]["FitSourceStatus"];
+            /** @description The fit job was asked to run now; the status shows its progress. */
+            queued?: boolean;
+            /**
+             * @description The steps the call ran itself. Empty from
+             *     `POST /v1/ontology/fit-sources/refresh`, which only asks the fit job
+             *     to run (`queued`).
+             */
+            steps?: components["schemas"]["FitSourceStep"][];
+        };
+        FitSourceSample: {
+            /**
+             * Format: int64
+             * @description Characters of the whole text the fit reads.
+             */
+            chars: number;
+            /**
+             * Format: int64
+             * @description Chunks the text makes (one reasoning-model call each).
+             */
+            chunks: number;
+            iri: string;
+            label: string;
+            /**
+             * @description The text, up to 8,000 characters; empty when the instance has no
+             *     value in any field.
+             */
+            text: string;
+            /** @description `text` is the start of a longer text. */
+            truncated?: boolean;
+        };
+        /**
+         * @description The model spend of a fit source in one month (UTC), from the providers'
+         *     reported usage at list prices.
+         */
+        FitSourceSpend: {
+            /**
+             * Format: int64
+             * @description Model calls (reasoning and decision).
+             */
+            calls?: number;
+            /**
+             * Format: int64
+             * @description In millionths of a US dollar.
+             */
+            cost_micro_usd?: number;
+            /** @description `yyyy-mm`. */
+            month: string;
+        };
+        /** @enum {string} */
+        FitSourceState: "backfilling" | "ready";
+        /** @description A fit source as `GET /v1/ontology/fit-sources` reports it. */
+        FitSourceStatus: {
+            backfill?: null | components["schemas"]["FitSourceBackfill"];
+            class: string;
+            counters: components["schemas"]["FitSourceCounters"];
+            created_at: string;
+            /**
+             * Format: int64
+             * @description Commits the source is behind the published generation.
+             */
+            lag_commits?: number | null;
+            last_error?: string | null;
+            last_error_at?: string | null;
+            name: string;
+            /**
+             * Format: int64
+             * @description Changed instances still to read.
+             */
+            pending: number;
+            processed_through_seq?: null | components["schemas"]["CommitSeq"];
+            published_seq?: null | components["schemas"]["CommitSeq"];
+            recipe: components["schemas"]["FitSourceRecipe"];
+            /** @description This month's spend. */
+            spend: components["schemas"]["FitSourceSpend"];
+            state: components["schemas"]["FitSourceState"];
+            /** @description The suggestions of this source (origin id `fit:<name>`) per status. */
+            suggestions: components["schemas"]["SuggestionStatusCounts"];
+            updated_at: string;
+        };
+        /** @description What one step of the fit job did. */
+        FitSourceStep: {
+            action: components["schemas"]["FitSourceStepAction"];
+            /** Format: int64 */
+            already_covered: number;
+            /** Format: int64 */
+            chunks: number;
+            /**
+             * Format: int64
+             * @description In millionths of a US dollar.
+             */
+            cost_micro_usd: number;
+            /** Format: int64 */
+            failed_chunks: number;
+            /** Format: int64 */
+            filed: number;
+            /**
+             * Format: int64
+             * @description Instances read.
+             */
+            instances: number;
+            /** Format: int64 */
+            invalid: number;
+            /** Format: int64 */
+            kept: number;
+            /** @description The source has more work (a backfill page, changed instances). */
+            more: boolean;
+            name: string;
+            processed_through_seq?: null | components["schemas"]["CommitSeq"];
+            /** Format: int64 */
+            proposals: number;
+            /** Format: int64 */
+            quote_not_found: number;
+            /** Format: int64 */
+            reopened: number;
+            /** Format: int64 */
+            updated: number;
+            /** Format: int64 */
+            weak_support: number;
+        };
+        /** @enum {string} */
+        FitSourceStepAction: "idle" | "backfill" | "incremental";
         /**
          * @description A bare JSON value in the flat `{ field: value }` property shape: a boolean,
          *     an integer, a number, a string, or an array of integers or of strings. The
@@ -33699,6 +34135,698 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["OntologyEvolveResponse"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Rate limit exceeded */
+            429: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Service unavailable */
+            503: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+        };
+    };
+    get_v1_ontology_fit_sources: {
+        parameters: {
+            query?: {
+                /** @description Graph name (default `main`) */
+                graph?: string;
+                /** @description one fit source (returns FitSourceStatus) */
+                name?: string;
+            };
+            header?: {
+                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                "Lbb-Version"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FitSourceListResponse"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Rate limit exceeded */
+            429: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Service unavailable */
+            503: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+        };
+    };
+    put_v1_ontology_fit_sources: {
+        parameters: {
+            query?: {
+                /** @description Graph name (default `main`) */
+                graph?: string;
+            };
+            header?: {
+                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                "Lbb-Version"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FitSourceDeclareRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FitSourceStatus"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Rate limit exceeded */
+            429: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Service unavailable */
+            503: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+        };
+    };
+    delete_v1_ontology_fit_sources: {
+        parameters: {
+            query?: {
+                /** @description Graph name (default `main`) */
+                graph?: string;
+                /** @description the fit source */
+                name?: string;
+                /** @description the fit source name again */
+                confirm?: string;
+            };
+            header?: {
+                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                "Lbb-Version"?: string;
+                /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
+                "Idempotency-Key"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Rate limit exceeded */
+            429: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Service unavailable */
+            503: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+        };
+    };
+    post_v1_ontology_fit_sources_preview: {
+        parameters: {
+            query?: {
+                /** @description Graph name (default `main`) */
+                graph?: string;
+            };
+            header?: {
+                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                "Lbb-Version"?: string;
+                /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
+                "Idempotency-Key"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FitSourcePreviewRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FitSourcePreviewResponse"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Rate limit exceeded */
+            429: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Service unavailable */
+            503: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+        };
+    };
+    post_v1_ontology_fit_sources_refresh: {
+        parameters: {
+            query?: {
+                /** @description Graph name (default `main`) */
+                graph?: string;
+                /** @description the fit source */
+                name?: string;
+            };
+            header?: {
+                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                "Lbb-Version"?: string;
+                /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
+                "Idempotency-Key"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FitSourceRefreshResponse"];
                 };
             };
             /** @description Bad request */
