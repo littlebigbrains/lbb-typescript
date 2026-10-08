@@ -959,11 +959,13 @@ test("entityDetail pins a commit and sends no valid-time selector", async () => 
     type: "Ticket",
     key: "4821",
     edges: 50,
+    evidence: 3,
     asOfCommitSeq: 12,
   });
 
   const url = new URL(calls[0].input);
   assert.equal(url.pathname, "/v1/graph/entity");
+  assert.equal(url.searchParams.get("evidence"), "3");
   assert.equal(url.searchParams.get("as_of_commit_seq"), "12");
   assert.equal(url.searchParams.get("key"), "4821");
   assert.equal(url.searchParams.has("as_of"), false);

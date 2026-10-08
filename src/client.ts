@@ -1397,9 +1397,12 @@ export class LbbClient {
 
   /**
    * Read projected attributes and current relationships from one RDF snapshot.
-   * Inspect `unavailable_sections` before interpreting legacy provenance arrays.
-   * Use strong consistency for read-after-write, or `asOfCommitSeq` for the
-   * record at a retained commit.
+   * Each relationship carries its evidence, newest commit first: `evidence`
+   * sets how many entries per relationship (default 5, 0 to 20). The
+   * response's `evidence` says whether that evidence is `complete` or
+   * `partial`. Inspect `unavailable_sections` before interpreting legacy
+   * provenance arrays. Use strong consistency for read-after-write, or
+   * `asOfCommitSeq` for the record at a retained commit.
    */
   entityDetail(opts: {
     id?: string;
@@ -1408,6 +1411,7 @@ export class LbbClient {
     key?: string;
     consistency?: "strong" | "eventual";
     edges?: number;
+    evidence?: number;
     asOfCommitSeq?: number;
   }): Promise<Schemas["EntityDetailResponse"]> {
     return this.request("GET", "/v1/graph/entity", {
@@ -1418,6 +1422,7 @@ export class LbbClient {
         key: opts.key,
         consistency: opts.consistency,
         edges: opts.edges,
+        evidence: opts.evidence,
         as_of_commit_seq: opts.asOfCommitSeq,
       },
     });
