@@ -80,6 +80,27 @@ function stringBody(body: unknown): string {
   return body;
 }
 
+test("import and retract preserve graph epoch fences as exact strings", async () => {
+  const { fetch, calls } = recordingFetch();
+  const client = new LbbClient({
+    baseUrl: "https://db.example.test",
+    graph: "research",
+    fetch,
+  });
+  const expectedGraphEpoch = "18446744073709551615";
+  await client.import([], { expectedGraphEpoch });
+  await client.retract({ entities: [] }, { expectedGraphEpoch });
+  await client.graph("research").facts.import([], { expectedGraphEpoch });
+  await client
+    .graph("research")
+    .retract({ entities: [] }, { expectedGraphEpoch });
+  for (const call of calls) {
+    const query = new URL(call.input).searchParams;
+    assert.equal(query.get("expected_graph_epoch"), expectedGraphEpoch);
+    assert.equal(query.get("graph"), "research");
+  }
+});
+
 async function streamedBody(body: unknown): Promise<string> {
   const chunks: Uint8Array[] = [];
   const stream = body as {
@@ -2317,4 +2338,31 @@ test("reload accepts a pre-built NDJSON string unchanged", async () => {
   assert.doesNotMatch(call.input, /dry_run=/);
   assert.doesNotMatch(call.input, /strict=/);
   assert.doesNotMatch(call.input, /observed_at=/);
+});
+
+test("a scoped graph incarnation pins all requests and cannot be overridden", async () => {
+  const { fetch, calls } = recordingFetch({ body: "{}" });
+  const base = new LbbClient({ baseUrl: "http://h", graph: "customer", fetch });
+  const pinned = base.withScope({ expectedGraphEpoch: "18446744073709551615" });
+  await pinned.request("GET", "/v1/ontology");
+  await pinned.request("POST", "/v1/ontology/evolve", { body: {} });
+  for (const call of calls) {
+    const url = new URL(call.input);
+    assert.equal(url.searchParams.get("graph"), "customer");
+    assert.deepEqual(url.searchParams.getAll("expected_graph_epoch"), [
+      "18446744073709551615",
+    ]);
+  }
+  await assert.rejects(
+    pinned.request("POST", "/v1/graph/retract", {
+      body: {},
+      query: { expected_graph_epoch: "1" },
+    }),
+    /cannot change/,
+  );
+  await base.request("GET", "/v1/ontology");
+  assert.equal(
+    new URL(calls.at(-1)!.input).searchParams.has("expected_graph_epoch"),
+    false,
+  );
 });

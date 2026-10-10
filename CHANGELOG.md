@@ -2,8 +2,96 @@
 
 All notable changes to the `@littlebigbrain/client` package are documented here.
 
-## Unreleased
+## 0.23.0 (2026-10-11)
 
+- `client.workflows.starters.try({ starter, params })` runs Try on samples
+  (`POST /v1/workflows/starters/try`, SaaS mode): a new graph with the
+  starter workflow's samples and the workflow on it. It is never retried.
+- New `lbbActivities(client)` for the code of a workflow: `reason`,
+  `decide` and `embed` call LBB's own models
+  (`POST /v1/workflows/activities/*`), and `pages`, `sparql`,
+  `writeOwned`, `review`, `evolve` and `ontology` wrap the routes a
+  workflow reads and writes. A model call takes the request and
+  `{ effectId, label }`: pass the step's `effectId`, and a step that runs
+  again gets the first answer (`cached: true`) at no cost. `reason<T>`
+  types the answer's `value`. A call with an effect id retries a `5xx` and
+  a network failure; one without retries only a `429` the server returns
+  before it runs the request. `reason` waits up to 5 minutes per attempt.
+  `pages(sha256)` reads to the end of the file, 50 pages per call.
+  `review({ workflow, ... })` files a suggestion with the origin
+  `{ kind: "agent", id: "starter:<workflow>" }`. New
+  `isActivityRefused(error)` (`422 activity_request_refused`) and
+  `splitInHalves(items)` for splitting a refused request, and the types
+  `LbbActivities`, `ActivityOptions`, `ActivityPagesOptions`,
+  `ReasonRequest`, `ReasonResult`, `DecideRequest`, `DecideQuestion`,
+  `DecideAnswer`, `DecideResult`, `EmbedRequest`, `EmbedResult` and
+  `ReviewRequest`.
+- `writeOwned` takes a function that returns the write: it runs inside
+  the step, so the write can read inputs the turn does not save (a file's
+  pages). A replayed step does not call it.
+- New `workflows.starters` and `workflows.triggered` for starter workflows:
+  templates a workflow is created from, and the workflows created from them
+  (triggered workflows), which run when a published commit changes the
+  class they watch. `workflows.starters.list()` reads the catalog
+  (`GET /v1/workflows/starters`, each entry with its `group`) and
+  `workflows.starters.use(request)` creates a workflow from one, or changes
+  one (`PUT /v1/workflows/triggered`). `workflows.triggered.list()`,
+  `get({ starter, name })`, `preview(request)`, `refresh({ starter, name })`,
+  `pause({ starter, name }, paused)` and `delete({ starter, name })` call
+  `/v1/workflows/triggered*`. Embeddings on classes (`search.embed`) and fit
+  sources (`ontology.fit`) are triggered workflows too. `use`, `pause` and a
+  preview without `propose` retry a failed call; `pause` defaults `paused`
+  to `true` (pass `false` to resume); `delete` repeats the name as
+  `confirm`. Also on `graph(name).workflows`. New types
+  `StarterWorkflowsNamespace`, `TriggeredWorkflowsNamespace` and
+  `TriggeredWorkflowRef`. Ontology starters stay `ontology.starters`.
+- Developer workflows (`workflow@v1`): a triggered workflow of `workflow`
+  sends the new and changed instances of a class to a workflow of your
+  worker as trigger messages. `workflows.starters.use` takes its
+  `workflow`, `owns` and `batch`.
+- New `triggeredWorkflow({ name, version, initialState, onInstances })`
+  defines the workflow that receives the messages. It checks each message
+  with `parseTriggerMessage` (a message of another shape fails its turn
+  without a retry), calls `onInstances(ctx, message, state)` with the typed
+  `WorkflowTriggerMessage`, and keeps the state when `onInstances` returns
+  none. `message.workflow` names the triggered workflow; a message stored
+  with `starter` instead reads the same. The server creates the instance
+  `starter.<name>` with the state `{}`, so `state` is `initialState` merged
+  under the saved state: a saved key wins, and a null or empty saved state
+  gives `initialState`. A handler can add to a number of `initialState`
+  (`state.seen + n`) from its first turn.
+- New `writeOwned(client, ctx, stepKey, write, options)`: inside the step
+  `stepKey`, one `POST /v1/graph/commit` with `replace_owned` replaces the
+  owned edges and fields of `write.subjects` with `write.triplets` and
+  `write.entity_properties`. The step's effect id is the idempotency key, so
+  a turn that runs again never writes twice. `options.graph` names the graph
+  (pass `message.graph`); edges default to `skip_unchanged`. New types
+  `WorkflowTriggerMessage`, `WorkflowTriggerReason`,
+  `TriggeredWorkflowDefinition`, `TriggeredWorkflowTurn`, `OwnedWrite`,
+  `OwnedWriteOptions` and `OwnedWriteResult`.
+- New `entityRef(iri, type, name?)` and `entityIdFromIri(iri)`: the commit
+  reference of an entity you know by its IRI (a trigger message's
+  `instances`, a SPARQL answer). Its `key` is `ENTITY_ID_KEY_SENTINEL` and
+  the entity's 32-hex id, so a commit or a `replace_owned` subject
+  addresses that entity directly, a keyed one included. A namespace other
+  than `ENTITY_IRI_NAMESPACE` or a malformed id throws a `RangeError`.
+  `name` (default: the id) is the display name a triplet endpoint or a
+  field row writes; `replace_owned` reads only the id.
+- New `files` for the files of a graph: `upload(data, { name,
+  contentType })` sends a `Blob`, `ArrayBuffer` or `Uint8Array` as the raw
+  body of `POST /v1/files` (the same bytes again change nothing, so a failed
+  call is retried); `list()`, `content(sha256)` (the bytes, a
+  `Uint8Array`), `pages(sha256, { from, to })` (the parsed lines and words
+  with their boxes) and `delete(sha256)` (repeats the SHA-256 as `confirm`)
+  call `/v1/files*`. Also on `graph(name).files`. New types
+  `FilesNamespace`, `FileRecord`, `FilePages`, `FileBody`, `BlobLike`,
+  `FileUploadOptions` and `FilePagesOptions`.
+- `RequestOptions` gains `responseType: "bytes"`, which returns a 2xx body
+  as a `Uint8Array`; a `FetchLike` response may carry `arrayBuffer()`.
+- `commit` and `graph(name).facts.create` send `replace_owned` and return
+  `owned`; `ontology.suggestions.create` sends `facts`, and an accepted
+  suggestion returns `facts_commit` (the request types come from the
+  contract).
 - `query.names` responses carry `index_complete`, `index_classes_read` and
   `index_gaps` (new types `QueryNamesIndexGap` and `QueryNamesGapReason`):
   whether the name index read every class in full, and the classes it did

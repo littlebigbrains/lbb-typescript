@@ -1,5 +1,9 @@
 import type { LbbClient, Schemas } from "./client.js";
 import type { CallOptions } from "./transport.js";
+import {
+  StarterWorkflowsNamespace,
+  TriggeredWorkflowsNamespace,
+} from "./triggered-workflows.js";
 
 type Turn = Schemas["WorkflowTurn"];
 type Task = Schemas["WorkflowTurnTask"];
@@ -178,7 +182,21 @@ export class WorkflowHandle<M = unknown> {
   }
 }
 export class WorkflowNamespace {
-  constructor(private readonly client: LbbClient) {}
+  /**
+   * The starter workflows this server offers (templates), and creating a
+   * workflow from one with `use`.
+   */
+  readonly starters: StarterWorkflowsNamespace;
+  /**
+   * The workflows created from a starter workflow on this graph: each one
+   * runs when a published commit changes the class it watches.
+   */
+  readonly triggered: TriggeredWorkflowsNamespace;
+
+  constructor(private readonly client: LbbClient) {
+    this.starters = new StarterWorkflowsNamespace(client);
+    this.triggered = new TriggeredWorkflowsNamespace(client);
+  }
   handle<M = unknown>(id: string): WorkflowHandle<M> {
     return new WorkflowHandle<M>(this, id);
   }

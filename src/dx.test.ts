@@ -26,14 +26,17 @@ function queuedFetch(
 ): {
   fetch: FetchLike;
   urls: string[];
+  methods: string[];
   headers: Array<Record<string, string>>;
   bodies: Array<string | undefined>;
 } {
   const urls: string[] = [];
+  const methods: string[] = [];
   const headers: Array<Record<string, string>> = [];
   const bodies: Array<string | undefined> = [];
   const fetch: FetchLike = async (url, init) => {
     urls.push(url);
+    methods.push(init?.method ?? "GET");
     headers.push(init?.headers ?? {});
     bodies.push(typeof init?.body === "string" ? init.body : undefined);
     const next = payloads.shift() ?? { body: {} };
@@ -53,7 +56,7 @@ function queuedFetch(
       text: async () => JSON.stringify(next.body),
     };
   };
-  return { fetch, urls, headers, bodies };
+  return { fetch, urls, methods, headers, bodies };
 }
 
 test("preferred namespaces make entity, ontology, and query operations discoverable", async () => {
@@ -170,6 +173,94 @@ test("fit sources namespace maps each operation to its route", async () => {
     class: "https://example.org/class/interview",
     propose: true,
   });
+});
+
+test("starter workflows and triggered workflows map each operation to its route", async () => {
+  const { fetch, urls, methods, bodies } = queuedFetch([]);
+  const client = new LbbClient({ baseUrl: "http://h", graph: "crm", fetch });
+  const ref = { starter: "ontology.fit", name: "interview" };
+
+  await client.workflows.starters.list();
+  await client.workflows.triggered.list();
+  await client.workflows.triggered.get(ref);
+  await client.workflows.starters.use({
+    starter: "ontology.fit",
+    watch: { class: "Interview", fields: ["transcript"] },
+    params: { context: "employee interviews" },
+  });
+  await client.workflows.triggered.preview({
+    starter: "search.embed",
+    watch: { class: "Ticket" },
+    sample: 3,
+  });
+  await client.workflows.triggered.refresh(ref);
+  await client.workflows.triggered.delete(ref);
+  await client.graph("sales").workflows.triggered.list();
+  // Ontology starters keep their own namespace and routes.
+  await client.ontology.starters.list();
+
+  assert.deepEqual(
+    urls.map((url, index) => `${methods[index]} ${url}`),
+    [
+      "GET http://h/v1/workflows/starters?graph=crm",
+      "GET http://h/v1/workflows/triggered?graph=crm",
+      "GET http://h/v1/workflows/triggered?graph=crm&starter=ontology.fit&name=interview",
+      "PUT http://h/v1/workflows/triggered?graph=crm",
+      "POST http://h/v1/workflows/triggered/preview?graph=crm",
+      "POST http://h/v1/workflows/triggered/refresh?graph=crm&starter=ontology.fit&name=interview",
+      "DELETE http://h/v1/workflows/triggered?graph=crm&starter=ontology.fit&name=interview&confirm=interview",
+      "GET http://h/v1/workflows/triggered?graph=sales",
+      "GET http://h/v1/ontology/starters?graph=crm",
+    ],
+  );
+  assert.deepEqual(JSON.parse(bodies[3] ?? ""), {
+    starter: "ontology.fit",
+    watch: { class: "Interview", fields: ["transcript"] },
+    params: { context: "employee interviews" },
+  });
+  assert.deepEqual(JSON.parse(bodies[4] ?? ""), {
+    starter: "search.embed",
+    watch: { class: "Ticket" },
+    sample: 3,
+  });
+});
+
+test("workflows.starters.use and a plain preview retry; a preview that runs the models does not", async () => {
+  const unavailable = {
+    status: 503,
+    body: { error: { message: "busy", code: "unavailable" } },
+  };
+  const { fetch, urls } = queuedFetch([
+    unavailable,
+    { body: { starter: "search.embed", name: "ticket" } },
+    unavailable,
+    { body: { starter: "search.embed", name: "ticket" } },
+    unavailable,
+  ]);
+  const client = new LbbClient({
+    baseUrl: "http://h",
+    fetch,
+    maxRetries: 1,
+    retryDelayMs: 0,
+  });
+
+  await client.workflows.starters.use({
+    starter: "search.embed",
+    watch: { class: "Ticket" },
+  });
+  await client.workflows.triggered.preview({
+    starter: "search.embed",
+    watch: { class: "Ticket" },
+  });
+  await assert.rejects(
+    client.workflows.triggered.preview({
+      starter: "ontology.fit",
+      watch: { class: "Interview" },
+      propose: true,
+    }),
+    (error: unknown) => error instanceof LbbError && error.status === 503,
+  );
+  assert.equal(urls.length, 5);
 });
 
 test("model trials and switches map each operation to its route", async () => {
@@ -1057,4 +1148,33 @@ test("A5: defaultConsistency applies when a call omits it, and a per-call value 
     urls[3].includes("consistency=strong"),
     `conformance URL should carry the default: ${urls[3]}`,
   );
+});
+
+test("workflows.starters.try posts to the try route and is never retried", async () => {
+  const unavailable = {
+    status: 503,
+    body: { error: { message: "busy", code: "unavailable" } },
+  };
+  const { fetch, urls, methods, bodies } = queuedFetch([unavailable]);
+  const client = new LbbClient({
+    baseUrl: "http://h",
+    graph: "main",
+    fetch,
+    maxRetries: 2,
+    retryDelayMs: 0,
+  });
+  await assert.rejects(
+    client.workflows.starters.try({
+      starter: "infer.llm",
+      params: { gate: 0.7 },
+    }),
+    (error: unknown) => error instanceof LbbError && error.status === 503,
+  );
+  assert.equal(urls.length, 1, "a try makes a new graph, so it is sent once");
+  assert.equal(methods[0], "POST");
+  assert.match(urls[0], /\/v1\/workflows\/starters\/try\?graph=main$/);
+  assert.deepEqual(JSON.parse(String(bodies[0])), {
+    starter: "infer.llm",
+    params: { gate: 0.7 },
+  });
 });

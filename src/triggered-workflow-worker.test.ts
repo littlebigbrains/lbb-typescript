@@ -1,0 +1,680 @@
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import { LbbClient, type FetchLike, type Schemas } from "./client.js";
+import { WorkflowError, WorkflowWorker } from "./workflows.js";
+import {
+  ENTITY_ID_KEY_SENTINEL,
+  ENTITY_IRI_NAMESPACE,
+  entityIdFromIri,
+  entityRef,
+  ownedCommitBody,
+  parseTriggerMessage,
+  triggeredWorkflow,
+  triggeredWorkflowState,
+  writeOwned,
+  type WorkflowTriggerMessage,
+} from "./triggered-workflow-worker.js";
+
+/** A fetch that answers `payloads` in order and keeps each request. */
+function queuedFetch(payloads: Array<{ status?: number; body: unknown }>) {
+  const requests: Array<{
+    url: string;
+    method?: string;
+    body?: unknown;
+    headers?: Record<string, string>;
+  }> = [];
+  const fetch: FetchLike = async (url, init) => {
+    requests.push({
+      url,
+      method: init?.method,
+      body: typeof init?.body === "string" ? JSON.parse(init.body) : undefined,
+      headers: init?.headers,
+    });
+    const next = payloads.shift() ?? { body: {} };
+    const status = next.status ?? 200;
+    return {
+      ok: status >= 200 && status < 300,
+      status,
+      headers: { get: () => null },
+      text: async () => JSON.stringify(next.body),
+    };
+  };
+  return { fetch, requests };
+}
+
+const MESSAGE: WorkflowTriggerMessage = {
+  type: "instances",
+  workflow: "notes",
+  graph: "crm",
+  as_of_commit_seq: 41,
+  reason: "changed",
+  instances: [
+    "https://littlebigbrain.com/e/aa",
+    "https://littlebigbrain.com/e/bb",
+  ],
+  removed: [],
+};
+
+const TRIGGERED = {
+  starter: "workflow",
+  version: "v1",
+  name: "notes",
+  owns: { properties: ["https://littlebigbrain.com/p/word_count"] },
+  status: { state: "paused", pending: 0 },
+};
+
+test("workflows.triggered.pause posts the flag for one triggered workflow", async () => {
+  const { fetch, requests } = queuedFetch([
+    { body: TRIGGERED },
+    { body: { ...TRIGGERED, status: { state: "ready", pending: 0 } } },
+  ]);
+  const client = new LbbClient({ baseUrl: "http://h", graph: "crm", fetch });
+  const ref = { starter: "workflow", name: "notes" };
+
+  const paused = await client.workflows.triggered.pause(ref);
+  const resumed = await client.workflows.triggered.pause(ref, false);
+
+  assert.equal(paused.status.state, "paused");
+  assert.equal(resumed.status.state, "ready");
+  assert.deepEqual(
+    requests.map(({ url, method, body }) => ({ url, method, body })),
+    [
+      {
+        url: "http://h/v1/workflows/triggered/pause?graph=crm&starter=workflow&name=notes",
+        method: "POST",
+        body: { paused: true },
+      },
+      {
+        url: "http://h/v1/workflows/triggered/pause?graph=crm&starter=workflow&name=notes",
+        method: "POST",
+        body: { paused: false },
+      },
+    ],
+  );
+});
+
+test("workflows.starters.use sends the workflow, the owned outputs and the batch", async () => {
+  const { fetch, requests } = queuedFetch([{ body: TRIGGERED }]);
+  const client = new LbbClient({ baseUrl: "http://h", graph: "crm", fetch });
+  const request: Schemas["TriggeredWorkflowRequest"] = {
+    starter: "workflow",
+    name: "notes",
+    watch: { class: "Note", fields: ["body"] },
+    workflow: { workflow_type: "word-count", version: "v1" },
+    owns: { properties: ["word_count"] },
+    batch: 8,
+  };
+
+  await client.graph("crm").workflows.starters.use(request);
+
+  assert.equal(requests[0]?.method, "PUT");
+  assert.equal(requests[0]?.url, "http://h/v1/workflows/triggered?graph=crm");
+  assert.deepEqual(requests[0]?.body, request);
+});
+
+test("a commit carries replace_owned and returns what it removed", async () => {
+  const owned = {
+    edges_retracted: 1,
+    fields_removed: 2,
+    entities_retracted: 0,
+  };
+  const { fetch, requests } = queuedFetch([
+    {
+      body: {
+        commit_seq: 42,
+        replayed: false,
+        idempotency_key: "k",
+        owned,
+        entities_written: 1,
+        edges_written: 0,
+      },
+    },
+  ]);
+  const client = new LbbClient({ baseUrl: "http://h", graph: "crm", fetch });
+  const body: Schemas["TripletCommitFile"] = {
+    entity_properties: [
+      {
+        type: "Note",
+        name: "n1",
+        properties: { word_count: 3 },
+      },
+    ],
+    replace_owned: {
+      subjects: [{ type: "Note", name: "n1" }],
+      properties: ["word_count"],
+    },
+  };
+
+  const written = await client.commit(body, { idempotencyKey: "k" });
+
+  assert.deepEqual(written.owned, owned);
+  assert.equal(written.commitSeq, 42);
+  assert.deepEqual(requests[0]?.body, body);
+  assert.equal(requests[0]?.headers?.["idempotency-key"], "k");
+});
+
+test("suggestions carry facts on create and report facts_commit on accept", async () => {
+  const facts: Schemas["SuggestedFacts"] = {
+    triplets: [
+      {
+        source: { type: "Room", name: "R 1.04" },
+        relation: "HAS_COMPONENT",
+        target: { type: "Component", name: "Fire door T30" },
+        confidence: 0.62,
+      },
+    ],
+    summary: "One component of room R 1.04",
+  };
+  const factsCommit = {
+    commit_seq: 9,
+    request_id: "ontology-suggestion:sg_1:facts:r1",
+  };
+  const { fetch, requests } = queuedFetch([
+    { body: { suggestion_id: "sg_1", facts, change: [] } },
+    {
+      body: {
+        suggestion_id: "sg_1",
+        status: "accepted",
+        facts_commit: factsCommit,
+      },
+    },
+  ]);
+  const client = new LbbClient({ baseUrl: "http://h", graph: "crm", fetch });
+
+  await client.ontology.suggestions.create({
+    title: "Link room R 1.04",
+    origin: { kind: "agent", id: "starter:rooms" },
+    change: [],
+    facts,
+  });
+  const accepted = await client.ontology.suggestions.accept("sg_1");
+
+  assert.deepEqual((requests[0]?.body as { facts: unknown }).facts, facts);
+  assert.deepEqual(accepted.facts_commit, factsCommit);
+  assert.equal(
+    requests[1]?.url,
+    "http://h/v1/ontology/suggestions/accept?graph=crm&suggestion_id=sg_1",
+  );
+});
+
+test("a trigger message is checked before the handler sees it", () => {
+  assert.deepEqual(parseTriggerMessage(MESSAGE), MESSAGE);
+  const withoutRemoved: Partial<WorkflowTriggerMessage> = { ...MESSAGE };
+  delete withoutRemoved.removed;
+  assert.deepEqual(parseTriggerMessage(withoutRemoved).removed, []);
+  // A reason this SDK does not know passes through.
+  assert.equal(
+    parseTriggerMessage({ ...MESSAGE, reason: "rebuilt" }).reason,
+    "rebuilt",
+  );
+  for (const [bad, problem] of [
+    [null, /not a JSON object/],
+    [{ ...MESSAGE, type: "other" }, /type is "other"/],
+    [{ ...MESSAGE, workflow: "" }, /workflow is not a name/],
+    [{ ...MESSAGE, workflow: 3, starter: "notes" }, /workflow is not a name/],
+    [{ ...MESSAGE, graph: 3 }, /graph/],
+    [{ ...MESSAGE, as_of_commit_seq: -1 }, /as_of_commit_seq/],
+    [{ ...MESSAGE, as_of_commit_seq: "41" }, /as_of_commit_seq/],
+    [{ ...MESSAGE, instances: "https://x" }, /instances/],
+    [{ ...MESSAGE, removed: [1] }, /removed/],
+  ] as const) {
+    assert.throws(
+      () => parseTriggerMessage(bad),
+      (error: unknown) =>
+        error instanceof WorkflowError && problem.test(error.message),
+    );
+  }
+});
+
+test("a message stored with starter instead of workflow still reads", () => {
+  const { workflow, ...rest } = MESSAGE;
+  const stored = { ...rest, starter: workflow };
+  const parsed = parseTriggerMessage(stored);
+  assert.equal(parsed.workflow, "notes");
+  assert.equal("starter" in parsed, false);
+  assert.deepEqual(parsed, MESSAGE);
+  // `workflow` wins when a message carries both.
+  assert.equal(
+    parseTriggerMessage({ ...MESSAGE, starter: "older" }).workflow,
+    "notes",
+  );
+  assert.throws(
+    () => parseTriggerMessage({ ...rest, starter: "" }),
+    (error: unknown) =>
+      error instanceof WorkflowError &&
+      /workflow is not a name/.test(error.message),
+  );
+});
+
+test("an owned write builds one commit, with replace_owned only for subjects", () => {
+  assert.equal(ownedCommitBody({ subjects: [] }), null);
+  const note = { type: "Note", name: "n1" };
+  assert.deepEqual(
+    ownedCommitBody({
+      subjects: [note],
+      properties: ["word_count"],
+      relations: [],
+      entity_properties: [
+        {
+          type: "Note",
+          name: "n1",
+          properties: { word_count: 3 },
+        },
+      ],
+    }),
+    {
+      entity_properties: [
+        {
+          type: "Note",
+          name: "n1",
+          properties: { word_count: 3 },
+        },
+      ],
+      edge_idempotency: "skip_unchanged",
+      replace_owned: { subjects: [note], properties: ["word_count"] },
+    },
+  );
+  const link = {
+    source: note,
+    relation: "MENTIONS",
+    target: { type: "Topic", name: "pricing" },
+  };
+  assert.deepEqual(
+    ownedCommitBody({ subjects: [], triplets: [link] }, "append"),
+    {
+      triplets: [link],
+      edge_idempotency: "append",
+    },
+  );
+  assert.deepEqual(
+    ownedCommitBody({ subjects: [], retract_entities: [note] }),
+    {
+      edge_idempotency: "skip_unchanged",
+      replace_owned: { subjects: [], retract_entities: [note] },
+    },
+  );
+});
+
+const ENTRY_ID = "0123456789abcdef0123456789abcdef";
+const ENTRY_IRI = `https://littlebigbrain.com/e/${ENTRY_ID}`;
+
+test("entityRef addresses the entity an IRI names by its id", () => {
+  assert.equal(ENTITY_IRI_NAMESPACE, "https://littlebigbrain.com/e/");
+  assert.equal(ENTITY_ID_KEY_SENTINEL, "\u0000lbb-eid:");
+  assert.equal(entityIdFromIri(ENTRY_IRI), ENTRY_ID);
+  assert.equal(
+    entityIdFromIri(`${ENTITY_IRI_NAMESPACE}${ENTRY_ID.toUpperCase()}`),
+    ENTRY_ID,
+  );
+  assert.deepEqual(entityRef(ENTRY_IRI, "DocEntry"), {
+    type: "DocEntry",
+    name: ENTRY_ID,
+    key: `\u0000lbb-eid:${ENTRY_ID}`,
+  });
+  assert.deepEqual(entityRef(ENTRY_IRI, "DocEntry", "S 1.1"), {
+    type: "DocEntry",
+    name: "S 1.1",
+    key: `\u0000lbb-eid:${ENTRY_ID}`,
+  });
+  // The key travels as JSON with its NUL escaped, as the server reads it.
+  assert.match(
+    JSON.stringify(entityRef(ENTRY_IRI, "DocEntry")),
+    /"key":"\\u0000lbb-eid:0123456789abcdef0123456789abcdef"/,
+  );
+});
+
+test("entityRef refuses an IRI of another namespace or a malformed id", () => {
+  for (const iri of [
+    "https://example.org/e/0123456789abcdef0123456789abcdef",
+    "https://littlebigbrain.com/class/docentry",
+    `${ENTRY_IRI}0`,
+    "https://littlebigbrain.com/e/0123456789abcdef0123456789abcdeg",
+    "https://littlebigbrain.com/e/",
+  ]) {
+    let thrown: unknown;
+    try {
+      entityRef(iri, "DocEntry");
+    } catch (error) {
+      thrown = error;
+    }
+    assert.ok(thrown instanceof RangeError, iri);
+  }
+  let typeError: unknown;
+  try {
+    entityRef(ENTRY_IRI, " ");
+  } catch (error) {
+    typeError = error;
+  }
+  assert.ok(typeError instanceof TypeError);
+});
+
+test("an owned write names its subjects by IRI with entityRef", () => {
+  const subjects = [ENTRY_IRI].map((iri) => entityRef(iri, "DocEntry"));
+  const body = ownedCommitBody({
+    subjects,
+    properties: ["width_cm"],
+    entity_properties: [
+      {
+        ...entityRef(ENTRY_IRI, "DocEntry", "S 1.1"),
+        properties: { width_cm: 60 },
+      },
+    ],
+  });
+  assert.deepEqual(body?.replace_owned?.subjects, [
+    { type: "DocEntry", name: ENTRY_ID, key: `\u0000lbb-eid:${ENTRY_ID}` },
+  ]);
+  assert.equal(body?.entity_properties?.[0]?.key, `\u0000lbb-eid:${ENTRY_ID}`);
+});
+
+type Task = Schemas["WorkflowTurnTask"];
+function task(
+  message: unknown,
+  steps: Task["turn"]["steps"] = [],
+  state: unknown = { seen: 0 },
+): Task {
+  return {
+    workflow_type: "word-count",
+    state,
+    token: "token",
+    lease_ms: 60_000,
+    effect_prefix: "4f2a",
+    turn: {
+      workflow_id: "starter.notes",
+      number: 3,
+      message_id: "starter-notes-3",
+      message,
+      version: "v1",
+      status: "running",
+      attempt: 1,
+      created_at_ms: 1,
+      updated_at_ms: 1,
+      ready_at_ms: 1,
+      steps,
+      result: null,
+      state_after: null,
+      sequence: 1,
+    },
+  };
+}
+
+/** A worker's server: hands out `tasks`, answers commits, keeps each call. */
+function worker(tasks: Task[]) {
+  const calls: Array<{
+    path: string;
+    query: string;
+    body: Record<string, unknown>;
+    headers: Record<string, string>;
+  }> = [];
+  const client = new LbbClient({
+    baseUrl: "http://h",
+    graph: "main",
+    maxRetries: 0,
+    retryDelayMs: 0,
+    fetch: async (input, init) => {
+      const url = new URL(input);
+      const body = JSON.parse(String(init?.body ?? "{}")) as Record<
+        string,
+        unknown
+      >;
+      calls.push({
+        path: url.pathname,
+        query: url.search,
+        body,
+        headers: init?.headers ?? {},
+      });
+      const answer =
+        url.pathname === "/v1/workflows/turns/claim"
+          ? { task: tasks.shift() ?? null }
+          : url.pathname === "/v1/graph/commit"
+            ? {
+                commit_seq: 43,
+                replayed: false,
+                idempotency_key: init?.headers?.["idempotency-key"],
+                owned: {
+                  edges_retracted: 0,
+                  fields_removed: 1,
+                  entities_retracted: 0,
+                },
+                entities_written: 2,
+                edges_written: 0,
+              }
+            : {};
+      return new Response(JSON.stringify(answer), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      });
+    },
+  });
+  return { client, calls };
+}
+
+test("triggeredWorkflow() hands the typed message to onInstances and keeps the state", async () => {
+  const { client, calls } = worker([task(MESSAGE), task(MESSAGE)]);
+  const seen: WorkflowTriggerMessage[] = [];
+  let turns = 0;
+  const notes = triggeredWorkflow<{ seen: number }>({
+    name: "word-count",
+    version: "v1",
+    initialState: { seen: 0 },
+    async onInstances(_ctx, message, state) {
+      seen.push(message);
+      turns += 1;
+      // The first turn returns nothing; the second one a new state.
+      return turns === 1
+        ? undefined
+        : {
+            state: { seen: state.seen + message.instances.length },
+            result: "ok",
+          };
+    },
+  });
+  assert.equal(notes.name, "word-count");
+  assert.deepEqual(notes.initialState, { seen: 0 });
+  const run = new WorkflowWorker(client, [notes], { worker: "w" });
+  await run.runOnce();
+  await run.runOnce();
+
+  assert.deepEqual(seen, [MESSAGE, MESSAGE]);
+  const done = calls.filter((c) => c.path.endsWith("/turns/complete"));
+  assert.deepEqual(done[0]?.body.state, { seen: 0 });
+  assert.equal(done[0]?.body.result, null);
+  assert.deepEqual(done[1]?.body.state, { seen: 2 });
+  assert.equal(done[1]?.body.result, "ok");
+});
+
+test("triggeredWorkflow() merges initialState under the saved state", async () => {
+  // The server creates `starter.<name>` with the state `{}`, so the first
+  // turn reads `{}`; a later turn reads what the turn before saved.
+  const { client, calls } = worker([
+    task(MESSAGE, [], {}),
+    task(MESSAGE, [], { seen: 2 }),
+    task(MESSAGE, [], null),
+    task(MESSAGE, [], { other: "kept" }),
+  ]);
+  const states: unknown[] = [];
+  const notes = triggeredWorkflow<{ seen: number; other?: string }>({
+    name: "word-count",
+    version: "v1",
+    initialState: { seen: 0 },
+    async onInstances(_ctx, message, state) {
+      states.push(structuredClone(state));
+      // Changed in place: the next turn must still start from `{ seen: 0 }`.
+      state.seen += message.instances.length;
+      return { state };
+    },
+  });
+  const run = new WorkflowWorker(client, [notes], { worker: "w" });
+  for (let turn = 0; turn < 4; turn += 1) await run.runOnce();
+
+  assert.deepEqual(states, [
+    { seen: 0 },
+    { seen: 2 },
+    { seen: 0 },
+    { seen: 0, other: "kept" },
+  ]);
+  assert.equal(calls.filter((c) => c.path.endsWith("/turns/fail")).length, 0);
+  const done = calls.filter((c) => c.path.endsWith("/turns/complete"));
+  assert.deepEqual(
+    done.map((c) => c.body.state),
+    [{ seen: 2 }, { seen: 4 }, { seen: 2 }, { seen: 2, other: "kept" }],
+  );
+  // A handler that changes its state leaves the definition's state alone.
+  assert.deepEqual(notes.initialState, { seen: 0 });
+});
+
+test("triggeredWorkflowState keeps a saved state that is not an object", () => {
+  assert.deepEqual(triggeredWorkflowState({ seen: 0 }, {}), { seen: 0 });
+  assert.deepEqual(triggeredWorkflowState({ seen: 0 }, undefined), { seen: 0 });
+  assert.deepEqual(triggeredWorkflowState({ seen: 0, a: 1 }, { seen: 5 }), {
+    seen: 5,
+    a: 1,
+  });
+  assert.equal(triggeredWorkflowState<number>(0, 7), 7);
+  assert.deepEqual(triggeredWorkflowState<unknown>([1], { a: 1 }), { a: 1 });
+});
+
+test("triggeredWorkflow() fails a turn whose message has another shape, without a retry", async () => {
+  const { client, calls } = worker([task({ add: 1 })]);
+  let called = false;
+  const notes = triggeredWorkflow({
+    name: "word-count",
+    version: "v1",
+    async onInstances() {
+      called = true;
+    },
+  });
+  await new WorkflowWorker(client, [notes], { worker: "w" }).runOnce();
+
+  assert.equal(called, false);
+  const failed = calls.find((c) => c.path.endsWith("/turns/fail"));
+  assert.equal(failed?.body.non_retryable, true);
+  assert.match(String(failed?.body.error), /not a trigger message/);
+  assert.equal(calls.filter((c) => c.path.endsWith("/complete")).length, 0);
+});
+
+test("writeOwned commits in a step with the step's effect id as idempotency key", async () => {
+  const { client, calls } = worker([task(MESSAGE)]);
+  const results: unknown[] = [];
+  const notes = triggeredWorkflow({
+    name: "word-count",
+    version: "v1",
+    async onInstances(ctx, message) {
+      results.push(
+        await writeOwned(
+          client,
+          ctx,
+          "write-counts",
+          {
+            subjects: [{ type: "Note", name: "n1" }],
+            properties: ["word_count"],
+            entity_properties: [
+              {
+                type: "Note",
+                name: "n1",
+                properties: { word_count: 3 },
+              },
+            ],
+          },
+          { graph: message.graph },
+        ),
+      );
+    },
+  });
+  await new WorkflowWorker(client, [notes], { worker: "w" }).runOnce();
+
+  const commits = calls.filter((c) => c.path === "/v1/graph/commit");
+  assert.equal(commits.length, 1);
+  assert.equal(commits[0]?.headers["idempotency-key"], "4f2a/write-counts");
+  assert.equal(commits[0]?.query, "?graph=crm");
+  assert.deepEqual(commits[0]?.body, {
+    entity_properties: [
+      {
+        type: "Note",
+        name: "n1",
+        properties: { word_count: 3 },
+      },
+    ],
+    edge_idempotency: "skip_unchanged",
+    replace_owned: {
+      subjects: [{ type: "Note", name: "n1" }],
+      properties: ["word_count"],
+    },
+  });
+  const saved = {
+    commit_seq: 43,
+    idempotency_key: "4f2a/write-counts",
+    replayed: false,
+    owned: { edges_retracted: 0, fields_removed: 1, entities_retracted: 0 },
+    entities_written: 2,
+    edges_written: 0,
+  };
+  assert.deepEqual(results, [saved]);
+  // The step's result is saved before the turn completes.
+  const checkpoint = calls.find((c) => c.path.endsWith("/turns/checkpoint"));
+  assert.equal(checkpoint?.body.key, "write-counts");
+  assert.deepEqual(checkpoint?.body.output, saved);
+  const operation = calls.find((c) => c.path.endsWith("/turns/operation"));
+  assert.ok(
+    calls.indexOf(operation!) < calls.indexOf(commits[0]!),
+    "the step begins before the commit",
+  );
+});
+
+test("a replayed turn returns the saved write and never commits twice", async () => {
+  const saved = {
+    commit_seq: 43,
+    idempotency_key: "4f2a/write-counts",
+    replayed: false,
+    owned: null,
+    entities_written: 2,
+    edges_written: 0,
+  };
+  const { client, calls } = worker([
+    task(MESSAGE, [
+      { key: "write-counts", kind: "step", output: saved, at_ms: 2 },
+    ]),
+  ]);
+  const results: unknown[] = [];
+  const notes = triggeredWorkflow({
+    name: "word-count",
+    version: "v1",
+    async onInstances(ctx) {
+      results.push(
+        await writeOwned(client, ctx, "write-counts", {
+          subjects: [{ type: "Note", name: "n1" }],
+          properties: ["word_count"],
+        }),
+      );
+    },
+  });
+  await new WorkflowWorker(client, [notes], { worker: "w" }).runOnce();
+
+  assert.deepEqual(results, [saved]);
+  assert.equal(calls.filter((c) => c.path === "/v1/graph/commit").length, 0);
+  assert.equal(calls.filter((c) => c.path.endsWith("/complete")).length, 1);
+});
+
+test("writeOwned with nothing to write saves the step without a commit", async () => {
+  const { client, calls } = worker([task(MESSAGE)]);
+  const results: unknown[] = [];
+  const notes = triggeredWorkflow({
+    name: "word-count",
+    version: "v1",
+    async onInstances(ctx) {
+      results.push(await writeOwned(client, ctx, "nothing", { subjects: [] }));
+    },
+  });
+  await new WorkflowWorker(client, [notes], { worker: "w" }).runOnce();
+
+  assert.equal(calls.filter((c) => c.path === "/v1/graph/commit").length, 0);
+  assert.deepEqual(results, [
+    {
+      commit_seq: null,
+      idempotency_key: "4f2a/nothing",
+      replayed: false,
+      owned: null,
+      entities_written: 0,
+      edges_written: 0,
+    },
+  ]);
+});

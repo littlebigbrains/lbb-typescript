@@ -27,10 +27,16 @@ function findContract(): string {
   }
 }
 const OPENAPI = findContract();
-// The namespaces (`client.query`, `client.evals`, ...) issue routes too.
-const CLIENT_SOURCES = ["src/client.ts", "src/namespaces.ts"].map((file) =>
-  resolve(process.cwd(), file),
-);
+// The namespaces (`client.query`, `client.evals`, `client.files`,
+// `client.workflows.triggered`, ...) and the developer workflow helpers
+// (`writeOwned`) issue routes too.
+const CLIENT_SOURCES = [
+  "src/client.ts",
+  "src/namespaces.ts",
+  "src/files.ts",
+  "src/triggered-workflows.ts",
+  "src/triggered-workflow-worker.ts",
+].map((file) => resolve(process.cwd(), file));
 
 const HTTP_METHODS = new Set(["get", "post", "put", "patch", "delete"]);
 

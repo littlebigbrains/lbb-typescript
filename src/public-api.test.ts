@@ -4,6 +4,8 @@ import * as sdk from "./index.js";
 
 test("the runtime entrypoint exposes only the supported public values", () => {
   assert.deepEqual(Object.keys(sdk).sort(), [
+    "ENTITY_ID_KEY_SENTINEL",
+    "ENTITY_IRI_NAMESPACE",
     "LbbCapabilityError",
     "LbbClient",
     "LbbError",
@@ -11,10 +13,18 @@ test("the runtime entrypoint exposes only the supported public values", () => {
     "WorkflowHandle",
     "WorkflowNamespace",
     "WorkflowWorker",
+    "entityIdFromIri",
+    "entityRef",
     "googleDrive",
+    "isActivityRefused",
+    "lbbActivities",
     "parseSparqlResults",
+    "parseTriggerMessage",
+    "splitInHalves",
     "starters",
+    "triggeredWorkflow",
     "workflow",
+    "writeOwned",
   ]);
 });
 
