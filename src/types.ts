@@ -145,6 +145,11 @@ export type FetchLike = (
   headers?: { get(name: string): string | null };
   text(): Promise<string>;
   /**
+   * The body as bytes. A request with `responseType: "bytes"` reads it when
+   * it is there, else it reads `text()` and encodes it as UTF-8.
+   */
+  arrayBuffer?(): Promise<ArrayBuffer>;
+  /**
    * The body as a stream (`ReadableStream` or an async iterable of bytes).
    * `query.askStream` reads it as events arrive; without it, the stream
    * is read whole with `text()`.
@@ -310,6 +315,8 @@ export interface LbbClientOptions {
   apiKey?: string;
   /** Graph name (sent as `?graph=`; server default is `main`). */
   graph?: string;
+  /** Pin synchronous graph/workflow requests to one graph incarnation (decimal u64). */
+  expectedGraphEpoch?: string;
   /**
    * Stack slug (sent as `?stack=`). Needed only with a session-token `apiKey`
    * (`lbb_ses_…`), which authorizes an account rather than a single stack; a

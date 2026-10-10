@@ -37,6 +37,15 @@ export type {
 export type { components, paths, operations } from "./schema.js";
 export * as starters from "./starters.js";
 export type { CdcNamespace } from "./cdc.js";
+export type {
+  BlobLike,
+  FileBody,
+  FilePages,
+  FilePagesOptions,
+  FileRecord,
+  FilesNamespace,
+  FileUploadOptions,
+} from "./files.js";
 export * as googleDrive from "./google-drive.js";
 export type {
   StarterClassTerm,
@@ -59,6 +68,11 @@ export type {
   QueryAskResult,
   QueryAskStreamEvent,
 } from "./namespaces.js";
+export type {
+  StarterWorkflowsNamespace,
+  TriggeredWorkflowRef,
+  TriggeredWorkflowsNamespace,
+} from "./triggered-workflows.js";
 export type {
   IntegrationsNamespace,
   IntegrationCdcAction,
@@ -84,6 +98,12 @@ export type {
   IntegrationConnectionDetail,
   IntegrationConnector,
   IntegrationConnectorsAnswer,
+  IntegrationProviderApp,
+  IntegrationProviderAppsAnswer,
+  IntegrationConnectSessionStatus,
+  IntegrationConnectSessionCreateAnswer,
+  IntegrationConnectSessionAnswer,
+  IntegrationConnectSessionInput,
   IntegrationCreateAnswer,
   IntegrationCreateInput,
   IntegrationCredentialField,
@@ -122,3 +142,40 @@ export type {
   WorkflowDefinition,
   WorkflowResult,
 } from "./workflows.js";
+export {
+  ENTITY_ID_KEY_SENTINEL,
+  ENTITY_IRI_NAMESPACE,
+  entityIdFromIri,
+  entityRef,
+  parseTriggerMessage,
+  triggeredWorkflow,
+  writeOwned,
+} from "./triggered-workflow-worker.js";
+export type {
+  OwnedWrite,
+  OwnedWriteOptions,
+  OwnedWriteResult,
+  TriggeredWorkflowDefinition,
+  TriggeredWorkflowTurn,
+  WorkflowTriggerMessage,
+  WorkflowTriggerReason,
+} from "./triggered-workflow-worker.js";
+export {
+  isActivityRefused,
+  lbbActivities,
+  splitInHalves,
+} from "./activities.js";
+export type {
+  ActivityOptions,
+  ActivityPagesOptions,
+  DecideAnswer,
+  DecideQuestion,
+  DecideRequest,
+  DecideResult,
+  EmbedRequest,
+  EmbedResult,
+  LbbActivities,
+  ReasonRequest,
+  ReasonResult,
+  ReviewRequest,
+} from "./activities.js";

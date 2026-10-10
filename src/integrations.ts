@@ -148,6 +148,47 @@ export interface IntegrationConnectorsAnswer {
   connectors: IntegrationConnector[];
 }
 
+/** Safe discovery metadata for a developer-owned provider app in this stack. */
+export interface IntegrationProviderApp {
+  id: string;
+  kind: "notion" | "github" | "slack";
+  label: string;
+  active: boolean;
+}
+
+export interface IntegrationProviderAppsAnswer {
+  ok: true;
+  apps: IntegrationProviderApp[];
+}
+
+export type IntegrationConnectSessionStatus =
+  | "created"
+  | "authorizing"
+  | "exchanging"
+  | "selecting"
+  | "completing"
+  | "complete"
+  | "failed";
+
+export interface IntegrationConnectSessionCreateAnswer {
+  ok: true;
+  session_id: string;
+  /** Short-lived bearer link to pass to this customer only. */
+  url: string;
+  /** Unix epoch milliseconds. */
+  expires_at: number;
+}
+
+export interface IntegrationConnectSessionAnswer {
+  ok: true;
+  session_id: string;
+  status: IntegrationConnectSessionStatus;
+  graph: string;
+  connection_id: string;
+  /** Unix epoch milliseconds. */
+  expires_at: number;
+}
+
 export interface IntegrationCreateAnswer {
   ok: true;
   id: string;
@@ -412,6 +453,15 @@ export interface IntegrationCreateInput extends IntegrationGraphOptions {
   start?: boolean;
 }
 
+/** Start authorization without collecting or sending provider credentials. */
+export interface IntegrationConnectSessionInput extends IntegrationGraphOptions {
+  appId: string;
+  /** Origin must be allowlisted on the developer's provider app. */
+  returnUrl: string;
+  /** Existing connection to reconnect, or a chosen id for a new connection. */
+  connectionId?: string;
+}
+
 export interface IntegrationSyncOptions extends IntegrationGraphOptions {
   /** Read every stream in full. */
   full?: boolean;
@@ -648,6 +698,43 @@ export class IntegrationsNamespace {
   /** The connector catalog: credential fields, settings and starter per kind. */
   connectors(opts: CallOptions = {}): Promise<IntegrationConnectorsAnswer> {
     return this.client.integrationsRequest("GET", `${BASE}/connectors`, opts);
+  }
+
+  /** Provider registrations available for customer connect; no management secrets. */
+  providerApps(opts: CallOptions = {}): Promise<IntegrationProviderAppsAnswer> {
+    return this.client.integrationsRequest("GET", `${BASE}/apps`, opts);
+  }
+
+  /**
+   * Create a hosted authorization link. Every call creates a new session and
+   * spends the creation quota, so this operation never retries automatically.
+   */
+  createConnectSession(
+    input: IntegrationConnectSessionInput,
+  ): Promise<IntegrationConnectSessionCreateAnswer> {
+    const { appId, graph, returnUrl, connectionId, ...opts } = input;
+    return this.client.integrationsRequest("POST", `${BASE}/connect-sessions`, {
+      ...opts,
+      retry: false,
+      body: {
+        app_id: appId,
+        graph,
+        return_url: returnUrl,
+        ...(connectionId === undefined ? {} : { connection_id: connectionId }),
+      },
+    });
+  }
+
+  /** Confirm session completion through your backend, not browser return parameters. */
+  getConnectSession(
+    id: string,
+    opts: CallOptions = {},
+  ): Promise<IntegrationConnectSessionAnswer> {
+    return this.client.integrationsRequest(
+      "GET",
+      `${BASE}/connect-sessions/${encodeURIComponent(id)}`,
+      opts,
+    );
   }
 
   /**

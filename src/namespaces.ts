@@ -1,5 +1,6 @@
 import type { WorkflowNamespace } from "./workflows.js";
 import type { LbbClient } from "./client.js";
+import type { FilesNamespace } from "./files.js";
 import {
   parseLbbError,
   sleep,
@@ -69,6 +70,8 @@ export class GraphNamespace {
   readonly checks: ChecksNamespace;
   readonly models: ModelsNamespace;
   readonly embeddings: EmbeddingsNamespace;
+  /** Files of this graph and their parsed pages. */
+  readonly files: FilesNamespace;
   readonly workflows: WorkflowNamespace;
 
   constructor(private readonly client: LbbClient) {
@@ -82,6 +85,7 @@ export class GraphNamespace {
     this.checks = client.checks;
     this.models = client.models;
     this.embeddings = client.embeddings;
+    this.files = client.files;
     this.workflows = client.workflows;
   }
 
@@ -131,10 +135,12 @@ export class GraphNamespace {
   /** Retract edges/entities from the scoped graph. See {@link LbbClient.retract}. */
   retract(
     body: Schemas["GraphRetractRequest"],
-    opts: CallOptions = {},
+    opts: CallOptions & { expectedGraphEpoch?: string } = {},
   ): Promise<Schemas["GraphRetractResponse"]> {
+    const { expectedGraphEpoch, ...request } = opts;
     return this.client.request("POST", "/v1/graph/retract", {
-      ...opts,
+      ...request,
+      query: { expected_graph_epoch: expectedGraphEpoch },
       idempotencyKey:
         opts.idempotencyKey ?? this.client.idempotencyKey("retract"),
       body,
@@ -165,9 +171,10 @@ export class FactsNamespace {
       strict?: boolean;
       observedAt?: string;
       idempotencyKey?: string;
+      expectedGraphEpoch?: string;
     } = {},
   ): Promise<Schemas["GraphImportResponse"]> {
-    const { batch, strict, observedAt, ...request } = opts;
+    const { batch, strict, observedAt, expectedGraphEpoch, ...request } = opts;
     const ndjson =
       typeof lines === "string"
         ? lines
@@ -178,7 +185,12 @@ export class FactsNamespace {
         request.idempotencyKey ?? this.client.idempotencyKey("import"),
       rawBody: ndjson,
       contentType: "application/x-ndjson",
-      query: { batch, strict, observed_at: observedAt },
+      query: {
+        batch,
+        strict,
+        observed_at: observedAt,
+        expected_graph_epoch: expectedGraphEpoch,
+      },
     });
   }
 

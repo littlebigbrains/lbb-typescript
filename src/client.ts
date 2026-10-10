@@ -1,5 +1,6 @@
 import { WorkflowNamespace } from "./workflows.js";
 import { CdcNamespace } from "./cdc.js";
+import { FilesNamespace } from "./files.js";
 import {
   DEFAULT_INTEGRATIONS_URL,
   IntegrationsNamespace,
@@ -216,6 +217,16 @@ async function durableImportBody(
   };
 }
 
+/** A response body as bytes: `arrayBuffer()` when the fetch has it, else
+ * `text()` encoded as UTF-8. */
+async function responseBytes(
+  response: Awaited<ReturnType<FetchLike>>,
+): Promise<Uint8Array> {
+  if (typeof response.arrayBuffer === "function")
+    return new Uint8Array(await response.arrayBuffer());
+  return new TextEncoder().encode(await response.text());
+}
+
 /** The body a request sends: `rawBody` as is, else `body` as JSON. */
 function requestBody(opts: RequestOptions): unknown {
   return opts.rawBody !== undefined
@@ -236,6 +247,7 @@ export class LbbClient {
   readonly integrationsUrl: string;
   private readonly apiKey?: string;
   private readonly graphName?: string;
+  private readonly expectedGraphEpoch?: string;
   private readonly stack?: string;
   private readonly fetchImpl: FetchLike;
   private readonly apiVersion: string;
@@ -261,6 +273,11 @@ export class LbbClient {
   /** Model trials of other models on the graph's uses, and switches. */
   readonly models: ModelsNamespace;
   readonly embeddings: EmbeddingsNamespace;
+  /**
+   * Files of the graph: upload a document, list the files, read a file's
+   * bytes and its parsed pages (lines and words with their boxes), delete.
+   */
+  readonly files: FilesNamespace;
   readonly workflows: WorkflowNamespace;
   readonly cdc: CdcNamespace;
   /** Hosted integrations for your end customers, at `integrationsUrl`. */
@@ -279,6 +296,12 @@ export class LbbClient {
     this.integrationsUrl = integrationsUrl.replace(/\/+$/, "");
     this.apiKey = options.apiKey;
     this.graphName = options.graph;
+    this.expectedGraphEpoch = options.expectedGraphEpoch;
+    if (
+      this.expectedGraphEpoch !== undefined &&
+      !/^[0-9]+$/.test(this.expectedGraphEpoch)
+    )
+      throw new RangeError("expectedGraphEpoch must be a decimal epoch string");
     this.stack = options.stack;
     this.apiVersion = options.apiVersion ?? "2026-07-23";
     this.maxRetries = options.maxRetries ?? 6;
@@ -317,6 +340,7 @@ export class LbbClient {
     this.checks = new ChecksNamespace(this);
     this.models = new ModelsNamespace(this);
     this.embeddings = new EmbeddingsNamespace(this);
+    this.files = new FilesNamespace(this);
     this.workflows = new WorkflowNamespace(this);
     this.cdc = new CdcNamespace(this);
     this.integrations = new IntegrationsNamespace(this);
@@ -336,12 +360,17 @@ export class LbbClient {
    * Each instance is scoped to one graph, so use this to target another
    * scope (e.g. creating a fresh graph) without mutating the current client.
    */
-  withScope(scope: { graph?: string; stack?: string }): LbbClient {
+  withScope(scope: {
+    graph?: string;
+    stack?: string;
+    expectedGraphEpoch?: string;
+  }): LbbClient {
     return new LbbClient({
       baseUrl: this.baseUrl,
       integrationsUrl: this.integrationsUrl,
       apiKey: this.apiKey,
       graph: scope.graph ?? this.graphName,
+      expectedGraphEpoch: scope.expectedGraphEpoch ?? this.expectedGraphEpoch,
       stack: scope.stack ?? this.stack,
       fetch: this.fetchImpl,
       apiVersion: this.apiVersion,
@@ -403,7 +432,17 @@ export class LbbClient {
       );
     if (this.graphName !== undefined) push("graph", this.graphName);
     if (this.stack !== undefined) push("stack", this.stack);
+    if (this.expectedGraphEpoch !== undefined)
+      push("expected_graph_epoch", this.expectedGraphEpoch);
     for (const [key, value] of Object.entries(query ?? {})) {
+      if (
+        key === "expected_graph_epoch" &&
+        this.expectedGraphEpoch !== undefined
+      ) {
+        if (value !== undefined && value !== this.expectedGraphEpoch)
+          throw new RangeError("request cannot change the client graph epoch");
+        continue;
+      }
       if (value !== undefined) push(key, value);
     }
     const qs = params.length > 0 ? `?${params.join("&")}` : "";
@@ -492,6 +531,10 @@ export class LbbClient {
     let attempts = 0;
     let response: Awaited<ReturnType<FetchLike>> | undefined;
     let text = "";
+    // `responseType: "bytes"`: the 2xx body as bytes; an error body is
+    // still read as text for the error and the retry verdict.
+    const wantsBytes = opts.responseType === "bytes";
+    let bytes: Uint8Array | undefined;
     for (let attempt = 0; attempt <= maxRetries; attempt += 1) {
       if (opts.signal?.aborted)
         throw opts.signal.reason ?? new Error("request aborted");
@@ -528,7 +571,12 @@ export class LbbClient {
           init: typeof requestInit,
         ) => ReturnType<FetchLike>;
         response = await streamingFetch(url, requestInit);
-        text = await response.text();
+        if (wantsBytes && response.ok) {
+          bytes = await responseBytes(response);
+          text = "";
+        } else {
+          text = await response.text();
+        }
       } catch (error) {
         const callerAborted = opts.signal?.aborted === true;
         const requestError =
@@ -632,13 +680,15 @@ export class LbbClient {
     // JSON lines (`application/x-ndjson`) parse to a list of the lines' values.
     const isNdjson = responseContentType.includes("application/x-ndjson");
     return {
-      data: isNdjson
-        ? (parseNdjson(text, response.status, requestId) as T)
-        : text
-          ? isRdfText
-            ? (text as T)
-            : parseResponseJson<T>(text, response.status, requestId)
-          : (undefined as T),
+      data: wantsBytes
+        ? ((bytes ?? new Uint8Array()) as T)
+        : isNdjson
+          ? (parseNdjson(text, response.status, requestId) as T)
+          : text
+            ? isRdfText
+              ? (text as T)
+              : parseResponseJson<T>(text, response.status, requestId)
+            : (undefined as T),
       status: response.status,
       requestId,
       version,
@@ -878,6 +928,8 @@ export class LbbClient {
       strict?: boolean;
       observedAt?: string;
       idempotencyKey?: string;
+      /** Refuse writes if the graph was deleted and recreated. */
+      expectedGraphEpoch?: string;
     } = {},
   ): Promise<Schemas["GraphImportResponse"] & { commitSeq: number | null }> {
     const ndjson =
@@ -894,6 +946,7 @@ export class LbbClient {
           batch: opts.batch,
           strict: opts.strict,
           observed_at: opts.observedAt,
+          expected_graph_epoch: opts.expectedGraphEpoch,
         },
         idempotencyKey: opts.idempotencyKey ?? this.idempotencyKey("import"),
       },
@@ -1067,10 +1120,11 @@ export class LbbClient {
    */
   retract(
     body: Schemas["GraphRetractRequest"],
-    opts: { idempotencyKey?: string } = {},
+    opts: { idempotencyKey?: string; expectedGraphEpoch?: string } = {},
   ): Promise<Schemas["GraphRetractResponse"]> {
     return this.request("POST", "/v1/graph/retract", {
       body,
+      query: { expected_graph_epoch: opts.expectedGraphEpoch },
       idempotencyKey: opts.idempotencyKey ?? this.idempotencyKey("retract"),
     });
   }

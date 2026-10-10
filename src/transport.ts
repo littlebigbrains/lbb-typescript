@@ -30,6 +30,11 @@ export interface RequestOptions extends CallOptions {
   contentType?: string;
   /** Set for streaming request bodies so Node's fetch accepts them. */
   duplex?: "half";
+  /**
+   * `bytes` returns a 2xx body as a `Uint8Array`, whatever its content type
+   * (a file's content). The default parses the body as JSON.
+   */
+  responseType?: "json" | "bytes";
 }
 
 /** Thrown when the server responds with a non-2xx status. */

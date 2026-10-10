@@ -212,6 +212,57 @@ console.log(diff.totals, diff.changed, diff.next_cursor);
 `compare` reads up to 20,000 rows per point and pages each list: pass
 `next_cursor` back as `cursor` with the same request.
 
+## Model calls in a workflow
+
+A workflow your `WorkflowWorker` runs can call LBB's own models from a
+durable step. `lbbActivities(client)` returns them with the other calls a
+workflow makes:
+
+| Activity | Does |
+| --- | --- |
+| `reason(request, options)` | The reasoning model answers `prompt` with JSON that follows `schema` |
+| `decide({ state, questions }, options)` | The decision model answers choice questions about `state`, each with a choice, a confidence and the probability of each option |
+| `embed({ texts }, options)` | The embedding model embeds up to 256 texts |
+| `pages(sha256, { from, to })` | The parsed pages of a file, with every line and word box |
+| `sparql(query, options)` | A SPARQL query, its rows flattened |
+| `writeOwned(ctx, stepKey, write)` | An owned write, committed inside a step |
+| `review({ workflow, title, rationale, facts })` | A review item: facts or ontology changes for a person to accept |
+| `evolve(ops, { dryRun })` | An ontology change, or what it would do |
+| `ontology()` | The graph's classes, relations and properties |
+
+Pass the step's `effectId` to a model call. When the worker stops after
+the model answered and before the step was saved, the next attempt sends
+the same effect id, and the server returns the first answer with
+`cached: true` at no cost:
+
+```ts
+import { isActivityRefused, lbbActivities } from "@littlebigbrain/client";
+
+const lbb = lbbActivities(client);
+const answer = await ctx.step("define-p3", (s) =>
+  lbb.reason<{ code: string; description: string }>(
+    {
+      prompt: 'Which code does this row define? "P3 Waschtisch 55x45"',
+      schema: {
+        type: "object",
+        properties: { code: { type: "string" }, description: { type: "string" } },
+        required: ["code", "description"],
+      },
+    },
+    { effectId: s.effectId, label: "define P3" },
+  ),
+);
+console.log(answer.value.code, answer.cost_micro_usd);
+```
+
+The calls count against the stack's model budget for workflows
+(`429 workflow_budget_exceeded` past it). A request that is too large for
+the model fails with `422 activity_request_refused`: `isActivityRefused`
+names that error, and `splitInHalves(items)` splits the items of a request
+so each half goes in its own call. The starter workflow templates in
+`sdk/templates` are complete examples; `npm create @littlebigbrain/workflow`
+copies one into a new project.
+
 ## Next steps
 
 - [Search by meaning](https://docs.littlebigbrain.com/guides/search-by-meaning/): choose which facts to embed, find records from a text description, and search inside a SPARQL query with `search:similarTo`.
@@ -226,11 +277,35 @@ a graph; a graph first written through RDF import does not accept
 ## Integrations for your customers
 
 `client.integrations` connects each of your customers' HubSpot, Linear,
-SharePoint or Google Drive to a graph of their own. Its routes are on the
+SharePoint or Google Drive to a graph of their own. Notion, GitHub and Slack
+use opt-in developer-owned apps: register your app in the console, then create
+a customer consent link from your backend. Its routes are on the
 integrations API, `https://api.littlebigbrain.com` by default
 (`integrationsUrl`). They take the
 same stack API key. An operator turns on developer access per stack; ask us
 first.
+
+```ts
+const { apps } = await lbb.integrations.providerApps();
+const app = apps.find((app) => app.active && app.kind === "notion");
+if (!app) throw new Error("Configure a Notion app first");
+const session = await lbb.integrations.createConnectSession({
+  appId: app.id,
+  graph: customer.graph, // from your authenticated customer record
+  connectionId: "notion-main",
+  returnUrl: "https://your-product.example/settings/connections",
+});
+// Redirect the customer to session.url; never log this bearer link.
+// On return, verify lbb_session via getConnectSession(id), including graph/status.
+```
+
+See [developer-owned app setup](https://docs.littlebigbrain.com/guides/developer-owned-integrations/)
+and the [runnable embedded product example](examples/embedded-integrations/README.md).
+The example includes status and disconnect. Disconnect retains imported graph
+data and does not uninstall the provider app. Resource changes require a new
+graph in this beta. Hosted app connections refuse raw token creation.
+
+For credential-based connectors:
 
 ```ts
 const graph = "c-5f1c9a0e3b7d2c4a8e6f1b0d"; // one opaque graph per customer

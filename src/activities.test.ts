@@ -1,0 +1,455 @@
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import { LbbClient, LbbError, type FetchLike } from "./client.js";
+import {
+  isActivityRefused,
+  lbbActivities,
+  splitInHalves,
+} from "./activities.js";
+import type { WorkflowContext } from "./workflows.js";
+
+interface Seen {
+  method: string;
+  path: string;
+  query: string;
+  body: Record<string, unknown> | undefined;
+  headers: Record<string, string>;
+}
+
+type Answer = {
+  status?: number;
+  body?: unknown;
+  headers?: Record<string, string>;
+};
+
+/** A fetch that answers each request with the next answer and keeps the requests. */
+function fakeFetch(answers: Answer[]) {
+  const seen: Seen[] = [];
+  const fetch: FetchLike = async (input, init) => {
+    const url = new URL(input);
+    seen.push({
+      method: init?.method ?? "GET",
+      path: url.pathname,
+      query: url.search,
+      body:
+        typeof init?.body === "string"
+          ? (JSON.parse(init.body) as Record<string, unknown>)
+          : undefined,
+      headers: init?.headers ?? {},
+    });
+    const answer = answers.shift() ?? { body: {} };
+    const status = answer.status ?? 200;
+    const headers = { "content-type": "application/json", ...answer.headers };
+    return {
+      ok: status >= 200 && status < 300,
+      status,
+      headers: {
+        get: (name: string) =>
+          headers[name.toLowerCase() as keyof typeof headers] ?? null,
+      },
+      text: async () => JSON.stringify(answer.body ?? {}),
+    };
+  };
+  return { fetch, seen };
+}
+
+function activities(answers: Answer[]) {
+  const { fetch, seen } = fakeFetch(answers);
+  const client = new LbbClient({
+    baseUrl: "http://h",
+    graph: "tender",
+    fetch,
+    retryDelayMs: 0,
+    maxRetries: 2,
+  });
+  return { lbb: lbbActivities(client), seen };
+}
+
+const USAGE = { tokens_in: 92, tokens_out: 21, cost_micro_usd: 591 };
+
+const refusal = (code: string, status: number, retryable = false) => ({
+  status,
+  body: { error: { code, message: code, retryable } },
+});
+
+test("reason sends the request with the step's effect id and returns the typed value", async () => {
+  const { lbb, seen } = activities([
+    {
+      body: {
+        value: { code: "P3", description: "Waschtisch 55x45" },
+        model: "claude-sonnet-5-5",
+        ...USAGE,
+        cached: false,
+      },
+    },
+  ]);
+  const schema = {
+    type: "object",
+    properties: { code: { type: "string" }, description: { type: "string" } },
+    required: ["code", "description"],
+  };
+  const answer = await lbb.reason<{ code: string; description: string }>(
+    {
+      prompt: 'Which code does this row define? "P3 Waschtisch 55x45"',
+      system: "You read equipment lists.",
+      schema,
+      max_tokens: 2_000,
+    },
+    {
+      effectId: "0f3c9a51e2d84b7aa1c6d2e9b0f47a13/define-p3",
+      label: "define P3",
+    },
+  );
+
+  assert.equal(answer.value.code, "P3");
+  assert.equal(answer.cost_micro_usd, 591);
+  assert.equal(seen.length, 1);
+  assert.equal(seen[0]?.method, "POST");
+  assert.equal(seen[0]?.path, "/v1/workflows/activities/reason");
+  assert.equal(seen[0]?.query, "?graph=tender");
+  assert.deepEqual(seen[0]?.body, {
+    prompt: 'Which code does this row define? "P3 Waschtisch 55x45"',
+    system: "You read equipment lists.",
+    schema,
+    max_tokens: 2_000,
+    effect_id: "0f3c9a51e2d84b7aa1c6d2e9b0f47a13/define-p3",
+    label: "define P3",
+  });
+});
+
+test("a call without an effect id sends neither effect_id nor label", async () => {
+  const { lbb, seen } = activities([
+    { body: { answers: {}, model: "jev", ...USAGE, cached: false } },
+  ]);
+  await lbb.decide({
+    state: { text: "Invoice 2026-118" },
+    questions: {
+      kind: {
+        instructions: "What is the document?",
+        criteria: { invoice: "an invoice", letter: "a letter" },
+      },
+    },
+  });
+
+  assert.equal(seen[0]?.path, "/v1/workflows/activities/decide");
+  assert.deepEqual(seen[0]?.body, {
+    state: { text: "Invoice 2026-118" },
+    questions: {
+      kind: {
+        instructions: "What is the document?",
+        criteria: { invoice: "an invoice", letter: "a letter" },
+      },
+    },
+  });
+});
+
+test("decide and embed pass the effect id as it is, slash included", async () => {
+  const { lbb, seen } = activities([
+    {
+      body: {
+        answers: {
+          kind: {
+            choice: "invoice",
+            confidence: 0.97,
+            probabilities: { invoice: 0.97, letter: 0.03 },
+          },
+        },
+        model: "jev-latest",
+        ...USAGE,
+        cached: true,
+      },
+    },
+    {
+      body: {
+        vectors: [[0.1, 0.2]],
+        model: "openai/text-embedding-3-small",
+        dim: 2,
+        tokens_in: 5,
+        cost_micro_usd: 0,
+        cached: false,
+      },
+    },
+  ]);
+  const decided = await lbb.decide(
+    {
+      state: "x",
+      questions: {
+        kind: { instructions: "?", criteria: { invoice: "i", letter: "l" } },
+      },
+    },
+    { effectId: "abc/triage" },
+  );
+  const embedded = await lbb.embed(
+    { texts: ["P3 Waschtisch 55x45"] },
+    { effectId: "abc/triage", label: "fixtures" },
+  );
+
+  assert.equal(decided.answers.kind?.choice, "invoice");
+  assert.equal(decided.cached, true);
+  assert.deepEqual(embedded.vectors, [[0.1, 0.2]]);
+  assert.equal(seen[0]?.body?.effect_id, "abc/triage");
+  assert.equal(seen[1]?.path, "/v1/workflows/activities/embed");
+  assert.deepEqual(seen[1]?.body, {
+    texts: ["P3 Waschtisch 55x45"],
+    effect_id: "abc/triage",
+    label: "fixtures",
+  });
+});
+
+test("a refused request is an LbbError that isActivityRefused names, and is not retried", async () => {
+  const { lbb, seen } = activities([
+    refusal("activity_request_refused", 422),
+    refusal("activity_request_refused", 422),
+  ]);
+  const error = await lbb
+    .reason({ prompt: "p", schema: { type: "object" } }, { effectId: "a/b" })
+    .then(
+      () => assert.fail("the call should fail"),
+      (caught: unknown) => caught,
+    );
+
+  assert.ok(error instanceof LbbError);
+  assert.equal(error.status, 422);
+  assert.equal(error.code, "activity_request_refused");
+  assert.equal(isActivityRefused(error), true);
+  assert.equal(seen.length, 1);
+});
+
+test("isActivityRefused is false for other errors", () => {
+  assert.equal(isActivityRefused(new Error("x")), false);
+  assert.equal(isActivityRefused(undefined), false);
+  const conflict = new LbbError(409, "{}", {
+    code: "activity_effect_conflict",
+    message: "another request",
+  });
+  assert.equal(isActivityRefused(conflict), false);
+});
+
+test("an effect conflict and a spent budget fail at once", async () => {
+  const { lbb, seen } = activities([
+    refusal("activity_effect_conflict", 409),
+    refusal("workflow_budget_exceeded", 429),
+  ]);
+  for (const expected of [
+    "activity_effect_conflict",
+    "workflow_budget_exceeded",
+  ]) {
+    await assert.rejects(
+      lbb.decide({ state: 1, questions: {} }, { effectId: "a/b" }),
+      (error: unknown) => error instanceof LbbError && error.code === expected,
+    );
+  }
+  assert.equal(seen.length, 2);
+});
+
+test("a model that did not answer is retried with an effect id, and not without one", async () => {
+  const unavailable = refusal("activity_model_unavailable", 503, true);
+  const answered = {
+    body: {
+      vectors: [[1]],
+      model: "m",
+      dim: 1,
+      tokens_in: 1,
+      cost_micro_usd: 0,
+      cached: false,
+    },
+  };
+  const kept = activities([unavailable, answered]);
+  const result = await kept.lbb.embed(
+    { texts: ["a"] },
+    { effectId: "t/embed" },
+  );
+  assert.deepEqual(result.vectors, [[1]]);
+  assert.equal(kept.seen.length, 2);
+  assert.deepEqual(kept.seen[0]?.body, kept.seen[1]?.body);
+
+  const unkept = activities([unavailable, answered]);
+  await assert.rejects(
+    unkept.lbb.embed({ texts: ["a"] }),
+    (error: unknown) =>
+      error instanceof LbbError && error.code === "activity_model_unavailable",
+  );
+  assert.equal(unkept.seen.length, 1);
+});
+
+test("pages reads to the end of the file in calls of at most 50 pages", async () => {
+  const page = (n: number) => ({ page: n, width: 595, height: 842, lines: [] });
+  const range = (from: number, to: number) =>
+    Array.from({ length: to - from }, (_, i) => page(from + i));
+  const sha = "ab".repeat(32);
+  const answer = (from: number, to: number) => ({
+    body: {
+      sha256: sha,
+      parser: "poppler-26.03.0",
+      page_count: 120,
+      from,
+      to,
+      pages: range(from, to),
+    },
+  });
+  const { lbb, seen } = activities([
+    answer(0, 50),
+    answer(50, 100),
+    answer(100, 120),
+  ]);
+  const pages = await lbb.pages(sha);
+
+  assert.equal(pages.pages.length, 120);
+  assert.equal(pages.from, 0);
+  assert.equal(pages.to, 120);
+  assert.deepEqual(
+    seen.map((s) => s.query),
+    [
+      `?graph=tender&sha256=${sha}&from=0&to=50`,
+      `?graph=tender&sha256=${sha}&from=50&to=100`,
+      `?graph=tender&sha256=${sha}&from=100&to=120`,
+    ],
+  );
+
+  const one = activities([answer(3, 5)]);
+  const window = await one.lbb.pages(sha, { from: 3, to: 5 });
+  assert.equal(window.pages.length, 2);
+  assert.equal(one.seen.length, 1);
+  assert.equal(one.seen[0]?.query, `?graph=tender&sha256=${sha}&from=3&to=5`);
+});
+
+test("sparql takes a query text or a request and returns rows", async () => {
+  const results = JSON.stringify({
+    head: { vars: ["s"] },
+    results: {
+      bindings: [
+        { s: { type: "uri", value: "https://littlebigbrain.com/e/aa" } },
+      ],
+    },
+  });
+  const { lbb, seen } = activities([
+    { body: { results } },
+    { body: { results } },
+  ]);
+  const plain = await lbb.sparql("SELECT ?s WHERE { ?s ?p ?o }");
+  const pinned = await lbb.sparql(
+    { query: "SELECT ?s WHERE { ?s ?p ?o }", as_of_commit_seq: 41 },
+    { consistency: "strong" },
+  );
+
+  assert.deepEqual(plain.rows, [{ s: "https://littlebigbrain.com/e/aa" }]);
+  assert.equal(pinned.rows.length, 1);
+  assert.equal(seen[0]?.path, "/v1/query/sparql-text");
+  assert.deepEqual(seen[0]?.body, { query: "SELECT ?s WHERE { ?s ?p ?o }" });
+  assert.deepEqual(seen[1]?.body, {
+    query: "SELECT ?s WHERE { ?s ?p ?o }",
+    as_of_commit_seq: 41,
+  });
+  assert.match(seen[1]?.query ?? "", /consistency=strong/);
+});
+
+test("writeOwned commits inside the step with its effect id as the idempotency key", async () => {
+  const { lbb, seen } = activities([
+    {
+      body: {
+        commit_seq: 9,
+        replayed: false,
+        idempotency_key: "turn/write",
+        entities_written: 1,
+        edges_written: 0,
+      },
+    },
+  ]);
+  const keys: string[] = [];
+  const ctx = {
+    step: async <T>(
+      key: string,
+      effect: (s: { effectId: string }) => Promise<T>,
+    ) => {
+      keys.push(key);
+      return effect({ effectId: `turn/${key}` });
+    },
+  } as unknown as WorkflowContext;
+  let built = 0;
+  const written = await lbb.writeOwned(ctx, "write", async () => {
+    built += 1;
+    return {
+      subjects: [{ type: "Note", name: "n1" }],
+      properties: ["word_count"],
+      entity_properties: [
+        { type: "Note", name: "n1", properties: { word_count: 3 } },
+      ],
+    };
+  });
+
+  assert.equal(built, 1, "a write function runs inside the step");
+  assert.deepEqual(keys, ["write"]);
+  assert.equal(written.commit_seq, 9);
+  assert.equal(seen[0]?.path, "/v1/graph/commit");
+  assert.equal(seen[0]?.headers["idempotency-key"], "turn/write");
+  assert.deepEqual(seen[0]?.body?.replace_owned, {
+    subjects: [{ type: "Note", name: "n1" }],
+    properties: ["word_count"],
+  });
+});
+
+test("review files a suggestion with facts and the workflow's agent origin", async () => {
+  const { lbb, seen } = activities([
+    { body: { suggestion_id: "s1", status: "open" } },
+  ]);
+  const facts = {
+    triplets: [
+      {
+        source: {
+          type: "DocMention",
+          name: "S1.1",
+          key: "mention:ab:p1-l3:S1.1",
+        },
+        relation: "REFERS_TO",
+        target: { type: "DocEntry", name: "S 1.1", key: "entry:cd:S 1.1" },
+        confidence: 0.7,
+      },
+    ],
+  };
+  await lbb.review({
+    workflow: "documents-link",
+    key: "starter:documents-link:link:ab:s1.1",
+    title: 'Link "S1.1" in raumblaetter.pdf to S 1.1',
+    rationale: "below the gate",
+    facts,
+  });
+
+  assert.equal(seen[0]?.path, "/v1/ontology/suggestions");
+  assert.deepEqual(seen[0]?.body, {
+    key: "starter:documents-link:link:ab:s1.1",
+    title: 'Link "S1.1" in raumblaetter.pdf to S 1.1',
+    rationale: "below the gate",
+    facts,
+    origin: { kind: "agent", id: "starter:documents-link" },
+  });
+});
+
+test("evolve sends the operations, and a dry run asks for one", async () => {
+  const { lbb, seen } = activities([{ body: { no_op: true } }, { body: {} }]);
+  const ops = [{ op: "add_entity_type" as const, name: "Mangel" }];
+  const preview = await lbb.evolve(ops, { dryRun: true });
+  await lbb.evolve(ops);
+
+  assert.equal(preview.no_op, true);
+  assert.equal(seen[0]?.path, "/v1/ontology/evolve");
+  assert.match(seen[0]?.query ?? "", /dry_run=true/);
+  assert.deepEqual(seen[0]?.body, { ops });
+  assert.doesNotMatch(seen[1]?.query ?? "", /dry_run/);
+});
+
+test("ontology reads the graph's ontology", async () => {
+  const { lbb, seen } = activities([
+    { body: { ontology_version: 3, entity_types: [], relations: [] } },
+  ]);
+  const view = await lbb.ontology();
+  assert.equal(view.ontology_version, 3);
+  assert.equal(seen[0]?.method, "GET");
+  assert.equal(seen[0]?.path, "/v1/ontology");
+});
+
+test("splitInHalves splits a list in two, the first half the smaller", () => {
+  assert.deepEqual(splitInHalves([1, 2, 3]), [[1], [2, 3]]);
+  assert.deepEqual(splitInHalves(["a", "b"]), [["a"], ["b"]]);
+  assert.equal(splitInHalves([1]), null);
+  assert.equal(splitInHalves([]), null);
+});

@@ -73,6 +73,85 @@ function only<T>(items: T[]): T {
 
 const status = { kind: "starting", detail: "The first sync starts soon." };
 
+test("provider app discovery and hosted connect sessions use the integrations host without inherited scope", async () => {
+  const appId = "a".repeat(32),
+    sessionId = "b".repeat(32);
+  const { fetch, calls } = fakeFetch([
+    {
+      body: {
+        ok: true,
+        apps: [{ id: appId, kind: "github", label: "Product", active: true }],
+      },
+    },
+    {
+      body: {
+        ok: true,
+        session_id: sessionId,
+        url: "https://connect.example.test/customer",
+        expires_at: 12345,
+      },
+    },
+    {
+      body: {
+        ok: true,
+        session_id: sessionId,
+        status: "complete",
+        graph: GRAPH,
+        connection_id: "github",
+        expires_at: 12345,
+      },
+    },
+  ]);
+  const api = client(fetch).integrations;
+  assert.equal((await api.providerApps()).apps[0]!.kind, "github");
+  assert.equal(
+    (
+      await api.createConnectSession({
+        appId,
+        graph: GRAPH,
+        returnUrl: "https://product.example.test/return",
+        connectionId: "github",
+      })
+    ).session_id,
+    sessionId,
+  );
+  assert.equal((await api.getConnectSession(sessionId)).status, "complete");
+  assert.deepEqual(
+    calls.map((call) => `${call.method} ${call.url.pathname}`),
+    [
+      "GET /v1/integrations/apps",
+      "POST /v1/integrations/connect-sessions",
+      `GET /v1/integrations/connect-sessions/${sessionId}`,
+    ],
+  );
+  assert.deepEqual(calls[1]!.body, {
+    app_id: appId,
+    graph: GRAPH,
+    return_url: "https://product.example.test/return",
+    connection_id: "github",
+  });
+  for (const call of calls) {
+    assert.equal(call.url.origin, API);
+    assert.equal(call.url.search, "");
+    assert.equal(call.headers.authorization, `Bearer ${KEY}`);
+  }
+});
+
+test("connect session creation never automatically retries a possible successful write", async () => {
+  const { fetch, calls } = fakeFetch([{ status: 503 }, { body: { ok: true } }]);
+  await assert.rejects(
+    client(fetch).integrations.createConnectSession({
+      appId: "a".repeat(32),
+      graph: GRAPH,
+      returnUrl: "https://product.example.test/return",
+      retry: true,
+    }),
+    LbbError,
+  );
+  assert.equal(calls.length, 1);
+  assert.ok(!Object.hasOwn(calls[0]!.body as object, "connection_id"));
+});
+
 test("the integrations routes use integrationsUrl and the stack key", async () => {
   const { fetch, calls } = fakeFetch([
     {
@@ -531,6 +610,14 @@ test("every integrations route matches contracts/integrations-openapi.json", asy
   const { fetch, calls } = fakeFetch();
   const api = client(fetch).integrations;
   await api.connectors();
+  await api.providerApps();
+  await api.createConnectSession({
+    appId: "a".repeat(32),
+    graph: GRAPH,
+    returnUrl: "https://product.example.test/return",
+    connectionId: "github",
+  });
+  await api.getConnectSession("b".repeat(32));
   await api.cdcStatus("postgres", { graph: GRAPH });
   await api.cdcMuteAlerts("postgres", {
     graph: GRAPH,
