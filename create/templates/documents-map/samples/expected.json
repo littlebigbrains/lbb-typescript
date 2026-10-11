@@ -1,0 +1,50 @@
+{
+  "about": [
+    "The answer key for the documents-map samples: the proposals a correct run makes from trace.json on a graph whose ontology is sampleOntology of samples.ts (Room, Equipment, SpecSection; HAS_EQUIPMENT from Room to Equipment, SPECIFIED_IN from Room to SpecSection) and that holds no instance of them yet.",
+    "All text is invented. Entries are named by their document and identifier; a room is a page entry made from the room sheet's own number in the head of its page.",
+    "instances: each entry a link needs is a new instance of its class, proposed as four statements: its rdf:type, its rdfs:label, its identifier, and the DENOTES link from its entry (a DocEntry, or the DocMention of a room number).",
+    "facts: each link of the trace is one statement from the room of its page to the instance of the entry it names, 15 in all. A correct run makes these 15 facts and no other: 75 proposals with the 60 statements of the instances.",
+    "leave_out: what a correct run does not propose."
+  ],
+  "instances": [
+    { "document": "raumblaetter.pdf", "identifier": "0.12", "class": "Room", "from": "the head of page 1" },
+    { "document": "raumblaetter.pdf", "identifier": "0.14", "class": "Room", "from": "the head of page 2" },
+    { "document": "ausstattungsliste.pdf", "identifier": "S 1.1", "class": "Equipment" },
+    { "document": "ausstattungsliste.pdf", "identifier": "S 1.2", "class": "Equipment" },
+    { "document": "ausstattungsliste.pdf", "identifier": "S 2.1", "class": "Equipment" },
+    { "document": "ausstattungsliste.pdf", "identifier": "S 2.2", "class": "Equipment" },
+    { "document": "ausstattungsliste.pdf", "identifier": "T 1", "class": "Equipment" },
+    { "document": "ausstattungsliste.pdf", "identifier": "T 2", "class": "Equipment" },
+    { "document": "ausstattungsliste.pdf", "identifier": "T 3", "class": "Equipment" },
+    { "document": "ausstattungsliste.pdf", "identifier": "L 1", "class": "Equipment" },
+    { "document": "ausstattungsliste.pdf", "identifier": "L 2", "class": "Equipment" },
+    { "document": "ausstattungsliste.pdf", "identifier": "L 3", "class": "Equipment" },
+    { "document": "ausstattungsliste.pdf", "identifier": "W 1", "class": "Equipment" },
+    { "document": "baubeschreibung.pdf", "identifier": "3.1", "class": "SpecSection" },
+    { "document": "baubeschreibung.pdf", "identifier": "3.2", "class": "SpecSection" }
+  ],
+  "facts": [
+    { "subject": "0.12", "predicate": "SPECIFIED_IN", "object": "3.1", "line_text": "Bodenbelag Linoleum, siehe Baubeschreibung Kap. 3.1" },
+    { "subject": "0.12", "predicate": "HAS_EQUIPMENT", "object": "T 1", "line_text": "T1 Einzeltisch, 28 Stück" },
+    { "subject": "0.12", "predicate": "HAS_EQUIPMENT", "object": "T 3", "line_text": "T 3 Schülerstuhl, 28 Stück" },
+    { "subject": "0.12", "predicate": "HAS_EQUIPMENT", "object": "T 2", "line_text": "T 2 Lehrertisch, 1 Stück" },
+    { "subject": "0.12", "predicate": "HAS_EQUIPMENT", "object": "W 1", "line_text": "W 1 Wandtafel, 1 Stück" },
+    { "subject": "0.12", "predicate": "HAS_EQUIPMENT", "object": "L 2", "line_text": "L 2 Deckenleuchte, 6 Stück" },
+    { "subject": "0.12", "predicate": "HAS_EQUIPMENT", "object": "S 1.1", "line_text": "S1.1 Waschtisch, 1 Stück, darüber Spiegel S 2.1" },
+    { "subject": "0.12", "predicate": "HAS_EQUIPMENT", "object": "S 2.1", "line_text": "S1.1 Waschtisch, 1 Stück, darüber Spiegel S 2.1" },
+    { "subject": "0.14", "predicate": "SPECIFIED_IN", "object": "3.2", "line_text": "Sanitärobjekte siehe Baubeschreibung Kap. 3.2" },
+    { "subject": "0.14", "predicate": "HAS_EQUIPMENT", "object": "S 1.2", "line_text": "S 1.2 WC, wandhängend, 3 Stück" },
+    { "subject": "0.14", "predicate": "HAS_EQUIPMENT", "object": "S 1.1", "line_text": "S1.1 Waschtisch, 2 Stück" },
+    { "subject": "0.14", "predicate": "HAS_EQUIPMENT", "object": "S 2.1", "line_text": "S 2.1 Spiegel, 2 Stück" },
+    { "subject": "0.14", "predicate": "HAS_EQUIPMENT", "object": "S 2.2", "line_text": "S.2.2 Seifenspender, 2 Stück" },
+    { "subject": "0.14", "predicate": "HAS_EQUIPMENT", "object": "L 1", "line_text": "L1 Wandleuchte über dem Spiegel, 2 Stück" },
+    { "subject": "0.14", "predicate": "HAS_EQUIPMENT", "object": "L 3", "line_text": "L 3 Sicherheitsleuchte über der Tür, 1 Stück" }
+  ],
+  "leave_out": [
+    { "identifier": "M 7", "reason": "No file defines M 7, so its mention has no link: no instance and no fact." },
+    { "identifier": "S 1.3", "reason": "The equipment list defines it, but no room sheet names it: no link needs its instance." },
+    { "identifier": "3.3", "reason": "The specification defines it, but no room sheet names it." },
+    { "identifier": "3,00 m", "reason": "A measure: a mention without a link." },
+    { "identifier": "DIN 18040", "reason": "A standard outside the project: a mention without a link." }
+  ]
+}

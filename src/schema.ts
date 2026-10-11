@@ -1726,7 +1726,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** What each managed model did for the stack in one month: totals, by day and by graph per feature (index, search, fit, judge, training, rewrite) and model, the months with activity, and the model each feature uses now. A stack read; the answering node adds the calls it has not written to the ledger yet */
+        /** What each managed model did for the stack in one month: totals, by day and by graph per feature (index, search, fit, judge, training, rerank, rewrite, trial, workflows) and model, the workflows' calls per workflow and job, the months with activity, and the model each feature uses now. A stack read; the answering node adds the calls it has not written to the ledger yet */
         get: operations["get_v1_models_activity"];
         put?: never;
         post?: never;
@@ -8108,7 +8108,7 @@ export interface components {
          * @description The feature a model call served.
          * @enum {string}
          */
-        ModelActivityFeature: "index" | "search" | "fit" | "judge" | "training" | "rerank" | "rewrite" | "trial";
+        ModelActivityFeature: "index" | "search" | "fit" | "judge" | "training" | "rerank" | "rewrite" | "trial" | "workflows";
         /**
          * @description One feature and model on one graph over the month. `graph` is `*` for
          *     the graphs past the ledger's bound ("other graphs").
@@ -8215,6 +8215,11 @@ export interface components {
         ModelActivityResponse: {
             by_day: components["schemas"]["ModelActivityDay"][];
             by_graph: components["schemas"]["ModelActivityGraph"][];
+            /**
+             * @description The `workflows` feature per workflow and job. A server from before
+             *     2026-10-11 sends none.
+             */
+            by_workflow?: components["schemas"]["ModelActivityWorkflow"][];
             managed: components["schemas"]["ModelActivityManaged"][];
             /** @description `yyyy-mm` (UTC). */
             month: string;
@@ -8289,6 +8294,35 @@ export interface components {
              * @description Checked calls whose ground truth is `wrong`.
              */
             wrong?: number;
+        };
+        /**
+         * @description One workflow, job and model on one graph over the month: the calls of the
+         *     `workflows` feature, per workflow and job. `workflow` is the triggered
+         *     workflow's name, `@activities` for the workflow activities (a developer
+         *     workflow's code calls them without naming its workflow), or `*` (with
+         *     `graph` `*`) for the workflows past the ledger's bound. Added
+         *     2026-10-11: a month recorded before has no rows.
+         */
+        ModelActivityWorkflow: {
+            /** Format: int64 */
+            calls: number;
+            /** Format: int64 */
+            cost_micro_usd: number;
+            /** Format: int64 */
+            errors: number;
+            feature: components["schemas"]["ModelActivityFeature"];
+            graph: string;
+            /** Format: int64 */
+            items: number;
+            /** @description The call log's job of the calls (`define`, `resolve`, `reason`, `embed`). */
+            job: components["schemas"]["ModelJob"];
+            /** Format: int64 */
+            last_at_ms: number;
+            model: string;
+            provider: string;
+            /** Format: int64 */
+            tokens_estimate: number;
+            workflow: string;
         };
         ModelArtifact: {
             blake3: string;
@@ -8636,7 +8670,7 @@ export interface components {
          * @description What LBB used a model for. Every call has one job.
          * @enum {string}
          */
-        ModelJob: "rerank" | "route" | "rewrite" | "fit" | "propose" | "label" | "embed" | "answer" | "ask" | "define" | "mention" | "resolve" | "infer" | "reason" | "decide";
+        ModelJob: "rerank" | "route" | "rewrite" | "fit" | "propose" | "label" | "embed" | "answer" | "ask" | "define" | "mention" | "resolve" | "infer" | "reason" | "decide" | "map";
         /** @description One job and model over a month of checks. */
         ModelJobQuality: {
             /** Format: int64 */

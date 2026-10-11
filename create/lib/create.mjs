@@ -15,7 +15,13 @@ import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 /** The templates a project can start from: the folder names under `sdk/templates`. */
-export const TEMPLATES = ["documents-link", "values-extract", "ontology-fit"];
+export const TEMPLATES = [
+  "documents-link",
+  "documents-map",
+  "review",
+  "values-extract",
+  "ontology-fit",
+];
 
 const PACKAGE = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 

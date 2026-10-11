@@ -1,0 +1,613 @@
+{
+  "about": [
+    "The input of documents-map: what a correct documents-link run writes on the three sample PDFs, with the roles and the answer key of documents-link/samples/expected.json. Written by sdk/templates/_samples/make-trace.mjs; do not edit by hand.",
+    "page is 0-based, as the graph holds it. box is [x0, y0, x1, y1], normalized to the page: the line of an entry, the span of a mention.",
+    "A link confidence is invented, as a link run gives it: 0.96 for a code as the list writes it, 0.9 for another spelling, 0.92 for a section of the specification. A mention with link null has no link."
+  ],
+  "documents": [
+    {
+      "name": "ausstattungsliste.pdf",
+      "sha256": "94c0d4143685b6a810cef7ffb51319b7c3b0bd85ec34e26b349484fc2eda612f",
+      "pages": 1
+    },
+    {
+      "name": "baubeschreibung.pdf",
+      "sha256": "ad840886f5b9f53c9670dbace9a12422ab3d6d93f3c8b3e774f2ad3fb914f43f",
+      "pages": 1
+    },
+    {
+      "name": "raumblaetter.pdf",
+      "sha256": "59e841396e003a2c5290f93c3a5b4fb859bd1b72df9783db1832f347a00a2cc3",
+      "pages": 2
+    }
+  ],
+  "entries": [
+    {
+      "document": "ausstattungsliste.pdf",
+      "identifier": "S 1.1",
+      "context": "S 1.1 Waschtisch, Keramik, ca. 55x45 cm, mit Einhebelmischer",
+      "line_id": "p1-l6",
+      "page": 0,
+      "box": [
+        0.121,
+        0.1898,
+        0.5972,
+        0.2008
+      ]
+    },
+    {
+      "document": "ausstattungsliste.pdf",
+      "identifier": "S 1.2",
+      "context": "S 1.2 WC, wandhängend, mit Unterputz-Spülkasten",
+      "line_id": "p1-l7",
+      "page": 0,
+      "box": [
+        0.121,
+        0.2076,
+        0.5113,
+        0.2186
+      ]
+    },
+    {
+      "document": "ausstattungsliste.pdf",
+      "identifier": "S 1.3",
+      "context": "S 1.3 Urinal, Keramik, mit Spülsteuerung",
+      "line_id": "p1-l8",
+      "page": 0,
+      "box": [
+        0.121,
+        0.2254,
+        0.43,
+        0.2364
+      ]
+    },
+    {
+      "document": "ausstattungsliste.pdf",
+      "identifier": "S 2.1",
+      "context": "S 2.1 Spiegel, Kristallglas, 60x45 cm",
+      "line_id": "p1-l9",
+      "page": 0,
+      "box": [
+        0.121,
+        0.2433,
+        0.3992,
+        0.2542
+      ]
+    },
+    {
+      "document": "ausstattungsliste.pdf",
+      "identifier": "S 2.2",
+      "context": "S 2.2 Seifenspender, Edelstahl, 0,5 l Möbel",
+      "line_id": "p1-l10",
+      "page": 0,
+      "box": [
+        0.121,
+        0.2611,
+        0.3983,
+        0.2721
+      ]
+    },
+    {
+      "document": "ausstattungsliste.pdf",
+      "identifier": "T 1",
+      "context": "T 1 Einzeltisch, 70x50 cm, höhenverstellbar",
+      "line_id": "p1-l12",
+      "page": 0,
+      "box": [
+        0.136,
+        0.3038,
+        0.4664,
+        0.3148
+      ]
+    },
+    {
+      "document": "ausstattungsliste.pdf",
+      "identifier": "T 2",
+      "context": "T 2 Lehrertisch, 140x70 cm",
+      "line_id": "p1-l13",
+      "page": 0,
+      "box": [
+        0.136,
+        0.3216,
+        0.345,
+        0.3326
+      ]
+    },
+    {
+      "document": "ausstattungsliste.pdf",
+      "identifier": "T 3",
+      "context": "T 3 Schülerstuhl, Kunststoff, Größe 5 Leuchten",
+      "line_id": "p1-l14",
+      "page": 0,
+      "box": [
+        0.136,
+        0.3395,
+        0.4179,
+        0.3504
+      ]
+    },
+    {
+      "document": "ausstattungsliste.pdf",
+      "identifier": "L 1",
+      "context": "L 1 Wandleuchte LED, 12 W",
+      "line_id": "p1-l16",
+      "page": 0,
+      "box": [
+        0.1369,
+        0.3822,
+        0.3544,
+        0.3932
+      ]
+    },
+    {
+      "document": "ausstattungsliste.pdf",
+      "identifier": "L 2",
+      "context": "L 2 Deckenleuchte LED, 36 W, dimmbar",
+      "line_id": "p1-l17",
+      "page": 0,
+      "box": [
+        0.1369,
+        0.4,
+        0.4421,
+        0.411
+      ]
+    },
+    {
+      "document": "ausstattungsliste.pdf",
+      "identifier": "L 3",
+      "context": "L 3 Sicherheitsleuchte mit Einzelbatterie Tafeln",
+      "line_id": "p1-l18",
+      "page": 0,
+      "box": [
+        0.1369,
+        0.4178,
+        0.4412,
+        0.4288
+      ]
+    },
+    {
+      "document": "ausstattungsliste.pdf",
+      "identifier": "W 1",
+      "context": "W 1 Wandtafel, Klapptafel, 200x100 cm Seite 1 von 1",
+      "line_id": "p1-l20",
+      "page": 0,
+      "box": [
+        0.1304,
+        0.4606,
+        0.431,
+        0.4716
+      ]
+    },
+    {
+      "document": "baubeschreibung.pdf",
+      "identifier": "3.1",
+      "context": "3.1 Bodenbeläge Klassenräume und Flure erhalten Linoleum, 2,5 mm, vollflächig auf schwimmendem Estrich geklebt. Sanitärräume erhalten rutschhemmende Bodenfliesen aus Feinsteinzeug.",
+      "line_id": "p1-l4",
+      "page": 0,
+      "box": [
+        0.121,
+        0.1498,
+        0.2679,
+        0.1618
+      ]
+    },
+    {
+      "document": "baubeschreibung.pdf",
+      "identifier": "3.2",
+      "context": "3.2 Sanitärobjekte Waschtische, WCs und Urinale sind aus weißer Sanitärkeramik, die Armaturen sind wassersparend. Die einzelnen Objekte nennt die Ausstattungsliste.",
+      "line_id": "p1-l7",
+      "page": 0,
+      "box": [
+        0.121,
+        0.2139,
+        0.2792,
+        0.226
+      ]
+    },
+    {
+      "document": "baubeschreibung.pdf",
+      "identifier": "3.3",
+      "context": "3.3 Beleuchtung Alle Räume erhalten LED-Leuchten. Die Leuchten der Klassenräume sind tageslichtabhängig dimmbar, Flure und Treppen erhalten Sicherheitsleuchten mit Einzelbatterie. Seite 1 von 1",
+      "line_id": "p1-l10",
+      "page": 0,
+      "box": [
+        0.121,
+        0.278,
+        0.2638,
+        0.2901
+      ]
+    }
+  ],
+  "mentions": [
+    {
+      "document": "raumblaetter.pdf",
+      "span": "0.12",
+      "kind": "own_number",
+      "line_id": "p1-l2",
+      "line_text": "Raum 0.12 Klassenraum",
+      "page": 0,
+      "box": [
+        0.2032,
+        0.0837,
+        0.2555,
+        0.1013
+      ],
+      "link": null
+    },
+    {
+      "document": "raumblaetter.pdf",
+      "span": "3,00 m",
+      "kind": "value",
+      "line_id": "p1-l5",
+      "line_text": "Lichte Raumhöhe 3,00 m",
+      "page": 0,
+      "box": [
+        0.2628,
+        0.1554,
+        0.3142,
+        0.1664
+      ],
+      "link": null
+    },
+    {
+      "document": "raumblaetter.pdf",
+      "span": "3.1",
+      "kind": "identifier",
+      "line_id": "p1-l6",
+      "line_text": "Bodenbelag Linoleum, siehe Baubeschreibung Kap. 3.1",
+      "page": 0,
+      "box": [
+        0.5599,
+        0.1732,
+        0.5832,
+        0.1842
+      ],
+      "link": {
+        "relation": "REFERS_TO",
+        "document": "baubeschreibung.pdf",
+        "identifier": "3.1",
+        "confidence": 0.92
+      }
+    },
+    {
+      "document": "raumblaetter.pdf",
+      "span": "T1",
+      "kind": "identifier",
+      "line_id": "p1-l8",
+      "line_text": "T1 Einzeltisch, 28 Stück",
+      "page": 0,
+      "box": [
+        0.1369,
+        0.2385,
+        0.1565,
+        0.2495
+      ],
+      "link": {
+        "relation": "REFERS_TO",
+        "document": "ausstattungsliste.pdf",
+        "identifier": "T 1",
+        "confidence": 0.9
+      }
+    },
+    {
+      "document": "raumblaetter.pdf",
+      "span": "T 3",
+      "kind": "identifier",
+      "line_id": "p1-l9",
+      "line_text": "T 3 Schülerstuhl, 28 Stück",
+      "page": 0,
+      "box": [
+        0.1322,
+        0.2563,
+        0.1565,
+        0.2673
+      ],
+      "link": {
+        "relation": "REFERS_TO",
+        "document": "ausstattungsliste.pdf",
+        "identifier": "T 3",
+        "confidence": 0.96
+      }
+    },
+    {
+      "document": "raumblaetter.pdf",
+      "span": "T 2",
+      "kind": "identifier",
+      "line_id": "p1-l10",
+      "line_text": "T 2 Lehrertisch, 1 Stück",
+      "page": 0,
+      "box": [
+        0.1322,
+        0.2741,
+        0.1565,
+        0.2851
+      ],
+      "link": {
+        "relation": "REFERS_TO",
+        "document": "ausstattungsliste.pdf",
+        "identifier": "T 2",
+        "confidence": 0.96
+      }
+    },
+    {
+      "document": "raumblaetter.pdf",
+      "span": "W 1",
+      "kind": "identifier",
+      "line_id": "p1-l11",
+      "line_text": "W 1 Wandtafel, 1 Stück",
+      "page": 0,
+      "box": [
+        0.1266,
+        0.2919,
+        0.1565,
+        0.3029
+      ],
+      "link": {
+        "relation": "REFERS_TO",
+        "document": "ausstattungsliste.pdf",
+        "identifier": "W 1",
+        "confidence": 0.96
+      }
+    },
+    {
+      "document": "raumblaetter.pdf",
+      "span": "L 2",
+      "kind": "identifier",
+      "line_id": "p1-l12",
+      "line_text": "L 2 Deckenleuchte, 6 Stück",
+      "page": 0,
+      "box": [
+        0.1331,
+        0.3098,
+        0.1565,
+        0.3207
+      ],
+      "link": {
+        "relation": "REFERS_TO",
+        "document": "ausstattungsliste.pdf",
+        "identifier": "L 2",
+        "confidence": 0.96
+      }
+    },
+    {
+      "document": "raumblaetter.pdf",
+      "span": "S1.1",
+      "kind": "identifier",
+      "line_id": "p1-l13",
+      "line_text": "S1.1 Waschtisch, 1 Stück, darüber Spiegel S 2.1",
+      "page": 0,
+      "box": [
+        0.1219,
+        0.3276,
+        0.1565,
+        0.3386
+      ],
+      "link": {
+        "relation": "REFERS_TO",
+        "document": "ausstattungsliste.pdf",
+        "identifier": "S 1.1",
+        "confidence": 0.9
+      }
+    },
+    {
+      "document": "raumblaetter.pdf",
+      "span": "S 2.1",
+      "kind": "identifier",
+      "line_id": "p1-l13",
+      "line_text": "S1.1 Waschtisch, 1 Stück, darüber Spiegel S 2.1",
+      "page": 0,
+      "box": [
+        0.4506,
+        0.3276,
+        0.4898,
+        0.3386
+      ],
+      "link": {
+        "relation": "REFERS_TO",
+        "document": "ausstattungsliste.pdf",
+        "identifier": "S 2.1",
+        "confidence": 0.96
+      }
+    },
+    {
+      "document": "raumblaetter.pdf",
+      "span": "M 7",
+      "kind": "identifier",
+      "line_id": "p1-l14",
+      "line_text": "M 7 Medienwagen, 1 Stück",
+      "page": 0,
+      "box": [
+        0.1285,
+        0.3454,
+        0.1565,
+        0.3564
+      ],
+      "link": null
+    },
+    {
+      "document": "raumblaetter.pdf",
+      "span": "0.14",
+      "kind": "own_number",
+      "line_id": "p2-l2",
+      "line_text": "Raum 0.14 WC Mädchen",
+      "page": 1,
+      "box": [
+        0.2032,
+        0.0837,
+        0.2555,
+        0.1013
+      ],
+      "link": null
+    },
+    {
+      "document": "raumblaetter.pdf",
+      "span": "2,50 m",
+      "kind": "value",
+      "line_id": "p2-l5",
+      "line_text": "Lichte Raumhöhe 2,50 m",
+      "page": 1,
+      "box": [
+        0.2628,
+        0.1554,
+        0.3142,
+        0.1664
+      ],
+      "link": null
+    },
+    {
+      "document": "raumblaetter.pdf",
+      "span": "DIN 18040",
+      "kind": "external",
+      "line_id": "p2-l6",
+      "line_text": "Barrierefreiheit eine Kabine nach DIN 18040",
+      "page": 1,
+      "box": [
+        0.3973,
+        0.1732,
+        0.4777,
+        0.1842
+      ],
+      "link": null
+    },
+    {
+      "document": "raumblaetter.pdf",
+      "span": "3.2",
+      "kind": "identifier",
+      "line_id": "p2-l7",
+      "line_text": "Sanitärobjekte siehe Baubeschreibung Kap. 3.2",
+      "page": 1,
+      "box": [
+        0.4824,
+        0.191,
+        0.5057,
+        0.202
+      ],
+      "link": {
+        "relation": "REFERS_TO",
+        "document": "baubeschreibung.pdf",
+        "identifier": "3.2",
+        "confidence": 0.92
+      }
+    },
+    {
+      "document": "raumblaetter.pdf",
+      "span": "S 1.2",
+      "kind": "identifier",
+      "line_id": "p2-l9",
+      "line_text": "S 1.2 WC, wandhängend, 3 Stück",
+      "page": 1,
+      "box": [
+        0.121,
+        0.2563,
+        0.1603,
+        0.2673
+      ],
+      "link": {
+        "relation": "REFERS_TO",
+        "document": "ausstattungsliste.pdf",
+        "identifier": "S 1.2",
+        "confidence": 0.96
+      }
+    },
+    {
+      "document": "raumblaetter.pdf",
+      "span": "S1.1",
+      "kind": "identifier",
+      "line_id": "p2-l10",
+      "line_text": "S1.1 Waschtisch, 2 Stück",
+      "page": 1,
+      "box": [
+        0.1257,
+        0.2741,
+        0.1603,
+        0.2851
+      ],
+      "link": {
+        "relation": "REFERS_TO",
+        "document": "ausstattungsliste.pdf",
+        "identifier": "S 1.1",
+        "confidence": 0.9
+      }
+    },
+    {
+      "document": "raumblaetter.pdf",
+      "span": "S 2.1",
+      "kind": "identifier",
+      "line_id": "p2-l11",
+      "line_text": "S 2.1 Spiegel, 2 Stück",
+      "page": 1,
+      "box": [
+        0.121,
+        0.2919,
+        0.1603,
+        0.3029
+      ],
+      "link": {
+        "relation": "REFERS_TO",
+        "document": "ausstattungsliste.pdf",
+        "identifier": "S 2.1",
+        "confidence": 0.96
+      }
+    },
+    {
+      "document": "raumblaetter.pdf",
+      "span": "S.2.2",
+      "kind": "identifier",
+      "line_id": "p2-l12",
+      "line_text": "S.2.2 Seifenspender, 2 Stück",
+      "page": 1,
+      "box": [
+        0.121,
+        0.3098,
+        0.1603,
+        0.3207
+      ],
+      "link": {
+        "relation": "REFERS_TO",
+        "document": "ausstattungsliste.pdf",
+        "identifier": "S 2.2",
+        "confidence": 0.9
+      }
+    },
+    {
+      "document": "raumblaetter.pdf",
+      "span": "L1",
+      "kind": "identifier",
+      "line_id": "p2-l13",
+      "line_text": "L1 Wandleuchte über dem Spiegel, 2 Stück",
+      "page": 1,
+      "box": [
+        0.1416,
+        0.3276,
+        0.1603,
+        0.3386
+      ],
+      "link": {
+        "relation": "REFERS_TO",
+        "document": "ausstattungsliste.pdf",
+        "identifier": "L 1",
+        "confidence": 0.9
+      }
+    },
+    {
+      "document": "raumblaetter.pdf",
+      "span": "L 3",
+      "kind": "identifier",
+      "line_id": "p2-l14",
+      "line_text": "L 3 Sicherheitsleuchte über der Tür, 1 Stück",
+      "page": 1,
+      "box": [
+        0.1369,
+        0.3454,
+        0.1603,
+        0.3564
+      ],
+      "link": {
+        "relation": "REFERS_TO",
+        "document": "ausstattungsliste.pdf",
+        "identifier": "L 3",
+        "confidence": 0.96
+      }
+    }
+  ]
+}

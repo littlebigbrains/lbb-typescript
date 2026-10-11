@@ -1,0 +1,31 @@
+{
+  "about": [
+    "The answer key for the review samples: the status each proposal of proposals.json gets with the default settings (gate 0.8, alwaysReview [\"new_instance\"]), and why.",
+    "written: the review writes the statement (or finds it held already). in_review: a review item waits for a person; accepting it writes the statement. refused: the graph cannot hold the statement.",
+    "facts: the statements the graph holds after the run, beside the edge it held before (room-014 HAS_EQUIPMENT s11)."
+  ],
+  "statuses": {
+    "p1": { "status": "written", "why": "At the gate or above, about two instances the graph has." },
+    "p2": { "status": "in_review", "why": "The confidence 0.62 is below the gate." },
+    "p3": { "status": "written", "why": "At the gate or above." },
+    "p4": { "status": "written", "held": true, "why": "The graph holds the edge already: nothing is written again." },
+    "p5": { "status": "written", "why": "A value of a property of the ontology, on a room with no area yet." },
+    "p6": { "status": "refused", "why": "vierzehn is not a value of area_m2 (f64)." },
+    "p7": { "status": "in_review", "why": "rdf:type of a new instance: the rule new_instance." },
+    "p8": { "status": "in_review", "why": "The label of a new instance: the rule new_instance." },
+    "p9": { "status": "in_review", "why": "Its object is a new instance: the rule new_instance." },
+    "p10": { "status": "refused", "why": "Not a relation or a property of the graph's records ontology." },
+    "p11": { "status": "refused", "why": "HAS_EQUIPMENT points to Equipment; room-014 is a Room." },
+    "p12": { "status": "in_review", "why": "s21 has another name already: a records entity has one name." },
+    "p13": { "status": "refused", "why": "owl:sameAs is not a relation of the records ontology." },
+    "p14": { "status": "written", "why": "At the gate or above." }
+  },
+  "facts": [
+    { "subject": "room-012", "predicate": "HAS_EQUIPMENT", "object": "t1" },
+    { "subject": "room-014", "predicate": "HAS_EQUIPMENT", "object": "s12" },
+    { "subject": "room-014", "predicate": "HAS_EQUIPMENT", "object": "s11" },
+    { "subject": "room-014", "predicate": "HAS_EQUIPMENT", "object": "l1" },
+    { "subject": "room-012", "predicate": "area_m2", "object": 62.4 }
+  ],
+  "review_items": 5
+}
