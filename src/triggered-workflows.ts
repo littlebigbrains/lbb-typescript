@@ -142,7 +142,7 @@ export class TriggeredWorkflowsNamespace {
   /**
    * Pause (`paused: true`, the default) or resume (`paused: false`) a
    * triggered workflow: a developer workflow, or one of `documents.parse`,
-   * `documents.link` and `infer.llm`. A paused workflow reads and sends
+   * `documents.link` and `values.extract`. A paused workflow reads and sends
    * nothing; a resume catches up from where it stopped. `search.embed` and
    * `ontology.fit` answer `400 workflow_pause_unsupported`. Returns the
    * triggered workflow; the same call again changes nothing, so a failed

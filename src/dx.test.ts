@@ -1165,7 +1165,7 @@ test("workflows.starters.try posts to the try route and is never retried", async
   });
   await assert.rejects(
     client.workflows.starters.try({
-      starter: "infer.llm",
+      starter: "values.extract",
       params: { gate: 0.7 },
     }),
     (error: unknown) => error instanceof LbbError && error.status === 503,
@@ -1174,7 +1174,7 @@ test("workflows.starters.try posts to the try route and is never retried", async
   assert.equal(methods[0], "POST");
   assert.match(urls[0], /\/v1\/workflows\/starters\/try\?graph=main$/);
   assert.deepEqual(JSON.parse(String(bodies[0])), {
-    starter: "infer.llm",
+    starter: "values.extract",
     params: { gate: 0.7 },
   });
 });

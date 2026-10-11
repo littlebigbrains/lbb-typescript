@@ -260,8 +260,8 @@ The calls count against the stack's model budget for workflows
 the model fails with `422 activity_request_refused`: `isActivityRefused`
 names that error, and `splitInHalves(items)` splits the items of a request
 so each half goes in its own call. The starter workflow templates in
-`sdk/templates` are complete examples; `npm create @littlebigbrain/workflow`
-copies one into a new project.
+`sdk/templates` are complete examples; `npm create @littlebigbrain` copies
+one into a new project.
 
 ## Next steps
 

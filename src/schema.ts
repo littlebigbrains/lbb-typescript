@@ -3357,7 +3357,7 @@ export interface paths {
         };
         /** Every triggered workflow of the graph (a workflow created from a starter workflow) in one status shape: embeddings, fit sources and the rest; `starter` and `name` for one (returns TriggeredWorkflow) */
         get: operations["get_v1_workflows_triggered"];
-        /** Create a workflow from a starter workflow, or change one. `search.embed` and `ontology.fit` write the same documents as `/v1/embeddings` and `/v1/ontology/fit-sources`; `workflow` sends the watched instances to a workflow of your worker; `documents.parse`, `documents.link` and `infer.llm` run in LBB and write the facts they own (409 `workflow_cycle`, 409 `workflow_owns_conflict`, 400 `rdf_native_graph`, 503 `workflows_disabled`, 503 `parser_unavailable`) */
+        /** Create a workflow from a starter workflow, or change one. `search.embed` and `ontology.fit` write the same documents as `/v1/embeddings` and `/v1/ontology/fit-sources`; `workflow` sends the watched instances to a workflow of your worker; `documents.parse`, `documents.link` and `values.extract` run in LBB and write the facts they own (409 `workflow_cycle`, 409 `workflow_owns_conflict`, 400 `rdf_native_graph`, 503 `workflows_disabled`, 503 `parser_unavailable`) */
         put: operations["put_v1_workflows_triggered"];
         post?: never;
         /** Delete a triggered workflow. What it already wrote stays */
@@ -14401,10 +14401,10 @@ export interface components {
             available: boolean;
             /**
              * @description The template a developer can copy to run this work in their own
-             *     worker: a folder of `sdk/templates/` (`documents-link`,
-             *     `values-from-text`, `fit-from-text`). Null when there is none
-             *     (`search.embed` and `documents.parse` run in LBB only, and `workflow`
-             *     is the developer's own code).
+             *     worker: a folder of `sdk/templates/`, the catalog id with dashes
+             *     (`documents-link`, `values-extract`, `ontology-fit`). Null when there
+             *     is none (`search.embed` and `documents.parse` run in LBB only, and
+             *     `workflow` is the developer's own code).
              */
             code?: string | null;
             fixed_watch?: null | components["schemas"]["WorkflowWatch"];
@@ -14474,8 +14474,9 @@ export interface components {
              */
             params?: unknown;
             /**
-             * @description The catalog id, with or without the version (`infer.llm`,
-             *     `infer.llm@v1`).
+             * @description The catalog id, with or without the version (`values.extract`,
+             *     `values.extract@v1`). The former id `infer.llm` reads as
+             *     `values.extract`.
              */
             starter: string;
         };
@@ -15037,7 +15038,8 @@ export interface components {
             params?: unknown;
             /**
              * @description The catalog id, with or without the version (`search.embed`,
-             *     `search.embed@v1`).
+             *     `search.embed@v1`). The former id `infer.llm` reads as
+             *     `values.extract`.
              */
             starter: string;
             watch?: null | components["schemas"]["WorkflowWatch"];

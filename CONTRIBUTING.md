@@ -42,6 +42,10 @@ approves that deployment; trusted publishing uploads
 `@littlebigbrain/client`, then CI creates the matching `vX.Y.Z` tag and GitHub
 Release. No local tag push or registry token is required.
 
+`create/` holds `@littlebigbrain/create`, the `npm create @littlebigbrain`
+generator, with its templates. A new version in `create/package.json`
+releases the same way (`release-create.yml`), with the tag `create-vX.Y.Z`.
+
 ## Conduct & security
 
 See [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) and [SECURITY.md](SECURITY.md).

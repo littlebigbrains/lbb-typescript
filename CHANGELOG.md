@@ -2,6 +2,13 @@
 
 All notable changes to the `@littlebigbrain/client` package are documented here.
 
+## Unreleased
+
+- The starter workflow Values from text is `values.extract` (formerly
+  `infer.llm`; the server still accepts the former id and answers with
+  `values.extract`). The README names the project generator
+  `npm create @littlebigbrain`.
+
 ## 0.23.0 (2026-10-11)
 
 - `client.workflows.starters.try({ starter, params })` runs Try on samples
