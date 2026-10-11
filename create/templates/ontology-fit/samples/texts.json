@@ -1,0 +1,22 @@
+[
+  {
+    "name": "Baustellenbericht 12",
+    "text": "Baustellenbericht 12 vom 02.09.2026. Begehung des Erdgeschosses mit der Bauleitung. Anwesend: Fliesenbau Muster GmbH, Bodenbau Beispiel GmbH. In Raum 0.14 (WC Mädchen) sind zwei Bodenfliesen gerissen. Der Mangel wurde der Fliesenbau Muster GmbH gemeldet, die Frist zur Beseitigung endet am 16.09.2026. In Raum 0.12 ist der Estrich trocken; die Bodenbau Beispiel GmbH verlegt das Linoleum ab dem 07.09.2026."
+  },
+  {
+    "name": "Baubesprechung 05.09.2026",
+    "text": "Protokoll der Baubesprechung vom 05.09.2026. Teilnehmer: Bauleitung, Elektro Beispiel GmbH, Haustechnik Exempel KG. Die Elektro Beispiel GmbH meldet, dass die Deckenleuchten erst am 21.09.2026 geliefert werden. Die Haustechnik Exempel KG hat die Waschtische im Erdgeschoss montiert. Mangel: In Raum 0.12 fehlt der Spiegel über dem Waschtisch. Zuständig ist die Haustechnik Exempel KG, Frist 12.09.2026."
+  },
+  {
+    "name": "Baustellenbericht 13",
+    "text": "Baustellenbericht 13 vom 09.09.2026. Mängelbegehung in Raum 0.14: Die gerissenen Bodenfliesen sind ersetzt, der Mangel ist behoben. Neu festgestellt: Die Trennwand der WC-Kabine 2 in Raum 0.14 steht schief. Zuständig ist die Trockenbau Probe GmbH, Frist 23.09.2026, Status offen."
+  },
+  {
+    "name": "Baustellenbericht 14",
+    "text": "Baustellenbericht 14 vom 16.09.2026. In Raum 0.12 ist der Spiegel montiert, der Mangel ist behoben. Im Flur 0.10 hat das Linoleum an zwei Stellen tiefe Kratzer. Zuständig ist die Bodenbau Beispiel GmbH, Frist 30.09.2026, Status offen. Die Deckenleuchten sind geliefert und werden bis zum 25.09.2026 montiert."
+  },
+  {
+    "name": "Vorbegehung zur Abnahme",
+    "text": "Vorbegehung zur Abnahme am 28.09.2026 mit Bauherr und Bauleitung. Die Trennwand der Kabine 2 in Raum 0.14 ist ausgerichtet, der Mangel ist behoben. Offen bleiben die Kratzer im Flur 0.10; die Bauleitung stuft diesen Mangel als unwesentlich ein. Wesentliche Mängel liegen nicht vor. Die Abnahme ist für den 02.10.2026 geplant."
+  }
+]

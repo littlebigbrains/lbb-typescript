@@ -1,0 +1,48 @@
+{
+  "name": "@littlebigbrain/create",
+  "version": "0.1.0",
+  "description": "Create a project from a little big brain starter workflow template: npm create @littlebigbrain",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/littlebigbrains/lbb-typescript.git",
+    "directory": "create"
+  },
+  "homepage": "https://docs.littlebigbrain.com/guides/workflow-templates/",
+  "bugs": "https://github.com/littlebigbrains/lbb-typescript/issues",
+  "keywords": [
+    "little-big-brain",
+    "workflow",
+    "template",
+    "create"
+  ],
+  "type": "module",
+  "bin": {
+    "create-littlebigbrain": "bin/create-littlebigbrain.mjs"
+  },
+  "files": [
+    "bin",
+    "lib",
+    "project",
+    "templates",
+    "README.md",
+    "LICENSE"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "prepack": "node scripts/copy-templates.mjs",
+    "postpack": "node scripts/copy-templates.mjs --clean",
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "node --test \"test/*.test.mjs\"",
+    "test:coverage": "npm test"
+  },
+  "devDependencies": {
+    "@types/node": "^22",
+    "typescript": "^5.6"
+  }
+}

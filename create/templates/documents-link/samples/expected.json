@@ -1,0 +1,404 @@
+{
+  "about": [
+    "The answer key for the documents-link samples: the entries the two defining files hold, and for each mention on the room sheets the entry it refers to.",
+    "All text is invented. make-samples.mjs checks that every line_text is a line of its page and that line_text.slice(start, end) is the span.",
+    "page is 1-based. line_text is the line as pdftotext -bbox-layout reads it, its words joined by one space. start and end are JavaScript string offsets into line_text.",
+    "Identifiers match as the LBB link stage matches them: without whitespace, without case, and without a dot between leading letters and a digit (S 1.1, S1.1 and S.1.1 match).",
+    "A correct run makes every link whose refers_to is an entry, and no other link. A mention with refers_to null must not link; a run may list it as a mention or skip it. A span this key does not list (an area, a count, the running header or footer) must not link either.",
+    "accept_spans names other spans a run may report for the same mention (Kap. 3.2 for 3.2). kind is the kind the LBB decision model should give the span."
+  ],
+  "roles": {
+    "ausstattungsliste.pdf": "defines",
+    "baubeschreibung.pdf": "defines",
+    "raumblaetter.pdf": "refers"
+  },
+  "notes": [
+    "The key assumes the roles above. With the default role both, the room sheets define their room numbers (0.12, 0.14), and each defining line of the other two files is also a mention of its own entry (own_number). None of those mentions should link: no entry of another file describes the same item.",
+    "raumblaetter.pdf repeats its header row (Neubau Grundschule Musterstadt, Raumblätter), the rows Geschoss Erdgeschoss and Pos. Ausstattung, and a footer Seite # von 2 on both pages. The LBB rows stage marks a row as running only when it repeats on more than max(2, 30% of the pages) pages, so on two pages these rows stay content. They hold no code.",
+    "baubeschreibung.pdf defines the chapter 3 Ausbau above its sections. A run may list 3 as an entry (optional below); no mention refers to it."
+  ],
+  "entries": [
+    {
+      "file": "ausstattungsliste.pdf",
+      "page": 1,
+      "identifier": "S 1.1",
+      "line_text": "S 1.1 Waschtisch, Keramik, ca. 55x45 cm, mit Einhebelmischer"
+    },
+    {
+      "file": "ausstattungsliste.pdf",
+      "page": 1,
+      "identifier": "S 1.2",
+      "line_text": "S 1.2 WC, wandhängend, mit Unterputz-Spülkasten"
+    },
+    {
+      "file": "ausstattungsliste.pdf",
+      "page": 1,
+      "identifier": "S 1.3",
+      "line_text": "S 1.3 Urinal, Keramik, mit Spülsteuerung"
+    },
+    {
+      "file": "ausstattungsliste.pdf",
+      "page": 1,
+      "identifier": "S 2.1",
+      "line_text": "S 2.1 Spiegel, Kristallglas, 60x45 cm"
+    },
+    {
+      "file": "ausstattungsliste.pdf",
+      "page": 1,
+      "identifier": "S 2.2",
+      "line_text": "S 2.2 Seifenspender, Edelstahl, 0,5 l"
+    },
+    {
+      "file": "ausstattungsliste.pdf",
+      "page": 1,
+      "identifier": "T 1",
+      "line_text": "T 1 Einzeltisch, 70x50 cm, höhenverstellbar"
+    },
+    {
+      "file": "ausstattungsliste.pdf",
+      "page": 1,
+      "identifier": "T 2",
+      "line_text": "T 2 Lehrertisch, 140x70 cm"
+    },
+    {
+      "file": "ausstattungsliste.pdf",
+      "page": 1,
+      "identifier": "T 3",
+      "line_text": "T 3 Schülerstuhl, Kunststoff, Größe 5"
+    },
+    {
+      "file": "ausstattungsliste.pdf",
+      "page": 1,
+      "identifier": "L 1",
+      "line_text": "L 1 Wandleuchte LED, 12 W"
+    },
+    {
+      "file": "ausstattungsliste.pdf",
+      "page": 1,
+      "identifier": "L 2",
+      "line_text": "L 2 Deckenleuchte LED, 36 W, dimmbar"
+    },
+    {
+      "file": "ausstattungsliste.pdf",
+      "page": 1,
+      "identifier": "L 3",
+      "line_text": "L 3 Sicherheitsleuchte mit Einzelbatterie"
+    },
+    {
+      "file": "ausstattungsliste.pdf",
+      "page": 1,
+      "identifier": "W 1",
+      "line_text": "W 1 Wandtafel, Klapptafel, 200x100 cm"
+    },
+    {
+      "file": "baubeschreibung.pdf",
+      "page": 1,
+      "identifier": "3",
+      "line_text": "3 Ausbau",
+      "optional": true,
+      "reason": "The chapter heading above the three sections. A run may list it or leave it out."
+    },
+    {
+      "file": "baubeschreibung.pdf",
+      "page": 1,
+      "identifier": "3.1",
+      "line_text": "3.1 Bodenbeläge"
+    },
+    {
+      "file": "baubeschreibung.pdf",
+      "page": 1,
+      "identifier": "3.2",
+      "line_text": "3.2 Sanitärobjekte"
+    },
+    {
+      "file": "baubeschreibung.pdf",
+      "page": 1,
+      "identifier": "3.3",
+      "line_text": "3.3 Beleuchtung"
+    }
+  ],
+  "mentions": [
+    {
+      "file": "raumblaetter.pdf",
+      "page": 1,
+      "line_text": "Raum 0.12 Klassenraum",
+      "span": "0.12",
+      "start": 5,
+      "end": 9,
+      "kind": "own_number",
+      "refers_to": null,
+      "reason": "The room's own number. No file defines room numbers as entries."
+    },
+    {
+      "file": "raumblaetter.pdf",
+      "page": 1,
+      "line_text": "Lichte Raumhöhe 3,00 m",
+      "span": "3,00 m",
+      "start": 16,
+      "end": 22,
+      "kind": "value",
+      "refers_to": null,
+      "reason": "A measure."
+    },
+    {
+      "file": "raumblaetter.pdf",
+      "page": 1,
+      "line_text": "Bodenbelag Linoleum, siehe Baubeschreibung Kap. 3.1",
+      "span": "3.1",
+      "start": 48,
+      "end": 51,
+      "accept_spans": [
+        "Kap. 3.1"
+      ],
+      "kind": "identifier",
+      "refers_to": {
+        "file": "baubeschreibung.pdf",
+        "identifier": "3.1"
+      },
+      "reason": "Cites section 3.1 of the spec. The words before it name the spec."
+    },
+    {
+      "file": "raumblaetter.pdf",
+      "page": 1,
+      "line_text": "T1 Einzeltisch, 28 Stück",
+      "span": "T1",
+      "start": 0,
+      "end": 2,
+      "kind": "identifier",
+      "refers_to": {
+        "file": "ausstattungsliste.pdf",
+        "identifier": "T 1"
+      },
+      "reason": "T 1 written without its space; the description matches."
+    },
+    {
+      "file": "raumblaetter.pdf",
+      "page": 1,
+      "line_text": "T 3 Schülerstuhl, 28 Stück",
+      "span": "T 3",
+      "start": 0,
+      "end": 3,
+      "kind": "identifier",
+      "refers_to": {
+        "file": "ausstattungsliste.pdf",
+        "identifier": "T 3"
+      },
+      "reason": "Same spelling as the entry."
+    },
+    {
+      "file": "raumblaetter.pdf",
+      "page": 1,
+      "line_text": "T 2 Lehrertisch, 1 Stück",
+      "span": "T 2",
+      "start": 0,
+      "end": 3,
+      "kind": "identifier",
+      "refers_to": {
+        "file": "ausstattungsliste.pdf",
+        "identifier": "T 2"
+      },
+      "reason": "Same spelling as the entry."
+    },
+    {
+      "file": "raumblaetter.pdf",
+      "page": 1,
+      "line_text": "W 1 Wandtafel, 1 Stück",
+      "span": "W 1",
+      "start": 0,
+      "end": 3,
+      "kind": "identifier",
+      "refers_to": {
+        "file": "ausstattungsliste.pdf",
+        "identifier": "W 1"
+      },
+      "reason": "Same spelling as the entry."
+    },
+    {
+      "file": "raumblaetter.pdf",
+      "page": 1,
+      "line_text": "L 2 Deckenleuchte, 6 Stück",
+      "span": "L 2",
+      "start": 0,
+      "end": 3,
+      "kind": "identifier",
+      "refers_to": {
+        "file": "ausstattungsliste.pdf",
+        "identifier": "L 2"
+      },
+      "reason": "Same spelling as the entry."
+    },
+    {
+      "file": "raumblaetter.pdf",
+      "page": 1,
+      "line_text": "S1.1 Waschtisch, 1 Stück, darüber Spiegel S 2.1",
+      "span": "S1.1",
+      "start": 0,
+      "end": 4,
+      "kind": "identifier",
+      "refers_to": {
+        "file": "ausstattungsliste.pdf",
+        "identifier": "S 1.1"
+      },
+      "reason": "S 1.1 written without its space. S 1.2 and S 2.1 differ by one more character; the description (Waschtisch) confirms S 1.1."
+    },
+    {
+      "file": "raumblaetter.pdf",
+      "page": 1,
+      "line_text": "S1.1 Waschtisch, 1 Stück, darüber Spiegel S 2.1",
+      "span": "S 2.1",
+      "start": 42,
+      "end": 47,
+      "kind": "identifier",
+      "refers_to": {
+        "file": "ausstattungsliste.pdf",
+        "identifier": "S 2.1"
+      },
+      "reason": "A second code in the same row, inside the description text."
+    },
+    {
+      "file": "raumblaetter.pdf",
+      "page": 1,
+      "line_text": "M 7 Medienwagen, 1 Stück",
+      "span": "M 7",
+      "start": 0,
+      "end": 3,
+      "kind": "identifier",
+      "refers_to": null,
+      "reason": "A code that no file defines. The equipment list has no Medienwagen."
+    },
+    {
+      "file": "raumblaetter.pdf",
+      "page": 2,
+      "line_text": "Raum 0.14 WC Mädchen",
+      "span": "0.14",
+      "start": 5,
+      "end": 9,
+      "kind": "own_number",
+      "refers_to": null,
+      "reason": "The room's own number. No file defines room numbers as entries."
+    },
+    {
+      "file": "raumblaetter.pdf",
+      "page": 2,
+      "line_text": "Lichte Raumhöhe 2,50 m",
+      "span": "2,50 m",
+      "start": 16,
+      "end": 22,
+      "kind": "value",
+      "refers_to": null,
+      "reason": "A measure."
+    },
+    {
+      "file": "raumblaetter.pdf",
+      "page": 2,
+      "line_text": "Barrierefreiheit eine Kabine nach DIN 18040",
+      "span": "DIN 18040",
+      "start": 34,
+      "end": 43,
+      "kind": "external",
+      "refers_to": null,
+      "reason": "A standard. No sample file defines it."
+    },
+    {
+      "file": "raumblaetter.pdf",
+      "page": 2,
+      "line_text": "Sanitärobjekte siehe Baubeschreibung Kap. 3.2",
+      "span": "3.2",
+      "start": 42,
+      "end": 45,
+      "accept_spans": [
+        "Kap. 3.2"
+      ],
+      "kind": "identifier",
+      "refers_to": {
+        "file": "baubeschreibung.pdf",
+        "identifier": "3.2"
+      },
+      "reason": "Cites section 3.2 of the spec, whose heading is the row's label."
+    },
+    {
+      "file": "raumblaetter.pdf",
+      "page": 2,
+      "line_text": "S 1.2 WC, wandhängend, 3 Stück",
+      "span": "S 1.2",
+      "start": 0,
+      "end": 5,
+      "kind": "identifier",
+      "refers_to": {
+        "file": "ausstattungsliste.pdf",
+        "identifier": "S 1.2"
+      },
+      "reason": "Same spelling as the entry."
+    },
+    {
+      "file": "raumblaetter.pdf",
+      "page": 2,
+      "line_text": "S1.1 Waschtisch, 2 Stück",
+      "span": "S1.1",
+      "start": 0,
+      "end": 4,
+      "kind": "identifier",
+      "refers_to": {
+        "file": "ausstattungsliste.pdf",
+        "identifier": "S 1.1"
+      },
+      "reason": "S 1.1 without its space, on a second page."
+    },
+    {
+      "file": "raumblaetter.pdf",
+      "page": 2,
+      "line_text": "S 2.1 Spiegel, 2 Stück",
+      "span": "S 2.1",
+      "start": 0,
+      "end": 5,
+      "kind": "identifier",
+      "refers_to": {
+        "file": "ausstattungsliste.pdf",
+        "identifier": "S 2.1"
+      },
+      "reason": "Same spelling as the entry, on a second page."
+    },
+    {
+      "file": "raumblaetter.pdf",
+      "page": 2,
+      "line_text": "S.2.2 Seifenspender, 2 Stück",
+      "span": "S.2.2",
+      "start": 0,
+      "end": 5,
+      "kind": "identifier",
+      "refers_to": {
+        "file": "ausstattungsliste.pdf",
+        "identifier": "S 2.2"
+      },
+      "reason": "S 2.2 written with a dot after the letter."
+    },
+    {
+      "file": "raumblaetter.pdf",
+      "page": 2,
+      "line_text": "L1 Wandleuchte über dem Spiegel, 2 Stück",
+      "span": "L1",
+      "start": 0,
+      "end": 2,
+      "kind": "identifier",
+      "refers_to": {
+        "file": "ausstattungsliste.pdf",
+        "identifier": "L 1"
+      },
+      "reason": "L 1 written without its space."
+    },
+    {
+      "file": "raumblaetter.pdf",
+      "page": 2,
+      "line_text": "L 3 Sicherheitsleuchte über der Tür, 1 Stück",
+      "span": "L 3",
+      "start": 0,
+      "end": 3,
+      "kind": "identifier",
+      "refers_to": {
+        "file": "ausstattungsliste.pdf",
+        "identifier": "L 3"
+      },
+      "reason": "Same spelling as the entry."
+    }
+  ]
+}
