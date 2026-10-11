@@ -18,6 +18,8 @@ npm test
 | `documents-link` | Finds the identifiers the documents define and the spans that mention them, and links each mention to its entry |
 | `values-extract` | Fills properties of a class from the text of its instances, each value with a verbatim quote |
 | `ontology-fit` | Proposes the ontology changes the texts of a class support, as review items |
+| `documents-map` | Maps the links of `documents-link` into the graph's own ontology, as fact proposals |
+| `review` | Writes the fact proposals at or above a gate as facts and gives the others to a person |
 
 A template id is the id of its starter workflow, with dashes for dots:
 `documents-link` is the code of `documents.link`.

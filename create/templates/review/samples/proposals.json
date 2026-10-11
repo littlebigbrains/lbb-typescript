@@ -1,0 +1,35 @@
+{
+  "about": [
+    "The input of the review samples: a small graph of the invented school building (two rooms and their equipment) and the fact proposals a proposer makes about it. All text is invented.",
+    "An instance is named by its id; samples.ts commits it with its class, name and identifier, and reads its IRI back. new names an instance the graph does not have yet: its IRI is minted from its id.",
+    "A predicate is a relation or a property of the ontology by name, rdf:type, rdfs:label, or an IRI as written. The object of rdf:type is a class name, of a relation an instance id, else a literal with its datatype.",
+    "expected.json gives the status each proposal gets with the default settings: gate 0.8, alwaysReview [\"new_instance\"]."
+  ],
+  "instances": [
+    { "id": "room-012", "class": "Room", "name": "Raum 0.12 Klassenraum", "identifier": "0.12" },
+    { "id": "room-014", "class": "Room", "name": "Raum 0.14 WC Mädchen", "identifier": "0.14" },
+    { "id": "t1", "class": "Equipment", "name": "T 1 Einzeltisch", "identifier": "T 1" },
+    { "id": "s11", "class": "Equipment", "name": "S 1.1 Waschtisch", "identifier": "S 1.1" },
+    { "id": "s12", "class": "Equipment", "name": "S 1.2 WC", "identifier": "S 1.2" },
+    { "id": "s21", "class": "Equipment", "name": "S 2.1 Spiegel", "identifier": "S 2.1" },
+    { "id": "l1", "class": "Equipment", "name": "L 1 Wandleuchte", "identifier": "L 1" }
+  ],
+  "edges": [{ "source": "room-014", "relation": "HAS_EQUIPMENT", "target": "s11" }],
+  "new": ["m7"],
+  "proposals": [
+    { "id": "p1", "subject": "room-012", "predicate": "HAS_EQUIPMENT", "object": "t1", "confidence": 0.95, "line": "T1 Einzeltisch, 28 Stück" },
+    { "id": "p2", "subject": "room-012", "predicate": "HAS_EQUIPMENT", "object": "s21", "confidence": 0.62, "line": "S1.1 Waschtisch, 1 Stück, darüber Spiegel S 2.1" },
+    { "id": "p3", "subject": "room-014", "predicate": "HAS_EQUIPMENT", "object": "s12", "confidence": 0.91, "line": "S 1.2 WC, wandhängend, 3 Stück" },
+    { "id": "p4", "subject": "room-014", "predicate": "HAS_EQUIPMENT", "object": "s11", "confidence": 0.88, "line": "S1.1 Waschtisch, 2 Stück" },
+    { "id": "p5", "subject": "room-012", "predicate": "area_m2", "object": "62.4", "datatype": "http://www.w3.org/2001/XMLSchema#double", "confidence": 0.9, "line": "Fläche 62,40 m²" },
+    { "id": "p6", "subject": "room-014", "predicate": "area_m2", "object": "vierzehn", "datatype": "http://www.w3.org/2001/XMLSchema#string", "confidence": 0.9, "line": "Fläche 14,20 m²" },
+    { "id": "p7", "subject": "new:m7", "predicate": "rdf:type", "object": "Equipment", "confidence": 0.93, "line": "M 7 Medienwagen, 1 Stück" },
+    { "id": "p8", "subject": "new:m7", "predicate": "rdfs:label", "object": "M 7 Medienwagen", "datatype": "http://www.w3.org/2001/XMLSchema#string", "confidence": 0.95, "line": "M 7 Medienwagen, 1 Stück" },
+    { "id": "p9", "subject": "room-012", "predicate": "HAS_EQUIPMENT", "object": "new:m7", "confidence": 0.9, "line": "M 7 Medienwagen, 1 Stück" },
+    { "id": "p10", "subject": "room-012", "predicate": "https://example.org/onto#hasWindow", "object": "Fenster Süd", "datatype": "http://www.w3.org/2001/XMLSchema#string", "confidence": 0.9, "line": "Fenster nach Süden" },
+    { "id": "p11", "subject": "room-012", "predicate": "HAS_EQUIPMENT", "object": "room-014", "confidence": 0.85, "line": "Raum 0.14 WC Mädchen" },
+    { "id": "p12", "subject": "s21", "predicate": "rdfs:label", "object": "S 2.1 Spiegel, Kristallglas", "datatype": "http://www.w3.org/2001/XMLSchema#string", "confidence": 0.9, "line": "S 2.1 Spiegel, Kristallglas, 60x45 cm" },
+    { "id": "p13", "subject": "l1", "predicate": "owl:sameAs", "object": "s21", "confidence": 0.9, "line": "L1 Wandleuchte über dem Spiegel, 2 Stück" },
+    { "id": "p14", "subject": "room-014", "predicate": "HAS_EQUIPMENT", "object": "l1", "confidence": 0.97, "line": "L1 Wandleuchte über dem Spiegel, 2 Stück" }
+  ]
+}

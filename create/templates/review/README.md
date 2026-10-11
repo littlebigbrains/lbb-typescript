@@ -1,0 +1,132 @@
+# review
+
+Decides which fact proposals become facts. A proposer (the
+[`documents-map`](../documents-map/README.md) template, LBB's
+`documents.map`, or a workflow of yours) does not write the facts of the
+graph's own ontology itself: it writes one `FactProposal` per statement,
+with its confidence and its evidence. This workflow writes a proposal at or
+above the gate as a fact, with the proposal as its evidence, and gives the
+others to a person as review items.
+
+The LBB-run version is the starter workflow `review@v1`
+(`docs/reference/starter-workflows.md`, "Review"; design
+`docs/architecture/document-output-mapping.md`). This template is the same
+decision in TypeScript: the workflow in `workflow.ts`, the rules and the
+facts in `decision.ts`. It calls no model.
+
+## How it runs
+
+The triggered workflow watches the class `FactProposal` and the fields of
+its statement (`fact_subject`, `fact_predicate`, `fact_object`), so a new
+proposal, or one whose statement changed, sends a message. A turn decides at
+most 30 proposals, two steps each; the rest of a message goes to a new turn
+(`ctx.continue`). Each proposal is decided once: one that has a
+`fact_status` already is skipped.
+
+1. **Read** the proposal (`fact_subject`, `fact_predicate`, `fact_object`,
+   `fact_datatype`, `fact_confidence`, `fact_evidence`, `proposed_by`), the
+   entities its statement names, and the ontology (`GET /v1/ontology`). An
+   entity the graph does not have is a new instance: its class comes from an
+   `rdf:type` proposal of it, its name from an `rdfs:label` proposal.
+2. **What the statement is** (`classify`): an `rdf:type` of a class, an
+   `rdfs:label`, a relation between two instances (the entry's `DENOTES`
+   included), or a property value in its type. The ends of a relation must fit
+   its domain and range, superclasses included.
+3. **The decision** (`decide`), in this order:
+   - **refused** when the graph cannot hold the statement: a predicate that
+     is no relation or property of the records ontology (nor `rdf:type` or
+     `rdfs:label`), a value of another type, an object that is no instance,
+     an instance without a class, an end its relation does not take, a second
+     class, or a statement about a proposal;
+   - **to a person** when a rule of `alwaysReview` names it (`new_instance`:
+     a statement whose subject or object the graph does not have yet; or a
+     predicate IRI), when it would replace another writer's value (a records
+     graph holds one value per property) or name, or when its confidence is
+     below the gate. The review item's title shows the statement
+     (`Write "Raum 0.12 Klassenraum · HAS_EQUIPMENT · S 2.1 Spiegel"?`), its
+     rationale says why, its evidence holds the proposal, and its facts are the
+     statement and the proposal's `fact_status: accepted`: accepting it writes
+     both;
+   - **written** otherwise: a relation as an edge whose evidence names the
+     proposal (`source_id` is the proposal's IRI, the text its evidence); a
+     property as its value; a new instance's `rdf:type` as the instance of
+     that class with `proposed_in` (a records graph holds an instance through
+     its facts); a label as the entity's name. A new instance takes the name
+     of its label proposal (the first in order) from its first write, so its
+     name does not depend on which statement is written first. A label is a
+     text: an IRI or an empty label is refused. A statement the graph holds
+     already is not written again. Nothing is taken back, a name included: a
+     records instance keeps one.
+4. **Write** (`writeOwned`): the proposal's `fact_status` (`written`,
+   `in_review` or `refused`) and `review_note`, owned by this workflow, and in
+   the same commit the facts of a written statement.
+
+## Settings
+
+`defaults` in `workflow.ts`, those of LBB's `review`:
+
+| Setting | Default | Meaning |
+| --- | --- | --- |
+| `className` | `FactProposal` | The class of the proposals |
+| `gate` | 0.8 | A proposal below this confidence goes to a person |
+| `alwaysReview` | `["new_instance"]` | What goes to a person whatever its confidence: `new_instance`, and predicate IRIs (`https://littlebigbrain.com/r/has_equipment`) |
+
+`trigger(settings)` names the triggered workflow `review` and owns
+`fact_status` and `review_note`. `ontology(settings)` adds the class and the
+properties of a proposal and of the review (`proposed_in` too). Do not run it
+beside an LBB-run `review` on the same graph: they own the same properties.
+
+## What the LBB-run version adds
+
+- **Withdrawn proposals.** When a proposer withdraws a proposal, it
+  supersedes the open review item and retracts the fact it wrote, unless a
+  person accepted it or the fact held before; a record per proposal says
+  which fact. The template keeps both: dismiss the item, or retract the fact
+  yourself.
+- **Dismissed items.** It checks the open review items and sets
+  `dismissed` on the proposal of a dismissed one. The template leaves
+  `in_review`.
+- **Predicates another workflow owns.** It refuses a statement whose
+  predicate another workflow owns by predicate, since that workflow's owned
+  write would delete it.
+- **RDF-native graphs by IRI.** On an RDF-native graph it writes each
+  statement as one owned triple: `lbb:denotes`, the asserted schema's
+  properties (the OWL object, symmetric, transitive, functional,
+  inverse-functional and asymmetric properties take an IRI) and classes
+  (the ends of `rdfs:subClassOf` count), the records ontology's terms and
+  `rdfs:label`. There a subject or object is new when it is the subject of
+  no statement. The template writes through `POST /v1/graph/commit`, on both
+  graph kinds: the records ontology's relations (the records `DENOTES`
+  included), properties and classes, and `rdfs:label`. An instance is new
+  when it has no class of the records ontology. It refuses any other
+  predicate with a note that says so (`owl:sameAs`, `lbb:denotes`).
+- **Ownership by statement.** Its facts count as owned by statement, so it
+  conflicts with no other workflow on the predicates it writes. The template
+  owns `fact_status` and `review_note` only and writes the facts without
+  owning them.
+- **The graph refuses.** It lets the commit refuse a statement (a domain, a
+  range) and marks the proposal `refused`. The template checks domain and
+  range before it writes; another refusal stops the turn.
+- **Status and preview.** Counters per outcome, the open items it follows,
+  and a preview of what it would decide.
+
+## Samples and test
+
+`samples/proposals.json` holds a small invented graph (two rooms of the
+school building and five pieces of equipment, one `HAS_EQUIPMENT` edge) and
+14 proposals about it, one for each case; `samples/expected.json` gives the
+status each one gets and the facts the graph holds after the run
+([`../_samples/README.md`](../_samples/README.md)).
+
+`npm run try` adds the sample ontology (`Room`, `Equipment`,
+`HAS_EQUIPMENT`, `identifier`, `area_m2`), commits the instances, reads
+their IRIs back, and commits the proposals as a proposer would
+(`proposed_by` is `samples/review`). This is the simplest input: the review
+calls no model and needs no proposer to run first. To review the proposals
+of `documents-map`, run it (or LBB's `documents.map`) on the same graph.
+
+`workflow.test.ts` runs the workflow on a graph in memory with the samples:
+the statuses and facts of the answer key, the evidence of a written fact,
+the notes, the facts of an accepted item, the settings without
+`new_instance` and with a predicate rule, a second message that changes
+nothing, and a message larger than a turn.

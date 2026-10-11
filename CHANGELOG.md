@@ -8,6 +8,9 @@ All notable changes to the `@littlebigbrain/client` package are documented here.
   `infer.llm`; the server still accepts the former id and answers with
   `values.extract`). The README names the project generator
   `npm create @littlebigbrain`.
+- `ModelJob` gains `map` (the decisions of `documents.map`) and
+  `ModelActivityFeature` gains `workflows`. The pause doc names
+  `documents.map`.
 
 ## 0.23.0 (2026-10-11)
 
