@@ -2,7 +2,7 @@
 
 All notable changes to the `@littlebigbrain/client` package are documented here.
 
-## Unreleased
+## 0.24.0 (2026-10-12)
 
 - The starter workflow Values from text is `values.extract` (formerly
   `infer.llm`; the server still accepts the former id and answers with
@@ -11,6 +11,12 @@ All notable changes to the `@littlebigbrain/client` package are documented here.
 - `ModelJob` gains `map` (the decisions of `documents.map`) and
   `ModelActivityFeature` gains `workflows`. The pause doc names
   `documents.map`.
+- Review items group by instance (`review` workflow): a suggestion's
+  `SuggestedFacts` gains `required`, the rows an accept must keep (the type
+  of a new instance). `OntologyChangeSuggestionAcceptRequest` gains
+  `facts`, the subset of the proposed facts to keep, each exactly as
+  proposed. A suggestion gains `proposed_facts` (when a person left facts
+  out) and `facts_written` (when the producer has written the facts).
 
 ## 0.23.0 (2026-10-11)
 
