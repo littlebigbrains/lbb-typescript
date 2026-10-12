@@ -388,6 +388,94 @@ export function shown(t: Terms, s: Statement): string {
   }
 }
 
+/** The trace from a document entry to its instance: `lbb:denotes`, or the records relation `DENOTES`. */
+export const isTrace = (predicate: string) =>
+  predicate.trim() === "https://littlebigbrain.com/ns#denotes" ||
+  predicate.trim() === relationIri("DENOTES");
+
+/**
+ * The instance a proposal's review item is about: the object of the trace, the object of a link
+ * whose subject the graph has and whose object is new, else the subject. Null when refused.
+ */
+export function groupOf(t: Terms, s: Statement): string | null {
+  switch (t.kind) {
+    case "refused":
+      return null;
+    case "relation":
+      return isTrace(s.predicate) || (t.subject.exists && !t.object.exists)
+        ? t.object.iri
+        : t.subject.iri;
+    default:
+      return t.subject.iri;
+  }
+}
+
+/** One fact of a review item, as the item shows it. */
+export interface Shown {
+  /** `type`, `label`, `value`, `link` or `source` (the trace). */
+  kind: string;
+  /** The fact in words, seen from its instance: `is a Room`, `HAS_EQUIPMENT → T 1`. */
+  text: string;
+}
+
+/** What an item shows of a fact about the instance `group`. */
+export function shownOf(
+  t: Exclude<Terms, { kind: "refused" }>,
+  s: Statement,
+  group: string,
+): Shown {
+  const name = (e: Known) => e.label?.trim() || e.iri.slice(e.iri.lastIndexOf("/") + 1);
+  switch (t.kind) {
+    case "type":
+      return { kind: "type", text: `is a ${t.class}` };
+    case "label":
+      return { kind: "label", text: `label · ${t.label}` };
+    case "property":
+      return { kind: "value", text: `${t.field} · ${t.value}` };
+    case "relation":
+      if (isTrace(s.predicate)) return { kind: "source", text: name(t.subject) };
+      return t.object.iri === group && t.subject.iri !== group
+        ? { kind: "link", text: `${t.relation} ← ${name(t.subject)}` }
+        : { kind: "link", text: `${t.relation} → ${name(t.object)}` };
+  }
+}
+
+/** The order of the kinds in an item: the type, the label, values, links, the trace. */
+export const KIND_ORDER = ["type", "label", "value", "link", "source"];
+
+/**
+ * Where a proposal's evidence comes from, for a person: `document`, `page`, `line` and `box` of
+ * its first source (the JSON of documents-map, or any object with those fields), else its text as
+ * the line. Null without evidence.
+ */
+export function place(evidence: string | undefined): Record<string, unknown> | null {
+  const raw = evidence?.trim();
+  if (!raw) return null;
+  let value: unknown;
+  try {
+    value = JSON.parse(raw);
+  } catch {
+    return { line: clip(raw, 160) };
+  }
+  const object = (v: unknown): v is Record<string, unknown> =>
+    typeof v === "object" && v !== null && !Array.isArray(v);
+  const sources = object(value) && Array.isArray(value.sources) ? value.sources : null;
+  const source = sources?.[0] ?? value;
+  if (!object(source)) return { line: clip(raw, 160) };
+  const text = (k: string) => (typeof source[k] === "string" ? (source[k] as string).trim() : "");
+  const line =
+    text("line") ||
+    [text("identifier"), text("description")].filter(Boolean).join(" ") ||
+    text("context");
+  const out: Record<string, unknown> = {};
+  if (text("document")) out.document = clip(text("document"), 160);
+  if (Number.isSafeInteger(source.page)) out.page = source.page;
+  if (line) out.line = clip(line, 160);
+  if (Array.isArray(source.box) && source.box.length === 4 && source.box.every(Number.isFinite))
+    out.box = source.box;
+  return Object.keys(out).length ? out : null;
+}
+
 /** Whitespace kept, cut at `chars` with an ellipsis. */
 export function clip(text: string, chars: number): string {
   const all = [...text];

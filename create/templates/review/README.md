@@ -6,7 +6,7 @@ Decides which fact proposals become facts. A proposer (the
 graph's own ontology itself: it writes one `FactProposal` per statement,
 with its confidence and its evidence. This workflow writes a proposal at or
 above the gate as a fact, with the proposal as its evidence, and gives the
-others to a person as review items.
+others to a person: one review item per instance.
 
 The LBB-run version is the starter workflow `review@v1`
 (`docs/reference/starter-workflows.md`, "Review"; design
@@ -19,9 +19,9 @@ facts in `decision.ts`. It calls no model.
 The triggered workflow watches the class `FactProposal` and the fields of
 its statement (`fact_subject`, `fact_predicate`, `fact_object`), so a new
 proposal, or one whose statement changed, sends a message. A turn decides at
-most 30 proposals, two steps each; the rest of a message goes to a new turn
-(`ctx.continue`). Each proposal is decided once: one that has a
-`fact_status` already is skipped.
+most 20 proposals, two steps each, and files at most one review item per
+instance; the rest of a message goes to a new turn (`ctx.continue`). Each
+proposal is decided once: one that has a `fact_status` already is skipped.
 
 1. **Read** the proposal (`fact_subject`, `fact_predicate`, `fact_object`,
    `fact_datatype`, `fact_confidence`, `fact_evidence`, `proposed_by`), the
@@ -42,11 +42,19 @@ most 30 proposals, two steps each; the rest of a message goes to a new turn
      a statement whose subject or object the graph does not have yet; or a
      predicate IRI), when it would replace another writer's value (a records
      graph holds one value per property) or name, or when its confidence is
-     below the gate. The review item's title shows the statement
-     (`Write "Raum 0.12 Klassenraum · HAS_EQUIPMENT · S 2.1 Spiegel"?`), its
-     rationale says why, its evidence holds the proposal, and its facts are the
-     statement and the proposal's `fact_status: accepted`: accepting it writes
-     both;
+     below the gate. The proposal goes into the **review item of its
+     instance** (`groupOf`): its subject; the object of a link whose subject
+     the graph has and whose object is new; and always the object of the
+     trace (`DENOTES`). One item holds every proposal of its instance that
+     the turn sends to a person, in order: the type, the label, values,
+     links, the trace (`fileItem`). Its title names the instance (`New
+     Equipment M 7 Medienwagen`, or `Room Raum 0.12 Klassenraum: 1 fact to
+     check`), its rationale says why, and it has one evidence sample per
+     fact (what it states, its confidence, its line). Its facts are each
+     statement and its proposal's `fact_status: accepted`, and each sample
+     names the rows and triplets of its fact (`row`, `rows`, `triplets`), so
+     a person can leave facts out of the accept. The type of a new instance
+     is a required row: a person keeps it or dismisses the item;
    - **written** otherwise: a relation as an edge whose evidence names the
      proposal (`source_id` is the proposal's IRI, the text its evidence); a
      property as its value; a new instance's `rdf:type` as the instance of
@@ -78,13 +86,24 @@ beside an LBB-run `review` on the same graph: they own the same properties.
 
 ## What the LBB-run version adds
 
-- **Withdrawn proposals.** When a proposer withdraws a proposal, it
-  supersedes the open review item and retracts the fact it wrote, unless a
+- **It writes the accepted facts itself.** Its item carries the statuses
+  only; its sweep writes each kept fact, the type first, and dismisses the
+  facts a person left out. A link to another new instance waits until that
+  instance's item is accepted, and is dismissed with it. The template's item
+  commits its facts on accept, so such a link makes the other instance too.
+- **One item per instance over time.** Its items follow the open proposals
+  of an instance across messages: when they change, it supersedes the open
+  item with a new one, and an accept of the old item fails (409). The
+  template files one item per instance and turn: the key carries the
+  proposals, so a later turn with other proposals of the instance files
+  another item.
+- **Withdrawn proposals.** When a proposer withdraws a proposal, it takes
+  the proposal out of its item and retracts the fact it wrote, unless a
   person accepted it or the fact held before; a record per proposal says
   which fact. The template keeps both: dismiss the item, or retract the fact
   yourself.
 - **Dismissed items.** It checks the open review items and sets
-  `dismissed` on the proposal of a dismissed one. The template leaves
+  `dismissed` on the proposals of a dismissed one. The template leaves
   `in_review`.
 - **Predicates another workflow owns.** It refuses a statement whose
   predicate another workflow owns by predicate, since that workflow's owned
@@ -115,7 +134,8 @@ beside an LBB-run `review` on the same graph: they own the same properties.
 `samples/proposals.json` holds a small invented graph (two rooms of the
 school building and five pieces of equipment, one `HAS_EQUIPMENT` edge) and
 14 proposals about it, one for each case; `samples/expected.json` gives the
-status each one gets and the facts the graph holds after the run
+status each one gets, the facts the graph holds after the run, and the three
+review items with the proposals each one holds
 ([`../_samples/README.md`](../_samples/README.md)).
 
 `npm run try` adds the sample ontology (`Room`, `Equipment`,
@@ -127,6 +147,7 @@ of `documents-map`, run it (or LBB's `documents.map`) on the same graph.
 
 `workflow.test.ts` runs the workflow on a graph in memory with the samples:
 the statuses and facts of the answer key, the evidence of a written fact,
-the notes, the facts of an accepted item, the settings without
-`new_instance` and with a predicate rule, a second message that changes
-nothing, and a message larger than a turn.
+the notes, one item per instance (the order of its facts and its required
+type), the facts of an accepted item, the settings without `new_instance`
+and with a predicate rule, a second message that changes nothing, and a
+message larger than a turn.
