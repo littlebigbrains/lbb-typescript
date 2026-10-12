@@ -3670,7 +3670,7 @@ export interface components {
             updated_at_micros: number;
         };
         /** @enum {string} */
-        ActivityKind: "publish" | "compaction" | "statistics" | "validation" | "embeddings" | "import" | "export" | "fork" | "index_upgrade";
+        ActivityKind: "publish" | "compaction" | "statistics" | "validation" | "embeddings" | "import" | "export" | "fork" | "index_upgrade" | "workflow";
         /** @description How far a job has come. `total` is absent when the job does not know it. */
         ActivityProgress: {
             /** Format: int64 */
@@ -3682,7 +3682,7 @@ export interface components {
         /** @enum {string} */
         ActivityState: "queued" | "waiting" | "running" | "succeeded" | "failed" | "cancelled";
         /** @enum {string} */
-        ActivityUnit: "phases" | "partitions" | "lines" | "bytes" | "entities" | "commits" | "tables";
+        ActivityUnit: "phases" | "partitions" | "lines" | "bytes" | "entities" | "commits" | "tables" | "documents" | "pages" | "mentions" | "links" | "proposals" | "instances" | "questions" | "messages" | "items";
         /**
          * @description The unpublished commits on the graph head against the write path's limits
          *     on them. Past any `soft_*` limit each write waits a little (the wait grows
@@ -15265,6 +15265,35 @@ export interface components {
             watch?: null | components["schemas"]["WorkflowWatch"];
             workflow?: null | components["schemas"]["WorkflowTypeRef"];
         };
+        /**
+         * @description The step a workflow runs now in the starters job: a phase in plain
+         *     words and how far it got. The job writes it every few seconds while the
+         *     step runs (and at least every 15 s), so it reads the same on every node.
+         */
+        TriggeredWorkflowRunning: {
+            /** Format: int64 */
+            done: number;
+            /** @description When the job last wrote this progress (RFC 3339). */
+            heartbeat_at: string;
+            /**
+             * @description What the step does now, in plain words: `reading documents`,
+             *     `reading pages`, `linking mentions`, `asking the decision model`,
+             *     `writing facts`, `filing review items`, `sending messages`, ….
+             */
+            phase: string;
+            /**
+             * @description When the step started (RFC 3339). A step that goes on in the job's
+             *     next round keeps its start.
+             */
+            started_at: string;
+            /**
+             * Format: int64
+             * @description Absent when the step does not know it.
+             */
+            total?: number | null;
+            /** @description What `done` and `total` count. */
+            unit: components["schemas"]["ActivityUnit"];
+        };
         /** @description Model spend of one month. */
         TriggeredWorkflowSpend: {
             /** Format: int64 */
@@ -15303,6 +15332,7 @@ export interface components {
             processed_through_seq?: number | null;
             /** Format: int64 */
             published_seq?: number | null;
+            running?: null | components["schemas"]["TriggeredWorkflowRunning"];
             spend?: null | components["schemas"]["TriggeredWorkflowSpend"];
             state: components["schemas"]["TriggeredWorkflowState"];
         };
