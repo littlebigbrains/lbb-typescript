@@ -3372,7 +3372,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Every triggered workflow of the graph (a workflow created from a starter workflow) in one status shape: embeddings, fit sources and the rest; `starter` and `name` for one (returns TriggeredWorkflow) */
+        /** Every triggered workflow of the graph (a workflow created from a starter workflow) in one status shape: embeddings, fit sources and the rest; `starter` and `name` for one (returns TriggeredWorkflow). The list is light: each workflow's status (with `outputs`) without its own status in `details`, which the read of one workflow carries; `details=true` adds it to the list */
         get: operations["get_v1_workflows_triggered"];
         /** Create a workflow from a starter workflow, or change one. `search.embed` and `ontology.fit` write the same documents as `/v1/embeddings` and `/v1/ontology/fit-sources`; `workflow` sends the watched instances to a workflow of your worker; `documents.parse`, `documents.link` and `values.extract` run in LBB and write the facts they own (409 `workflow_cycle`, 409 `workflow_owns_conflict`, 400 `rdf_native_graph`, 503 `workflows_disabled`, 503 `parser_unavailable`) */
         put: operations["put_v1_workflows_triggered"];
@@ -47442,6 +47442,8 @@ export interface operations {
                 starter?: string;
                 /** @description the triggered workflow's name */
                 name?: string;
+                /** @description `true` adds each workflow's own status (`details`) to the list; absent or `false`, the list leaves it out */
+                details?: string;
             };
             header?: {
                 /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
