@@ -9,11 +9,16 @@
 //   type, a new instance without its class, a domain or a range the ends do not fit);
 // - to a person when a rule of `alwaysReview` names it (`new_instance`, the default, or a
 //   predicate), when it would replace another writer's value or name, or when its confidence is
-//   below the gate: a review item (`review`) whose facts are the statement;
+//   below the gate;
 // - written otherwise: the statement, with the proposal as its evidence (`writeOwned`).
 //
-// The proposal gets its `fact_status` (`written`, `in_review`, `refused`) and `review_note`, owned
-// by this workflow. Accepting a review item writes the statement and the status `accepted`.
+// The proposals for a person go into one review item per instance (`review`): the instance a
+// proposal is about (its subject, the new object of a link from an instance the graph has, and
+// always the object of the trace). The item's facts are each statement and its proposal's
+// `fact_status: accepted`; a person can leave facts out of the accept, except the type of a new
+// instance. The proposal gets its `fact_status` (`written`, `in_review`, `refused`) and
+// `review_note`, owned by this workflow.
+import { createHash } from "node:crypto";
 import {
   entityRef,
   triggeredWorkflow,
@@ -73,8 +78,8 @@ export interface ReviewState {
   refused: number;
 }
 
-/** Proposals one turn decides: two steps each, in a turn of 64 steps. */
-const TURN_PROPOSALS = 30;
+/** Proposals one turn decides: two steps each, and at most one review item each, in a turn of 64 steps. */
+const TURN_PROPOSALS = 20;
 const PLAIN_IRI = /^[^\s<>"{}|\\^`]+$/;
 const values = (iris: Iterable<string>) =>
   [...iris]
@@ -101,6 +106,14 @@ interface Outcome {
   note?: string;
   facts?: review.Facts;
   holds?: boolean;
+  /** For a person: the item's instance, its view, and what the item shows of the fact. */
+  item?: {
+    instance: string;
+    class?: string;
+    label?: string;
+    isNew: boolean;
+    shown: review.Shown;
+  };
 }
 
 /** The workflow, for a `WorkflowWorker`. `lbb` is `lbbActivities(client)`, or a mock in a test. */
@@ -114,9 +127,10 @@ export function createWorkflow(lbb: LbbActivities, settings: Settings = defaults
       let cache: Promise<Read> | undefined;
       const read = () => (cache ??= reader(lbb, batch, settings));
       const next = { ...state };
+      const forPeople: { iri: string; outcome: Outcome }[] = [];
       for (const [i, iri] of batch.entries()) {
         const outcome = await ctx.step(`decide-${i}`, async () =>
-          decideOne(lbb, await read(), iri, message, settings),
+          decideOne(lbb, await read(), iri, settings),
         );
         await lbb.writeOwned(ctx, `write-${i}`, async () =>
           statusWrite(await read(), iri, outcome, settings),
@@ -125,7 +139,19 @@ export function createWorkflow(lbb: LbbActivities, settings: Settings = defaults
         next.proposals += 1;
         if (outcome.status === "written") next[outcome.holds ? "held" : "written"] += 1;
         else next[outcome.status] += 1;
+        if (outcome.status === "in_review") forPeople.push({ iri, outcome });
       }
+      // One review item per instance of this turn.
+      const groups = new Map<string, { iri: string; outcome: Outcome }[]>();
+      for (const one of forPeople) {
+        const instance = one.outcome.item!.instance;
+        groups.set(instance, [...(groups.get(instance) ?? []), one]);
+      }
+      for (const [n, members] of [...groups.values()].entries())
+        await ctx.step(`review-${n}`, async () => {
+          await fileItem(lbb, await read(), members, message, settings);
+          return true;
+        });
       // A proposal its proposer withdrew (message.removed) keeps the fact written for it: see the README.
       const rest = message.instances.slice(TURN_PROPOSALS);
       return rest.length
@@ -232,12 +258,11 @@ async function entities(
   return out;
 }
 
-/** Decide one proposal, and file its review item when it goes to a person. */
+/** Decide one proposal; one for a person carries what its item shows. */
 async function decideOne(
   lbb: LbbActivities,
   read: Read,
   iri: string,
-  message: WorkflowTriggerMessage,
   settings: Settings,
 ): Promise<Outcome> {
   const proposal = read.proposals.get(iri);
@@ -275,53 +300,149 @@ async function decideOne(
     return decision.holds
       ? { status: "written", holds: true }
       : { status: "written", holds: false, facts };
-  // To a person: the review item writes the statement and the proposal's `accepted` when accepted.
-  const words = review.shown(terms, s);
-  await lbb.review({
-    workflow: message.workflow,
-    key: `starter:${message.workflow}:fact:${iri.slice(iri.lastIndexOf("/") + 1)}`,
-    title: review.clip(`Write "${words}"?`, 200),
-    rationale: review.clip(
-      `${decision.why} Proposed by ${proposal.proposedBy || "an unnamed proposer"} with confidence ${proposal.confidence.toFixed(2)}.`,
-      500,
-    ),
-    facts: {
-      triplets: facts.triplets,
-      entity_properties: [
-        ...facts.entity_properties,
-        { ...proposalRef(proposal, settings), properties: { fact_status: "accepted" } },
-      ],
-      summary: review.clip(words, 500),
+  // To a person: into the item of its instance.
+  const instance = review.groupOf(terms, s)!;
+  const known = [...seen.entities.values()].find((e) => e.iri === instance) ?? {
+    iri: instance,
+    exists: false,
+  };
+  return {
+    status: "in_review",
+    note: decision.why,
+    facts,
+    item: {
+      instance,
+      ...(known.class || terms.kind === "type"
+        ? { class: terms.kind === "type" ? terms.class : known.class }
+        : {}),
+      ...(known.label ? { label: known.label } : {}),
+      isNew: !known.exists,
+      shown: review.shownOf(terms, s, instance),
     },
-    evidence: {
-      records: 1,
-      samples: [
-        {
-          proposal: iri,
-          statement: s,
-          confidence: proposal.confidence,
-          proposed_by: proposal.proposedBy,
-          evidence: proposal.evidence ? review.clip(proposal.evidence, 2_000) : null,
-        },
-      ],
-    },
-  });
-  return { status: "in_review", note: decision.why };
+  };
 }
 
 const proposalRef = (proposal: Proposal, settings: Settings) =>
   entityRef(proposal.iri, settings.className, proposal.label);
+
+/**
+ * File the review item of one instance: each fact's statement and its proposal's
+ * `fact_status: accepted`, in the item's order (the type, the label, values, links, the trace),
+ * with one evidence sample per fact. The key carries the proposals, so other proposals file
+ * another item.
+ */
+async function fileItem(
+  lbb: LbbActivities,
+  read: Read,
+  members: { iri: string; outcome: Outcome }[],
+  message: WorkflowTriggerMessage,
+  settings: Settings,
+) {
+  const first = members[0]!.outcome.item!;
+  const instance = first.instance;
+  const kind = (m: { outcome: Outcome }) => m.outcome.item!.shown.kind;
+  const ordered = [...members].sort(
+    (a, b) =>
+      review.KIND_ORDER.indexOf(kind(a)) - review.KIND_ORDER.indexOf(kind(b)) ||
+      a.outcome.item!.shown.text.localeCompare(b.outcome.item!.shown.text),
+  );
+  const creates = first.isNew && ordered.some((m) => kind(m) === "type");
+  const className = ordered.map((m) => m.outcome.item!.class).find(Boolean) ?? "Instance";
+  const label =
+    ordered.map((m) => m.outcome.item!.label).find(Boolean) ??
+    instance.slice(instance.lastIndexOf("/") + 1);
+  const triplets: Schemas["TripletInput"][] = [];
+  const rows: Schemas["EntityPropertiesInput"][] = [];
+  // The rows an accept must keep (`required`, from client 0.24; an older client sends it as is).
+  const required: { row: number; reason: string }[] = [];
+  const samples: Record<string, unknown>[] = [];
+  const whys = new Set<string>();
+  for (const { iri, outcome } of ordered) {
+    const proposal = read.proposals.get(iri)!;
+    const shown = outcome.item!.shown;
+    const needed = shown.kind === "source" || (creates && shown.kind === "type");
+    const writeTriplets = (outcome.facts?.triplets ?? []).map((t) => triplets.push(t) - 1);
+    const writeRows = (outcome.facts?.entity_properties ?? []).map((r) => rows.push(r) - 1);
+    const row =
+      rows.push({ ...proposalRef(proposal, settings), properties: { fact_status: "accepted" } }) -
+      1;
+    if (needed)
+      for (const at of [...writeRows, row])
+        required.push({
+          row: at,
+          reason:
+            shown.kind === "type"
+              ? "a new instance needs its type"
+              : "the source of an instance goes with it",
+        });
+    if (outcome.note) whys.add(outcome.note);
+    samples.push({
+      proposal: iri,
+      row,
+      ...(writeRows.length ? { rows: writeRows } : {}),
+      ...(writeTriplets.length ? { triplets: writeTriplets } : {}),
+      kind: shown.kind,
+      fact: shown.text,
+      confidence: Math.round(proposal.confidence * 1000) / 1000,
+      ...(review.place(proposal.evidence) ?? {}),
+      ...(needed ? { required: true } : {}),
+    });
+  }
+  const proposalsHash = createHash("sha256")
+    .update(
+      ordered
+        .map((m) => m.iri)
+        .sort()
+        .join("\n"),
+    )
+    .digest("hex")
+    .slice(0, 12);
+  const title = creates
+    ? `New ${className} ${label}`
+    : `${className} ${label}: ${members.length === 1 ? "1 fact" : `${members.length} facts`} to check`;
+  const proposers = [...new Set(ordered.map((m) => read.proposals.get(m.iri)!.proposedBy))].filter(
+    Boolean,
+  );
+  await lbb.review({
+    workflow: message.workflow,
+    key: `starter:${message.workflow}:instance:${instance.slice(instance.lastIndexOf("/") + 1)}:${proposalsHash}`,
+    title: review.clip(title, 200),
+    rationale: review.clip(
+      `${[...whys].slice(0, 3).join(" ")}${proposers.length ? ` Proposed by ${proposers.join(", ")}.` : ""}`,
+      500,
+    ),
+    facts: {
+      triplets,
+      entity_properties: rows,
+      required,
+      summary: review.clip(ordered.map((m) => m.outcome.item!.shown.text).join(" · "), 500),
+    } as Schemas["SuggestedFacts"],
+    mapping: {
+      review: {
+        instance,
+        class: className,
+        label,
+        new: creates,
+        facts: members.length,
+        shown: members.length,
+        truncated: false,
+      },
+    },
+    evidence: { records: members.length, samples },
+  });
+}
 
 /** The owned write of a decision: the proposal's status and note, and the facts of a written statement. */
 function statusWrite(read: Read, iri: string, outcome: Outcome, settings: Settings) {
   const proposal = read.proposals.get(iri);
   if (!proposal || outcome.status === "decided") return { subjects: [] };
   const own = proposalRef(proposal, settings);
+  const written = outcome.status === "written" ? outcome.facts : undefined;
   return {
     subjects: [own],
     properties: ["fact_status", "review_note"],
     entity_properties: [
-      ...(outcome.facts?.entity_properties ?? []),
+      ...(written?.entity_properties ?? []),
       {
         ...own,
         properties: {
@@ -330,6 +451,6 @@ function statusWrite(read: Read, iri: string, outcome: Outcome, settings: Settin
         },
       },
     ],
-    triplets: outcome.facts?.triplets ?? [],
+    triplets: written?.triplets ?? [],
   };
 }

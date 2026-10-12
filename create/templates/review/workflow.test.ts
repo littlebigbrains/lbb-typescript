@@ -29,6 +29,7 @@ interface Expected {
   statuses: Record<string, { status: string; held?: boolean }>;
   facts: { subject: string; predicate: string; object: string | number }[];
   review_items: number;
+  items: { instance: string; title: string; facts: string[] }[];
 }
 const EXPECTED = readJson<Expected>(join(SAMPLES, "expected.json"));
 
@@ -209,9 +210,39 @@ test("a written fact names its proposal as evidence, a refusal and a review say 
   assert.match(note("p2"), /below the gate 0\.8/);
   assert.match(note("p7"), /rule new_instance/);
   assert.equal(note("p1"), undefined);
-  const item = [...lbb.reviews.values()].find((r) => r.title.includes("S 2.1 Spiegel"))!;
-  assert.equal(item.title, 'Write "Raum 0.12 Klassenraum · HAS_EQUIPMENT · S 2.1 Spiegel"?');
+  const item = [...lbb.reviews.values()].find((r) => r.title.includes("Raum 0.12"))!;
+  assert.equal(item.title, "Room Raum 0.12 Klassenraum: 1 fact to check");
   assert.equal(item.workflow, "review");
+});
+
+test("one item per instance: a new instance's facts in order, its type required", async () => {
+  const { lbb, proposals } = sampleGraph();
+  await runMessage(createWorkflow(lbb), triggerMessage("review", [...proposals.values()]));
+  const items = [...lbb.reviews.values()];
+  const expected = EXPECTED.items.map((item) => item.title).sort();
+  assert.deepEqual(items.map((item) => item.title).sort(), expected);
+  const m7 = items.find((item) => item.title === "New Equipment M 7 Medienwagen")!;
+  const samples = m7.evidence!.samples as Record<string, unknown>[];
+  assert.deepEqual(
+    samples.map((sample) => [sample.kind, sample.fact]),
+    [
+      ["type", "is a Equipment"],
+      ["label", "label · M 7 Medienwagen"],
+      ["link", "HAS_EQUIPMENT ← Raum 0.12 Klassenraum"],
+    ],
+  );
+  assert.deepEqual(
+    samples.map((sample) => sample.proposal),
+    ["p7", "p8", "p9"].map((id) => proposals.get(id)),
+  );
+  assert.equal(samples[0]!.line, "M 7 Medienwagen, 1 Stück");
+  // The type's write and its status are required; the link is not.
+  const required = (m7.facts as { required?: { row: number }[] }).required!.map((r) => r.row);
+  assert.deepEqual(required, [samples[0]!.rows, samples[0]!.row].flat());
+  assert.equal(samples[2]!.required, undefined);
+  assert.deepEqual(samples[2]!.triplets, [0]);
+  assert.match(m7.key!, /^starter:review:instance:[0-9a-f]{32}:[0-9a-f]{12}$/);
+  assert.deepEqual((m7.mapping as { review: { new: boolean } }).review.new, true);
 });
 
 test("accepting a review item writes its statement and the proposal's accepted", async () => {
@@ -242,7 +273,7 @@ test("accepting a review item writes its statement and the proposal's accepted",
     assert.equal(statusOf(lbb.graph, proposals.get(id)!), "accepted", id);
   // The label's item names s21 again (the server renames it; the graph in memory keeps names).
   const rename = [...lbb.reviews.values()].find((r) =>
-    r.title.startsWith('Write "S 2.1 Spiegel · label'),
+    r.title.startsWith("Equipment S 2.1 Spiegel"),
   )!;
   assert.deepEqual(rename.facts!.entity_properties![0]!.name, "S 2.1 Spiegel, Kristallglas");
   assert.equal(

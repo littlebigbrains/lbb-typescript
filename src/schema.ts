@@ -9271,6 +9271,7 @@ export interface components {
             evidence?: components["schemas"]["SuggestionEvidence"];
             facts?: null | components["schemas"]["SuggestedFacts"];
             facts_commit?: null | components["schemas"]["SuggestionFactsCommit"];
+            facts_written?: null | components["schemas"]["SuggestionFactsWritten"];
             graph: components["schemas"]["GraphKey"];
             /** @description Records to link as one identity after `change` applies. */
             identities?: components["schemas"]["SuggestedIdentity"][];
@@ -9293,6 +9294,7 @@ export interface components {
              *     `change` before accepting.
              */
             proposed_change?: components["schemas"]["OntologyEvolveOp"][] | null;
+            proposed_facts?: null | components["schemas"]["SuggestedFacts"];
             /**
              * @description The identities as the producer proposed them, kept when a person
              *     removed some before accepting.
@@ -9326,6 +9328,7 @@ export interface components {
             change_sources?: (number | null)[] | null;
             /** @description Added to the discussion with the acceptance. */
             comment?: string | null;
+            facts?: null | components["schemas"]["SuggestedFacts"];
             /**
              * @description The identities to link, when a person removed some or some members:
              *     each must be a subset of a proposed identity, with at least two
@@ -11653,6 +11656,19 @@ export interface components {
             retract_entities?: components["schemas"]["NamedEntityInput"][];
             /** @description The instances this write is for. */
             subjects: components["schemas"]["NamedEntityInput"][];
+        };
+        /** @description A row of a suggestion's facts that an accept must keep. */
+        RequiredFactRow: {
+            /**
+             * @description Why the other facts need it, for the refusal: for example "a new
+             *     instance needs its type". 1 to 200 characters.
+             */
+            reason: string;
+            /**
+             * Format: int32
+             * @description The index of the row in `entity_properties`.
+             */
+            row: number;
         };
         ResolutionAlternative: {
             /** Format: float */
@@ -14635,11 +14651,19 @@ export interface components {
          *     ordinary triplet commit, after any evolve operations; dismissing writes
          *     nothing. At most 200 triplets plus entity property rows, and 64 KiB of
          *     JSON. On an RDF-native graph the accept writes them as RDF, the
-         *     statements a records graph shows for them.
+         *     statements a records graph shows for them. A person can leave facts out
+         *     of the accept (`OntologyChangeSuggestionAcceptRequest::facts`), except
+         *     the rows `required` names.
          */
         SuggestedFacts: {
             entity_properties?: components["schemas"]["EntityPropertiesInput"][];
             replace_owned?: null | components["schemas"]["ReplaceOwnedInput"];
+            /**
+             * @description The `entity_properties` rows an accept must keep when it leaves other
+             *     facts out: the other facts need them (the type of a new instance). An
+             *     accept that leaves one out is refused; dismiss the suggestion instead.
+             */
+            required?: components["schemas"]["RequiredFactRow"][];
             /** @description One line about the facts for a reviewer. At most 500 characters. */
             summary?: string | null;
             triplets?: components["schemas"]["TripletInput"][];
@@ -14734,8 +14758,42 @@ export interface components {
             /** @description The facts were in the graph already: nothing new was written. */
             no_op?: boolean;
             owned?: null | components["schemas"]["OwnedOutputsOutcome"];
-            /** @description The commit's idempotency key: `ontology-suggestion:<id>:facts:r<revision>`. */
+            /**
+             * @description The commit's idempotency key: `ontology-suggestion:<id>:facts:r<revision>`,
+             *     with `:k<hash>` of the kept facts when a person left some out.
+             */
             request_id: string;
+        };
+        /**
+         * @description What the producer wrote after the accept, for facts it writes itself:
+         *     the item of the `review` workflow commits the proposals' status on
+         *     accept, and the workflow then writes the facts. Absent until the
+         *     producer has written them.
+         */
+        SuggestionFactsWritten: {
+            /** @description RFC 3339 time of the last change. */
+            at: string;
+            /**
+             * Format: int32
+             * @description Facts the person left out, or that a dismissed item took with it.
+             */
+            dismissed?: number;
+            /**
+             * Format: int32
+             * @description Facts the graph refused.
+             */
+            refused?: number;
+            /**
+             * Format: int32
+             * @description Facts that wait for another review item: a link to an instance that
+             *     the other item makes.
+             */
+            waiting?: number;
+            /**
+             * Format: int32
+             * @description Facts written, or held by the graph already.
+             */
+            written: number;
         };
         /**
          * @description The producer of a suggestion. `id` names it within its kind: the
