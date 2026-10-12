@@ -67,12 +67,56 @@ changed questions cost.
    `rdf:type` (the grounding answer's probability times the class answer's),
    its `rdfs:label`, its `identifier` and its `DENOTES`. `fact_evidence` holds
    the line, the page, the box, the link and every option with its
-   probability. The answers `no_class` and `missing_property` with a
+   probability. An entry whose class question chose `no_class` proposes
+   nothing (no type, label, identifier or `DENOTES`) until the ontology has a
+   class for it, and its links are not typed.
+6. **Suggest.** The answers `no_class` and `missing_property` with a
    probability of at least 0.5 become ontology suggestions, one per pattern
-   (`Add a class for entries of …`, `Add a relation from Room to …`).
-6. **Write.** The proposals that changed since the graph's copy, owned with
+   (see below).
+7. **Write.** The proposals that changed since the graph's copy, owned with
    `replace_owned` over the proposal's seven fields, in parts of 900. The
    proposals of this workflow that no link states any more are retracted.
+
+## Ontology suggestions
+
+Each suggestion explains itself. Its rationale says what the decision model
+found, from how many lines or entries, and quotes them (page, line, the two
+ends and the probability). Its samples have the shape of a review item's
+(`document`, `page` from 1, `line`, `box`, plus `line_id`, `span`, `subject`
+and `object`, or `identifier` and `description` for an entry), with the
+answer: `choice`, `answer` in words, `probability` and every option's
+probability in `options`.
+
+- **A relation** (`Add a relation from Room to SpecSection: SIEHE_KAP`). Its
+  name comes from the words next to the span on its lines: the two nearest
+  words before the span (else after it) that are made of letters, at least
+  three long, and not words of the two ends or of the object's document. The
+  phrase most lines share wins, in upper case ASCII. Only when the lines have
+  no such words is it `HAS_<CLASS>`. A taken name gets a number.
+- **The overlap rule.** When an existing relation fits the two classes
+  (either way round), a line backs the suggestion only when its typing
+  question offered that relation and the answer chose `missing_property`
+  over it. The suggestion is then filed only with at least 2 such lines, or
+  one at 0.8 or more (`OVERLAP_LINES`, `OVERLAP_ALONE_AT` in `map.ts`), and
+  its rationale names the relation and the most probability the answers gave
+  it. Otherwise nothing is filed, and the lines are unmapped links.
+- **A class** (`Add a class for 3.1 Bodenbeläge`, or `Add a class for 2
+  entries of baubeschreibung.pdf: 3.1 …, 3.2 …`). Its title and rationale
+  name its entries; the rationale lists the classes the answers weighed and
+  the entries of the same document, written the same way, that got a class
+  of the ontology. A person who finds those belong to the new class too
+  dismisses their types in the review.
+
+Edit the name, then accept (the accept request's `change`, or **Edit, then
+accept** in the console): the next message maps the links of the pattern
+again.
+
+**Unmapped links.** A link that makes no proposal and backs no filed
+suggestion stays in the workflow's state: `unmapped` counts them and
+`unmappedLinks` holds the first 50, by document, page and line, each with
+its line, the two ends, its `outcome` (`no_subject`, `ungrounded`,
+`same_instance`, `unclassed`, `unanswered`, `no_fact`, `lacks`), a `reason`
+in words and the typing answer when it has one.
 
 The questions go in requests of at most 32 questions and 60,000 characters:
 grounding and classes per defining document, typing per page. A refused
@@ -162,6 +206,7 @@ question picks the relation whose range is the object's class. The run makes
 the 15 facts of the answer key and the 60 statements of the 15 new
 instances, and nothing for `M 7`, `S 1.3` or `3.3`. The test also checks the
 confidences, a second message answered from the effect cache, a turn
-stopped part way, an existing instance, the ontology suggestions, a
-withdrawn link, a refused request split in halves, a declared mapping, and
-the subject rules.
+stopped part way, an existing instance, the ontology suggestions (their
+titles, rationales, samples, names from the lines, the overlap rule, and
+the links of an entry without a class as unmapped), a withdrawn link, a
+refused request split in halves, a declared mapping, and the subject rules.

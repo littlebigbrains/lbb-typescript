@@ -9524,10 +9524,16 @@ export interface components {
             origin: components["schemas"]["SuggestionOrigin"];
             /** @description Whether the last dry run can be published; absent before any dry run. */
             publishable?: boolean | null;
+            /**
+             * @description The start of the rationale, at most 300 characters (cut at a word,
+             *     with `…`); the suggestion holds all of it.
+             */
+            rationale?: string;
             /** Format: int64 */
             records?: number | null;
             /** Format: int64 */
             revision: number;
+            source?: null | components["schemas"]["SuggestionSourceSummary"];
             status: components["schemas"]["OntologyChangeSuggestionStatus"];
             suggestion_id: string;
             title: string;
@@ -14919,6 +14925,24 @@ export interface components {
             text: string;
             /** Format: int32 */
             v: number;
+        };
+        /**
+         * @description Where a suggestion's evidence comes from, for a list row: the first
+         *     evidence sample that names a document.
+         */
+        SuggestionSourceSummary: {
+            /**
+             * Format: float
+             * @description The sample's `confidence` (or `probability`), from 0 to 1.
+             */
+            confidence?: number | null;
+            /** @description The document's name. */
+            document: string;
+            /**
+             * Format: int32
+             * @description The page, from 1.
+             */
+            page?: number | null;
         };
         /** @description Suggestions per status, over the whole graph (not only the listed page). */
         SuggestionStatusCounts: {

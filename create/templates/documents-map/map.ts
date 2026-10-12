@@ -71,6 +71,13 @@ export const CLASS_OPTIONS = 12;
 export const PROPERTY_OPTIONS = 12;
 /** "No class fits" and "a property the ontology lacks" with at least this probability file a suggestion. */
 export const LACK_SUGGEST_AT = 0.5;
+/**
+ * A relation suggestion whose two classes an existing relation fits needs this many lines whose
+ * answer weighed that relation and chose "a property the ontology lacks", or one such line at
+ * `OVERLAP_ALONE_AT` or more.
+ */
+export const OVERLAP_LINES = 2;
+export const OVERLAP_ALONE_AT = 0.8;
 /** The top of a page, as a share of its height: a page's head. */
 export const HEAD_BAND = 0.3;
 /** Lines whose middles are this close (a share of the page height) are on one row. */
@@ -190,23 +197,118 @@ export function newInstanceLabel(identifier: string, description: string): strin
   return !rest || identifierKey(rest) === identifierKey(id) ? id : `${id} ${rest}`;
 }
 
-/** A relation name for a property the ontology lacks: `HAS_<CLASS>`, else `RELATES_TO_<CLASS>`. */
-export function lackingRelationName(objectClass: string, taken: Set<string>): string {
-  const upper = humanize(objectClass).toUpperCase().replace(/ /g, "_");
-  const free = (name: string) => !taken.has(name.toLowerCase());
-  for (const name of [`HAS_${upper}`, `RELATES_TO_${upper}`]) if (free(name)) return name;
-  for (let n = 2; ; n++) if (free(`RELATES_TO_${upper}_${n}`)) return `RELATES_TO_${upper}_${n}`;
+/** The key two ontology names compare by: letters and digits, lower case (`HAS_EQUIPMENT` is `hasEquipment`). */
+export const nameKey = (name: string) => name.replace(/[^\p{L}\p{N}]+/gu, "").toLowerCase();
+
+/** `name`, or `<name><sep>2`, `<name><sep>3` … when `taken` (name keys) has it. */
+function freeName(name: string, taken: Set<string>, sep = "_"): string {
+  if (!taken.has(nameKey(name))) return name;
+  for (let n = 2; ; n++) if (!taken.has(nameKey(`${name}${sep}${n}`))) return `${name}${sep}${n}`;
 }
 
-/** A class name for entries no class fits: the longest word of the document's name and `Item`. */
-export function lackingClassName(document: string): string {
+const FOLD: Record<string, string> = {
+  Ä: "AE",
+  Æ: "AE",
+  Ö: "OE",
+  Œ: "OE",
+  Ü: "UE",
+  ẞ: "SS",
+  À: "A",
+  Á: "A",
+  Â: "A",
+  Ã: "A",
+  Å: "A",
+  Ç: "C",
+  È: "E",
+  É: "E",
+  Ê: "E",
+  Ë: "E",
+  Ì: "I",
+  Í: "I",
+  Î: "I",
+  Ï: "I",
+  Ñ: "N",
+  Ò: "O",
+  Ó: "O",
+  Ô: "O",
+  Õ: "O",
+  Ø: "O",
+  Ù: "U",
+  Ú: "U",
+  Û: "U",
+  Ý: "Y",
+  Ÿ: "Y",
+};
+
+/** A word in upper case ASCII for a records name: `darüber` reads `DARUEBER`. */
+function asciiUpper(word: string): string {
+  return [...word.toUpperCase()].map((c) => FOLD[c] ?? (/^[A-Z0-9]$/.test(c) ? c : "")).join("");
+}
+
+/** The words of a text, lower case, made of letters only and at least three long. */
+export const nameWords = (text: string) =>
+  new Set(
+    text
+      .split(/[^\p{L}\p{N}]+/u)
+      .filter((w) => [...w].length >= 3 && /^\p{L}+$/u.test(w))
+      .map((w) => w.toLowerCase()),
+  );
+
+/**
+ * The words next to a link's span on its line, which may say how the line relates the two ends:
+ * the two nearest words before the span, else after it, made of letters only, at least three
+ * long, and not in `skip` (the words of the two ends). `Sanitärobjekte siehe Baubeschreibung
+ * Kap. 3.2`, span `3.2`, skipping the object's words, gives `siehe`, `Kap`.
+ */
+export function spanPhrase(line: string, span: string, skip: Set<string>): string[] {
+  const words = [...line.matchAll(/[\p{L}\p{N}]+/gu)].map((m) => ({
+    word: m[0],
+    from: m.index,
+    to: m.index + m[0].length,
+  }));
+  const usable = (w: string) =>
+    [...w].length >= 3 && /^\p{L}+$/u.test(w) && !skip.has(w.toLowerCase());
+  const at = span.trim() ? line.indexOf(span.trim()) : -1;
+  const [from, to] = at >= 0 ? [at, at + span.trim().length] : [line.length, line.length];
+  const before = words.filter((w) => w.to <= from && usable(w.word)).map((w) => w.word);
+  if (before.length) return before.slice(-2);
+  return words
+    .filter((w) => w.from >= to && usable(w.word))
+    .map((w) => w.word)
+    .slice(0, 2);
+}
+
+/**
+ * A relation name for a property the ontology lacks, from the words next to the spans of its
+ * lines: the phrase most lines share (the most probable line's first on a tie), in upper case
+ * ASCII (`SIEHE_KAP`), with a number when the ontology has that name. `undefined` when no line
+ * has such words.
+ */
+export function relationNameFromLines(phrases: string[][], taken: Set<string>): string | undefined {
+  const counts = new Map<string, number>();
+  for (const phrase of phrases) {
+    const name = phrase.map(asciiUpper).filter(Boolean).join("_");
+    if (name) counts.set(name, (counts.get(name) ?? 0) + 1);
+  }
+  const most = Math.max(0, ...counts.values());
+  const name = [...counts].find(([, n]) => n === most)?.[0];
+  return name ? freeName(name, taken) : undefined;
+}
+
+/** A relation name when the lines have no words for one: `HAS_<CLASS>`, with a number when taken. */
+export function lackingRelationName(objectClass: string, taken: Set<string>): string {
+  return freeName(`HAS_${humanize(objectClass).toUpperCase().replace(/ /g, "_")}`, taken);
+}
+
+/** A class name for entries no class fits: the longest word of the document's name and `Item`, with a number when taken. */
+export function lackingClassName(document: string, taken: Set<string> = new Set()): string {
   const stem = document.includes(".") ? document.slice(0, document.lastIndexOf(".")) : document;
   const word =
     stem
       .split(/[^\p{L}]+/u)
       .filter((w) => [...w].length >= 4)
       .sort((a, b) => [...b].length - [...a].length)[0] ?? "Document";
-  return `${word[0]!.toUpperCase()}${word.slice(1)}Item`;
+  return freeName(`${word[0]!.toUpperCase()}${word.slice(1)}Item`, taken, "");
 }
 
 /** A SHA-256 of the parts, as hex. */
@@ -348,6 +450,16 @@ export class MapOntology {
    * inverse.
    */
   propertyOptions(subject: string, object: string, line: string): PropertyOption[] {
+    return this.fittingProperties(subject, object, line).slice(0, PROPERTY_OPTIONS);
+  }
+
+  /** The IRIs of every relation that fits a link from `subject` to `object`, either way round, before the cut to 12. */
+  propertiesBetween(subject: string, object: string): Set<string> {
+    return new Set(this.fittingProperties(subject, object, "").map((o) => o.property));
+  }
+
+  /** `propertyOptions` without the cut. */
+  private fittingProperties(subject: string, object: string, line: string): PropertyOption[] {
     const [up, down] = [this.ancestors(subject), this.ancestors(object)];
     const fits = (declared: string[], classes: Set<string>) =>
       declared.length === 0 || declared.some((c) => classes.has(c));
@@ -378,7 +490,7 @@ export class MapOntology {
         b.score - a.score ||
         (a.option.key < b.option.key ? -1 : a.option.key > b.option.key ? 1 : 0),
     );
-    return found.slice(0, PROPERTY_OPTIONS).map((f) => f.option);
+    return found.map((f) => f.option);
   }
 
   /** The part of the ontology a typing request's state shows: the classes and properties, by name. */
@@ -801,5 +913,223 @@ export function proposalRow(
 /** A proposal's evidence, as JSON text. */
 export const evidenceText = (p: Proposal) =>
   JSON.stringify({ kind: p.kind, name: p.name, sources: p.sources.map((s) => s.evidence) });
+
+// ---- ontology suggestions --------------------------------------------------------------------
+
+/** An answer that the ontology lacks a class or a property. */
+export interface Lack {
+  kind: "class" | "property";
+  subjectClass?: string;
+  objectClass?: string;
+  document: string;
+  /** The evidence sample: where it is (`document`, `page` from 1, `line`, `box`) and the answer. */
+  sample: Record<string, unknown>;
+  p: number;
+  /** The answer's probability per option key. */
+  options: Record<string, number>;
+  /** A property lack: the relation IRI of each property option its question offered, by key. */
+  offered?: Record<string, string>;
+  /** A property lack: the words next to the span (`spanPhrase`). */
+  phrase?: string[];
+  /** How the rationale quotes it: `p. 2, "line" (0.14 → 3.2, 0.59)`. */
+  quote: string;
+  /** A class lack: the entry as a title names it, and how its identifier is written. */
+  entry?: { name: string; shape: string };
+}
+
+/** A new instance whose class question chose a class: a class suggestion names those of its document written alike. */
+export interface ClassedEntry {
+  document: string;
+  shape: string;
+  name: string;
+  classLabel: string;
+  p: number;
+}
+
+/** What an ontology suggestion of a pattern says, before it is filed. */
+export interface SuggestionDraft {
+  title: string;
+  rationale: string;
+  change: Schemas["OntologyEvolveOp"][];
+  records: number;
+  samples: Record<string, unknown>[];
+}
+
+/** The name keys an ontology has: its classes' and its relations' names and labels. */
+export function takenNames(ontology: MapOntology): Set<string> {
+  return new Set([
+    ...[...ontology.classes.values()].flatMap((c) => [
+      nameKey(c.name),
+      nameKey(classLabel(c.name)),
+    ]),
+    ...ontology.properties.flatMap((p) => [nameKey(p.name), nameKey(humanize(p.name))]),
+  ]);
+}
+
+/** An answer in words. */
+export function answerWords(choice: string, property?: string): string {
+  if (choice === MISSING_PROPERTY) return "a property the ontology lacks";
+  if (choice === NO_FACT) return "no fact";
+  if (choice === SAME_ITEM) return "the same item";
+  if (choice === NO_CLASS) return "no class fits";
+  if (property && choice === "declared")
+    return `${humanize(localName(property))} (a declared mapping)`;
+  return property ? humanize(localName(property)) : choice;
+}
+
+const counted = (n: number, one: string, many: string) => (n === 1 ? `1 ${one}` : `${n} ${many}`);
+const RATIONALE_LINES = 5;
+const SUGGESTION_EXAMPLES = 10;
+
+/** The quotes of the first lacks, and how many more there are. */
+function quotes(members: Lack[]): string {
+  const shown = members.slice(0, RATIONALE_LINES).map((l) => l.quote);
+  const more = members.length - shown.length;
+  return more > 0 ? `${shown.join("; ")}; and ${more} more` : shown.join("; ");
+}
+
+/**
+ * The relation suggestion of the lines that relate an instance of `subject` to one of `object`
+ * in `document` in a way no relation states, or the lines as unmapped links when it is not filed.
+ * The existing relations that fit the two classes (either way round) overlap it: a line backs
+ * it only when its question offered each of them. With an overlap it is filed only when
+ * `OVERLAP_LINES` lines back it, or one at `OVERLAP_ALONE_AT` or more, and its rationale names
+ * each overlapping relation with the most a backing line's answer gave it. The name comes from
+ * the words next to the spans (`relationNameFromLines`), else `HAS_<CLASS>`.
+ */
+export function relationDraft(
+  ontology: MapOntology,
+  subject: string,
+  object: string,
+  document: string,
+  members: Lack[],
+): { draft: SuggestionDraft } | { unmapped: Record<string, unknown>[] } {
+  const name = (iri: string) => ontology.classes.get(iri)?.name ?? localName(iri);
+  const [subjectName, objectName] = [name(subject), name(object)];
+  const overlap = ontology.propertiesBetween(subject, object);
+  const overlapping = ontology.properties.filter((p) => overlap.has(p.iri));
+  const weighed = (lack: Lack) =>
+    [...overlap].every((iri) => Object.values(lack.offered ?? {}).includes(iri));
+  const backing = members.filter(weighed);
+  const enough =
+    !overlap.size ||
+    backing.length >= OVERLAP_LINES ||
+    backing.some((l) => l.p >= OVERLAP_ALONE_AT);
+  const relations = overlapping.map((p) => p.name).join(", ");
+  if (!enough)
+    return {
+      unmapped: members.map((lack) => ({
+        ...lack.sample,
+        outcome: "lacks",
+        reason: weighed(lack)
+          ? `${relations} fits ${subjectName} → ${objectName}: a new relation between them needs ${OVERLAP_LINES} lines whose answer chose a property the ontology lacks, or one at ${OVERLAP_ALONE_AT} or more`
+          : `its typing question did not offer ${relations}, which fits ${subjectName} → ${objectName}`,
+      })),
+    };
+  const taken = takenNames(ontology);
+  const fromLines = relationNameFromLines(
+    backing.map((l) => l.phrase ?? []),
+    taken,
+  );
+  const relation = fromLines ?? lackingRelationName(objectName, taken);
+  const top = backing[0]?.p ?? 0;
+  let rationale = `In ${document}, the decision model found that ${counted(backing.length, "line", "lines")} relate an instance of ${subjectName} to one of ${objectName} in a way no property of the ontology states (a property the ontology lacks, up to ${top.toFixed(2)}): ${quotes(backing)}.`;
+  for (const property of overlapping) {
+    const best = Math.max(
+      0,
+      ...backing.flatMap((l) =>
+        Object.entries(l.offered ?? {})
+          .filter(([, iri]) => iri === property.iri)
+          .map(([key]) => l.options[key] ?? 0),
+      ),
+    );
+    rationale += ` The ontology has ${property.name} (${humanize(property.name)}), which fits ${subjectName} → ${objectName}. On these lines the model gave it ${best.toFixed(2)} at most: it found that ${property.name} does not state what the lines say.`;
+  }
+  rationale += fromLines
+    ? ` Proposed name: ${relation}, from the words next to the span on the lines.`
+    : ` Proposed name: ${relation}, from the class ${objectName}: the lines have no other words next to the span.`;
+  rationale += " Edit the name, then accept: the next run maps these links again.";
+  return {
+    draft: {
+      title: `Add a relation from ${subjectName} to ${objectName}: ${relation}`,
+      rationale,
+      change: [{ op: "add_relation", name: relation, domain: [subjectName], range: [objectName] }],
+      records: backing.length,
+      samples: backing.slice(0, SUGGESTION_EXAMPLES).map((l) => l.sample),
+    },
+  };
+}
+
+/**
+ * The class suggestion of the entries of `document` that are new instances no class fits. Its
+ * title names the entries; its rationale names them, the classes their answers weighed (the most
+ * each got), and the entries of the same document written the same way that got a class: a
+ * person who finds they belong to the new class too dismisses their types in the review. These
+ * entries propose nothing (no type, label, identifier or trace) until a class exists.
+ */
+export function classDraft(
+  ontology: MapOntology,
+  document: string,
+  members: Lack[],
+  classed: ClassedEntry[],
+): SuggestionDraft {
+  const names = members.flatMap((l) => (l.entry ? [l.entry.name] : []));
+  let title: string;
+  if (names.length === 1) title = `Add a class for ${clip(names[0]!, 120)}`;
+  else {
+    const head = `Add a class for ${names.length} entries of ${document}: `;
+    const listed: string[] = [];
+    for (const n of names) {
+      const short = clip(n, 40);
+      const length =
+        [...head].length +
+        listed.reduce((sum, l) => sum + [...l].length + 2, 0) +
+        [...short].length;
+      if (length > 195) {
+        listed.push("…");
+        break;
+      }
+      listed.push(short);
+    }
+    title = head + listed.join(", ");
+  }
+  const labelOf = new Map(
+    [...ontology.classKeys()].map(([iri, key]) => [key, ontology.classLabel(iri)]),
+  );
+  const weighed = new Map<string, number>();
+  for (const lack of members)
+    for (const [key, p] of Object.entries(lack.options)) {
+      const label = labelOf.get(key);
+      if (label) weighed.set(label, Math.max(weighed.get(label) ?? 0, p));
+    }
+  const top = members[0]?.p ?? 0;
+  let rationale = `The decision model found that no class of the ontology fits ${counted(members.length, "entry", "entries")} of ${document} (no class fits, up to ${top.toFixed(2)}): ${quotes(members)}.`;
+  const listed = [...weighed]
+    .sort((a, b) => b[1] - a[1] || (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0))
+    .slice(0, RATIONALE_LINES)
+    .map(([label, p]) => `${label} ${p.toFixed(2)}`);
+  if (listed.length)
+    rationale += ` The classes the model weighed got at most: ${listed.join(", ")}.`;
+  rationale +=
+    " These entries propose no type, label, identifier or trace until the ontology has a class for them.";
+  const shapes = new Set(members.flatMap((l) => (l.entry ? [l.entry.shape] : [])));
+  const siblings = classed
+    .filter((e) => e.document === document && shapes.has(e.shape))
+    .map((e) => `${clip(e.name, 60)} (${e.classLabel}, ${e.p.toFixed(2)})`);
+  if (siblings.length) {
+    const shown = siblings.slice(0, RATIONALE_LINES);
+    const more = siblings.length - shown.length;
+    rationale += ` Other entries of ${document}, written the same way, got a class of the ontology: ${shown.join(", ")}${more > 0 ? `, and ${more} more` : ""}. When they belong to the new class too, dismiss their types in the review.`;
+  }
+  const cls = lackingClassName(document, takenNames(ontology));
+  rationale += ` Proposed name: ${cls}, from the document's name. Edit the name, then accept: the next run maps them again.`;
+  return {
+    title,
+    rationale,
+    change: [{ op: "add_entity_type", name: cls }],
+    records: members.length,
+    samples: members.slice(0, SUGGESTION_EXAMPLES).map((l) => l.sample),
+  };
+}
 
 export { round3 };

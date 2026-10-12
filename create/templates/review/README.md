@@ -77,7 +77,11 @@ proposal is decided once: one that has a `fact_status` already is skipped.
 | --- | --- | --- |
 | `className` | `FactProposal` | The class of the proposals |
 | `gate` | 0.8 | A proposal below this confidence goes to a person |
-| `alwaysReview` | `["new_instance"]` | What goes to a person whatever its confidence: `new_instance`, and predicate IRIs (`https://littlebigbrain.com/r/has_equipment`) |
+| `alwaysReview` | `[]` | What goes to a person whatever its confidence: `new_instance`, and predicate IRIs (`https://littlebigbrain.com/r/has_equipment`). Empty: the gate decides everything, a new instance too |
+
+With `["new_instance"]` every statement about a new instance goes to a
+person, whatever its confidence. That was the default of LBB's `review`
+until 2026-10-12.
 
 `trigger(settings)` names the triggered workflow `review` and owns
 `fact_status` and `review_note`. `ontology(settings)` adds the class and the
@@ -134,8 +138,9 @@ beside an LBB-run `review` on the same graph: they own the same properties.
 `samples/proposals.json` holds a small invented graph (two rooms of the
 school building and five pieces of equipment, one `HAS_EQUIPMENT` edge) and
 14 proposals about it, one for each case; `samples/expected.json` gives the
-status each one gets, the facts the graph holds after the run, and the three
-review items with the proposals each one holds
+status each one gets with `alwaysReview` `["new_instance"]`, the facts the
+graph holds after the run, and the three review items with the proposals
+each one holds
 ([`../_samples/README.md`](../_samples/README.md)).
 
 `npm run try` adds the sample ontology (`Room`, `Equipment`,
@@ -148,6 +153,6 @@ of `documents-map`, run it (or LBB's `documents.map`) on the same graph.
 `workflow.test.ts` runs the workflow on a graph in memory with the samples:
 the statuses and facts of the answer key, the evidence of a written fact,
 the notes, one item per instance (the order of its facts and its required
-type), the facts of an accepted item, the settings without `new_instance`
-and with a predicate rule, a second message that changes nothing, and a
-message larger than a turn.
+type), the facts of an accepted item, the default settings (the gate
+decides a new instance), a predicate rule, a second message that changes
+nothing, and a message larger than a turn.

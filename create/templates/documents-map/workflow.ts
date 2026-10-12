@@ -88,7 +88,18 @@ export interface MapState {
   entries: number;
   proposals: number;
   suggestions: number;
+  /** Links that made no proposal and back no filed suggestion. */
+  unmapped: number;
+  /**
+   * The first 50 of them, by document, page and line: each with its `document`, `page`,
+   * `line_id`, `line`, `box`, `span`, `subject`, `object`, `outcome`, `reason`, and the typing
+   * answer (`choice`, `answer`, `probability`, `options`) when it has one.
+   */
+  unmappedLinks: Record<string, unknown>[];
 }
+
+/** Unmapped links the state lists, at most. */
+const UNMAPPED_MAX = 50;
 
 /** Links one message maps at most: one turn holds the answers. The LBB version maps any number. */
 const MAX_LINKS = 1_000;
@@ -155,6 +166,8 @@ interface Trace {
   docs: Map<string, Doc>;
   units: Unit[];
   ends: Map<string, End>;
+  /** The links whose mention has no subject: no entry of the page or the line. */
+  noSubject: { mention: Mention; link: Link }[];
 }
 
 const box = (row: Record<string, string>) => ["x0", "y0", "x1", "y1"].map((k) => num(row[k]));
@@ -186,7 +199,7 @@ async function readTrace(lbb: LbbActivities, message: WorkflowTriggerMessage): P
     );
   const referring = new Set(linked.rows.map((r) => r.doc!));
   const targets = new Set(linked.rows.map((r) => r.entry!));
-  if (!links.size) return { docs: new Map(), units: [], ends: new Map() };
+  if (!links.size) return { docs: new Map(), units: [], ends: new Map(), noSubject: [] };
   const { rows: mentionRows } = await lbb.sparql({
     ...at,
     query: `# documents-map: mentions\n${P}SELECT ?mention ?doc ?span ?line ?text ?page ?x0 ?y0 ?x1 ?y1 WHERE {
@@ -232,6 +245,7 @@ async function readTrace(lbb: LbbActivities, message: WorkflowTriggerMessage): P
   // The subject of each mention's links, per referring document.
   const units: Unit[] = [];
   const ends = new Map<string, End>();
+  const noSubject: Trace["noSubject"] = [];
   const entryEnd = (e: Entry): End => ({
     key: e.iri,
     doc: doc(e.doc),
@@ -269,11 +283,17 @@ async function readTrace(lbb: LbbActivities, message: WorkflowTriggerMessage): P
     );
     mentions.forEach((m, n) => {
       const s = subjects[n];
-      if (!s) return;
+      if (!s) {
+        noSubject.push(...m.links.map((link) => ({ mention: m, link })));
+        return;
+      }
       let end: End;
       if ("entry" in s) {
         const entry = entries.get(s.entry);
-        if (!entry) return;
+        if (!entry) {
+          noSubject.push(...m.links.map((link) => ({ mention: m, link })));
+          return;
+        }
         end = entryEnd(entry);
       } else {
         // A page entry made from the mention of the page's head: its span the identifier, the
@@ -303,7 +323,7 @@ async function readTrace(lbb: LbbActivities, message: WorkflowTriggerMessage): P
       }
     });
   }
-  return { docs, units, ends };
+  return { docs, units, ends, noSubject };
 }
 
 // ---- candidates ------------------------------------------------------------------------------
@@ -521,25 +541,53 @@ interface Grounded {
   noClass?: number;
 }
 
-/** A pattern the ontology lacks: a class, or a property between two classes. */
-interface Lack {
-  kind: "class" | "property";
-  subjectClass?: string;
-  objectClass?: string;
-  document: string;
-  example: Record<string, unknown>;
-  p: number;
-}
-
 /** The id of a question about an end or a link: from its key, so it stays the same from run to run. */
 const qid = (key: string) => map.hash(key).slice(0, 12);
+
+/** Where a link is: its mention on its line and the two ends it names (a review item's sample shape). */
+const mentionSample = (doc: Doc, mention: Mention, subject: string, object: string) => ({
+  kind: "link",
+  document: doc.name,
+  page: mention.page + 1,
+  line_id: mention.line,
+  line: map.clip(mention.text, 200),
+  box: mention.box,
+  span: mention.span,
+  subject,
+  object,
+});
+
+/** Why an end has no instance, or no class, in words. */
+function endState(id: string, g: Grounded | undefined): string {
+  if (!g) return `${id} was not grounded`;
+  if (g.kind === "unanswered") return `${id} got no grounding answer`;
+  if (g.kind === "none")
+    return `the decision model found that ${id} is no thing of the graph (none, ${g.p.toFixed(2)})`;
+  if (g.kind === "new" && !g.class) {
+    if (g.noClass === undefined) return `${id} has no class: its class question got no answer`;
+    return g.noClass >= map.LACK_SUGGEST_AT
+      ? `${id} has no class: no class of the ontology fits it (${g.noClass.toFixed(2)}), and it waits for the class suggestion`
+      : `${id} has no class: no class fits it (${g.noClass.toFixed(2)}), below ${map.LACK_SUGGEST_AT}`;
+  }
+  if (g.kind === "existing" && !g.class)
+    return `${id} is an instance with no class of the ontology`;
+  return `${id} is grounded`;
+}
 
 /** The workflow, for a `WorkflowWorker`. `lbb` is `lbbActivities(client)`, or a mock in a test. */
 export function createWorkflow(lbb: LbbActivities, settings: Settings = defaults) {
   return triggeredWorkflow<MapState>({
     name: workflowType.workflow_type,
     version: workflowType.version,
-    initialState: { runs: 0, links: 0, entries: 0, proposals: 0, suggestions: 0 },
+    initialState: {
+      runs: 0,
+      links: 0,
+      entries: 0,
+      proposals: 0,
+      suggestions: 0,
+      unmapped: 0,
+      unmappedLinks: [],
+    },
     async onInstances(ctx, message, state) {
       const proposedBy = `workflow/${message.workflow}`;
       const steps = { used: 0 };
@@ -665,11 +713,37 @@ export function createWorkflow(lbb: LbbActivities, settings: Settings = defaults
         declared?: string;
         id: string;
       }[] = [];
+      // The links that make no proposal and back no filed suggestion stay in the state.
+      const unmapped: Record<string, unknown>[] = trace.noSubject.map(({ mention, link }) => ({
+        ...mentionSample(
+          trace.docs.get(mention.doc)!,
+          mention,
+          "",
+          trace.ends.get(link.entry)?.view.identifier ?? "",
+        ),
+        outcome: "no_subject",
+        reason: "no entry of its page or line is the subject of the link",
+      }));
       for (const unit of trace.units) {
         const [subject, object] = [instanceOf(unit.subject), instanceOf(unit.link.entry)];
-        if (!subject?.class || !object?.class || subject.iri === object.iri) continue;
-        const id = qid(`${unit.mention.iri}\u0000${unit.link.relation}\u0000${unit.link.entry}`);
         const doc = trace.docs.get(unit.mention.doc)!;
+        const [s, o] = [trace.ends.get(unit.subject)!, trace.ends.get(unit.link.entry)!];
+        if (!subject || !object || !subject.class || !object.class || subject.iri === object.iri) {
+          const why = (end: End) => endState(end.view.identifier, grounded.get(end.key));
+          const [outcome, reason] =
+            !subject || !object
+              ? ["ungrounded", why(subject ? o : s)]
+              : subject.iri === object.iri
+                ? ["same_instance", `its two ends are one instance, ${map.short(subject)}`]
+                : ["unclassed", why(subject.class ? o : s)];
+          unmapped.push({
+            ...mentionSample(doc, unit.mention, s.view.identifier, o.view.identifier),
+            outcome,
+            reason,
+          });
+          continue;
+        }
+        const id = qid(`${unit.mention.iri}\u0000${unit.link.relation}\u0000${unit.link.entry}`);
         const [up, down] = [ontology.ancestors(subject.class), ontology.ancestors(object.class)];
         const declared = settings.mappings.find(
           (m) =>
@@ -741,18 +815,34 @@ export function createWorkflow(lbb: LbbActivities, settings: Settings = defaults
 
       // 3. The proposals and the patterns the ontology lacks.
       const proposals = new Map<string, map.Proposal>();
-      const lacks: Lack[] = [];
+      const lacks: map.Lack[] = [];
+      const classed: map.ClassedEntry[] = [];
       let links = 0;
       for (const t of typed) {
         const { unit, subject, object } = t;
         const answer: map.Kept | undefined = t.declared
           ? ["declared", 1, {}]
           : typeAnswers[`t${t.id}`];
-        if (!answer) continue;
+        const doc = trace.docs.get(unit.mention.doc)!;
+        const sample = mentionSample(doc, unit.mention, map.short(subject), map.short(object));
+        if (!answer) {
+          unmapped.push({
+            ...sample,
+            outcome: "unanswered",
+            reason: "its typing question got no answer",
+          });
+          continue;
+        }
         const [choice, p, options] = answer;
         const option = t.options.find((o) => o.key === choice);
         const property = t.declared ?? option?.property;
-        const doc = trace.docs.get(unit.mention.doc)!;
+        const answered = {
+          ...sample,
+          choice,
+          answer: map.answerWords(choice, property),
+          probability: p,
+          options,
+        };
         const evidence = {
           mention: unit.mention.iri,
           document: doc.name,
@@ -797,22 +887,37 @@ export function createWorkflow(lbb: LbbActivities, settings: Settings = defaults
             confidence,
             evidence,
           });
-        } else if (choice === map.MISSING_PROPERTY && p >= map.LACK_SUGGEST_AT)
+        } else if (choice === map.MISSING_PROPERTY && p >= map.LACK_SUGGEST_AT) {
+          // The words of the two ends and of the object's document name the ends, not the relation.
+          const skip = new Set(
+            [trace.ends.get(unit.link.entry)!.doc.name, subject, object].flatMap((end) =>
+              typeof end === "string"
+                ? [...map.nameWords(end)]
+                : [end.identifier ?? "", end.label, end.description ?? ""].flatMap((text) => [
+                    ...map.nameWords(text),
+                  ]),
+            ),
+          );
           lacks.push({
             kind: "property",
             subjectClass: subject.class!,
             objectClass: object.class!,
             document: doc.name,
-            example: {
-              document: doc.name,
-              page: unit.mention.page + 1,
-              line_id: unit.mention.line,
-              line: unit.mention.text,
-              subject: map.short(subject),
-              object: map.short(object),
-              probability: p,
-            },
+            sample: answered,
             p,
+            options,
+            offered: Object.fromEntries(t.options.map((o) => [o.key, o.property])),
+            phrase: map.spanPhrase(unit.mention.text, unit.mention.span, skip),
+            quote: `p. ${unit.mention.page + 1}, "${map.clip(unit.mention.text, 120)}" (${map.short(subject)} → ${map.short(object)}, ${p.toFixed(2)})`,
+          });
+        } else
+          unmapped.push({
+            ...answered,
+            outcome: choice === map.MISSING_PROPERTY ? "lacks" : "no_fact",
+            reason:
+              choice === map.MISSING_PROPERTY
+                ? `the decision model chose a property the ontology lacks at ${p.toFixed(2)}, below ${map.LACK_SUGGEST_AT}: no suggestion`
+                : "the decision model found that the line states no fact about the two",
           });
       }
       // The groundings' own proposals: DENOTES, and a new instance's type, label and identifier.
@@ -846,6 +951,13 @@ export function createWorkflow(lbb: LbbActivities, settings: Settings = defaults
         else if (g.kind === "new" && g.class) {
           const label = map.newInstanceLabel(id, e.view.description);
           const literal = { datatype: map.XSD_STRING };
+          classed.push({
+            document: e.doc.name,
+            shape: map.codeShape(id),
+            name: label,
+            classLabel: ontology.classLabel(g.class),
+            p: g.classP ?? 0,
+          });
           for (const proposal of [
             {
               statement: { subject: g.iri!, predicate: map.RDF_TYPE, object: g.class },
@@ -878,19 +990,33 @@ export function createWorkflow(lbb: LbbActivities, settings: Settings = defaults
             },
           ])
             map.addProposal(proposals, proposedBy, { ...proposal, evidence });
-        } else if (g.kind === "new" && (g.noClass ?? 0) >= map.LACK_SUGGEST_AT)
+        } else if (g.kind === "new" && (g.noClass ?? 0) >= map.LACK_SUGGEST_AT) {
+          // No class fits: the entry proposes nothing (no type, label, identifier or trace) until
+          // a class exists; it backs a class suggestion.
+          const name = map.newInstanceLabel(id, e.view.description);
           lacks.push({
             kind: "class",
             document: e.doc.name,
-            example: {
+            sample: {
+              kind: "entry",
               document: e.doc.name,
               page: e.view.page,
               line_id: e.line,
+              line: map.clip(e.view.context || `${id} ${e.view.description}`, 200),
+              box: e.box,
               identifier: id,
-              description: e.view.description,
+              description: map.clip(e.view.description, 160),
+              choice: map.NO_CLASS,
+              answer: map.answerWords(map.NO_CLASS),
+              probability: g.noClass!,
+              options: g.classOptions ?? {},
             },
             p: g.noClass!,
+            options: g.classOptions ?? {},
+            quote: `${map.clip(name, 80)} (p. ${e.view.page}, ${g.noClass!.toFixed(2)})`,
+            entry: { name, shape: map.codeShape(id) },
           });
+        }
       }
 
       // Ontology suggestions, one per pattern; then the writes, in parts of 900 proposals.
@@ -899,8 +1025,14 @@ export function createWorkflow(lbb: LbbActivities, settings: Settings = defaults
         throw new WorkflowError(
           `${current.length} proposals need more steps than one turn of the template holds. Use the LBB-run documents.map.`,
         );
-      const suggestions = await ctx.step("lacks", () =>
-        suggest(lbb, message.workflow, ontology, lacks),
+      const filed = await ctx.step("lacks", () =>
+        suggest(lbb, message.workflow, ontology, lacks, classed),
+      );
+      const left = [...unmapped, ...filed.unmapped].sort(
+        (a, b) =>
+          String(a.document).localeCompare(String(b.document)) ||
+          Number(a.page) - Number(b.page) ||
+          String(a.line_id).localeCompare(String(b.line_id)),
       );
       // The proposals: write what changed, retract what this workflow no longer proposes.
       const existing = proposalReader(lbb, proposedBy);
@@ -937,7 +1069,9 @@ export function createWorkflow(lbb: LbbActivities, settings: Settings = defaults
           entries: [...grounded.values()].filter((g) => g.kind === "existing" || g.kind === "new")
             .length,
           proposals: proposals.size,
-          suggestions,
+          suggestions: filed.suggestions,
+          unmapped: left.length,
+          unmappedLinks: left.slice(0, UNMAPPED_MAX),
         },
       };
     },
@@ -983,59 +1117,56 @@ function proposalReader(lbb: LbbActivities, proposedBy: string) {
   };
 }
 
-/** File one ontology suggestion per pattern the ontology lacks. Returns how many. */
+/**
+ * File one ontology suggestion per pattern the ontology lacks (`map.relationDraft`,
+ * `map.classDraft`). Returns how many it filed, and the lines no suggestion backs as unmapped
+ * links.
+ */
 async function suggest(
   lbb: LbbActivities,
   workflow: string,
   ontology: map.MapOntology,
-  lacks: Lack[],
-): Promise<number> {
-  const patterns = new Map<string, Lack[]>();
+  lacks: map.Lack[],
+  classed: map.ClassedEntry[],
+): Promise<{ suggestions: number; unmapped: Record<string, unknown>[] }> {
+  const patterns = new Map<string, map.Lack[]>();
   for (const lack of lacks) {
     const key = [lack.kind, lack.subjectClass ?? "", lack.objectClass ?? "", lack.document].join(
       "\u0000",
     );
     patterns.set(key, [...(patterns.get(key) ?? []), lack]);
   }
-  const name = (iri: string) => ontology.classes.get(iri)?.name ?? map.localName(iri);
-  for (const [key, members] of patterns) {
-    const [first] = members;
-    const samples = [...members]
-      .sort((a, b) => b.p - a.p)
-      .slice(0, 10)
-      .map((l) => l.example);
-    const filed =
-      first!.kind === "property"
-        ? (() => {
-            const [subject, object] = [name(first!.subjectClass!), name(first!.objectClass!)];
-            const relation = map.lackingRelationName(
-              object,
-              new Set(ontology.properties.map((p) => p.name.toLowerCase())),
-            );
-            return {
-              title: `Add a relation from ${subject} to ${object}`,
-              rationale: `In ${first!.document}, ${members.length} lines relate an instance of ${subject} to one of ${object}, and the decision model found that no property of the ontology states that relation. Name the relation (proposed: ${relation}) and accept it: the next run maps these links.`,
-              change: [
-                { op: "add_relation" as const, name: relation, domain: [subject], range: [object] },
-              ],
-            };
-          })()
-        : (() => {
-            const cls = map.lackingClassName(first!.document);
-            return {
-              title: `Add a class for entries of ${first!.document}`,
-              rationale: `${members.length} entries of ${first!.document} are new instances that no class of the ontology fits, as the decision model found. Name the class (proposed: ${cls}) and accept it: the next run maps them.`,
-              change: [{ op: "add_entity_type" as const, name: cls }],
-            };
-          })();
+  let suggestions = 0;
+  const unmapped: Record<string, unknown>[] = [];
+  for (const [key, list] of patterns) {
+    const members = [...list].sort(
+      (a, b) => b.p - a.p || (a.quote < b.quote ? -1 : a.quote > b.quote ? 1 : 0),
+    );
+    const first = members[0]!;
+    let draft: map.SuggestionDraft;
+    if (first.kind === "property") {
+      const drafted = map.relationDraft(
+        ontology,
+        first.subjectClass!,
+        first.objectClass!,
+        first.document,
+        members,
+      );
+      if ("unmapped" in drafted) {
+        unmapped.push(...drafted.unmapped);
+        continue;
+      }
+      draft = drafted.draft;
+    } else draft = map.classDraft(ontology, first.document, members, classed);
     await lbb.review({
       workflow,
       key: `starter:${workflow}:lack:${map.hash(key).slice(0, 24)}`,
-      title: filed.title.slice(0, 200),
-      rationale: filed.rationale.slice(0, 4_000),
-      change: filed.change,
-      evidence: { records: members.length, samples },
+      title: draft.title.slice(0, 200),
+      rationale: draft.rationale.slice(0, 4_000),
+      change: draft.change,
+      evidence: { records: draft.records, samples: draft.samples },
     });
+    suggestions += 1;
   }
-  return patterns.size;
+  return { suggestions, unmapped };
 }
