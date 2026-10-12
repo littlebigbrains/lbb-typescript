@@ -2406,6 +2406,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/ontology/fit-text": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Run the fit once on a text: pasted `text`, or the parsed pages of an uploaded file (`document`, its SHA-256; `pages` 1-based and inclusive). The same pipeline as a fit source reads it: chunks of 4,500 characters (at most 16, about 60,000 characters; `truncated` past them), the reasoning model's proposals with verbatim quotes, the quote check, the check against the current ontology, and the decision model's support score. The kept proposals are filed as suggestions under `fit:<name>/…`, with the quote and, for a file, the page and line as evidence; `dry_run: true` files nothing. 400 `fit_text_invalid`, 404 `file_not_found`, 409 `document_not_parsed`, 429 `fit_budget_exceeded`, 503 `fit_models_unavailable` */
+        post: operations["post_v1_ontology_fit_text"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/ontology/resolve": {
         parameters: {
             query?: never;
@@ -6815,6 +6832,90 @@ export interface components {
         };
         /** @enum {string} */
         FitSourceStepAction: "idle" | "backfill" | "incremental";
+        /** @description Pages of a document, 1-based and inclusive. */
+        FitTextPages: {
+            /** Format: int32 */
+            from: number;
+            /** Format: int32 */
+            to: number;
+        };
+        /**
+         * @description Run the fit once on a text (`POST /v1/ontology/fit-text`): pasted text,
+         *     or the parsed pages of an uploaded file. Exactly one of `text` and
+         *     `document`.
+         */
+        FitTextRequest: {
+            /** @description A sentence about the text, for the models. */
+            context?: string | null;
+            /** @description The SHA-256 of an uploaded file whose pages `documents.parse` parsed. */
+            document?: string | null;
+            /** @description Run the models and the checks, and file nothing. */
+            dry_run?: boolean;
+            /**
+             * @description The source name in the suggestion keys (`fit:<name>/…`),
+             *     `[a-z0-9][a-z0-9-]{0,62}`. Default `text-<first 8 hex of the blake3
+             *     of the text, or of the file's SHA-256>`.
+             */
+            name?: string | null;
+            pages?: null | components["schemas"]["FitTextPages"];
+            /** @description The pasted text. */
+            text?: string | null;
+        };
+        FitTextResponse: {
+            /**
+             * Format: int64
+             * @description Characters of text the models read.
+             */
+            chars: number;
+            /**
+             * Format: int64
+             * @description Chunks the text was cut into (one reasoning-model call each).
+             */
+            chunks: number;
+            /**
+             * Format: int64
+             * @description Chunks the reasoning model gave no answer for (a refusal, an error,
+             *     or the 120 s limit).
+             */
+            failed_chunks?: number;
+            /**
+             * Format: int64
+             * @description Suggestions filed new; 0 with `dry_run`.
+             */
+            filed: number;
+            name: string;
+            pages?: null | components["schemas"]["FitTextPages"];
+            /**
+             * @description Every proposal, the dropped ones included, with what the checks made
+             *     of it.
+             */
+            proposals: components["schemas"]["FitProposal"][];
+            spend: components["schemas"]["FitTextSpend"];
+            /**
+             * @description The call did not read all of the text: past 60,000 characters, or
+             *     past 50 pages.
+             */
+            truncated: boolean;
+            /**
+             * Format: int64
+             * @description Suggestions that got this text's evidence (open ones, and dismissed
+             *     ones it reopened); 0 with `dry_run`.
+             */
+            updated: number;
+        };
+        /** @description The spend of one fit-text call. */
+        FitTextSpend: {
+            /**
+             * Format: int64
+             * @description Model calls (reasoning and decision).
+             */
+            calls: number;
+            /**
+             * Format: int64
+             * @description In millionths of a US dollar.
+             */
+            cost_micro_usd: number;
+        };
         /**
          * @description A bare JSON value in the flat `{ field: value }` property shape: a boolean,
          *     an integer, a number, a string, or an array of integers or of strings. The
@@ -38397,6 +38498,146 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["FitSourceRefreshResponse"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Rate limit exceeded */
+            429: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Service unavailable */
+            503: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+        };
+    };
+    post_v1_ontology_fit_text: {
+        parameters: {
+            query?: {
+                /** @description Graph name (default `main`) */
+                graph?: string;
+            };
+            header?: {
+                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                "Lbb-Version"?: string;
+                /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
+                "Idempotency-Key"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FitTextRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FitTextResponse"];
                 };
             };
             /** @description Bad request */
