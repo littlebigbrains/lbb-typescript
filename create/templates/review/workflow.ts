@@ -7,8 +7,8 @@
 //
 // - refused when the graph cannot hold the statement (an unknown predicate, a value of the wrong
 //   type, a new instance without its class, a domain or a range the ends do not fit);
-// - to a person when a rule of `alwaysReview` names it (`new_instance`, the default, or a
-//   predicate), when it would replace another writer's value or name, or when its confidence is
+// - to a person when a rule of `alwaysReview` names it (`new_instance` or a predicate; by default
+//   no rule), when it would replace another writer's value or name, or when its confidence is
 //   below the gate;
 // - written otherwise: the statement, with the proposal as its evidence (`writeOwned`).
 //
@@ -33,7 +33,7 @@ export interface Settings {
   className: string;
   /** A proposal below this confidence goes to a person. */
   gate: number;
-  /** What goes to a person whatever its confidence: `new_instance` (a statement about an instance the graph does not have yet) and predicate IRIs. */
+  /** What goes to a person whatever its confidence: `new_instance` (a statement about an instance the graph does not have yet) and predicate IRIs. Empty: the gate decides everything. */
   alwaysReview: string[];
 }
 
@@ -41,7 +41,7 @@ export interface Settings {
 export const defaults: Settings = {
   className: "FactProposal",
   gate: 0.8,
-  alwaysReview: [review.NEW_INSTANCE],
+  alwaysReview: [],
 };
 
 /** The workflow type and version the triggered workflow names. */

@@ -3,7 +3,7 @@
     "The input of the review samples: a small graph of the invented school building (two rooms and their equipment) and the fact proposals a proposer makes about it. All text is invented.",
     "An instance is named by its id; samples.ts commits it with its class, name and identifier, and reads its IRI back. new names an instance the graph does not have yet: its IRI is minted from its id.",
     "A predicate is a relation or a property of the ontology by name, rdf:type, rdfs:label, or an IRI as written. The object of rdf:type is a class name, of a relation an instance id, else a literal with its datatype.",
-    "expected.json gives the status each proposal gets with the default settings: gate 0.8, alwaysReview [\"new_instance\"]."
+    "expected.json gives the status each proposal gets with the settings of the samples: gate 0.8, alwaysReview [\"new_instance\"] (the default alwaysReview is [])."
   ],
   "instances": [
     { "id": "room-012", "class": "Room", "name": "Raum 0.12 Klassenraum", "identifier": "0.12" },

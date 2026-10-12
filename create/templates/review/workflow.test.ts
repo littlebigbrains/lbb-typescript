@@ -32,6 +32,8 @@ interface Expected {
   items: { instance: string; title: string; facts: string[] }[];
 }
 const EXPECTED = readJson<Expected>(join(SAMPLES, "expected.json"));
+/** The settings of the answer key: every statement about a new instance goes to a person. */
+const SAMPLE_SETTINGS: Settings = { ...defaults, alwaysReview: [review.NEW_INSTANCE] };
 
 /** The ontology view `GET /v1/ontology` answers for evolve operations. */
 function viewOf(ops: Schemas["OntologyEvolveOp"][]): Schemas["OntologyView"] {
@@ -168,7 +170,7 @@ const statusOf = (graph: MemoryGraph, iri: string) =>
 test("the samples get the statuses and the facts of the answer key", async () => {
   const { lbb, iris, proposals } = sampleGraph();
   const { state, turns } = await runMessage(
-    createWorkflow(lbb),
+    createWorkflow(lbb, SAMPLE_SETTINGS),
     triggerMessage("review", [...proposals.values()]),
   );
 
@@ -192,7 +194,10 @@ test("the samples get the statuses and the facts of the answer key", async () =>
 
 test("a written fact names its proposal as evidence, a refusal and a review say why", async () => {
   const { lbb, iris, proposals } = sampleGraph();
-  await runMessage(createWorkflow(lbb), triggerMessage("review", [...proposals.values()]));
+  await runMessage(
+    createWorkflow(lbb, SAMPLE_SETTINGS),
+    triggerMessage("review", [...proposals.values()]),
+  );
   const edge = lbb.graph
     .edgesOf("HAS_EQUIPMENT")
     .find((e) => e.source === iris.get("room-012") && e.target === iris.get("t1"))!;
@@ -217,7 +222,10 @@ test("a written fact names its proposal as evidence, a refusal and a review say 
 
 test("one item per instance: a new instance's facts in order, its type required", async () => {
   const { lbb, proposals } = sampleGraph();
-  await runMessage(createWorkflow(lbb), triggerMessage("review", [...proposals.values()]));
+  await runMessage(
+    createWorkflow(lbb, SAMPLE_SETTINGS),
+    triggerMessage("review", [...proposals.values()]),
+  );
   const items = [...lbb.reviews.values()];
   const expected = EXPECTED.items.map((item) => item.title).sort();
   assert.deepEqual(items.map((item) => item.title).sort(), expected);
@@ -247,7 +255,10 @@ test("one item per instance: a new instance's facts in order, its type required"
 
 test("accepting a review item writes its statement and the proposal's accepted", async () => {
   const { lbb, iris, proposals } = sampleGraph();
-  await runMessage(createWorkflow(lbb), triggerMessage("review", [...proposals.values()]));
+  await runMessage(
+    createWorkflow(lbb, SAMPLE_SETTINGS),
+    triggerMessage("review", [...proposals.values()]),
+  );
   // A person accepts every item: the server commits each item's facts.
   for (const item of lbb.reviews.values())
     lbb.graph.apply({
@@ -282,13 +293,10 @@ test("accepting a review item writes its statement and the proposal's accepted",
   );
 });
 
-test("without the new_instance rule a confident new instance is written, typed and named", async () => {
+test("by default the gate decides a new instance: written at the gate, an item below it", async () => {
+  assert.deepEqual(defaults.alwaysReview, []);
   const { lbb, iris, proposals } = sampleGraph();
-  const settings: Settings = { ...defaults, alwaysReview: [] };
-  await runMessage(
-    createWorkflow(lbb, settings),
-    triggerMessage("review", [...proposals.values()]),
-  );
+  await runMessage(createWorkflow(lbb), triggerMessage("review", [...proposals.values()]));
   const m7 = lbb.graph.entities.get(
     statementOf(
       DATA.proposals.find((p) => p.id === "p7")!,
@@ -299,6 +307,31 @@ test("without the new_instance rule a confident new instance is written, typed a
   assert.equal(m7.name, "M 7 Medienwagen");
   for (const id of ["p7", "p8", "p9"])
     assert.equal(statusOf(lbb.graph, proposals.get(id)!), "written", id);
+  const titles = [...lbb.reviews.values()].map((item) => item.title);
+  assert.ok(!titles.some((title) => title.includes("M 7")), titles.join(", "));
+  assert.equal(lbb.reviews.size, EXPECTED.review_items - 1);
+
+  // The same new instance below the gate goes to a person, in one item.
+  const unsure: SampleProposals = {
+    ...DATA,
+    proposals: DATA.proposals.map((p) =>
+      ["p7", "p8", "p9"].includes(p.id) ? { ...p, confidence: 0.5 } : p,
+    ),
+  };
+  const below = sampleGraph(unsure);
+  await runMessage(
+    createWorkflow(below.lbb),
+    triggerMessage("review", [...below.proposals.values()]),
+  );
+  for (const id of ["p7", "p8", "p9"])
+    assert.equal(statusOf(below.lbb.graph, below.proposals.get(id)!), "in_review", id);
+  const item = [...below.lbb.reviews.values()].find(
+    (r) => r.title === "New Equipment M 7 Medienwagen",
+  )!;
+  assert.equal((item.evidence!.samples as unknown[]).length, 3);
+  const note = below.lbb.graph.entities.get(below.proposals.get("p7")!)!.properties
+    .review_note as string;
+  assert.match(note, /below the gate 0\.8/);
 });
 
 test("a predicate rule sends its statements to a person whatever their confidence", async () => {

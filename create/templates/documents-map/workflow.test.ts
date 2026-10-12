@@ -301,7 +301,15 @@ test("the samples give the proposals of the answer key and none other", async ()
   for (const out of EXPECTED.leave_out)
     assert.ok(!all.some((p) => p.text.includes(` ${out.identifier}`)), out.identifier);
   assert.equal(all.length, EXPECTED.facts.length + 4 * EXPECTED.instances.length);
-  assert.deepEqual(state, { runs: 1, links: 15, entries: 15, proposals: 75, suggestions: 0 });
+  assert.deepEqual(state, {
+    runs: 1,
+    links: 15,
+    entries: 15,
+    proposals: 75,
+    suggestions: 0,
+    unmapped: 0,
+    unmappedLinks: [],
+  });
   assert.equal(lbb.reviews.size, 0);
   assert.equal(turns.length, 1);
   assert.ok(turns[0]!.keys.length <= 64);
@@ -420,10 +428,45 @@ test("a class or a property the ontology lacks becomes one ontology suggestion p
   const { state } = await runMessage(createWorkflow(first), message());
   assert.equal(state.suggestions, 1);
   const [item] = [...first.reviews.values()];
-  assert.equal(item!.title, "Add a class for entries of baubeschreibung.pdf");
+  // The title and the rationale name the entries, with what the model answered.
+  assert.ok(
+    item!.title.startsWith("Add a class for 2 entries of baubeschreibung.pdf: 3.1 Bodenbeläge"),
+    item!.title,
+  );
+  assert.ok(item!.title.includes(", 3.2 Sanitärobjekte"), item!.title);
+  assert.ok(
+    item!.rationale!.startsWith(
+      "The decision model found that no class of the ontology fits 2 entries of baubeschreibung.pdf (no class fits, up to 0.80): 3.1 Bodenbeläge",
+    ),
+    item!.rationale,
+  );
+  assert.ok(item!.rationale!.includes("The classes the model weighed got at most:"));
   assert.deepEqual(item!.change, [{ op: "add_entity_type", name: "BaubeschreibungItem" }]);
   assert.equal(item!.evidence!.records, 2);
   assert.equal(item!.workflow, WORKFLOW);
+  // Each sample is where its entry is, with the answer.
+  const [sample] = item!.evidence!.samples as Record<string, unknown>[];
+  assert.equal(sample!.kind, "entry");
+  assert.equal(sample!.document, "baubeschreibung.pdf");
+  assert.equal(sample!.page, 1);
+  assert.equal(sample!.answer, "no class fits");
+  assert.equal(sample!.probability, 0.8);
+  assert.equal((sample!.box as number[]).length, 4);
+  // An entry no class fits proposes nothing: no type, label, identifier or trace. Its links
+  // stay in the state as unmapped, with the reason.
+  assert.ok(
+    !first.graph
+      .ofType(map.FACT_PROPOSAL)
+      .some(
+        (e) =>
+          e.properties.fact_subject === minted("baubeschreibung.pdf", "3.1") ||
+          e.properties.fact_object === minted("baubeschreibung.pdf", "3.1"),
+      ),
+  );
+  const waiting = state.unmappedLinks.filter((l) => l.outcome === "unclassed");
+  assert.deepEqual(waiting.map((l) => l.object).sort(), ["3.1", "3.2"]);
+  assert.ok(String(waiting[0]!.reason).includes("waits for the class suggestion"));
+  assert.equal(waiting[0]!.document, "raumblaetter.pdf");
   // SpecSection without SPECIFIED_IN: no property relates a room to a section.
   const noRelation = sampleOntology.filter((op) => !("name" in op) || op.name !== "SPECIFIED_IN");
   const second = new MockActivities(
@@ -431,11 +474,108 @@ test("a class or a property the ontology lacks becomes one ontology suggestion p
   );
   await runMessage(createWorkflow(second), message());
   const [relation] = [...second.reviews.values()];
-  assert.equal(relation!.title, "Add a relation from Room to SpecSection");
+  // Named from the words next to the span: "… siehe Baubeschreibung Kap. 3.1".
+  assert.equal(relation!.title, "Add a relation from Room to SpecSection: SIEHE_KAP");
   assert.deepEqual(relation!.change, [
-    { op: "add_relation", name: "HAS_SPEC_SECTION", domain: ["Room"], range: ["SpecSection"] },
+    { op: "add_relation", name: "SIEHE_KAP", domain: ["Room"], range: ["SpecSection"] },
   ]);
+  assert.ok(
+    relation!.rationale!.includes(
+      'p. 1, "Bodenbelag Linoleum, siehe Baubeschreibung Kap. 3.1" (0.12 → 3.1, 0.80)',
+    ),
+    relation!.rationale,
+  );
+  assert.ok(!relation!.rationale!.includes("The ontology has"), relation!.rationale);
+  const [line] = relation!.evidence!.samples as Record<string, unknown>[];
+  assert.equal(line!.kind, "link");
+  assert.equal(line!.answer, "a property the ontology lacks");
+  assert.equal(line!.document, "raumblaetter.pdf");
   assert.ok(!factsOf(second.graph).some((f) => f.includes("3.1") || f.includes("3.2")));
+});
+
+test("a relation an existing relation fits needs 2 lines or one at 0.8, and says why it does not fit", () => {
+  const ontology = map.MapOntology.fromView(SAMPLE_VIEW);
+  const [room, equipment] = [map.classIri("Room"), map.classIri("Equipment")];
+  const has = map.relationIri("HAS_EQUIPMENT");
+  const line = "S1.1 Waschtisch, 1 Stück, darüber Spiegel S 2.1";
+  const lack = (p: number, offered = true): map.Lack => ({
+    kind: "property",
+    subjectClass: room,
+    objectClass: equipment,
+    document: "raumblaetter.pdf",
+    sample: { line, probability: p },
+    p,
+    options: { HAS_EQUIPMENT: (1 - p) * 0.8, missing_property: p, no_fact: (1 - p) * 0.2 },
+    offered: offered ? { HAS_EQUIPMENT: has } : {},
+    phrase: map.spanPhrase(line, "S 2.1", map.nameWords("S 2.1 Spiegel")),
+    quote: `p. 1, "${line}" (0.12 → S 2.1, ${p.toFixed(2)})`,
+  });
+  const draft = (members: map.Lack[]) =>
+    map.relationDraft(ontology, room, equipment, "raumblaetter.pdf", members);
+  // One line at 0.59: nothing is filed; the line is unmapped, with the reason.
+  const one = draft([lack(0.59)]);
+  assert.ok("unmapped" in one);
+  assert.equal(one.unmapped[0]!.outcome, "lacks");
+  assert.ok(String(one.unmapped[0]!.reason).includes("HAS_EQUIPMENT fits Room → Equipment"));
+  // One line at 0.85, or two lines: filed, named from the line, with the reason from the answer.
+  const sure = draft([lack(0.85)]);
+  assert.ok("draft" in sure);
+  assert.equal(sure.draft.title, "Add a relation from Room to Equipment: STUECK_DARUEBER");
+  assert.ok(
+    sure.draft.rationale.includes(
+      "The ontology has HAS_EQUIPMENT (has equipment), which fits Room → Equipment. On these lines the model gave it 0.12 at most",
+    ),
+    sure.draft.rationale,
+  );
+  assert.ok("draft" in draft([lack(0.6), lack(0.6)]));
+  // A line whose question did not offer HAS_EQUIPMENT does not back it.
+  const unweighed = draft([lack(0.6), lack(0.95, false)]);
+  assert.ok("unmapped" in unweighed);
+  assert.ok(String(unweighed.unmapped[1]!.reason).includes("did not offer HAS_EQUIPMENT"));
+});
+
+test("a class suggestion names the entries of its document written alike that got a class", () => {
+  const ontology = map.MapOntology.fromView(SAMPLE_VIEW);
+  const entry = (id: string, description: string, p: number): map.Lack => ({
+    kind: "class",
+    document: "baubeschreibung.pdf",
+    sample: { identifier: id },
+    p,
+    options: { Equipment: 0.2, Room: 0.01, no_class: p },
+    quote: `${id} ${description} (p. 1, ${p.toFixed(2)})`,
+    entry: { name: map.newInstanceLabel(id, description), shape: map.codeShape(id) },
+  });
+  const classed = (document: string, id: string, description: string, p: number) => ({
+    document,
+    shape: map.codeShape(id),
+    name: map.newInstanceLabel(id, description),
+    classLabel: "Equipment",
+    p,
+  });
+  const draft = map.classDraft(
+    ontology,
+    "baubeschreibung.pdf",
+    [entry("3.1", "Bodenbeläge", 0.69)],
+    [
+      classed("baubeschreibung.pdf", "3.2", "Sanitärobjekte", 0.89),
+      classed("baubeschreibung.pdf", "3.3", "Beleuchtung", 0.92),
+      classed("baubeschreibung.pdf", "S 1.1", "Waschtisch", 0.95),
+      classed("raumblaetter.pdf", "3.4", "Türen", 0.9),
+    ],
+  );
+  assert.equal(draft.title, "Add a class for 3.1 Bodenbeläge");
+  assert.ok(
+    draft.rationale.includes(
+      "got a class of the ontology: 3.2 Sanitärobjekte (Equipment, 0.89), 3.3 Beleuchtung (Equipment, 0.92). When they belong to the new class too, dismiss their types in the review.",
+    ),
+    draft.rationale,
+  );
+  assert.ok(
+    draft.rationale.includes(
+      "The classes the model weighed got at most: Equipment 0.20, Room 0.01.",
+    ),
+  );
+  assert.ok(!draft.rationale.includes("Waschtisch") && !draft.rationale.includes("Türen"));
 });
 
 test("a withdrawn link withdraws the proposals that only it made", async () => {
@@ -590,9 +730,23 @@ test("names, keys and shapes", () => {
   assert.equal(map.pageEntryDescription("0.12", "Raum 0.12 Klassenraum"), "Raum Klassenraum");
   assert.equal(map.pageEntryDescription("0.12", "0.12"), "0.12");
   assert.equal(map.lackingRelationName("EquipmentType", new Set()), "HAS_EQUIPMENT_TYPE");
+  // A taken name gets a number, whatever its case and separators.
   assert.equal(
-    map.lackingRelationName("Equipment", new Set(["has_equipment", "relates_to_equipment"])),
-    "RELATES_TO_EQUIPMENT_2",
+    map.lackingRelationName("Equipment", new Set([map.nameKey("hasEquipment")])),
+    "HAS_EQUIPMENT_2",
   );
   assert.equal(map.lackingClassName("B18_Equipment-schedule_main-site.pdf"), "EquipmentItem");
+  assert.equal(
+    map.lackingClassName("B18_Equipment.pdf", new Set([map.nameKey("Equipment item")])),
+    "EquipmentItem2",
+  );
+  // A lacking relation is named from the words next to its span.
+  const skip = map.nameWords("3.2 Sanitärobjekte baubeschreibung.pdf");
+  const kap = map.spanPhrase("Sanitärobjekte siehe Baubeschreibung Kap. 3.2", "3.2", skip);
+  assert.deepEqual(kap, ["siehe", "Kap"]);
+  assert.deepEqual(map.spanPhrase("3.2 gilt für alle Räume", "3.2", new Set()), ["gilt", "für"]);
+  assert.deepEqual(map.spanPhrase("S 2.1", "S 2.1", new Set()), []);
+  assert.equal(map.relationNameFromLines([kap, kap, ["darüber"]], new Set()), "SIEHE_KAP");
+  assert.equal(map.relationNameFromLines([["darüber"]], new Set()), "DARUEBER");
+  assert.equal(map.relationNameFromLines([[]], new Set()), undefined);
 });

@@ -1,6 +1,6 @@
 {
   "about": [
-    "The answer key for the review samples: the status each proposal of proposals.json gets with the default settings (gate 0.8, alwaysReview [\"new_instance\"]), and why.",
+    "The answer key for the review samples: the status each proposal of proposals.json gets with the settings of the samples (gate 0.8, alwaysReview [\"new_instance\"]; the default alwaysReview is []), and why.",
     "written: the review writes the statement (or finds it held already). in_review: the proposal goes into the review item of its instance; accepting the item writes the statement. refused: the graph cannot hold the statement.",
     "facts: the statements the graph holds after the run, beside the edge it held before (room-014 HAS_EQUIPMENT s11).",
     "items: one review item per instance, with the proposals it holds. The instance is the subject, the new object of a link from an instance the graph has (p9), and always the object of the trace."
