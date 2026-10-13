@@ -17,6 +17,7 @@ import {
   Crash,
   MockActivities,
   mockId,
+  phases,
   readJson,
   runMessage,
   runTurn,
@@ -362,8 +363,34 @@ test("a long document is read in windows over several turns", async () => {
   assert.equal(lbb.graph.edgesOf("REFERS_TO").length, 225);
 });
 
+test("each step reports its phase as the LBB-run documents.link words it", async () => {
+  const { turns } = await run();
+  assert.deepEqual(phases(turns), [
+    "reading pages",
+    "writing facts",
+    "embedding the catalogue",
+    "linking mentions",
+  ]);
+  const first = turns[0]!.progress[0]!;
+  assert.deepEqual(
+    [first.step, first.phase, first.done, first.unit],
+    ["define-p1", "reading pages", 0, "pages"],
+  );
+  const linking = turns.at(-1)!.progress.filter((p) => p.phase === "linking mentions");
+  assert.deepEqual(
+    linking.map((p) => p.done),
+    linking.map((_, n) => n),
+  );
+  assert.ok(linking.every((p) => p.total === linking.length && p.unit === "pages"));
+});
+
 test("links below the gate go to review instead of the graph", async () => {
-  const { lbb, docs, state } = await run({ gate: 0.99 });
+  const { lbb, docs, state, turns } = await run({ gate: 0.99 });
+  const filing = turns.flatMap((t) => t.progress).filter((p) => p.phase === "filing review items");
+  assert.deepEqual(
+    filing.map((p) => [p.done, p.total, p.unit]),
+    filing.map((_, k) => [k, 13, "items"]),
+  );
   const reviewed = [...lbb.reviews.values()];
   const linked = reviewed.filter((r) => r.key!.includes(":link:"));
   // One item per document, span and entry: S1.1 and S 2.1 are on both room sheets.

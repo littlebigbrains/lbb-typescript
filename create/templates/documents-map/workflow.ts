@@ -5,7 +5,7 @@
 // them). A message is a signal: each one maps every link of the graph again, in one turn.
 //
 // 1. Ground the entries. Each entry a link points to, and each entry a mention's line belongs to
-//    (the room of a room sheet), gets candidates: the instances whose identifier or label is the
+//    (the item a page is about), gets candidates: the instances whose identifier or label is the
 //    entry's identifier. The decision model (`decide`) answers which instance the entry is: a
 //    candidate, a new instance, or none. A new instance gets a second question: its class.
 // 2. Type the links. For a link whose two ends are instances with a class, the decision model
@@ -504,6 +504,13 @@ async function ask(
   }
 }
 
+/** The phase each stage reports, the words of the LBB-run documents.map. */
+const STAGE_PHASE: Record<string, string> = {
+  ground: "grounding entries",
+  class: "choosing classes",
+  type: "typing links",
+};
+
 /** The steps of one stage, one per request: `<stage>-<n>`. Throws when the turn cannot hold them. */
 async function askStage(
   ctx: WorkflowContext,
@@ -521,7 +528,17 @@ async function askStage(
   const answers: Record<string, map.Kept> = {};
   for (const [n, { plan, members }] of requests.entries()) {
     steps.used += 1;
-    Object.assign(answers, await ctx.step(`${stage}-${n}`, () => ask(lbb, plan, members)));
+    Object.assign(
+      answers,
+      await ctx.step(`${stage}-${n}`, (s) => {
+        s.progress(STAGE_PHASE[stage] ?? stage, {
+          done: n,
+          total: requests.length,
+          unit: "questions",
+        });
+        return ask(lbb, plan, members);
+      }),
+    );
   }
   return answers;
 }
@@ -1025,8 +1042,10 @@ export function createWorkflow(lbb: LbbActivities, settings: Settings = defaults
         throw new WorkflowError(
           `${current.length} proposals need more steps than one turn of the template holds. Use the LBB-run documents.map.`,
         );
-      const filed = await ctx.step("lacks", () =>
-        suggest(lbb, message.workflow, ontology, lacks, classed),
+      const filed = await ctx.step("lacks", (s) =>
+        suggest(lbb, message.workflow, ontology, lacks, classed, (done, total) =>
+          s.progress("filing review items", { done, total, unit: "items" }),
+        ),
       );
       const left = [...unmapped, ...filed.unmapped].sort(
         (a, b) =>
@@ -1041,7 +1060,12 @@ export function createWorkflow(lbb: LbbActivities, settings: Settings = defaults
         return [...have.keys()].filter((key) => !proposals.has(key)).length;
       });
       for (let n = 0; n * PART < current.length; n++)
-        await lbb.writeOwned(ctx, `write-${n}`, async () => {
+        await lbb.writeOwned(ctx, `write-${n}`, async (s) => {
+          s.progress("writing proposals", {
+            done: n * PART,
+            total: current.length,
+            unit: "proposals",
+          });
           const have = await existing();
           const changed = current
             .slice(n * PART, (n + 1) * PART)
@@ -1054,7 +1078,8 @@ export function createWorkflow(lbb: LbbActivities, settings: Settings = defaults
           };
         });
       for (let n = 0; n * PART < stale; n++)
-        await lbb.writeOwned(ctx, `retract-${n}`, async () => {
+        await lbb.writeOwned(ctx, `retract-${n}`, async (s) => {
+          s.progress("writing proposals", { done: n * PART, total: stale, unit: "proposals" });
           const have = await existing();
           const gone = [...have.entries()].filter(([key]) => !proposals.has(key)).slice(0, PART);
           return {
@@ -1128,6 +1153,7 @@ async function suggest(
   ontology: map.MapOntology,
   lacks: map.Lack[],
   classed: map.ClassedEntry[],
+  report: (done: number, total: number) => void = () => {},
 ): Promise<{ suggestions: number; unmapped: Record<string, unknown>[] }> {
   const patterns = new Map<string, map.Lack[]>();
   for (const lack of lacks) {
@@ -1138,7 +1164,8 @@ async function suggest(
   }
   let suggestions = 0;
   const unmapped: Record<string, unknown>[] = [];
-  for (const [key, list] of patterns) {
+  for (const [n, [key, list]] of [...patterns].entries()) {
+    report(n, patterns.size);
     const members = [...list].sort(
       (a, b) => b.p - a.p || (a.quote < b.quote ? -1 : a.quote > b.quote ? 1 : 0),
     );

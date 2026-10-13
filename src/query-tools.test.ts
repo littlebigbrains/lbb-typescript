@@ -23,10 +23,10 @@ function queuedFetch(payloads: Array<{ status?: number; body: unknown }>) {
   return { fetch, requests };
 }
 
-const korn = {
-  text: "David Korn",
-  iri: "https://x.test/e/korn",
-  label: "David Korn",
+const lindqvist = {
+  text: "Mara Lindqvist",
+  iri: "https://x.test/e/lindqvist",
+  label: "Mara Lindqvist",
   class: "https://x.test/class/Person",
   score: 1,
   by: "exact",
@@ -36,7 +36,7 @@ test("query names posts the text and returns the candidates", async () => {
   const { fetch, requests } = queuedFetch([
     {
       body: {
-        candidates: [korn],
+        candidates: [lindqvist],
         index_ready: true,
         index_names: 8,
         commit_seq: 4,
@@ -47,17 +47,20 @@ test("query names posts the text and returns the candidates", async () => {
   const client = new LbbClient({ baseUrl: "http://h", graph: "crm", fetch });
 
   const found = await client.query.names({
-    text: "Summarize David Korn's deals",
+    text: "Summarize Mara Lindqvist's deals",
     limit: 3,
   });
 
-  assert.equal(found.candidates[0]?.iri, korn.iri);
+  assert.equal(found.candidates[0]?.iri, lindqvist.iri);
   assert.equal(found.index_ready, true);
   assert.deepEqual(requests, [
     {
       url: "http://h/v1/query/names?graph=crm",
       method: "POST",
-      body: JSON.stringify({ text: "Summarize David Korn's deals", limit: 3 }),
+      body: JSON.stringify({
+        text: "Summarize Mara Lindqvist's deals",
+        limit: 3,
+      }),
     },
   ]);
 });

@@ -8,6 +8,15 @@ import {
 type Turn = Schemas["WorkflowTurn"];
 type Task = Schemas["WorkflowTurnTask"];
 type Instance = Schemas["WorkflowInstance"];
+type Origin = Schemas["WorkflowMessageOrigin"];
+type Inbox = Schemas["WorkflowInboxResponse"];
+/** A page of an inbox: the turns after `after`, at most `limit` (1 to 100, 50 by default). */
+export interface InboxOptions {
+  after?: number;
+  limit?: number;
+  /** Include each message's payload. */
+  payloads?: boolean;
+}
 const base = "/v1/workflows";
 const notJson = (v: unknown): boolean =>
   v === undefined ||
@@ -71,6 +80,19 @@ export interface WorkflowStepOptions {
   /** Require explicit progress from the operation, independent of worker liveness. */
   heartbeatTimeoutMs?: number;
 }
+/** What a step's progress counts (see {@link WorkflowStepContext.progress}). */
+export interface WorkflowProgressCounts {
+  /** A whole number, at least 0. */
+  done: number;
+  /** A whole number; leave it out when the step does not know it. */
+  total?: number;
+  /**
+   * What `done` and `total` count: `documents`, `pages`, `mentions`,
+   * `links`, `proposals`, `instances`, `questions`, `messages`, `items`,
+   * or another short word.
+   */
+  unit?: string;
+}
 export interface WorkflowStepContext {
   effectId: string;
   signal: AbortSignal;
@@ -80,6 +102,17 @@ export interface WorkflowStepContext {
     details: unknown,
     options?: { checkpoint?: unknown },
   ): Promise<void>;
+  /**
+   * Report what the step does now in the progress convention
+   * (`{phase, done, total, unit}`), which the console draws as a Running
+   * line and a bar. Coalesced: a phase change is sent at once, other calls
+   * at most once per `progressEveryMs` of the worker (3 s by default, or
+   * half the step's `heartbeatTimeoutMs` when that is shorter), the last
+   * value wins, and the last value is sent when the step returns. Keeps
+   * the resume checkpoint of the last `heartbeat`. Does not wait for the
+   * write; a failed write fails the step when it returns.
+   */
+  progress(phase: string, counts: WorkflowProgressCounts): void;
 }
 export type WorkflowSignalResult<T> =
   { received: true; value: T } | { received: false; value: null };
@@ -88,6 +121,8 @@ export interface WorkflowContext {
   readonly workflowId: string;
   readonly messageId: string;
   readonly turn: number;
+  /** Where the message came from, when its sender named it. */
+  readonly origin?: Schemas["WorkflowMessageOrigin"] | null;
   /** Sequential named effects only. Pass effectId to the external service as its idempotency key. */
   step<T>(
     key: string,
@@ -153,9 +188,20 @@ export class WorkflowHandle<M = unknown> {
   status(options?: CallOptions): Promise<Instance> {
     return this.api.get(this.id, options);
   }
-  /** Reuse id when retrying the same message, including after a client restart. */
-  send(message: M, options: { id: string } & CallOptions): Promise<Turn> {
+  /**
+   * Reuse id when retrying the same message, including after a client
+   * restart. `origin` says where the message came from; it is stored with
+   * the turn and shown in the inbox.
+   */
+  send(
+    message: M,
+    options: { id: string; origin?: Origin } & CallOptions,
+  ): Promise<Turn> {
     return this.api.send(this.id, message, options);
+  }
+  /** The messages that wait in this workflow's inbox, oldest first. */
+  inbox(options?: InboxOptions & CallOptions): Promise<Inbox> {
+    return this.api.inbox(this.id, options);
   }
   /** Deliver an approval, callback or other event to a specific run, including while it waits. */
   signal(
@@ -243,13 +289,49 @@ export class WorkflowNamespace {
   send(
     workflowId: string,
     message: unknown,
-    options: { id: string } & CallOptions,
+    options: { id: string; origin?: Origin } & CallOptions,
   ): Promise<Turn> {
-    const { id, ...call } = options;
+    const { id, origin, ...call } = options;
     return this.client.request("POST", `${base}/instances/message`, {
       ...call,
       retry: true,
-      body: { workflow_id: workflowId, id, message: copy(message, "message") },
+      body: {
+        workflow_id: workflowId,
+        id,
+        message: copy(message, "message"),
+        origin,
+      },
+    });
+  }
+  /**
+   * The unfinished turns of one workflow, oldest first: each message's
+   * status, ready time, attempt, size and origin, and the running turn's
+   * progress. Payloads only with `payloads: true`.
+   */
+  inbox(id: string, options: InboxOptions & CallOptions = {}): Promise<Inbox> {
+    const { after, limit, payloads, ...call } = options;
+    return this.client.request("GET", "/v1/workflows/instances/inbox", {
+      ...call,
+      query: { id, after, limit, payloads },
+    });
+  }
+  /**
+   * The workflows of one type (one `version`, or every version) whose
+   * inbox holds messages, by id: each one's count, its oldest message and
+   * its inbox head.
+   */
+  inboxByType(
+    workflowType: string,
+    options: {
+      version?: string;
+      after?: string;
+      limit?: number;
+    } & CallOptions = {},
+  ): Promise<Schemas["WorkflowTypeInboxResponse"]> {
+    const { version, after, limit, ...call } = options;
+    return this.client.request("GET", "/v1/workflows/inbox", {
+      ...call,
+      query: { workflow_type: workflowType, version, after, limit },
     });
   }
   signal(
@@ -312,12 +394,51 @@ export class WorkflowNamespace {
 }
 const suspended = Symbol("workflow sleep");
 
+/** Progress writes of one step at most this often, by default. */
+const PROGRESS_EVERY_MS = 3_000;
+const UNIT = /^[\p{L}\p{N} _-]{1,32}$/u;
+/** Progress details in the convention the console draws, checked as the server checks them. */
+function progressDetails(
+  phase: string,
+  counts: WorkflowProgressCounts,
+): { phase: string; done: number; total?: number; unit?: string } {
+  const text = typeof phase === "string" ? phase.trim() : "";
+  const whole = (n: unknown) => Number.isSafeInteger(n) && (n as number) >= 0;
+  if (!text || [...text].length > 80 || /\p{Cc}/u.test(text))
+    throw new WorkflowError(
+      "Progress phase must be text of 1 to 80 characters",
+    );
+  if (!whole(counts?.done))
+    throw new WorkflowError(
+      "Progress done must be a whole number of at least 0",
+    );
+  if (counts.total !== undefined && !whole(counts.total))
+    throw new WorkflowError(
+      "Progress total must be a whole number of at least 0",
+    );
+  const unit = counts.unit?.trim();
+  if (counts.unit !== undefined && !(unit && UNIT.test(unit)))
+    throw new WorkflowError(
+      "Progress unit must be a short word of 1 to 32 characters",
+    );
+  return {
+    phase: text,
+    done: counts.done,
+    ...(counts.total !== undefined ? { total: counts.total } : {}),
+    ...(unit ? { unit } : {}),
+  };
+}
+
 /** One turn at a time per worker; run additional worker processes for concurrency. */
 export class WorkflowWorker {
   constructor(
     private readonly client: LbbClient,
     private readonly definitions: readonly RegisteredWorkflow[],
-    private readonly options: { worker: string },
+    private readonly options: {
+      worker: string;
+      /** A step's `progress` writes at most this often (default 3000 ms). */
+      progressEveryMs?: number;
+    },
   ) {
     const keys = definitions.map((d) => `${d.name}/${d.version}`);
     if (!keys.length || new Set(keys).size !== keys.length)
@@ -487,6 +608,51 @@ export class WorkflowWorker {
             active = true;
           let cursor: unknown = begun.operation?.checkpoint ?? null;
           let pending: Promise<void> = Promise.resolve();
+          /** One progress write, in order behind the earlier ones. */
+          const report = (details: unknown, savedCursor?: unknown) => {
+            pending = pending.then(async () => {
+              check();
+              if (savedCursor !== undefined) cursor = savedCursor;
+              await this.client.request("POST", `${base}/turns/progress`, {
+                signal: controller.signal,
+                retry: true,
+                body: {
+                  ...lease,
+                  key,
+                  sequence: ++sequence,
+                  details,
+                  checkpoint: cursor,
+                },
+              });
+              check();
+              watchProgress();
+            });
+            // The worker also observes this promise if the handler forgets to await it.
+            void pending.catch(() => {});
+            return pending;
+          };
+          // Coalesced `progress`: a phase change goes out at once, other
+          // values at most once per interval, the last value wins.
+          const progressEvery = Math.min(
+            this.options.progressEveryMs ?? PROGRESS_EVERY_MS,
+            progressTimeout !== undefined
+              ? Math.max(50, Math.floor(progressTimeout / 2))
+              : Infinity,
+          );
+          let lastPhase: string | undefined;
+          let lastSentAt = -Infinity;
+          let held: ReturnType<typeof progressDetails> | undefined;
+          let flushTimer: ReturnType<typeof setTimeout> | undefined;
+          const flush = () => {
+            clearTimeout(flushTimer);
+            flushTimer = undefined;
+            if (held === undefined) return;
+            const details = held;
+            held = undefined;
+            lastPhase = details.phase;
+            lastSentAt = Date.now();
+            void report(details);
+          };
           const deadline = setTimeout(
             () => controller.abort(new Error(`Operation ${key} timed out`)),
             timeout,
@@ -507,6 +673,7 @@ export class WorkflowWorker {
           const clearOperationTimers = () => {
             clearTimeout(deadline);
             clearTimeout(progressTimer);
+            clearTimeout(flushTimer);
           };
           controller.signal.addEventListener("abort", clearOperationTimers, {
             once: true,
@@ -526,34 +693,26 @@ export class WorkflowWorker {
                     options && "checkpoint" in options
                       ? copy(options.checkpoint, `step "${key}" checkpoint`)
                       : undefined;
-                  pending = pending.then(async () => {
-                    check();
-                    if (savedCursor !== undefined) cursor = savedCursor;
-                    await this.client.request(
-                      "POST",
-                      `${base}/turns/progress`,
-                      {
-                        signal: controller.signal,
-                        retry: true,
-                        body: {
-                          ...lease,
-                          key,
-                          sequence: ++sequence,
-                          details: savedDetails,
-                          checkpoint: cursor,
-                        },
-                      },
-                    );
-                    check();
-                    watchProgress();
-                  });
-                  // The worker also observes this promise if the handler forgets to await it.
-                  void pending.catch(() => {});
-                  return pending;
+                  // An explicit heartbeat is newer than a held progress value.
+                  held = undefined;
+                  clearTimeout(flushTimer);
+                  flushTimer = undefined;
+                  return report(savedDetails, savedCursor);
+                },
+                progress: (phase, counts) => {
+                  check();
+                  if (!active)
+                    throw new WorkflowError("Operation has already finished");
+                  held = progressDetails(phase, counts);
+                  const wait = lastSentAt + progressEvery - Date.now();
+                  if (held.phase !== lastPhase || wait <= 0) flush();
+                  else flushTimer ??= setTimeout(flush, wait);
                 },
               }),
               `step "${key}"`,
             );
+            // The last progress value goes out before the step's checkpoint.
+            flush();
             active = false;
             await pending;
           } finally {
@@ -625,6 +784,7 @@ export class WorkflowWorker {
       workflowId: lease.workflow_id,
       messageId: task.turn.message_id,
       turn: lease.turn,
+      origin: task.turn.origin ?? null,
       step: async <T>(
         key: string,
         fn: (context: WorkflowStepContext) => Promise<T>,

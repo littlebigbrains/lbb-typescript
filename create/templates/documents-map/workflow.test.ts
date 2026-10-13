@@ -16,6 +16,7 @@ import {
 import {
   MockActivities,
   mockId,
+  phases,
   readJson,
   runMessage,
   runTurn,
@@ -315,6 +316,19 @@ test("the samples give the proposals of the answer key and none other", async ()
   assert.ok(turns[0]!.keys.length <= 64);
 });
 
+test("each step reports its phase as the LBB-run documents.map words it", async () => {
+  const lbb = new MockActivities(rules());
+  const { turns } = await runMessage(createWorkflow(lbb), message());
+  assert.deepEqual(phases(turns), [
+    "grounding entries",
+    "choosing classes",
+    "typing links",
+    "writing proposals",
+  ]);
+  for (const call of turns[0]!.progress.filter((p) => p.phase !== "writing proposals"))
+    assert.equal(call.unit, "questions", call.step);
+});
+
 test("a fact's confidence is the link's times the typing answer's, a room's DENOTES starts at its mention", async () => {
   const lbb = new MockActivities(rules());
   await runMessage(createWorkflow(lbb), message());
@@ -425,8 +439,12 @@ test("a class or a property the ontology lacks becomes one ontology suggestion p
   const first = new MockActivities(
     rules({ view: viewOf([...traceOntology, ...ontology(), ...noClass]) }),
   );
-  const { state } = await runMessage(createWorkflow(first), message());
+  const { state, turns } = await runMessage(createWorkflow(first), message());
   assert.equal(state.suggestions, 1);
+  assert.deepEqual(
+    turns[0]!.progress.filter((p) => p.phase === "filing review items"),
+    [{ step: "lacks", phase: "filing review items", done: 0, total: 1, unit: "items" }],
+  );
   const [item] = [...first.reviews.values()];
   // The title and the rationale name the entries, with what the model answered.
   assert.ok(
@@ -735,9 +753,9 @@ test("names, keys and shapes", () => {
     map.lackingRelationName("Equipment", new Set([map.nameKey("hasEquipment")])),
     "HAS_EQUIPMENT_2",
   );
-  assert.equal(map.lackingClassName("B18_Equipment-schedule_main-site.pdf"), "EquipmentItem");
+  assert.equal(map.lackingClassName("D18_Equipment-schedule_main-site.pdf"), "EquipmentItem");
   assert.equal(
-    map.lackingClassName("B18_Equipment.pdf", new Set([map.nameKey("Equipment item")])),
+    map.lackingClassName("D18_Equipment.pdf", new Set([map.nameKey("Equipment item")])),
     "EquipmentItem2",
   );
   // A lacking relation is named from the words next to its span.

@@ -21,7 +21,7 @@ import type {
   Schemas,
   SparqlResults,
 } from "./types.js";
-import type { WorkflowContext } from "./workflows.js";
+import type { WorkflowContext, WorkflowStepContext } from "./workflows.js";
 
 /** The options of a model activity (`reason`, `decide`, `embed`). */
 export interface ActivityOptions extends CallOptions {
@@ -142,12 +142,14 @@ export interface LbbActivities {
   /**
    * Commit an owned write inside the step `stepKey`, with the step's effect
    * id as the idempotency key: `writeOwned(client, ctx, …)` bound to this
-   * client.
+   * client. A `write` function gets the step's context.
    */
   writeOwned(
     ctx: WorkflowContext,
     stepKey: string,
-    write: OwnedWrite | (() => OwnedWrite | Promise<OwnedWrite>),
+    write:
+      | OwnedWrite
+      | ((step: WorkflowStepContext) => OwnedWrite | Promise<OwnedWrite>),
     options?: OwnedWriteOptions,
   ): Promise<OwnedWriteResult>;
   /**

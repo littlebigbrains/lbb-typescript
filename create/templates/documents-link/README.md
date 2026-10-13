@@ -1,10 +1,12 @@
 # documents-link
 
-Finds the identifiers the documents of a graph define (the codes of an
-equipment list, the sections of a specification) and the spans of other
-documents that mention them, and links each mention to its entry. A room
-sheet's `S1.1` gets a `REFERS_TO` link to `S 1.1` of the equipment list,
-with the line as evidence and the span's box on the page as its region.
+Connects mentions of the same thing across the documents of a graph. It
+finds the identifiers the documents define (the codes of a parts list, the
+sections of a specification) and the spans that refer to them. Each
+mention links to the entry of the same thing, in the same document or in
+another one. A manual's `P114` gets a `REFERS_TO` link to `P 114` of the
+parts list, with the line as evidence and the span's box on the page as
+its region.
 
 The LBB-run version is the starter workflow `documents.link@v1`
 (`docs/reference/starter-workflows.md`, "Document workflows"). This
@@ -97,12 +99,12 @@ classes `DocEntry` and `DocMention` and the relations `DEFINED_IN`,
   definition across the whole document; here it stops at the end of the
   window.
 - **Number tokens and page heads.** Candidates also come from the number
-  tokens of a span (`Pos.-Nr. 2.4` finds `RB-Pos. 2.4`), and an own number
+  tokens of a span (`Section 2.4` finds `Ref. 2.4`), and an own number
   gets candidates by the meaning of its page head.
 - **Roles as a setting.** `params.roles` of the triggered workflow, so a
   request changes them without new code.
 - **Same-item questions.** A span that is the number of the item its page
-  is about (a room sheet's own position) is asked which entry describes the
+  is about (a product sheet's own number) is asked which entry describes the
   same item, and links with `SAME_ITEM_AS`. Here `own_number` does not
   link.
 - **Request size estimate.** A decide request is packed by an estimate of

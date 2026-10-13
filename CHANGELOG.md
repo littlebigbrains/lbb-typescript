@@ -2,6 +2,39 @@
 
 All notable changes to the `@littlebigbrain/client` package are documented here.
 
+## 0.25.0 (2026-10-13)
+
+- `client.evals.runAnswers({ runner, answers })` checks your own agent's
+  answers to the question goldens (`POST /v1/evals/run/answers`): the
+  server runs each answer's query and checks it as it checks Ask's answer.
+  `client.evals.results({ runner })` reads one agent's runs.
+- `SparqlTextRequest` gains `route`: with `request`, the route your app
+  took (the `route` of `query.ask` in `mode: "route"`); the eval trace
+  keeps it. `EvalLabelRequest` gains `route`, `EvalTrace` and `Golden`
+  gain `route`, a verdict gains `route_check` (the router's pick against
+  the golden's route), and `EvalResults` gains `runner`, `route_checked`
+  and `route_right`. `EvalVia` gains `app`.
+- `SearchRequest` gains `shown`, the app's cut (`min_score`,
+  `min_relevance`, `limit`) for the eval trace of a search with `request`.
+  `EvalTrace` gains `rerank` and `shown`, `Golden` and a verdict gain
+  `shown`; a search trace's items hold `relevance` and `shown`.
+- The step context of `WorkflowWorker` gains `progress(phase, {done,
+  total, unit})`: progress in the convention the console draws as a
+  Running line and a bar. It is coalesced (a phase change at once, then at
+  most one write per `progressEveryMs`, 3 s by default or half the step's
+  `heartbeatTimeoutMs`, and the last value when the step returns). A new
+  worker option `progressEveryMs` sets the interval.
+- `ctx.origin` names where the turn's message came from. `send` and
+  `handle.send` take `origin`. New `workflows.inbox(id)` /
+  `handle.inbox()` (`GET /v1/workflows/instances/inbox`) and
+  `workflows.inboxByType(type, {version})` (`GET /v1/workflows/inbox`)
+  list the messages that wait.
+- `WorkflowInstance` and `WorkflowTurn` gain `progress`, and
+  `WorkflowTurn` gains `origin`.
+- A `writeOwned` write function gets the step's context, so it can report
+  progress before the commit. `WorkflowProgressCounts` and `InboxOptions`
+  are exported.
+
 ## 0.24.0 (2026-10-12)
 
 - The starter workflow Values from text is `values.extract` (formerly

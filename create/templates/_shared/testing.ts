@@ -26,6 +26,8 @@ import {
   type SparqlResults,
   type WorkflowContext,
   type WorkflowDefinition,
+  type WorkflowProgressCounts,
+  type WorkflowStepContext,
   type WorkflowTriggerMessage,
 } from "@littlebigbrain/client";
 
@@ -291,12 +293,13 @@ export class MockActivities implements LbbActivities {
   writeOwned(
     ctx: WorkflowContext,
     stepKey: string,
-    write: OwnedWrite | (() => OwnedWrite | Promise<OwnedWrite>),
+    write: OwnedWrite | ((step: WorkflowStepContext) => OwnedWrite | Promise<OwnedWrite>),
   ) {
-    return ctx.step(stepKey, async ({ effectId }) => {
+    return ctx.step(stepKey, async (step) => {
+      const { effectId } = step;
       const replayed = this.written.has(effectId);
       if (!replayed) {
-        this.graph.apply(typeof write === "function" ? await write() : write);
+        this.graph.apply(typeof write === "function" ? await write(step) : write);
         this.written.add(effectId);
       }
       return {
@@ -345,12 +348,33 @@ function assertNever(what: string): never {
 
 // ---- turns -------------------------------------------------------------------------
 
-/** One turn: its step keys, their saved outputs, and the model calls of its steps. */
+/** One progress report of a step (`s.progress`), as the worker would send it. */
+export interface ProgressCall extends WorkflowProgressCounts {
+  step: string;
+  phase: string;
+}
+
+/** One turn: its step keys, their saved outputs, and the progress its steps reported. */
 export interface Turn {
   message: WorkflowTriggerMessage;
   keys: string[];
   outputs: unknown[];
   bytes: number;
+  progress: ProgressCall[];
+}
+
+const UNIT = /^[\p{L}\p{N} _-]{1,32}$/u;
+const whole = (n: unknown) => Number.isSafeInteger(n) && (n as number) >= 0;
+
+/** A progress report checked as the worker checks it: the progress convention. */
+function progressCall(step: string, phase: string, counts: WorkflowProgressCounts): ProgressCall {
+  const text = phase.trim();
+  if (!text || [...text].length > 80) throw new Error(`step ${step}: progress phase "${phase}"`);
+  if (!whole(counts.done) || (counts.total !== undefined && !whole(counts.total)))
+    throw new Error(`step ${step}: progress counts ${JSON.stringify(counts)}`);
+  if (counts.unit !== undefined && !UNIT.test(counts.unit))
+    throw new Error(`step ${step}: progress unit "${counts.unit}"`);
+  return { step, phase: text, ...counts };
 }
 
 /** What a turn returns: its state, and a continuation when the work goes on in another turn. */
@@ -384,7 +408,7 @@ export async function runTurn<S>(
   options: { prefix?: string; saved?: Turn; crashAfter?: number } = {},
 ): Promise<{ result: TurnResult<S>; turn: Turn }> {
   const prefix = options.prefix ?? mockId(JSON.stringify(message));
-  const turn: Turn = { message, keys: [], outputs: [], bytes: 0 };
+  const turn: Turn = { message, keys: [], outputs: [], bytes: 0, progress: [] };
   let busy = false;
   let ran = 0;
   const ctx = {
@@ -399,6 +423,7 @@ export async function runTurn<S>(
         signal: AbortSignal;
         checkpoint: unknown;
         heartbeat(): Promise<void>;
+        progress(phase: string, counts: WorkflowProgressCounts): void;
       }) => Promise<T>,
     ) {
       if (busy) throw new Error("steps run one at a time: await each step");
@@ -423,6 +448,7 @@ export async function runTurn<S>(
           signal: new AbortController().signal,
           checkpoint: null,
           heartbeat: async () => {},
+          progress: (phase, counts) => turn.progress.push(progressCall(key, phase, counts)),
         });
         const json = JSON.stringify(output ?? null);
         if (json.length > 64 * 1024)
@@ -470,6 +496,11 @@ export async function runMessage<S>(
     next = ran.result.continuation?.message;
   }
   return { state: state as S, turns };
+}
+
+/** The phases the steps of `turns` reported, each once, in the order they first came. */
+export function phases(turns: Turn[]): string[] {
+  return [...new Set(turns.flatMap((t) => t.progress.map((p) => p.phase)))];
 }
 
 /** A trigger message of the triggered workflow `workflow`. */

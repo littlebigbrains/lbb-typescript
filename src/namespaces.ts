@@ -564,7 +564,9 @@ export class EvalsNamespace {
    * answer. On a question's trace, `valid` alone judges the whole answer:
    * `true` makes the trace's query the golden query of the question;
    * `false` with `sparql` gives the right query, which becomes the golden
-   * query; `false` alone marks the answer wrong. */
+   * query; `false` alone marks the answer wrong. `route` with an answer
+   * label that names the query sets the route the question expects;
+   * `true` alone takes the trace's route. */
   label(
     traceId: string,
     body: Schemas["EvalLabelRequest"],
@@ -636,13 +638,33 @@ export class EvalsNamespace {
     });
   }
 
+  /** Check your app's own answers to the question goldens. Ask each
+   * golden's `request` with your own loop, then send one answer per golden:
+   * the query whose rows hold the answer, and the `route` you got from
+   * `query.ask({ question, mode: "route" })`. The server runs each query and
+   * checks it as it checks Ask's answer (type, rows, judged results, and the
+   * router's route). `runner` names your app (default `app`); its runs are
+   * a series of their own: `results({ runner })`. */
+  runAnswers(
+    body: Schemas["EvalRunAnswersRequest"],
+    opts: CallOptions & Pick<ReadConsistencyOptions, "consistency"> = {},
+  ): Promise<Schemas["EvalRunResponse"]> {
+    return this.client.request("POST", "/v1/evals/run/answers", {
+      ...opts,
+      query: { consistency: opts.consistency },
+      body,
+    });
+  }
+
+  /** The runs, newest first: the server's runs, or one app's runs
+   * (`runner`). */
   results(
-    options: { limit?: number } & CallOptions = {},
+    options: { limit?: number; runner?: string } & CallOptions = {},
   ): Promise<Schemas["EvalResultsListResponse"]> {
-    const { limit, ...opts } = options;
+    const { limit, runner, ...opts } = options;
     return this.client.request("GET", "/v1/evals/results", {
       ...opts,
-      query: { limit },
+      query: { limit, runner },
     });
   }
 
@@ -1096,6 +1118,14 @@ export interface OntologySuggestionListOptions extends CallOptions {
   limit?: number;
 }
 
+export interface OntologySuggestionPatternOptions extends CallOptions {
+  status?: Schemas["OntologyChangeSuggestionStatus"];
+  /** Producer id, for example `starter:documents-link`. */
+  originId?: string;
+  /** What the suggestions ask: `facts`, `links`, `ontology` or `other`. */
+  type?: Schemas["SuggestionKind"];
+}
+
 /**
  * Fit from text: a fit source is declared on a class, like an embedding,
  * and names the properties that hold the text (transcripts, documents). A
@@ -1198,6 +1228,61 @@ export class OntologySuggestionsNamespace {
         limit,
       },
     });
+  }
+
+  /**
+   * The suggestions grouped by pattern (the suggestions that ask one
+   * decision), the largest first: per pattern the count, the confidence
+   * range, three samples and every id. One read of the suggestion objects.
+   */
+  patterns(
+    options: OntologySuggestionPatternOptions = {},
+  ): Promise<Schemas["OntologySuggestionPatternList"]> {
+    const { status, originId, type, ...opts } = options;
+    return this.client.request("GET", "/v1/ontology/suggestions/patterns", {
+      ...opts,
+      query: { status, origin_id: originId, type },
+    });
+  }
+
+  /**
+   * Accept up to 500 suggestions, each as `accept` does with every proposed
+   * fact, identity and operation. A superseded one is skipped (with the
+   * suggestion named in its place); an accepted one stays accepted. Name the
+   * samples a person saw in `shown`.
+   */
+  acceptBatch(
+    body: Schemas["OntologySuggestionBatchRequest"],
+    opts: CallOptions = {},
+  ): Promise<Schemas["OntologySuggestionBatchResponse"]> {
+    return this.client.request(
+      "POST",
+      "/v1/ontology/suggestions/accept-batch",
+      {
+        ...opts,
+        retry: opts.retry ?? true,
+        body,
+      },
+    );
+  }
+
+  /**
+   * Dismiss up to 500 suggestions, each as `dismiss` does. An accepted or
+   * superseded one is skipped; a dismissed one stays dismissed.
+   */
+  dismissBatch(
+    body: Schemas["OntologySuggestionBatchRequest"],
+    opts: CallOptions = {},
+  ): Promise<Schemas["OntologySuggestionBatchResponse"]> {
+    return this.client.request(
+      "POST",
+      "/v1/ontology/suggestions/dismiss-batch",
+      {
+        ...opts,
+        retry: opts.retry ?? true,
+        body,
+      },
+    );
   }
 
   /** One suggestion with its evidence, impact and discussion. */

@@ -418,3 +418,171 @@ test("a late operation admission response cannot start a model call after lease 
   await new Promise((resolve) => setTimeout(resolve, 120));
   assert.equal(effects, 0);
 });
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+test("progress is coalesced: a phase change at once, then at most one write per interval, the last value when the step returns", async () => {
+  const { client, calls } = setup([task()]);
+  const agent = workflow({
+    name: "counter",
+    version: "v1",
+    initialState: {},
+    async onMessage(ctx) {
+      await ctx.step("read", async ({ heartbeat, progress }) => {
+        await heartbeat({ started: true }, { checkpoint: { page: 0 } });
+        progress("reading pages", { done: 1, total: 10, unit: "pages" });
+        progress("reading pages", { done: 2, total: 10, unit: "pages" });
+        progress("reading pages", { done: 3, total: 10, unit: "pages" });
+        progress("writing facts", { done: 0 });
+        progress("writing facts", { done: 5, unit: "items" });
+        await sleep(300);
+        progress("writing facts", { done: 6, unit: "items" });
+        return 6;
+      });
+      return { state: {} };
+    },
+  });
+  await new WorkflowWorker(client, [agent], {
+    worker: "w",
+    progressEveryMs: 200,
+  }).runOnce();
+  const progress = calls.filter((c) => c.path.endsWith("/progress"));
+  assert.deepEqual(
+    progress.map((c) => c.body.details),
+    [
+      { started: true },
+      { phase: "reading pages", done: 1, total: 10, unit: "pages" },
+      { phase: "writing facts", done: 0 },
+      { phase: "writing facts", done: 5, unit: "items" },
+      { phase: "writing facts", done: 6, unit: "items" },
+    ],
+  );
+  assert.deepEqual(
+    progress.map((c) => c.body.sequence),
+    [1, 2, 3, 4, 5],
+  );
+  // Progress keeps the resume checkpoint of the last heartbeat.
+  for (const call of progress.slice(1))
+    assert.deepEqual(call.body.checkpoint, { page: 0 });
+  // The last value goes out before the step's checkpoint.
+  const order = calls.map((c) => c.path.split("/").pop());
+  assert.ok(order.lastIndexOf("progress") < order.indexOf("checkpoint"));
+  assert.deepEqual(calls.at(-1)?.body.state, {});
+});
+test("progress writes often enough for the step's progress timeout", async () => {
+  const { client, calls } = setup([task()]);
+  const agent = workflow({
+    name: "counter",
+    version: "v1",
+    initialState: {},
+    async onMessage(ctx) {
+      await ctx.step(
+        "embed",
+        async ({ progress }) => {
+          progress("embedding", { done: 1 });
+          progress("embedding", { done: 2 });
+          // Half the progress timeout: the held value goes out at 500 ms.
+          await sleep(700);
+          progress("embedding", { done: 3 });
+          return 3;
+        },
+        { kind: "model", timeoutMs: 5_000, heartbeatTimeoutMs: 1_000 },
+      );
+      return { state: {} };
+    },
+  });
+  await new WorkflowWorker(client, [agent], { worker: "w" }).runOnce();
+  assert.deepEqual(
+    calls
+      .filter((c) => c.path.endsWith("/progress"))
+      .map((c) => (c.body.details as { done: number }).done),
+    [1, 2, 3],
+  );
+  assert.ok(calls.some((c) => c.path.endsWith("/complete")));
+});
+test("progress outside the convention fails the turn for good and writes nothing", async () => {
+  for (const [phase, counts] of [
+    ["", { done: 1 }],
+    ["reading", { done: -1 }],
+    ["reading", { done: 1.5 }],
+    ["reading", { done: 1, total: -3 }],
+    ["reading", { done: 1, unit: "pages/s" }],
+  ] as const) {
+    const { client, calls } = setup([task()]);
+    const agent = workflow({
+      name: "counter",
+      version: "v1",
+      initialState: {},
+      async onMessage(ctx) {
+        await ctx.step("read", async ({ progress }) => {
+          progress(phase, counts);
+          return 1;
+        });
+        return { state: {} };
+      },
+    });
+    await new WorkflowWorker(client, [agent], { worker: "w" }).runOnce();
+    assert.equal(
+      calls.find((c) => c.path.endsWith("/fail"))?.body.non_retryable,
+      true,
+      `${phase} ${JSON.stringify(counts)}`,
+    );
+    assert.equal(
+      calls.some((c) => c.path.endsWith("/progress")),
+      false,
+    );
+  }
+});
+test("a handler reads its message's origin, and senders and the inbox carry origins", async () => {
+  const claimed = task();
+  claimed.turn.origin = { kind: "commit", to_seq: 9 };
+  const { client, calls } = setup([claimed], false, (path) =>
+    path.endsWith("/inbox") ? { messages: [] } : undefined,
+  );
+  let seen: unknown;
+  const agent = workflow({
+    name: "counter",
+    version: "v1",
+    initialState: {},
+    async onMessage(ctx) {
+      seen = ctx.origin;
+      return { state: {} };
+    },
+  });
+  await new WorkflowWorker(client, [agent], { worker: "w" }).runOnce();
+  assert.deepEqual(seen, { kind: "commit", to_seq: 9 });
+  const handle = client.workflows.handle("agent");
+  await handle.send(
+    { n: 1 },
+    { id: "m-1", origin: { kind: "app", note: "nightly import" } },
+  );
+  assert.deepEqual(calls.at(-1)?.body, {
+    workflow_id: "agent",
+    id: "m-1",
+    message: { n: 1 },
+    origin: { kind: "app", note: "nightly import" },
+  });
+  const seenUrls: URL[] = [];
+  const reader = new LbbClient({
+    baseUrl: "http://localhost:7400",
+    fetch: async (input) => {
+      seenUrls.push(new URL(input));
+      return Response.json({ messages: [], instances: [] });
+    },
+  });
+  await reader.workflows
+    .handle("agent")
+    .inbox({ after: 2, limit: 10, payloads: true });
+  await reader.workflows.inboxByType("counter", { version: "v1", after: "a" });
+  assert.equal(seenUrls[0]?.pathname, "/v1/workflows/instances/inbox");
+  assert.deepEqual(Object.fromEntries(seenUrls[0]!.searchParams), {
+    id: "agent",
+    after: "2",
+    limit: "10",
+    payloads: "true",
+  });
+  assert.equal(seenUrls[1]?.pathname, "/v1/workflows/inbox");
+  assert.deepEqual(Object.fromEntries(seenUrls[1]!.searchParams), {
+    workflow_type: "counter",
+    version: "v1",
+    after: "a",
+  });
+});

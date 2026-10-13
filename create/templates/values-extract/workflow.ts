@@ -205,6 +205,7 @@ export function createWorkflow(lbb: LbbActivities, settings: Settings = defaults
       const read: Value[][] = [];
       for (const [i, iri] of batch.entries()) {
         const proposed = await ctx.step(`values-${i}`, async (s) => {
+          s.progress("reading values", { done: i, total: batch.length, unit: "instances" });
           const record = (await texts())[iri];
           if (!record?.text.trim()) return [];
           const prompt = JSON.stringify({
@@ -238,6 +239,11 @@ export function createWorkflow(lbb: LbbActivities, settings: Settings = defaults
         read.push(
           await ctx.step(`support-${i}`, async (s) => {
             if (!proposed.length) return [];
+            s.progress("asking the decision model", {
+              done: i,
+              total: batch.length,
+              unit: "instances",
+            });
             const record = (await texts())[iri]!;
             const questions = Object.fromEntries(
               proposed.map((v, n) => [
@@ -278,9 +284,10 @@ export function createWorkflow(lbb: LbbActivities, settings: Settings = defaults
           .values.filter((v) => v.support! < settings.gate && v.support! >= 0.5)
           .map((v) => ({ i, v })),
       );
-      const accepted = await ctx.step("review", async () => {
+      const accepted = await ctx.step("review", async (s) => {
         const kept: { i: number; property: string }[] = [];
-        for (const { i, v } of below) {
+        for (const [n, { i, v }] of below.entries()) {
+          s.progress("filing review items", { done: n, total: below.length, unit: "items" });
           const record = (await texts())[batch[i]!]!;
           const facts = valueFacts(batch[i]!, record.label, v);
           const filed = await lbb.review({
@@ -302,7 +309,8 @@ export function createWorkflow(lbb: LbbActivities, settings: Settings = defaults
         }
         return kept;
       });
-      await lbb.writeOwned(ctx, "write", async () => {
+      await lbb.writeOwned(ctx, "write", async (s) => {
+        s.progress("writing facts", { done: 0, total: batch.length, unit: "instances" });
         const records = await texts();
         const write = {
           subjects: [] as Schemas["NamedEntityInput"][],

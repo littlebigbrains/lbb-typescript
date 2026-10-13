@@ -7,6 +7,7 @@ import { join } from "node:path";
 import type { Schemas } from "@littlebigbrain/client";
 import {
   MockActivities,
+  phases,
   readJson,
   runMessage,
   samplesDir,
@@ -190,6 +191,13 @@ test("the samples get the statuses and the facts of the answer key", async () =>
   assert.deepEqual(state, { proposals: 14, written: 4, held: 1, in_review: 5, refused: 4 });
   assert.equal(turns.length, 1);
   assert.ok(turns[0]!.keys.length <= 64);
+  // Each step reports its phase as the LBB-run review words it.
+  assert.deepEqual(phases(turns), ["deciding proposals", "writing facts", "filing review items"]);
+  const deciding = turns[0]!.progress.filter((p) => p.phase === "deciding proposals");
+  assert.deepEqual(
+    deciding.map((p) => [p.step, p.done, p.total, p.unit]),
+    deciding.map((_, i) => [`decide-${i}`, i, deciding.length, "proposals"]),
+  );
 });
 
 test("a written fact names its proposal as evidence, a refusal and a review say why", async () => {

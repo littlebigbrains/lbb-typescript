@@ -678,3 +678,38 @@ test("writeOwned with nothing to write saves the step without a commit", async (
     },
   ]);
 });
+
+test("a writeOwned write function gets the step's context and reports progress before the commit", async () => {
+  const { client, calls } = worker([task(MESSAGE)]);
+  const notes = triggeredWorkflow({
+    name: "word-count",
+    version: "v1",
+    async onInstances(ctx) {
+      await writeOwned(client, ctx, "write-counts", (step) => {
+        assert.equal(step.effectId, "4f2a/write-counts");
+        step.progress("writing facts", {
+          done: 0,
+          total: 1,
+          unit: "instances",
+        });
+        return {
+          subjects: [{ type: "Note", name: "n1" }],
+          properties: ["word_count"],
+          entity_properties: [
+            { type: "Note", name: "n1", properties: { word_count: 3 } },
+          ],
+        };
+      });
+    },
+  });
+  await new WorkflowWorker(client, [notes], { worker: "w" }).runOnce();
+
+  const progress = calls.filter((c) => c.path.endsWith("/turns/progress"));
+  assert.deepEqual(
+    progress.map((c) => c.body.details),
+    [{ phase: "writing facts", done: 0, total: 1, unit: "instances" }],
+  );
+  const commit = calls.find((c) => c.path === "/v1/graph/commit");
+  assert.ok(commit, "the write commits");
+  assert.ok(calls.indexOf(progress[0]!) < calls.indexOf(commit!));
+});
