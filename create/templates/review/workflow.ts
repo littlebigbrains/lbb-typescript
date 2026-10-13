@@ -129,12 +129,14 @@ export function createWorkflow(lbb: LbbActivities, settings: Settings = defaults
       const next = { ...state };
       const forPeople: { iri: string; outcome: Outcome }[] = [];
       for (const [i, iri] of batch.entries()) {
-        const outcome = await ctx.step(`decide-${i}`, async () =>
-          decideOne(lbb, await read(), iri, settings),
-        );
-        await lbb.writeOwned(ctx, `write-${i}`, async () =>
-          statusWrite(await read(), iri, outcome, settings),
-        );
+        const outcome = await ctx.step(`decide-${i}`, async (s) => {
+          s.progress("deciding proposals", { done: i, total: batch.length, unit: "proposals" });
+          return decideOne(lbb, await read(), iri, settings);
+        });
+        await lbb.writeOwned(ctx, `write-${i}`, async (s) => {
+          s.progress("writing facts", { done: i, total: batch.length, unit: "proposals" });
+          return statusWrite(await read(), iri, outcome, settings);
+        });
         if (outcome.status === "decided") continue;
         next.proposals += 1;
         if (outcome.status === "written") next[outcome.holds ? "held" : "written"] += 1;
@@ -148,7 +150,8 @@ export function createWorkflow(lbb: LbbActivities, settings: Settings = defaults
         groups.set(instance, [...(groups.get(instance) ?? []), one]);
       }
       for (const [n, members] of [...groups.values()].entries())
-        await ctx.step(`review-${n}`, async () => {
+        await ctx.step(`review-${n}`, async (s) => {
+          s.progress("filing review items", { done: n, total: groups.size, unit: "instances" });
           await fileItem(lbb, await read(), members, message, settings);
           return true;
         });

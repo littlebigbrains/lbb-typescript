@@ -123,6 +123,19 @@ test("ontology suggestions namespace maps each operation to its route", async ()
   await client.ontology.suggestions.dismiss("sg_1", { reason: "not now" });
   await client.ontology.suggestions.supersede("sg_1", { reason: "gone" });
   await client.ontology.suggestions.comment("sg_1", { text: "why?" });
+  await client.ontology.suggestions.patterns({
+    status: "open",
+    originId: "starter:documents-link",
+    type: "links",
+  });
+  await client.ontology.suggestions.acceptBatch({
+    suggestion_ids: ["sg_1", "sg_2"],
+    shown: ["sg_1"],
+  });
+  await client.ontology.suggestions.dismissBatch({
+    suggestion_ids: ["sg_3"],
+    reason: "not a link",
+  });
 
   assert.deepEqual(urls, [
     "http://h/v1/ontology/suggestions?status=open&origin_kind=integration&origin_id=hubspot-main&limit=20",
@@ -133,7 +146,14 @@ test("ontology suggestions namespace maps each operation to its route", async ()
     "http://h/v1/ontology/suggestions/dismiss?suggestion_id=sg_1",
     "http://h/v1/ontology/suggestions/supersede?suggestion_id=sg_1",
     "http://h/v1/ontology/suggestions/comment?suggestion_id=sg_1",
+    "http://h/v1/ontology/suggestions/patterns?status=open&origin_id=starter%3Adocuments-link&type=links",
+    "http://h/v1/ontology/suggestions/accept-batch",
+    "http://h/v1/ontology/suggestions/dismiss-batch",
   ]);
+  assert.deepEqual(JSON.parse(bodies[9] ?? ""), {
+    suggestion_ids: ["sg_1", "sg_2"],
+    shown: ["sg_1"],
+  });
   assert.equal(bodies[4], "{}");
   assert.deepEqual(JSON.parse(bodies[5] ?? ""), { reason: "not now" });
 });

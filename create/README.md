@@ -15,7 +15,7 @@ npm test
 
 | Template | Does |
 | --- | --- |
-| `documents-link` | Finds the identifiers the documents define and the spans that mention them, and links each mention to its entry |
+| `documents-link` | Connects mentions of the same thing across the documents: each reference links to where that thing is defined or described |
 | `values-extract` | Fills properties of a class from the text of its instances, each value with a verbatim quote |
 | `ontology-fit` | Proposes the ontology changes the texts of a class support, as review items |
 | `documents-map` | Maps the links of `documents-link` into the graph's own ontology, as fact proposals |

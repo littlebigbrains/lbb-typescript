@@ -300,6 +300,7 @@ export function createWorkflow(lbb: LbbActivities, settings: Settings = defaults
       for (const [i, iri] of batch.entries()) {
         kept.push(
           await ctx.step(`propose-${i}`, async (s) => {
+            s.progress("reading texts", { done: i, total: batch.length, unit: "instances" });
             const record = (await texts())[iri];
             if (!record?.text.trim()) return [];
             const ontology = await (onto ??= lbb.ontology().then(describe));
@@ -346,7 +347,7 @@ export function createWorkflow(lbb: LbbActivities, settings: Settings = defaults
           }),
         );
       }
-      const filed = await ctx.step("review", async () => {
+      const filed = await ctx.step("review", async (s) => {
         const records = await texts();
         const byKey = new Map<
           string,
@@ -362,7 +363,8 @@ export function createWorkflow(lbb: LbbActivities, settings: Settings = defaults
             });
             byKey.set(change.key, group);
           }
-        for (const { change, samples } of byKey.values())
+        for (const [n, { change, samples }] of [...byKey.values()].entries()) {
+          s.progress("filing review items", { done: n, total: byKey.size, unit: "items" });
           await lbb.review({
             workflow: message.workflow,
             key: change.key,
@@ -372,6 +374,7 @@ export function createWorkflow(lbb: LbbActivities, settings: Settings = defaults
             change: change.change,
             evidence: { records: samples.length, samples: samples.slice(0, 20) },
           });
+        }
         return byKey.size;
       });
       const next = {

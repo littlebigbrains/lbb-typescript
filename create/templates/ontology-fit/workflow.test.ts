@@ -13,6 +13,7 @@ import { ENTITY_IRI_NAMESPACE, type Schemas } from "@littlebigbrain/client";
 import {
   MockActivities,
   mockId,
+  phases,
   readJson,
   runMessage,
   samplesDir,
@@ -195,7 +196,7 @@ function rules(more: MockRules = {}): MockRules {
 
 test("the samples give the changes of expected.md, one review item per key", async () => {
   const lbb = new MockActivities(rules());
-  const { state } = await runMessage(
+  const { state, turns } = await runMessage(
     createWorkflow(lbb),
     triggerMessage(
       "berichte",
@@ -203,6 +204,11 @@ test("the samples give the changes of expected.md, one review item per key", asy
     ),
   );
 
+  assert.deepEqual(phases(turns), ["reading texts", "filing review items"]);
+  assert.deepEqual(
+    turns[0]!.progress.filter((p) => p.phase === "filing review items").map((p) => p.done),
+    [0, 1, 2, 3, 4],
+  );
   assert.equal(EXPECTED_KEYS.length, 5);
   assert.deepEqual([...lbb.reviews.keys()].sort(), [...EXPECTED_KEYS].sort());
   assert.deepEqual(state, { texts: 5, proposals: 3 + 4 + 5 + 5 + 2, filed: 5 });

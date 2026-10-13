@@ -194,7 +194,7 @@ server knows. None calls a model.
 
 ```ts
 // The IRI of a name, the person before a document with the name.
-const { candidates } = await lbb.query.names({ text: "Summarize David Korn's deals" });
+const { candidates } = await lbb.query.names({ text: "Summarize Mara Lindqvist's deals" });
 // The classes and properties a question needs: how many instances hold each
 // property, and the values of small classes such as stages.
 const { text } = await lbb.query.describe({ question: "Which deals moved stage?" });

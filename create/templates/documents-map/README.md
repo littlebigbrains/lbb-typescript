@@ -1,10 +1,10 @@
 # documents-map
 
-Maps the links of `documents-link` into the graph's own ontology. A room
-sheet's line `T1 Einzeltisch, 28 Stück` links the span `T1` to the entry
-`T 1` of the equipment list. This workflow asks which instance each entry
-is and which statement the line makes, and proposes the fact
-`room 0.12 HAS_EQUIPMENT equipment T 1`. It writes each statement as a
+Maps the links of `documents-link` into the graph's own ontology. A
+manual's line `Replace the filter P114 every 500 hours` links the span
+`P114` to the entry `P 114` of the parts list. This workflow asks which
+instance each entry is and which statement the line makes, and proposes
+the fact `procedure 4.2 USES_PART part P 114`. It writes each statement as a
 `FactProposal`; a `review` workflow (LBB's `review`, or the
 [`review`](../review/README.md) template) decides which become facts.
 
@@ -33,7 +33,7 @@ changed questions cost.
    these are true: the page has at least two mentions, the mention starts in
    the top 30% of the page, no entry the document defines on the page is on
    its row or above it, and it is written unlike most of the page's other
-   mentions (a room sheet's `0.12` above codes like `S 1.1`). Then its
+   mentions (a product sheet's number above the codes it uses). Then its
    link's entry, or else a page entry made from it (the span is the
    identifier, the rest of its line the description), is the subject of
    every other mention of the page, and of the next page when that has

@@ -12,6 +12,7 @@ import {
   WorkflowError,
   type WorkflowContext,
   type WorkflowDefinition,
+  type WorkflowStepContext,
   type WorkflowStepOptions,
 } from "./workflows.js";
 
@@ -334,7 +335,9 @@ export function ownedCommitBody(
  * step results), so a second attempt sends the same body. `write` can be a
  * function that returns the write: it runs inside the step, so it can read
  * inputs the turn does not save (a file's parsed pages, which never
- * change). A replayed step does not call it.
+ * change), and it gets the step's context, so it can report progress
+ * (`(s) => { s.progress("writing facts", {done: 0}); return write; }`). A
+ * replayed step does not call it.
  *
  * ```ts
  * await writeOwned(client, ctx, "counts", {
@@ -351,15 +354,18 @@ export function writeOwned(
   client: LbbClient,
   ctx: WorkflowContext,
   stepKey: string,
-  write: OwnedWrite | (() => OwnedWrite | Promise<OwnedWrite>),
+  write:
+    | OwnedWrite
+    | ((step: WorkflowStepContext) => OwnedWrite | Promise<OwnedWrite>),
   options: OwnedWriteOptions = {},
 ): Promise<OwnedWriteResult> {
   const { graph, edgeIdempotency, ...stepOptions } = options;
   return ctx.step(
     stepKey,
-    async ({ effectId, signal }): Promise<OwnedWriteResult> => {
+    async (step): Promise<OwnedWriteResult> => {
+      const { effectId, signal } = step;
       const body = ownedCommitBody(
-        typeof write === "function" ? await write() : write,
+        typeof write === "function" ? await write(step) : write,
         edgeIdempotency,
       );
       if (!body)

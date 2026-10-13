@@ -1,5 +1,6 @@
-// documents-link: find the identifiers the documents of a graph define and the spans that mention
-// them, and link each mention to its entry.
+// documents-link: connect mentions of the same thing across the documents of a graph. Find the
+// identifiers the documents define and the spans that refer to them, and link each mention to the
+// entry it names.
 //
 // A triggered workflow of the starter workflow `workflow` watches the class `Document` and its
 // field `parse_status` (LBB's parse writes it), and sends the parsed documents here. The workflow
@@ -12,8 +13,8 @@
 //    candidates from the catalogue (every `DocEntry` of the graph) by characters and by meaning
 //    (`embed`), and the decision model (`decide`) answers what the span is and which entry it
 //    names. A mention is written as a `DocMention` `MENTIONED_IN` the document, with a
-//    `REFERS_TO` link to its entry when the link's confidence reaches the gate; a link below the
-//    gate becomes a review item.
+//    `REFERS_TO` link to the entry it names when the link's confidence reaches the gate; a link
+//    below the gate becomes a review item.
 //
 // Each model call runs in a step and passes the step's effect id, so a turn that runs again after
 // a crash pays for nothing twice.
@@ -254,6 +255,7 @@ async function define(
   const found: link.Definition[] = [];
   for (let page = w.from; page < w.to; page++) {
     const kept = await ctx.step(`define-p${page + 1}`, async (s) => {
+      s.progress("reading pages", { done: page - w.from, total: w.to - w.from, unit: "pages" });
       const p = await read.page(page);
       const answer = await lbb.reason(link.definitionsRequest(p), {
         effectId: s.effectId,
@@ -266,9 +268,10 @@ async function define(
   // A commit names at most 1,000 entities: the entries go in parts of at most 900.
   const count = new Set(found.map((d) => d.identifier)).size;
   for (let n = 0; n * link.PART < count; n++)
-    await lbb.writeOwned(ctx, `entries-${n}`, async () =>
-      link.part(link.entriesWrite(doc, await read.pages(), found), n),
-    );
+    await lbb.writeOwned(ctx, `entries-${n}`, async (s) => {
+      s.progress("writing facts", { done: n * link.PART, total: count, unit: "items" });
+      return link.part(link.entriesWrite(doc, await read.pages(), found), n);
+    });
   return { ...state, entries: state.entries + count };
 }
 
@@ -287,6 +290,7 @@ async function linkMentions(
   const mentions: link.Mention[][] = [];
   for (const page of pages) {
     const kept = await ctx.step(`mention-p${page + 1}`, async (s) => {
+      s.progress("reading pages", { done: page - w.from, total: w.to - w.from, unit: "pages" });
       const p = await read.page(page);
       const answer = await lbb.reason(link.mentionsRequest(p), {
         effectId: s.effectId,
@@ -296,12 +300,16 @@ async function linkMentions(
     });
     mentions.push(kept);
   }
-  const byMeaning = await ctx.step("meaning", (s) => meaning(s.effectId, lbb, doc, read, mentions));
+  const byMeaning = await ctx.step("meaning", (s) => {
+    s.progress("embedding the catalogue", { done: 0, unit: "items" });
+    return meaning(s.effectId, lbb, doc, read, mentions);
+  });
   const resolved: link.Resolved[][] = [];
   for (const [n, page] of pages.entries()) {
-    const answers = await ctx.step(`decide-p${page + 1}`, (s) =>
-      decidePage(s.effectId, lbb, doc, read, page, mentions[n]!, byMeaning[n]!),
-    );
+    const answers = await ctx.step(`decide-p${page + 1}`, (s) => {
+      s.progress("linking mentions", { done: n, total: pages.length, unit: "pages" });
+      return decidePage(s.effectId, lbb, doc, read, page, mentions[n]!, byMeaning[n]!);
+    });
     resolved.push(answers);
   }
 
@@ -316,7 +324,7 @@ async function linkMentions(
   );
   const written = all.filter((x) => x.target !== null && x.confidence >= settings.gate);
   const below = all.filter((x) => x.target !== null && x.confidence < settings.gate);
-  await ctx.step("review", async () => {
+  await ctx.step("review", async (s) => {
     const catalogue = await read.catalogue();
     // One item per span and entry: S1.1 on two pages is one item with two links.
     const groups = new Map<string, typeof below>();
@@ -331,7 +339,8 @@ async function linkMentions(
         group: group.slice(n * 100, (n + 1) * 100),
       })),
     );
-    for (const { n, group } of items) {
+    for (const [k, { n, group }] of items.entries()) {
+      s.progress("filing review items", { done: k, total: items.length, unit: "items" });
       const entry = catalogue[group[0]!.target!]!;
       const span = group[0]!.m.span;
       const lowest = Math.min(...group.map((x) => x.confidence));
@@ -357,7 +366,8 @@ async function linkMentions(
     return items.length;
   });
   for (let n = 0; n * link.PART < all.length; n++)
-    await lbb.writeOwned(ctx, `mentions-${n}`, async () => {
+    await lbb.writeOwned(ctx, `mentions-${n}`, async (s) => {
+      s.progress("writing facts", { done: n * link.PART, total: all.length, unit: "mentions" });
       const [pages, catalogue] = [await read.pages(), await read.catalogue()];
       const links = written.map((x) => ({ ...x, entry: catalogue[x.target!]! }));
       return link.part(link.mentionsWrite(doc, pages, all, links), n);

@@ -138,6 +138,8 @@ export type {
   WorkflowContext,
   WorkflowStepOptions,
   WorkflowStepContext,
+  WorkflowProgressCounts,
+  InboxOptions,
   WorkflowSignalResult,
   WorkflowDefinition,
   WorkflowResult,

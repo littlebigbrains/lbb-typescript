@@ -1175,7 +1175,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Eval runs, newest first */
+        /** Eval runs, newest first: the server's runs, or one app's runs (`runner`) */
         get: operations["get_v1_evals_results"];
         put?: never;
         post?: never;
@@ -1196,6 +1196,23 @@ export interface paths {
         put?: never;
         /** Check every golden at the current commit and record the verdicts; a question is asked again through Ask and checked for its type, its rows against the golden query, and its judged results */
         post: operations["post_v1_evals_run"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/evals/run/answers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Check an app's own answers to the question goldens: the server runs each answer's query and checks it as it checks Ask's answer (type, rows against the golden query, judged results, and the router's route); the runs form the app's own series */
+        post: operations["post_v1_evals_run_answers"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1753,6 +1770,75 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/models/calibration": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The graph's calibration sessions, newest first, with their job and workflow, status (a session whose stop rule is met and whose judge people agree with reads `validated`), questions, answers, the judge's agreement, the proposed and the applied threshold, and the judge cost */
+        get: operations["get_v1_models_calibration"];
+        put?: never;
+        /** Start a calibration session of a choice job. `route` and `fit` measure their own threshold; `resolve`, `infer` and `map` measure the gate of the workflow named in `workflow` (a `documents.link`, a `values.extract`, or the `review` that gates the proposals of `documents.map`), from the gate decisions the workflow noted on its logged calls, above the gate as well as below it. The job's units of the last `since_days` days are sampled by confidence band ([0, 0.5), [0.5, 0.8), [0.8, 0.9), [0.9, 1]) with the disputed units added (at most 120), the sampled calls the checker has not checked are judged against the session's own budget, and one yes or no question is written per judged unit: is the judge right? Answers the queued session. 400 `invalid_calibration_request` for another job, a missing or extra `workflow`, or an option out of range; 404 for an unknown workflow; 409 `calibration_running` while another session of the graph and job (and workflow) is queued or running */
+        post: operations["post_v1_models_calibration"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/models/calibration/answer": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Answer one question: `yes` (the judge is right), `no` (with the right option in `right` when known) or `cant_tell`. A later answer replaces the earlier one. For a `route` or `fit` call with one question the answer is filed as a review of the call's check too. 409 `calibration_not_asking` before the session has questions; 404 for a question the session does not have */
+        post: operations["post_v1_models_calibration_answer"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/models/calibration/apply": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Apply a threshold for the session's job: the request's `threshold` (0.5 to 0.99), else the session's proposal. For `route` and `fit` it is written to the graph's applied thresholds; for a workflow job it becomes the gate of the session's workflow, which reads its instances again. Marks the session applied. 409 `calibration_no_proposal` without a proposal or a threshold; 409 `calibration_not_asking` before the session has questions */
+        post: operations["post_v1_models_calibration_apply"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/models/calibration/get": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** One calibration session: the population, the judging, the questions with their answers, and the report computed on read (the judge's agreement with its 95% Wilson interval, whether the stop rule is met, the model's accuracy per band, the estimated accuracy and automatic share at each threshold from 0.50 to 0.95, the proposed threshold, and for a workflow job the accuracy above and below its gate) */
+        get: operations["get_v1_models_calibration_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/models/calls": {
         parameters: {
             query?: never;
@@ -2069,6 +2155,23 @@ export interface paths {
         };
         /** Execution-verified QA probes generated from current edges (labels are the executed projections; deterministic per snapshot) */
         get: operations["get_v1_models_synthetic_eval"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/models/thresholds": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The graph's applied thresholds of `route` and `fit`: the threshold, the session it came from, who applied it and when, and whether people validated the session. The Ask router uses the `route` threshold, 0.7 without one. A workflow's gate is a setting of the workflow */
+        get: operations["get_v1_models_thresholds"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2560,6 +2663,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/ontology/suggestions/accept-batch": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Accept up to 500 suggestions, each as the single accept does (all its facts, identities and operations); a superseded one is skipped with the suggestion named in its place, an accepted one stays accepted. One evolve, and the facts and links in commits of at most 1,000 facts. Each accepted suggestion records the batch */
+        post: operations["post_v1_ontology_suggestions_accept_batch"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/ontology/suggestions/comment": {
         parameters: {
             query?: never;
@@ -2605,6 +2725,40 @@ export interface paths {
         put?: never;
         /** Decline a suggestion with a reason; the ontology does not change */
         post: operations["post_v1_ontology_suggestions_dismiss"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/ontology/suggestions/dismiss-batch": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Dismiss up to 500 suggestions, each as the single dismiss does; an accepted or superseded one is skipped, a dismissed one stays dismissed. Each dismissed suggestion records the batch */
+        post: operations["post_v1_ontology_suggestions_dismiss_batch"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/ontology/suggestions/patterns": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The suggestions grouped by pattern (the suggestions that ask one decision: the same producer, document, kind of fact and shape of text), the largest first: per pattern the count, the confidence range, three samples and every id; counts per status and per kind. One read of the suggestion objects, at most 1,000 (`truncated` past them) */
+        get: operations["get_v1_ontology_suggestions_patterns"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -3143,6 +3297,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/workflows/inbox": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Message workflows: the instances of a workflow type with unfinished turns */
+        get: operations["get_v1_workflows_inbox"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/workflows/instances": {
         parameters: {
             query?: never;
@@ -3221,6 +3392,23 @@ export interface paths {
         };
         /** Message workflows: instances/history */
         get: operations["get_v1_workflows_instances_history"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/workflows/instances/inbox": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Message workflows: the unfinished turns of one instance, with their origins */
+        get: operations["get_v1_workflows_instances_inbox"];
         put?: never;
         post?: never;
         delete?: never;
@@ -3379,6 +3567,40 @@ export interface paths {
         post?: never;
         /** Delete a triggered workflow. What it already wrote stays */
         delete: operations["delete_v1_workflows_triggered"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/workflows/triggered/calibration": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The gates of the graph's gated workflows (`documents.link`, `review`, `values.extract`) measured from inbox decisions: per display band below each gate, the labels a person's accept or dismiss of a review item gives (n, right, precision, 95% Wilson interval); each candidate gate below it (0.50, 0.55, …, walking down) with the labels from it up to the gate and those of its 0.1 tail; and the lowest candidate that passes as a lower gate. A candidate passes with at least 30 labels up to the gate, the target precision (`gate.target_precision`, default 0.95), an interval that starts at most 0.1 below it, and a tail that holds a label and, from 10 labels, is right at least the target less 0.1. A precision below the target, a bad tail or an empty tail stop the walk. Bands at or above the gate hold no inbox label, so a proposal only lowers a gate. Reads at most 1,000 review items (`truncated`) */
+        get: operations["get_v1_workflows_triggered_calibration"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/workflows/triggered/calibration/apply": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Set a gated workflow's gate from its measurement (a person only: in SaaS mode a console session; 403 `calibration_apply_needs_person` for an API key). The labels are read again; 409 `calibration_no_proposal` without a proposal. `gate` lies from the proposal's gate up to below the current gate (default: the proposal's). Changes the workflow as `PUT /v1/workflows/triggered` does with the new gate, and keeps where it came from in `gate_calibration` until the gate changes again */
+        post: operations["post_v1_workflows_triggered_calibration_apply"];
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -5946,13 +6168,16 @@ export interface components {
          *     `items` labels the answer as a whole: `true` makes the trace's query the
          *     golden query of the question; `false` with `sparql` makes that query the
          *     golden query (the server checks and runs it once); `false` alone marks
-         *     the answer wrong.
+         *     the answer wrong. `route` with `valid: true`, or with `valid: false` and
+         *     `sparql`, names the question's route; `valid: true` alone takes the
+         *     trace's route.
          */
         EvalLabelRequest: {
             by?: string | null;
             item?: string | null;
             items?: components["schemas"]["EvalItemLabelInput"][];
             note?: string | null;
+            route?: null | components["schemas"]["QueryRoute"];
             source?: null | components["schemas"]["EvalLabelSource"];
             /** @description With `valid: false` and no `item`: the right query for the question. */
             sparql?: string | null;
@@ -6031,6 +6256,19 @@ export interface components {
             /** @description Traces this run opened for results nobody judged yet. */
             review_traces?: number;
             /**
+             * @description Goldens with a route check: the golden has a route and the router
+             *     answered.
+             */
+            route_checked?: number;
+            /** @description Route checks where the router picked the golden's route. */
+            route_right?: number;
+            /**
+             * @description The app whose answers the run checked (`POST /v1/evals/run/answers`);
+             *     absent for a run of the server's own Ask. Each app's runs are a
+             *     series of their own.
+             */
+            runner?: string | null;
+            /**
              * Format: float
              * @description Share of goldens that pass; `1.0` for an empty suite.
              */
@@ -6049,6 +6287,63 @@ export interface components {
         };
         EvalResultsListResponse: {
             results: components["schemas"]["EvalResults"][];
+        };
+        /**
+         * @description The route check of an `ask` golden: the router's pick for the question
+         *     against the route the golden expects. It scores the router and does not
+         *     change the verdict: the answer loop may take another route, and an
+         *     answer stands on its rows.
+         */
+        EvalRouteCheck: {
+            /** @description The route the golden expects. */
+            expected: components["schemas"]["QueryRoute"];
+            /**
+             * Format: float
+             * @description The router's probability of its pick.
+             */
+            probability: number;
+            /** @description `router == expected`. */
+            right: boolean;
+            /** @description The router's pick this time. */
+            router: components["schemas"]["QueryRoute"];
+        };
+        /** @description The app's answer to one `ask` golden. */
+        EvalRunAnswer: {
+            as_of_commit_seq?: null | components["schemas"]["CommitSeq"];
+            /**
+             * Format: int64
+             * @description What the app's models cost for this answer, in millionths of a US
+             *     dollar.
+             */
+            cost_micro_usd?: number | null;
+            entailment?: components["schemas"]["SparqlEntailment"];
+            /** @description Why the app has no answer: the verdict is an `error`. */
+            error?: string | null;
+            /** @description The golden's id (`GET /v1/evals/goldens`). */
+            golden: string;
+            reply?: null | components["schemas"]["QueryAnswer"];
+            route?: null | components["schemas"]["QueryRouteDecision"];
+            /**
+             * @description The `SELECT` or `ASK` query whose rows hold the answer. The server
+             *     runs it. Absent: the app wrote no query (it found the question
+             *     unanswerable), or it failed (`error`).
+             */
+            sparql?: string | null;
+        };
+        /**
+         * @description The app's own answers to `ask` goldens (`POST /v1/evals/run/answers`):
+         *     the app asked each question with its own loop. The run checks these
+         *     goldens only, as it checks Ask's answers, and keeps the results in the
+         *     app's own series.
+         */
+        EvalRunAnswersRequest: {
+            /** @description One answer per golden, at most 2,000. */
+            answers: components["schemas"]["EvalRunAnswer"][];
+            /**
+             * @description The app: lower-case letters, digits and `-`, at most 40 characters
+             *     (default `app`). `GET /v1/evals/results?runner=` reads its runs.
+             */
+            runner?: string | null;
         };
         EvalRunResponse: {
             results: components["schemas"]["EvalResults"];
@@ -6080,6 +6375,13 @@ export interface components {
              * @description Settings format version. Currently `1`.
              */
             v: number;
+        };
+        /** @description The hits an app showed of a search. */
+        EvalShown: {
+            /** @description The hits that passed it. */
+            count: number;
+            /** @description The app's cut. */
+            cut: components["schemas"]["SearchShown"];
         };
         EvalSummaryResponse: {
             goldens: number;
@@ -6124,6 +6426,7 @@ export interface components {
             reply?: null | components["schemas"]["QueryAnswer"];
             /** @description The user's words, as the caller passed them in `request`. */
             request: string;
+            rerank?: null | components["schemas"]["SearchRerankReport"];
             results: components["schemas"]["EvalItems"];
             /**
              * @description Results the judge looked at but left for a person, with its
@@ -6132,8 +6435,10 @@ export interface components {
             review?: {
                 [key: string]: number;
             };
+            route?: null | components["schemas"]["QueryRouteDecision"];
             /** @description The commit of the graph the results were read at. */
             served_at_seq: components["schemas"]["CommitSeq"];
+            shown?: null | components["schemas"]["EvalShown"];
             /** @description The SPARQL query, or the query text on the vector surface. */
             sparql: string;
             surface?: components["schemas"]["EvalSurface"];
@@ -6158,7 +6463,7 @@ export interface components {
             /**
              * Format: int64
              * @description What the models of the replay cost, in millionths of a US dollar
-             *     (`via: ask`).
+             *     (`via: ask`), or what the app said its models cost (`via: app`).
              */
             cost_micro_usd?: number | null;
             expected_type?: null | components["schemas"]["EvalQueryType"];
@@ -6186,7 +6491,16 @@ export interface components {
             /** @description The trace opened for the unknown results (the review queue). */
             review_trace_id?: string | null;
             route?: null | components["schemas"]["QueryRoute"];
-            /** @description The query Ask wrote this time (`via: ask`). */
+            route_check?: null | components["schemas"]["EvalRouteCheck"];
+            /**
+             * @description The hits the app would show this time, for a `search` golden with a
+             *     cut: the result counts above count only these.
+             */
+            shown?: number | null;
+            /**
+             * @description The query Ask wrote this time (`via: ask`), or the app's query
+             *     (`via: app`).
+             */
             sparql?: string | null;
             /** @description Returned results nobody judged yet. */
             unknown_returned?: number;
@@ -6199,7 +6513,7 @@ export interface components {
          * @description How a run tested a golden.
          * @enum {string}
          */
-        EvalVia: "ask" | "query" | "search";
+        EvalVia: "ask" | "query" | "search" | "app";
         /**
          * @description Whether the evidence a read returns is complete.
          * @enum {string}
@@ -7062,6 +7376,8 @@ export interface components {
             origin: components["schemas"]["GoldenOrigin"];
             query_type?: null | components["schemas"]["EvalQueryType"];
             request?: string | null;
+            route?: null | components["schemas"]["QueryRoute"];
+            shown?: null | components["schemas"]["SearchShown"];
             sparql: string;
             surface?: components["schemas"]["EvalSurface"];
             top_k?: number | null;
@@ -8449,6 +8765,555 @@ export interface components {
             /** Format: int64 */
             trained_at_commit_seq?: number | null;
         };
+        /** @description An answer to one question. */
+        ModelCalibrationAnswer: {
+            answer: components["schemas"]["ModelCalibrationAnswerValue"];
+            /** Format: int64 */
+            at_ms: number;
+            /** @description Who answered: `account:<id>`, `key:<key id>`, `token`. */
+            by: string;
+            note?: string | null;
+            /** @description The right option's key, given with `no`. */
+            right?: string | null;
+        };
+        /**
+         * @description `POST /v1/models/calibration/answer?graph&id`: answer one question. A
+         *     later answer replaces the earlier one. `right` only with `no`.
+         */
+        ModelCalibrationAnswerRequest: {
+            answer: components["schemas"]["ModelCalibrationAnswerValue"];
+            /** @description At most 2,000 characters. */
+            note?: string | null;
+            /** @description The question's id (`q1`). */
+            question: string;
+            /** @description The right option's key, one of the question's options. */
+            right?: string | null;
+        };
+        /**
+         * @description A person's answer to "Is the judge right?".
+         * @enum {string}
+         */
+        ModelCalibrationAnswerValue: "yes" | "no" | "cant_tell";
+        /** @description The threshold a person applied from a session. */
+        ModelCalibrationApplied: {
+            /** Format: int64 */
+            at_ms: number;
+            by: string;
+            /** Format: double */
+            threshold: number;
+        };
+        /**
+         * @description `POST /v1/models/calibration/apply?graph&id`: apply a threshold, by
+         *     default the session's proposal.
+         */
+        ModelCalibrationApplyRequest: {
+            /**
+             * Format: double
+             * @description 0.5 to 0.99.
+             */
+            threshold?: number | null;
+        };
+        /** @description The model's accuracy in one confidence band, against the ground truth. */
+        ModelCalibrationBandAccuracy: {
+            /** Format: double */
+            accuracy?: number | null;
+            /**
+             * Format: int64
+             * @description Known units the model got right.
+             */
+            correct: number;
+            /** Format: double */
+            high: number;
+            /**
+             * Format: int64
+             * @description Sampled units whose ground truth is known.
+             */
+            known: number;
+            /** Format: double */
+            low: number;
+            /**
+             * Format: int64
+             * @description Units of the window in the band.
+             */
+            population: number;
+            /** Format: int64 */
+            sampled: number;
+        };
+        /**
+         * @description One confidence band of the population: `[low, high)`, the last
+         *     `[0.9, 1]`. A band holds two strata: the units no check disputes, and
+         *     the disputed units (their check shows the judge picking another option).
+         */
+        ModelCalibrationBandCount: {
+            /**
+             * Format: int64
+             * @description Disputed units the session sampled.
+             */
+            disputed_sampled?: number;
+            /**
+             * Format: int64
+             * @description Disputed units of the window in the band.
+             */
+            disputed_units?: number;
+            /** Format: double */
+            high: number;
+            /** Format: double */
+            low: number;
+            /**
+             * Format: int64
+             * @description Those units the session sampled.
+             */
+            sampled: number;
+            /**
+             * Format: int64
+             * @description Units of the window in the band that no check disputes.
+             */
+            units: number;
+        };
+        /** @description One session in the list. */
+        ModelCalibrationBrief: {
+            /** Format: double */
+            agreement?: number | null;
+            /** Format: int64 */
+            answered: number;
+            /** Format: double */
+            applied_threshold?: number | null;
+            /** Format: int64 */
+            cost_micro_usd: number;
+            /** Format: int64 */
+            created_at_ms: number;
+            /** Format: int64 */
+            finished_at_ms?: number | null;
+            id: string;
+            job: components["schemas"]["ModelJob"];
+            /** Format: double */
+            proposed_threshold?: number | null;
+            /** Format: int64 */
+            questions: number;
+            status: components["schemas"]["ModelCalibrationStatus"];
+            /** @description For a workflow job: the workflow's name. */
+            workflow?: string | null;
+        };
+        /**
+         * @description A workflow's gate in a session's report: how often the decisions it
+         *     wrote without a person are right, and how often the ones it sent to a
+         *     person are.
+         */
+        ModelCalibrationGateReport: {
+            /** @description At or above the gate: written without a person. */
+            above: components["schemas"]["ModelCalibrationGateSide"];
+            /** @description Below the gate: sent to a person (or dropped). */
+            below: components["schemas"]["ModelCalibrationGateSide"];
+            /**
+             * Format: double
+             * @description The gate the sides split at: the workflow's gate when the session
+             *     started.
+             */
+            gate: number;
+        };
+        /** @description The decisions on one side of a workflow's gate. */
+        ModelCalibrationGateSide: {
+            /**
+             * Format: int64
+             * @description Known units the model got right.
+             */
+            correct: number;
+            /**
+             * Format: double
+             * @description Weighted by stratum, as the thresholds are.
+             */
+            estimated_accuracy?: number | null;
+            /**
+             * Format: int64
+             * @description Sampled units whose ground truth is known.
+             */
+            known: number;
+            /**
+             * Format: int64
+             * @description Units of the window on this side.
+             */
+            population: number;
+            /** Format: int64 */
+            sampled: number;
+        };
+        /** @description One judge call of a session and what it cost. */
+        ModelCalibrationJudgeCall: {
+            call: string;
+            /** Format: int64 */
+            cost_micro_usd: number;
+            /**
+             * @description `right`, `partly` or `wrong` (the check's verdict), `skipped_refused`
+             *     or `failed`.
+             */
+            outcome: string;
+        };
+        /** @description The judge's pick of a question, from its check. */
+        ModelCalibrationJudgePick: {
+            key: string;
+            label: string;
+            /**
+             * Format: double
+             * @description The judge's probability of its pick.
+             */
+            probability: number;
+            /** @description The judge's reason, from its check. */
+            reason: string;
+        };
+        /** @description How the judging of a session's sample went. */
+        ModelCalibrationJudging: {
+            /**
+             * Format: int64
+             * @description Distinct calls of the sample.
+             */
+            calls: number;
+            /**
+             * Format: int64
+             * @description Calls that had a check before the session.
+             */
+            checked_before: number;
+            /** Format: int64 */
+            failed: number;
+            /**
+             * Format: int64
+             * @description Calls the session's judge checked.
+             */
+            judged: number;
+            /**
+             * Format: int64
+             * @description Calls left without a check when the judging stopped.
+             */
+            not_judged: number;
+            /** Format: int64 */
+            refused: number;
+            /** @description Why the judging stopped early: `budget` or `time`. */
+            stopped?: string | null;
+        };
+        /** @description `GET /v1/models/calibration?graph`: the sessions, newest first. */
+        ModelCalibrationListResponse: {
+            sessions: components["schemas"]["ModelCalibrationBrief"][];
+        };
+        /** @description The model's pick of a question. */
+        ModelCalibrationModelPick: {
+            /**
+             * Format: double
+             * @description The number the job's threshold compares: for `route` the pick's
+             *     probability (else the answer's confidence), for `fit` the answer's
+             *     confidence (else the pick's probability), for a workflow job the
+             *     value its gate compares.
+             */
+            confidence: number;
+            key: string;
+            label: string;
+        };
+        /** @description One option of a choice question. */
+        ModelCalibrationOption: {
+            key: string;
+            label: string;
+        };
+        /** @description What a calibration session runs with, set at its start. */
+        ModelCalibrationOptions: {
+            /**
+             * Format: int64
+             * @description The judge cost the session may spend.
+             */
+            budget_micro_usd: number;
+            /** Format: int32 */
+            max_questions: number;
+            /** Format: int32 */
+            sample_per_band: number;
+            /** Format: int32 */
+            since_days: number;
+            /** Format: double */
+            target_precision: number;
+        };
+        /**
+         * @description The units a session read from the call log. A unit is one choice question
+         *     of one logged call; for a workflow job, one gate decision a workflow
+         *     noted on its call (`ModelCall::gates`).
+         */
+        ModelCalibrationPopulation: {
+            /**
+             * Format: int64
+             * @description For a workflow job: units at or above the workflow's gate, which
+             *     were written without a person.
+             */
+            above_gate?: number | null;
+            bands: components["schemas"]["ModelCalibrationBandCount"][];
+            /**
+             * Format: int64
+             * @description Call log batches read.
+             */
+            batches: number;
+            /**
+             * Format: int64
+             * @description Calls with at least one unit.
+             */
+            calls: number;
+            /**
+             * Format: int64
+             * @description Units whose check shows the judge picking another option.
+             */
+            disputed: number;
+            /** @description The read bounds stopped before the start of the window. */
+            limited: boolean;
+            /** Format: int64 */
+            units: number;
+            /**
+             * Format: int64
+             * @description Answers without a confidence, or for a workflow job without a gate
+             *     decision: left out.
+             */
+            without_confidence: number;
+        };
+        /** @description The threshold a session proposes. */
+        ModelCalibrationProposal: {
+            /** Format: double */
+            automatic_share: number;
+            /** Format: double */
+            estimated_accuracy: number;
+            /** Format: int64 */
+            known: number;
+            /** Format: double */
+            threshold: number;
+        };
+        /** @description One yes or no question of a session: is the judge right about this unit? */
+        ModelCalibrationQuestion: {
+            /**
+             * @description For a workflow job: the decision is at or above the workflow's gate,
+             *     so it was written without a person.
+             */
+            above_gate?: boolean;
+            answer?: null | components["schemas"]["ModelCalibrationAnswer"];
+            /**
+             * Format: int32
+             * @description The confidence band of the model's pick, 0 to 3.
+             */
+            band: number;
+            /** @description The call id. */
+            call: string;
+            /**
+             * @description The judge's check picked another option than the model before the
+             *     session.
+             */
+            disputed: boolean;
+            /** @description `q1`, `q2`, … in the order the questions are asked. */
+            id: string;
+            /** @description The question's instructions, at most 500 characters. */
+            instructions: string;
+            judge: components["schemas"]["ModelCalibrationJudgePick"];
+            model: components["schemas"]["ModelCalibrationModelPick"];
+            /** @description The options a correction picks from. */
+            options: components["schemas"]["ModelCalibrationOption"][];
+            /** @description The call had more options than the question keeps. */
+            options_truncated?: boolean;
+            /** @description The question's id in the call. */
+            question: string;
+        };
+        /** @description A session's report, computed when it is read. */
+        ModelCalibrationReport: {
+            /**
+             * Format: int64
+             * @description Answers `yes`.
+             */
+            agreed: number;
+            /**
+             * Format: double
+             * @description `agreed / answered`, the judge's agreement with people.
+             */
+            agreement?: number | null;
+            /** Format: double */
+            agreement_high?: number | null;
+            /**
+             * Format: double
+             * @description The 95% Wilson interval of the agreement.
+             */
+            agreement_low?: number | null;
+            /**
+             * Format: int64
+             * @description Answers `yes` and `no`.
+             */
+            answered: number;
+            bands: components["schemas"]["ModelCalibrationBandAccuracy"][];
+            /** Format: int64 */
+            budget_micro_usd: number;
+            /** Format: int64 */
+            cant_tell: number;
+            /** Format: int64 */
+            cost_micro_usd: number;
+            gate?: null | components["schemas"]["ModelCalibrationGateReport"];
+            /** @description Why there is no proposal. */
+            no_proposal?: string | null;
+            proposal?: null | components["schemas"]["ModelCalibrationProposal"];
+            /**
+             * @description The interval of the agreement is at most 0.1 on each side, or the
+             *     answers reached `max_questions`.
+             */
+            stop_reached: boolean;
+            /**
+             * @description The candidate thresholds 0.50, 0.55, …, 0.95, from the lowest up.
+             *     The walk judges them from 0.95 down; the proposal is the lowest
+             *     that passes before the walk stops.
+             */
+            thresholds: components["schemas"]["ModelCalibrationThresholdEstimate"][];
+            validation: components["schemas"]["ModelCalibrationValidation"];
+        };
+        /** @description One calibration session. */
+        ModelCalibrationSession: {
+            applied?: null | components["schemas"]["ModelCalibrationApplied"];
+            /**
+             * Format: int64
+             * @description The judge cost the session spent.
+             */
+            cost_micro_usd: number;
+            /** Format: int64 */
+            created_at_ms: number;
+            error?: string | null;
+            /** Format: int64 */
+            finished_at_ms?: number | null;
+            id: string;
+            job: components["schemas"]["ModelJob"];
+            judge_calls?: components["schemas"]["ModelCalibrationJudgeCall"][];
+            judging?: components["schemas"]["ModelCalibrationJudging"];
+            options: components["schemas"]["ModelCalibrationOptions"];
+            population?: null | components["schemas"]["ModelCalibrationPopulation"];
+            questions?: components["schemas"]["ModelCalibrationQuestion"][];
+            /**
+             * @description Why a failed session failed: `no_checker`, `no_calls`,
+             *     `no_workflow`, `stale` or `error`.
+             */
+            reason?: string | null;
+            report?: null | components["schemas"]["ModelCalibrationReport"];
+            /** Format: int64 */
+            started_at_ms?: number | null;
+            status: components["schemas"]["ModelCalibrationStatus"];
+            /** @description `collect`, `judge` or `questions`. */
+            step?: string | null;
+            workflow?: null | components["schemas"]["ModelCalibrationWorkflow"];
+            /** Format: int64 */
+            workflow_turn?: number | null;
+        };
+        /**
+         * @description `POST /v1/models/calibration?graph`: start a calibration session of one
+         *     choice job. `route` and `fit` measure the threshold of the Ask router and
+         *     the ontology fit. `resolve`, `infer` and `map` measure the gate of a
+         *     workflow and name it in `workflow`: a `documents.link` workflow for
+         *     `resolve`, a `values.extract` workflow for `infer`, and for `map` the
+         *     `review` workflow that gates the proposals of `documents.map`. Every
+         *     field but `job` (and `workflow` for a workflow job) has a default.
+         */
+        ModelCalibrationStartRequest: {
+            /**
+             * Format: double
+             * @description The judge cost the session may spend, 0 to 100 US dollars; default 10.
+             */
+            budget_usd?: number | null;
+            job: components["schemas"]["ModelJob"];
+            /**
+             * Format: int32
+             * @description Answers after which the session stops asking, 1 to 120; default 40.
+             */
+            max_questions?: number | null;
+            /**
+             * Format: int32
+             * @description Units sampled per confidence band, 1 to 30; default 15.
+             */
+            sample_per_band?: number | null;
+            /**
+             * Format: int32
+             * @description Days of the call log the session reads, 1 to 90; default 30.
+             */
+            since_days?: number | null;
+            /**
+             * Format: double
+             * @description The accuracy a proposed threshold must reach, 0.5 to 0.999. Default:
+             *     0.99 for `route` and `fit`; for a workflow job the workflow's
+             *     `gate.target_precision` (0.95 when it names none), the target of its
+             *     inbox measurement.
+             */
+            target_precision?: number | null;
+            /**
+             * @description The workflow whose gate a session of `resolve`, `infer` or `map`
+             *     measures, by name.
+             */
+            workflow?: string | null;
+        };
+        /**
+         * @description Where a calibration session is.
+         * @enum {string}
+         */
+        ModelCalibrationStatus: "queued" | "running" | "asking" | "validated" | "applied" | "failed";
+        /**
+         * @description The estimated accuracy of the model's picks at or above one threshold,
+         *     and what the walk says about it.
+         */
+        ModelCalibrationThresholdEstimate: {
+            /**
+             * Format: double
+             * @description The share of the population at or above the threshold.
+             */
+            automatic_share: number;
+            /**
+             * Format: double
+             * @description Weighted by stratum (the band, and whether a check disputed the
+             *     unit): each known unit counts its stratum's population divided by the
+             *     stratum's known sampled units.
+             */
+            estimated_accuracy?: number | null;
+            /**
+             * Format: double
+             * @description The low end of the estimate's 95% Wilson interval, at the effective
+             *     sample size of the weights.
+             */
+            interval_low?: number | null;
+            /**
+             * Format: int64
+             * @description Known sampled units at or above the threshold.
+             */
+            known: number;
+            outcome: components["schemas"]["ModelCalibrationThresholdOutcome"];
+            /** Format: double */
+            tail_accuracy?: number | null;
+            /**
+             * Format: double
+             * @description The tail: the units from the threshold up to 0.1 above it (the
+             *     tail that reaches 1 includes 1). Its units, its known sampled units
+             *     and their estimated accuracy.
+             */
+            tail_high: number;
+            /** Format: int64 */
+            tail_known: number;
+            /** Format: int64 */
+            tail_units: number;
+            /** Format: double */
+            threshold: number;
+            /** @description Why it does not pass, in one sentence. */
+            why?: string | null;
+        };
+        /**
+         * @description What the walk says about one candidate threshold. The walk goes through
+         *     the candidates from 0.95 down, with the rule of the workflow gates
+         *     measured from inbox decisions.
+         * @enum {string}
+         */
+        ModelCalibrationThresholdOutcome: "pass" | "needs_units" | "fails" | "not_reached";
+        /**
+         * @description Whether people validated a session's figures.
+         * @enum {string}
+         */
+        ModelCalibrationValidation: "validated" | "not_validated";
+        /** @description The workflow whose gate a session measures. */
+        ModelCalibrationWorkflow: {
+            /**
+             * Format: double
+             * @description Its gate when the session started: decisions at or above it were
+             *     written without a person.
+             */
+            gate: number;
+            /** @description The workflow's name. */
+            name: string;
+            /** @description Its starter: `documents.link`, `values.extract` or `review`. */
+            starter: string;
+        };
         /** @description One logged model call. */
         ModelCall: {
             /**
@@ -8458,6 +9323,17 @@ export interface components {
             at_ms: number;
             effort?: string | null;
             error?: string | null;
+            /**
+             * @description The gate decisions a workflow made from the call's answers, by
+             *     question id: what the decision states and the value its gate
+             *     compares. A calibration session of a workflow job reads them
+             *     (`docs/architecture/calibration.md`, "Sessions of a workflow
+             *     gate"). Choice calls of `documents.link`, `documents.map` and
+             *     `values.extract` carry them; added 2026-10-12.
+             */
+            gates?: {
+                [key: string]: components["schemas"]["ModelCallGate"];
+            };
             graph: string;
             /** @description `<at_ms:020>-<node>-<seq:010>-<n>`: the batch and the index in it. */
             id: string;
@@ -8493,6 +9369,22 @@ export interface components {
         ModelCallDetailResponse: {
             call: components["schemas"]["ModelCall"];
             check?: null | components["schemas"]["ModelCheck"];
+        };
+        /** @description A gate decision a workflow made from one answer of a logged choice call. */
+        ModelCallGate: {
+            /**
+             * @description The option the decision states: the entry a `documents.link`
+             *     mention names (`none_of_these` for no link), the option a
+             *     `documents.map` answer chose, `supported` for a value of
+             *     `values.extract`.
+             */
+            pick: string;
+            /**
+             * Format: float
+             * @description The value the workflow's gate compares, 0 to 1: at or above the gate
+             *     the decision is written without a person.
+             */
+            value: number;
         };
         /** @description `GET /v1/models/calls`: the call log, newest first. */
         ModelCallListResponse: {
@@ -8948,6 +9840,27 @@ export interface components {
         ModelSwitchRequest: {
             trial: string;
         };
+        /** @description The applied threshold of one job. */
+        ModelThreshold: {
+            /** Format: int64 */
+            at_ms: number;
+            by: string;
+            /** @description The session it came from. */
+            session: string;
+            /** Format: double */
+            threshold: number;
+            /** @description People validated the session when it was applied. */
+            validated: boolean;
+        };
+        /**
+         * @description `GET /v1/models/thresholds?graph`: the graph's applied thresholds of the
+         *     `route` and `fit` jobs. A workflow's gate is its own setting.
+         */
+        ModelThresholdsResponse: {
+            jobs: {
+                [key: string]: components["schemas"]["ModelThreshold"];
+            };
+        };
         /**
          * @description Per-graph automatic-training configuration, stored as one small CAS
          *     object under the graph prefix (purged with the tenant). **[PIN]** field
@@ -9351,6 +10264,7 @@ export interface components {
              */
             accepted_ontology_version?: number | null;
             anchor: components["schemas"]["SuggestionAnchor"];
+            batch?: null | components["schemas"]["SuggestionBatchDecision"];
             /**
              * @description The evolve operations that accepting applies, in order. May be empty
              *     when `identities` or `facts` is not.
@@ -9496,7 +10410,10 @@ export interface components {
              */
             ontology_version: number;
             suggestions: components["schemas"]["OntologyChangeSuggestionSummary"][];
-            /** @description More suggestions matched than `limit` allowed. */
+            /**
+             * @description More suggestions matched than `limit` allowed, or this read did not
+             *     cover every suggestion (more than 10,000, or some left to the next).
+             */
             truncated: boolean;
         };
         /**
@@ -9510,8 +10427,15 @@ export interface components {
          */
         OntologyChangeSuggestionSummary: {
             anchor: components["schemas"]["SuggestionAnchor"];
+            batch?: null | components["schemas"]["SuggestionBatchDecision"];
             change: components["schemas"]["OntologyEvolveOp"][];
             comment_count: number;
+            /**
+             * Format: float
+             * @description The lowest confidence of its evidence samples (`confidence`,
+             *     `support` or `probability`), from 0 to 1.
+             */
+            confidence?: number | null;
             created_at: string;
             /**
              * @description How many triplets and entity property rows the suggestion's facts
@@ -9521,7 +10445,10 @@ export interface components {
             /** @description How many identities the suggestion links. */
             identity_count?: number;
             key: string;
+            kind?: null | components["schemas"]["SuggestionKind"];
+            link?: null | components["schemas"]["SuggestionLinkSummary"];
             origin: components["schemas"]["SuggestionOrigin"];
+            pattern?: null | components["schemas"]["SuggestionPattern"];
             /** @description Whether the last dry run can be published; absent before any dry run. */
             publishable?: boolean | null;
             /**
@@ -10135,6 +11062,74 @@ export interface components {
             created: boolean;
             /** @description The suggestion's id; null when the graph already holds the starter. */
             suggestion_id?: string | null;
+        };
+        /**
+         * @description `POST /v1/ontology/suggestions/accept-batch` and `/dismiss-batch`: one
+         *     decision for many suggestions, each decided as the single route decides
+         *     it.
+         */
+        OntologySuggestionBatchRequest: {
+            author?: string | null;
+            /**
+             * @description The pattern the person decided (`SuggestionPattern::key`), recorded
+             *     on each suggestion.
+             */
+            pattern?: string | null;
+            /**
+             * @description Dismiss: the reason, at most 1,000 characters (absent: a reason that
+             *     names the batch). Accept: added to each suggestion's discussion.
+             */
+            reason?: string | null;
+            /**
+             * @description The ids of the samples the person saw before deciding; recorded on
+             *     each suggestion (`SuggestionBatchDecision::shown`). At most 500.
+             */
+            shown?: string[];
+            /** @description 1 to 500 suggestion ids; a repeated id counts once. */
+            suggestion_ids: string[];
+        };
+        /** @description The answer of a batch decision. */
+        OntologySuggestionBatchResponse: {
+            accepted: number;
+            batch_id: string;
+            /**
+             * @description The commits the accept made for the facts and the links of its
+             *     suggestions, in order: one per chunk of at most 1,000 facts.
+             */
+            commits?: components["schemas"]["CommitSeq"][];
+            dismissed: number;
+            /**
+             * Format: int64
+             * @description The ontology version the accept's one evolve produced.
+             */
+            ontology_version?: number | null;
+            /** @description One per suggestion id, in the request's order. */
+            results: components["schemas"]["SuggestionBatchResult"][];
+            skipped: number;
+        };
+        /**
+         * @description `GET /v1/ontology/suggestions/patterns`: the suggestions grouped by
+         *     pattern, the largest first. One read of the same objects as the list.
+         */
+        OntologySuggestionPatternList: {
+            /** @description Suggestions per status, over every suggestion read. */
+            counts: components["schemas"]["SuggestionStatusCounts"];
+            graph: components["schemas"]["GraphKey"];
+            /** @description Suggestions per kind, over the status and producer asked for. */
+            kind_counts: components["schemas"]["SuggestionKindCounts"];
+            /**
+             * Format: int64
+             * @description The graph's current ontology version.
+             */
+            ontology_version: number;
+            patterns: components["schemas"]["SuggestionPatternGroup"][];
+            /** @description How many suggestions the patterns hold. */
+            total: number;
+            /**
+             * @description This read did not cover every suggestion: the graph holds more than
+             *     10,000, or some are left to the next read.
+             */
+            truncated: boolean;
         };
         /**
          * @description A named entity type or relation in the graph's active ontology. Returned by
@@ -12775,6 +13770,7 @@ export interface components {
              *     (`GET /v1/search/settings`).
              */
             rerank?: boolean | null;
+            shown?: null | components["schemas"]["SearchShown"];
             /** @description The query text; embedded with the serving version's model. */
             text?: string | null;
             top_k?: number | null;
@@ -12910,6 +13906,26 @@ export interface components {
              * @description Candidates the rerank model reads, 20 to 80; `null`: the default.
              */
             rerank_depth?: number | null;
+        };
+        /**
+         * @description The hits an app shows of a search: in the returned order, the hits at or
+         *     above `min_score` and, when the search reranked, at or above
+         *     `min_relevance`, at most `limit` of them. A field left out does not cut.
+         */
+        SearchShown: {
+            /** @description The most hits the app shows, at least 1. */
+            limit?: number | null;
+            /**
+             * Format: float
+             * @description The lowest rerank `relevance` the app shows, 0 to 1. A hit without a
+             *     relevance (the search did not rerank) passes.
+             */
+            min_relevance?: number | null;
+            /**
+             * Format: float
+             * @description The lowest similarity (`score`) the app shows, -1 to 1.
+             */
+            min_score?: number | null;
         };
         SearchSignalWeights: {
             /** Format: float */
@@ -14508,6 +15524,7 @@ export interface components {
              *     so the caller can label the result valid or not (managed evals).
              */
             request?: string | null;
+            route?: null | components["schemas"]["QueryRouteDecision"];
         };
         /**
          * @description Result of a [`SparqlTextRequest`]: the SPARQL 1.1 Query Results JSON document,
@@ -14825,6 +15842,51 @@ export interface components {
          * @enum {string}
          */
         SuggestionAnchorKind: "ontology" | "class" | "property" | "relation";
+        /**
+         * @description How a batch decided a suggestion: the batch, its size, the pattern a
+         *     person decided, and whether the person saw this suggestion as a sample.
+         */
+        SuggestionBatchDecision: {
+            /**
+             * @description The batch's id (`batch_` and 24 hex characters), the same on every
+             *     suggestion one call decided.
+             */
+            id: string;
+            /** @description The pattern key the request named (`SuggestionPattern::key`). */
+            pattern?: string | null;
+            /**
+             * @description Whether the request's `shown` named this suggestion: the person saw
+             *     it as a sample before deciding. Absent when the request named no
+             *     samples.
+             */
+            shown?: boolean | null;
+            /**
+             * Format: int32
+             * @description How many suggestions the call named.
+             */
+            size: number;
+        };
+        /**
+         * @description What a batch did with one suggestion.
+         * @enum {string}
+         */
+        SuggestionBatchOutcome: "accepted" | "dismissed" | "skipped";
+        /** @description One suggestion of a batch. */
+        SuggestionBatchResult: {
+            outcome: components["schemas"]["SuggestionBatchOutcome"];
+            /**
+             * @description Why it was skipped, or that it was decided before (`accepted
+             *     already`).
+             */
+            reason?: string | null;
+            status?: null | components["schemas"]["OntologyChangeSuggestionStatus"];
+            suggestion_id: string;
+            /**
+             * @description For a superseded suggestion: the suggestion its producer named in
+             *     its place, when it named one.
+             */
+            superseded_by?: string | null;
+        };
         SuggestionComment: {
             /** @description RFC 3339 time. */
             at: string;
@@ -14839,6 +15901,13 @@ export interface components {
          * @enum {string}
          */
         SuggestionCommentKind: "comment" | "event";
+        /** @description The lowest and the highest confidence of a pattern's suggestions. */
+        SuggestionConfidenceRange: {
+            /** Format: float */
+            max: number;
+            /** Format: float */
+            min: number;
+        };
         /**
          * @description What the producer saw. Every field is optional; the server bounds the
          *     sizes (at most 20 samples of at most 4 KiB each, at most 200 source fields).
@@ -14903,6 +15972,69 @@ export interface components {
             written: number;
         };
         /**
+         * @description What a suggestion asks a person to decide: facts to review (the review
+         *     items of `review`, the values of `values.extract`, any facts without a
+         *     change), links (the link reviews of `documents.link`), an ontology
+         *     change, or something else (records to link as one identity).
+         * @enum {string}
+         */
+        SuggestionKind: "facts" | "links" | "ontology" | "other";
+        /** @description Suggestions per kind. */
+        SuggestionKindCounts: {
+            facts: number;
+            links: number;
+            ontology: number;
+            other: number;
+        };
+        /**
+         * @description What a link review of `documents.link` asks: link a mention to an entry
+         *     (a link below the gate), or the model chose no entry and the facts link
+         *     each mention to its best candidate.
+         * @enum {string}
+         */
+        SuggestionLinkDecision: "link" | "no_entry";
+        /**
+         * @description A link review in brief, from its first fact and evidence sample: the
+         *     mention it goes from, the entry it goes to, and the model's answer.
+         */
+        SuggestionLinkSummary: {
+            /**
+             * Format: float
+             * @description For no entry: the probability the model gave its best candidate.
+             */
+            best_probability?: number | null;
+            /**
+             * Format: float
+             * @description The link's confidence; for no entry, the confidence of that answer.
+             */
+            confidence?: number | null;
+            decision: components["schemas"]["SuggestionLinkDecision"];
+            /** @description The mention's document, page (from 1) and line. */
+            document?: string | null;
+            line?: string | null;
+            line_id?: string | null;
+            /**
+             * Format: int32
+             * @description The mentions the review holds (its facts).
+             */
+            mentions: number;
+            /** Format: int32 */
+            page?: number | null;
+            /**
+             * @description `REFERS_TO` (the span names the entry) or `SAME_ITEM_AS` (the same
+             *     item).
+             */
+            relation: string;
+            /** @description The text of the mention. */
+            span: string;
+            /**
+             * @description The entry's identifier, and its key (`entry:<sha256>:<identifier>`,
+             *     the sha-256 of its defining document).
+             */
+            target: string;
+            target_key?: string | null;
+        };
+        /**
          * @description The producer of a suggestion. `id` names it within its kind: the
          *     integration's connection id, the agent's name, or the person. `label` is
          *     display text.
@@ -14917,6 +16049,51 @@ export interface components {
          * @enum {string}
          */
         SuggestionOriginKind: "integration" | "agent" | "person";
+        /**
+         * @description The pattern of a suggestion: the suggestions that ask one decision a
+         *     person can make from a few samples (the same producer, document, kind of
+         *     fact and shape of text). Derived when the suggestion is read, from its
+         *     stored fields.
+         */
+        SuggestionPattern: {
+            /** @description Stable: `pt_` and 20 hex characters of the pattern's parts. */
+            key: string;
+            /**
+             * @description The pattern in words, for example `Link "#.#.#" in manual.pdf to
+             *     Section #.#.# (REFERS_TO)`. At most 200 characters.
+             */
+            label: string;
+        };
+        /** @description The suggestions of one pattern. */
+        SuggestionPatternGroup: {
+            confidence?: null | components["schemas"]["SuggestionConfidenceRange"];
+            count: number;
+            kind: components["schemas"]["SuggestionKind"];
+            /**
+             * @description Every suggestion of the pattern with its title and confidence, in
+             *     the order of `suggestion_ids`: a person can leave some out before a
+             *     batch decision.
+             */
+            members: components["schemas"]["SuggestionPatternMember"][];
+            /** @description The producer (every suggestion of a pattern has the same). */
+            origin: components["schemas"]["SuggestionOrigin"];
+            pattern: components["schemas"]["SuggestionPattern"];
+            /**
+             * @description Up to 3 suggestions to check: the least confident, the middle one and
+             *     the most confident.
+             */
+            samples: components["schemas"]["OntologyChangeSuggestionSummary"][];
+            /** @description Every suggestion of the pattern, the least confident first. */
+            suggestion_ids: string[];
+        };
+        /** @description One suggestion of a pattern, for the list a person picks from. */
+        SuggestionPatternMember: {
+            /** Format: float */
+            confidence?: number | null;
+            link?: null | components["schemas"]["SuggestionLinkSummary"];
+            suggestion_id: string;
+            title: string;
+        };
         SuggestionShownV1: {
             candidate_id: string;
             prefix: string;
@@ -15152,6 +16329,7 @@ export interface components {
              */
             details?: unknown;
             gate?: null | components["schemas"]["WorkflowGate"];
+            gate_calibration?: null | components["schemas"]["WorkflowGateCalibration"];
             name: string;
             owns?: components["schemas"]["WorkflowOwns"];
             params?: unknown;
@@ -15636,11 +16814,341 @@ export interface components {
         WorkflowGate: {
             /** Format: float */
             below: number;
+            /**
+             * Format: double
+             * @description The precision a lower gate measured from the inbox decisions must
+             *     reach, 0.5 to 0.999 (`GET /v1/workflows/triggered/calibration`).
+             *     Absent: 0.95. A change of it alone reads no instance again.
+             */
+            target_precision?: number | null;
         };
+        /**
+         * @description `POST /v1/workflows/triggered/calibration/apply`: set a gated workflow's
+         *     gate from its measurement. The labels are read again; the request is
+         *     refused without a proposal (409 `calibration_no_proposal`).
+         */
+        WorkflowGateApplyRequest: {
+            /**
+             * Format: float
+             * @description The gate to set: from the proposal's gate up to below the current
+             *     gate. Absent: the proposal's gate.
+             */
+            gate?: number | null;
+            name: string;
+            /** @description The starter workflow's catalog id. */
+            starter: string;
+        };
+        /**
+         * @description One confidence band of a gate's report: the labels whose gate value lies
+         *     in `[low, high)` (the last band of the scale includes 1). A band that
+         *     reaches above the gate is cut at the gate.
+         */
+        WorkflowGateBand: {
+            /**
+             * @description The band lies below the gate. A band at or above the gate holds
+             *     answers written without a person: inbox decisions do not measure it
+             *     (calibration sessions with a judge do).
+             */
+            below_gate: boolean;
+            /**
+             * Format: int64
+             * @description Labels that say the answer was right.
+             */
+            correct: number;
+            /** Format: double */
+            high: number;
+            /** Format: double */
+            low: number;
+            /**
+             * Format: int64
+             * @description Labels in the band.
+             */
+            n: number;
+            /**
+             * Format: double
+             * @description `correct / n`; absent without labels.
+             */
+            precision?: number | null;
+            /** Format: double */
+            wilson_high?: number | null;
+            /**
+             * Format: double
+             * @description The 95% Wilson interval of the precision; absent without labels.
+             */
+            wilson_low?: number | null;
+        };
+        /**
+         * @description Where a gate came from when a person applied it from a measurement: the
+         *     inbox decisions (`POST /v1/workflows/triggered/calibration/apply`) or a
+         *     calibration session (`POST /v1/models/calibration/apply`). A change of
+         *     the gate by `PUT /v1/workflows/triggered` removes it.
+         */
+        WorkflowGateCalibration: {
+            /**
+             * @description When (RFC 3339) and who: `account:<id>` for a console session,
+             *     `token` in single mode.
+             */
+            applied_at: string;
+            applied_by: string;
+            /**
+             * Format: float
+             * @description The gate the apply set, and the gate before it.
+             */
+            gate: number;
+            measurement?: null | components["schemas"]["WorkflowGateMeasurement"];
+            /** Format: float */
+            previous_gate: number;
+            /** @description For a session: its id (`GET /v1/models/calibration/get?id=`). */
+            session_id?: string | null;
+            /**
+             * @description What the gate was applied from. Absent in a record from before the
+             *     field: `inbox`.
+             */
+            source?: components["schemas"]["WorkflowGateSource"];
+        };
+        /**
+         * @description `GET /v1/workflows/triggered/calibration`: the gated workflows of the
+         *     graph, ordered by starter, then name.
+         */
+        WorkflowGateCalibrationReport: {
+            /** @description The unseen batch labels fill the bands (`include_batch=true`). */
+            include_batch: boolean;
+            /**
+             * Format: int64
+             * @description Review items read. The read is bounded as the inbox list is: at most
+             *     1,000 items.
+             */
+            items_read: number;
+            /** @description When the labels were read (RFC 3339). */
+            measured_at: string;
+            /** @description The graph holds more review items than were read. */
+            truncated: boolean;
+            workflows: components["schemas"]["WorkflowGateReport"][];
+        };
+        /**
+         * @description One candidate gate below the current gate (0.50, 0.55, …), with the
+         *     labels from it up to the current gate and those of its tail.
+         */
+        WorkflowGateCandidate: {
+            /** Format: int64 */
+            correct: number;
+            /**
+             * Format: float
+             * @description The candidate gate.
+             */
+            gate: number;
+            /**
+             * Format: int64
+             * @description The labels from the candidate up to the current gate, and their
+             *     precision with the low end of its 95% Wilson interval.
+             */
+            n: number;
+            outcome: components["schemas"]["WorkflowGateCandidateOutcome"];
+            /** @description The gate can go down to this candidate. */
+            pass: boolean;
+            /** Format: double */
+            precision?: number | null;
+            /** Format: int64 */
+            tail_correct: number;
+            /**
+             * Format: double
+             * @description The tail: the labels from the candidate up to 0.1 above it (or the
+             *     current gate, when that is lower), and their precision.
+             */
+            tail_high: number;
+            /** Format: int64 */
+            tail_n: number;
+            /** Format: double */
+            tail_precision?: number | null;
+            /** @description Why it does not pass, in one sentence. */
+            why?: string | null;
+            /** Format: double */
+            wilson_low?: number | null;
+        };
+        /**
+         * @description What the rule says about one candidate gate.
+         * @enum {string}
+         */
+        WorkflowGateCandidateOutcome: "pass" | "needs_labels" | "fails" | "not_reached";
+        /** @description What the labels of a gate are made of. */
+        WorkflowGateLabels: {
+            /**
+             * Format: int64
+             * @description Labels from the other batch decisions. They fill the bands only with
+             *     `include_batch=true`.
+             */
+            batch: number;
+            /**
+             * Format: int64
+             * @description Labels from a batch decision on an item the person saw: they fill
+             *     the bands.
+             */
+            batch_seen: number;
+            /**
+             * Format: int64
+             * @description Items of the workflow that a person accepted or dismissed.
+             */
+            decided_items: number;
+            /**
+             * Format: int64
+             * @description Labels left out: the value the gate compared is at or above the
+             *     gate now, or the item does not keep it.
+             */
+            excluded: number;
+            /**
+             * Format: int64
+             * @description Items of the workflow that wait for a person.
+             */
+            open_items: number;
+            /**
+             * Format: int64
+             * @description Labels from a decision on one item: they fill the bands.
+             */
+            single: number;
+        };
+        /**
+         * @description The labels of a gate at one time: the bands, the counts and the
+         *     proposal. A gate's calibration keeps the one it was applied from.
+         */
+        WorkflowGateMeasurement: {
+            bands: components["schemas"]["WorkflowGateBand"][];
+            candidates?: components["schemas"]["WorkflowGateCandidate"][];
+            labels: components["schemas"]["WorkflowGateLabels"];
+            /** @description When the labels were read (RFC 3339). */
+            measured_at: string;
+            proposal?: null | components["schemas"]["WorkflowGateProposal"];
+            /** Format: double */
+            target_precision: number;
+        };
+        /** @description A lower gate the labels support. */
+        WorkflowGateProposal: {
+            /**
+             * Format: float
+             * @description The proposed gate: the lowest candidate that passes, walking down
+             *     from the current gate.
+             */
+            gate: number;
+            /** Format: int64 */
+            n: number;
+            /**
+             * Format: double
+             * @description The precision of the labels from the proposed gate to the current
+             *     one, with the low end of its 95% Wilson interval and their count.
+             */
+            precision: number;
+            /** Format: double */
+            wilson_low: number;
+        };
+        /** @description One gated workflow in `GET /v1/workflows/triggered/calibration`. */
+        WorkflowGateReport: {
+            applied?: null | components["schemas"]["WorkflowGateCalibration"];
+            /** @description The display bands, from 0 up: 0 to 0.5, then 0.1 wide up to 1. */
+            bands: components["schemas"]["WorkflowGateBand"][];
+            /**
+             * @description The candidate gates below the current gate (0.50, 0.55, …), from
+             *     the highest down: where the gate could go, and why not.
+             */
+            candidates?: components["schemas"]["WorkflowGateCandidate"][];
+            /**
+             * Format: float
+             * @description The gate now: answers below it go to a person.
+             */
+            gate: number;
+            labels: components["schemas"]["WorkflowGateLabels"];
+            name: string;
+            /** @description Why there is no proposal, in one sentence. */
+            no_proposal?: string | null;
+            proposal?: null | components["schemas"]["WorkflowGateProposal"];
+            /**
+             * @description The starter workflow's catalog id: `documents.link`, `review` or
+             *     `values.extract`.
+             */
+            starter: string;
+            /**
+             * Format: double
+             * @description The precision a proposal must reach (`gate.target_precision`, else
+             *     0.95).
+             */
+            target_precision: number;
+        };
+        /**
+         * @description What a person applied a gate from.
+         * @enum {string}
+         */
+        WorkflowGateSource: "inbox" | "session";
         WorkflowHeartbeatRequest: {
             run_id: string;
             step_id: string;
             token: string;
+        };
+        /**
+         * @description One unfinished turn of an instance's inbox: a message that runs or
+         *     waits.
+         */
+        WorkflowInboxMessage: {
+            /** Format: int32 */
+            attempt: number;
+            /** @description The error of the last failed attempt. */
+            error?: string | null;
+            /** @description The message itself, only with `payloads=true`. */
+            message?: unknown;
+            /**
+             * Format: int64
+             * @description The size of the message, serialized.
+             */
+            message_bytes: number;
+            message_id: string;
+            origin?: null | components["schemas"]["WorkflowMessageOrigin"];
+            progress?: null | components["schemas"]["WorkflowProgress"];
+            /**
+             * Format: int64
+             * @description When a worker may claim it (a queued or waiting turn).
+             */
+            ready_at_ms: number;
+            /**
+             * Format: int64
+             * @description When the inbox admitted the message.
+             */
+            received_at_ms: number;
+            /** @description `queued`, `waiting`, `running` or `failed`. */
+            status: components["schemas"]["WorkflowTurnStatus"];
+            /**
+             * Format: int64
+             * @description The turn number; turns run in this order.
+             */
+            turn: number;
+        };
+        /**
+         * @description `GET /v1/workflows/instances/inbox?id=&after=&limit=&payloads=`: the
+         *     unfinished turns of one instance, oldest first, from one read of the
+         *     instance object.
+         */
+        WorkflowInboxResponse: {
+            messages: components["schemas"]["WorkflowInboxMessage"][];
+            /**
+             * Format: int64
+             * @description When the newest unfinished message was admitted.
+             */
+            newest_received_at_ms?: number | null;
+            /**
+             * Format: int64
+             * @description The turn number to pass as `after` for the next page.
+             */
+            next_after?: number | null;
+            /**
+             * Format: int64
+             * @description When the oldest unfinished message was admitted.
+             */
+            oldest_received_at_ms?: number | null;
+            /**
+             * Format: int64
+             * @description Every unfinished turn, on this page or not.
+             */
+            pending_messages: number;
+            status: components["schemas"]["WorkflowInstanceStatus"];
+            version: string;
+            workflow_id: string;
+            workflow_type: string;
         };
         WorkflowInstance: {
             /** Format: int64 */
@@ -15663,6 +17171,7 @@ export interface components {
             id: string;
             /** Format: int64 */
             pending_messages: number;
+            progress?: null | components["schemas"]["WorkflowProgress"];
             /** Format: int64 */
             sequence: number;
             state: unknown;
@@ -15716,6 +17225,60 @@ export interface components {
             next_after?: string | null;
             runs: components["schemas"]["WorkflowRun"][];
         };
+        /**
+         * @description Where a message came from. One origin per message: a message of several
+         *     instances holds the union of their fields. Every field but `kind` is
+         *     optional, and the whole origin is at most 1 KiB.
+         *
+         *     The engine stores it with the turn, beside the message. It is no part
+         *     of the message's identity: a repeated message id with the same message
+         *     answers the first turn and keeps the first origin.
+         */
+        WorkflowMessageOrigin: {
+            /** @description Who asked, when a person or a named client did. */
+            actor?: string | null;
+            /**
+             * Format: int32
+             * @description How many times the item was sent before (a requeue).
+             */
+            attempt?: number | null;
+            /** @description The event of the data plane that sent it. */
+            event?: string | null;
+            /** @description The fields (predicate IRIs or names) whose change caused it. */
+            fields?: string[];
+            /**
+             * Format: int64
+             * @description The first commit of the range that caused it.
+             */
+            from_seq?: number | null;
+            /** @description One of [`WORKFLOW_ORIGIN_KINDS`], or `continuation`. */
+            kind: string;
+            /** @description A continuation: the message id of the turn that continued. */
+            message_id?: string | null;
+            /** @description A short note, at most 280 characters. */
+            note?: string | null;
+            /** @description The sender's own reason word (`changed`, `refresh`, …). */
+            reason?: string | null;
+            /** @description The request ids of the commits that caused it. */
+            requests?: string[];
+            /**
+             * Format: int64
+             * @description The commit a pass over a class reads up to.
+             */
+            target_seq?: number | null;
+            /**
+             * Format: int64
+             * @description The last commit of the range that caused it.
+             */
+            to_seq?: number | null;
+            /** @description The trigger that sent it. */
+            trigger?: string | null;
+            /**
+             * Format: int64
+             * @description A continuation: the turn that continued.
+             */
+            turn?: number | null;
+        };
         WorkflowMessageRequest: {
             /**
              * @description Caller-assigned idempotency key. A repeated id answers the turn it
@@ -15724,6 +17287,7 @@ export interface components {
              */
             id: string;
             message: unknown;
+            origin?: null | components["schemas"]["WorkflowMessageOrigin"];
             workflow_id: string;
         };
         /** @enum {string} */
@@ -15737,6 +17301,32 @@ export interface components {
             classes?: string[];
             properties?: string[];
             relations?: string[];
+        };
+        /**
+         * @description What a running step of a message workflow does now, read from its
+         *     operation progress details. The same shape as the Running line of a
+         *     triggered workflow (`TriggeredWorkflowRunning`), with a free `unit`.
+         */
+        WorkflowProgress: {
+            /** Format: int64 */
+            done: number;
+            /** @description When the worker last reported progress (RFC 3339). */
+            heartbeat_at: string;
+            /** @description What the step does now, in plain words: `reading pages`. */
+            phase: string;
+            /** @description When the step's operation started (RFC 3339). */
+            started_at: string;
+            /**
+             * Format: int64
+             * @description Absent when the step does not know it.
+             */
+            total?: number | null;
+            /**
+             * @description What `done` and `total` count: one of the `ActivityUnit` words
+             *     (`documents`, `pages`, `mentions`, `links`, `proposals`,
+             *     `instances`, `questions`, `messages`, `items`) or another short word.
+             */
+            unit?: string | null;
         };
         WorkflowRun: {
             /** Format: int64 */
@@ -15943,6 +17533,8 @@ export interface components {
             /** Format: int64 */
             number: number;
             operation?: null | components["schemas"]["WorkflowTurnOperation"];
+            origin?: null | components["schemas"]["WorkflowMessageOrigin"];
+            progress?: null | components["schemas"]["WorkflowProgress"];
             /** Format: int64 */
             ready_at_ms: number;
             result: unknown;
@@ -16100,6 +17692,44 @@ export interface components {
             /** Format: int64 */
             turn: number;
             workflow_id: string;
+        };
+        /** @description One instance in the inbox of a workflow type. */
+        WorkflowTypeInboxEntry: {
+            head?: null | components["schemas"]["WorkflowInboxMessage"];
+            /**
+             * Format: int64
+             * @description When its oldest unfinished message was admitted.
+             */
+            oldest_received_at_ms?: number | null;
+            /** Format: int64 */
+            pending_messages: number;
+            status: components["schemas"]["WorkflowInstanceStatus"];
+            version: string;
+            workflow_id: string;
+        };
+        /**
+         * @description `GET /v1/workflows/inbox?workflow_type=&version=&after=&limit=`: the
+         *     instances of a type with unfinished turns, by id. The namespace index
+         *     names them; each listed instance is one read.
+         */
+        WorkflowTypeInboxResponse: {
+            /**
+             * Format: int64
+             * @description Instances of the type (and version) in the namespace index, idle
+             *     ones included. The index lags a write of another node by at most
+             *     its poll interval.
+             */
+            identities: number;
+            instances: components["schemas"]["WorkflowTypeInboxEntry"][];
+            /** @description The instance id to pass as `after` for the next page. */
+            next_after?: string | null;
+            version?: string | null;
+            /**
+             * Format: int64
+             * @description Of them, the instances the index lists with an unfinished turn.
+             */
+            with_messages: number;
+            workflow_type: string;
         };
         /** @description The workflow type a developer workflow sends its trigger messages to. */
         WorkflowTypeRef: {
@@ -26734,6 +28364,8 @@ export interface operations {
                 graph?: string;
                 /** @description runs to return (default 20, at most 40) */
                 limit?: string;
+                /** @description the app whose runs to return (`POST /v1/evals/run/answers`); omit for the server's runs */
+                runner?: string;
             };
             header?: {
                 /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
@@ -26881,6 +28513,148 @@ export interface operations {
             cookie?: never;
         };
         requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EvalRunResponse"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Rate limit exceeded */
+            429: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Service unavailable */
+            503: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+        };
+    };
+    post_v1_evals_run_answers: {
+        parameters: {
+            query?: {
+                /** @description Graph name (default `main`) */
+                graph?: string;
+                /** @description eventual (default) checks the last published commit; strong checks the head */
+                consistency?: string;
+            };
+            header?: {
+                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                "Lbb-Version"?: string;
+                /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
+                "Idempotency-Key"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EvalRunAnswersRequest"];
+            };
+        };
         responses: {
             /** @description OK */
             200: {
@@ -32422,6 +34196,702 @@ export interface operations {
             };
         };
     };
+    get_v1_models_calibration: {
+        parameters: {
+            query?: {
+                /** @description Graph name (default `main`) */
+                graph?: string;
+                /** @description sessions, 1 to 50; default 20 */
+                limit?: string;
+            };
+            header?: {
+                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                "Lbb-Version"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ModelCalibrationListResponse"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Rate limit exceeded */
+            429: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Service unavailable */
+            503: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+        };
+    };
+    post_v1_models_calibration: {
+        parameters: {
+            query?: {
+                /** @description Graph name (default `main`) */
+                graph?: string;
+            };
+            header?: {
+                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                "Lbb-Version"?: string;
+                /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
+                "Idempotency-Key"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ModelCalibrationStartRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ModelCalibrationSession"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Rate limit exceeded */
+            429: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Service unavailable */
+            503: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+        };
+    };
+    post_v1_models_calibration_answer: {
+        parameters: {
+            query?: {
+                /** @description Graph name (default `main`) */
+                graph?: string;
+                /** @description the session id */
+                id?: string;
+            };
+            header?: {
+                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                "Lbb-Version"?: string;
+                /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
+                "Idempotency-Key"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ModelCalibrationAnswerRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ModelCalibrationSession"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Rate limit exceeded */
+            429: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Service unavailable */
+            503: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+        };
+    };
+    post_v1_models_calibration_apply: {
+        parameters: {
+            query?: {
+                /** @description Graph name (default `main`) */
+                graph?: string;
+                /** @description the session id */
+                id?: string;
+            };
+            header?: {
+                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                "Lbb-Version"?: string;
+                /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
+                "Idempotency-Key"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ModelCalibrationApplyRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ModelCalibrationSession"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Rate limit exceeded */
+            429: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Service unavailable */
+            503: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+        };
+    };
+    get_v1_models_calibration_get: {
+        parameters: {
+            query?: {
+                /** @description Graph name (default `main`) */
+                graph?: string;
+                /** @description the session id */
+                id?: string;
+            };
+            header?: {
+                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                "Lbb-Version"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ModelCalibrationSession"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Rate limit exceeded */
+            429: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Service unavailable */
+            503: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+        };
+    };
     get_v1_models_calls: {
         parameters: {
             query?: {
@@ -35092,6 +37562,140 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SyntheticEvalResponse"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Rate limit exceeded */
+            429: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Service unavailable */
+            503: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+        };
+    };
+    get_v1_models_thresholds: {
+        parameters: {
+            query?: {
+                /** @description Graph name (default `main`) */
+                graph?: string;
+            };
+            header?: {
+                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                "Lbb-Version"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ModelThresholdsResponse"];
                 };
             };
             /** @description Bad request */
@@ -40070,6 +42674,146 @@ export interface operations {
             };
         };
     };
+    post_v1_ontology_suggestions_accept_batch: {
+        parameters: {
+            query?: {
+                /** @description Graph name (default `main`) */
+                graph?: string;
+            };
+            header?: {
+                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                "Lbb-Version"?: string;
+                /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
+                "Idempotency-Key"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OntologySuggestionBatchRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OntologySuggestionBatchResponse"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Rate limit exceeded */
+            429: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Service unavailable */
+            503: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+        };
+    };
     post_v1_ontology_suggestions_comment: {
         parameters: {
             query?: {
@@ -40388,6 +43132,286 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["OntologyChangeSuggestion"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Rate limit exceeded */
+            429: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Service unavailable */
+            503: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+        };
+    };
+    post_v1_ontology_suggestions_dismiss_batch: {
+        parameters: {
+            query?: {
+                /** @description Graph name (default `main`) */
+                graph?: string;
+            };
+            header?: {
+                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                "Lbb-Version"?: string;
+                /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
+                "Idempotency-Key"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OntologySuggestionBatchRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OntologySuggestionBatchResponse"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Rate limit exceeded */
+            429: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Service unavailable */
+            503: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+        };
+    };
+    get_v1_ontology_suggestions_patterns: {
+        parameters: {
+            query?: {
+                /** @description Graph name (default `main`) */
+                graph?: string;
+                /** @description open | accepted | dismissed | superseded */
+                status?: string;
+                /** @description Producer id, for example `starter:documents-link` */
+                origin_id?: string;
+                /** @description facts | links | ontology | other */
+                type?: string;
+            };
+            header?: {
+                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                "Lbb-Version"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OntologySuggestionPatternList"];
                 };
             };
             /** @description Bad request */
@@ -45509,6 +48533,150 @@ export interface operations {
             };
         };
     };
+    get_v1_workflows_inbox: {
+        parameters: {
+            query?: {
+                /** @description Graph name (default `main`) */
+                graph?: string;
+                /** @description Optional decimal u64 graph incarnation from /v1/workflows/scope. A changed incarnation returns 409 graph_epoch_changed; a graph missing at admission returns 404. Synchronous writes and CAS retries cannot mutate a replacement incarnation; detached jobs are outside this precondition. */
+                expected_graph_epoch?: string;
+                /** @description Workflow type */
+                workflow_type?: string;
+                /** @description Workflow version (every version when absent) */
+                version?: string;
+                /** @description Workflow id cursor */
+                after?: string;
+                /** @description Maximum instances (1-100) */
+                limit?: string;
+            };
+            header?: {
+                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                "Lbb-Version"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkflowTypeInboxResponse"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Rate limit exceeded */
+            429: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Service unavailable */
+            503: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+        };
+    };
     get_v1_workflows_instances: {
         parameters: {
             query?: {
@@ -46247,6 +49415,150 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["WorkflowTurnHistoryResponse"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Rate limit exceeded */
+            429: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Service unavailable */
+            503: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+        };
+    };
+    get_v1_workflows_instances_inbox: {
+        parameters: {
+            query?: {
+                /** @description Graph name (default `main`) */
+                graph?: string;
+                /** @description Optional decimal u64 graph incarnation from /v1/workflows/scope. A changed incarnation returns 409 graph_epoch_changed; a graph missing at admission returns 404. Synchronous writes and CAS retries cannot mutate a replacement incarnation; detached jobs are outside this precondition. */
+                expected_graph_epoch?: string;
+                /** @description Workflow id */
+                id?: string;
+                /** @description Turn number cursor */
+                after?: string;
+                /** @description Maximum messages (1-100) */
+                limit?: string;
+                /** @description true to include each message */
+                payloads?: string;
+            };
+            header?: {
+                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                "Lbb-Version"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkflowInboxResponse"];
                 };
             };
             /** @description Bad request */
@@ -47777,6 +51089,282 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["TriggeredWorkflowDeleteResponse"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Rate limit exceeded */
+            429: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Service unavailable */
+            503: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+        };
+    };
+    get_v1_workflows_triggered_calibration: {
+        parameters: {
+            query?: {
+                /** @description Graph name (default `main`) */
+                graph?: string;
+                /** @description `true` puts the labels of batch decisions on unseen items into the bands */
+                include_batch?: string;
+            };
+            header?: {
+                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                "Lbb-Version"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkflowGateCalibrationReport"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Rate limit exceeded */
+            429: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Service unavailable */
+            503: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+        };
+    };
+    post_v1_workflows_triggered_calibration_apply: {
+        parameters: {
+            query?: {
+                /** @description Graph name (default `main`) */
+                graph?: string;
+            };
+            header?: {
+                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                "Lbb-Version"?: string;
+                /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
+                "Idempotency-Key"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WorkflowGateApplyRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TriggeredWorkflow"];
                 };
             };
             /** @description Bad request */

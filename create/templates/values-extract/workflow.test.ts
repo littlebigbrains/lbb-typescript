@@ -11,6 +11,7 @@ import { ENTITY_IRI_NAMESPACE, type DecideAnswer } from "@littlebigbrain/client"
 import {
   MockActivities,
   mockId,
+  phases,
   readJson,
   runMessage,
   samplesDir,
@@ -176,6 +177,24 @@ test("each written value has a source whose evidence is a quote of the text", as
   }
 });
 
+test("each step reports its phase as the LBB-run values.extract words it", async () => {
+  const lbb = new MockActivities(rules(RECORDS));
+  const { turns } = await runMessage(
+    createWorkflow(lbb),
+    triggerMessage(
+      "values-extract",
+      RECORDS.map((r) => iriOf(r.name)),
+    ),
+  );
+  assert.deepEqual(phases(turns), ["reading values", "asking the decision model", "writing facts"]);
+  assert.deepEqual(
+    turns[0]!.progress
+      .filter((p) => p.phase === "reading values")
+      .map((p) => [p.step, p.done, p.total, p.unit]),
+    RECORDS.map((_, i) => [`values-${i}`, i, RECORDS.length, "instances"]),
+  );
+});
+
 test("a value below the gate goes to review, and the checks drop wrong types and quotes", async () => {
   const record = {
     name: "S 9.1",
@@ -188,9 +207,13 @@ test("a value below the gate goes to review, and the checks drop wrong types and
     { property: "material", value: "Kunststoff", quote: "Becken aus Kunststoff" },
   ];
   const lbb = new MockActivities(rules([record], { reason: () => ({ values: proposals }) }));
-  const { state } = await runMessage(
+  const { state, turns } = await runMessage(
     createWorkflow(lbb),
     triggerMessage("values-extract", [iriOf(record.name)]),
+  );
+  assert.deepEqual(
+    turns[0]!.progress.find((p) => p.phase === "filing review items"),
+    { step: "review", phase: "filing review items", done: 0, total: 1, unit: "items" },
   );
 
   assert.deepEqual(written(lbb, record.name), { material: "Kunststoff" });
