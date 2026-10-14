@@ -2,7 +2,7 @@
 
 All notable changes to the `@littlebigbrain/client` package are documented here.
 
-## Unreleased
+## 0.26.0 (2026-10-14)
 
 - `client.workflows.named` reads and writes workflows with triggers
   (`/v1/workflows/named`): `list`, `get`, `put` (your worker's workflow
