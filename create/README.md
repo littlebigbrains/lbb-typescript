@@ -20,6 +20,7 @@ npm test
 | `ontology-fit` | Proposes the ontology changes the texts of a class support, as review items |
 | `documents-map` | Maps the links of `documents-link` into the graph's own ontology, as fact proposals |
 | `review` | Writes the fact proposals at or above a gate as facts and gives the others to a person |
+| `link` | Connects the mentions of one thing across the records of a graph into one thing, and proposes records of one thing as an identity |
 
 A template id is the id of its starter workflow, with dashes for dots:
 `documents-link` is the code of `documents.link`.
@@ -31,7 +32,8 @@ A template id is the id of its starter workflow, with dashes for dots:
 | `src/workflow.ts` | The workflow, its settings, the triggered workflow that sends it the instances (`trigger()`) and the ontology it writes (`ontology()`) |
 | `src/*.ts` | The template's helpers and `samples.ts`, which puts the samples on a graph |
 | `src/workflow.test.ts`, `src/testing.ts` | The workflow on its samples, with mock models and no server |
-| `src/worker.ts`, `src/setup.ts`, `src/try.ts` | `npm start`, `npm run setup` and `npm run try` |
+| `src/worker.ts`, `src/setup.ts`, `src/try.ts` | `npm start`, `npm run setup` and `npm run try`; a template that has its own (`link`) keeps them |
+| `src/grade-run.ts` | `npm run grade`, in a template that grades a run against a gold file (`link`) |
 | `samples/` | The samples and their answer key |
 
 `npm run try` creates a graph (`LBB_GRAPH`, default `try-<template>`), puts

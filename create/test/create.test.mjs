@@ -95,6 +95,36 @@ test("a documents-link project has the template, its samples and the three comma
   assert.doesNotMatch(readme, /\]\(\.\.\//, "no link into the repository");
 });
 
+test("a link project keeps the template's folders, its own commands and its grading command", async () => {
+  const dir = join(await scratch(), "links");
+  const files = await create({ template: "link", dir });
+  for (const file of [
+    "src/sources/records.ts",
+    "src/grade-run.ts",
+    "samples/gold.json",
+    "samples/records.json",
+  ])
+    assert.ok(files.includes(file), file);
+  const setup = await readFile(join(dir, "src", "setup.ts"), "utf8");
+  assert.match(setup, /await setup\(client/, "the template's own setup, not the project's");
+  const fixture = await readFile(join(dir, "src", "fixture.ts"), "utf8");
+  assert.match(fixture, /from "\.\/testing\.js"/);
+  const pkg = JSON.parse(await readFile(join(dir, "package.json"), "utf8"));
+  assert.equal(pkg.scripts.grade, "tsx src/grade-run.ts");
+  const other = JSON.parse(
+    await readFile(
+      join(
+        await create({ template: "review", dir: join(dir, "..", "review") }).then(() =>
+          join(dir, "..", "review"),
+        ),
+        "package.json",
+      ),
+      "utf8",
+    ),
+  );
+  assert.equal(other.scripts.grade, undefined);
+});
+
 test("a project needs a known template and an empty directory", async () => {
   const dir = await scratch();
   await assert.rejects(create({ template: "embeddings", dir: join(dir, "x") }), /unknown template/);

@@ -405,7 +405,14 @@ export async function runTurn<S>(
   definition: WorkflowDefinition<S, WorkflowTriggerMessage>,
   state: unknown,
   message: WorkflowTriggerMessage,
-  options: { prefix?: string; saved?: Turn; crashAfter?: number } = {},
+  options: {
+    prefix?: string;
+    saved?: Turn;
+    crashAfter?: number;
+    /** The engine identity that runs the turn (default `starter.test`), and the turn's number. */
+    workflowId?: string;
+    turn?: number;
+  } = {},
 ): Promise<{ result: TurnResult<S>; turn: Turn }> {
   const prefix = options.prefix ?? mockId(JSON.stringify(message));
   const turn: Turn = { message, keys: [], outputs: [], bytes: 0, progress: [] };
@@ -413,9 +420,9 @@ export async function runTurn<S>(
   let ran = 0;
   const ctx = {
     signal: new AbortController().signal,
-    workflowId: "starter.test",
+    workflowId: options.workflowId ?? "starter.test",
     messageId: "starter-test-1",
-    turn: 1,
+    turn: options.turn ?? 1,
     async step<T>(
       key: string,
       effect: (s: {
@@ -480,17 +487,23 @@ export async function runTurn<S>(
 /**
  * Run a message and every continuation it leads to, from the empty state the
  * server creates the instance with. Returns the final state and the turns.
+ * With `workflowId` and `turn`, the turns run as that identity, numbered
+ * from `turn` on.
  */
 export async function runMessage<S>(
   definition: WorkflowDefinition<S, WorkflowTriggerMessage>,
   message: WorkflowTriggerMessage,
   state: unknown = {},
+  options: { workflowId?: string; turn?: number } = {},
 ) {
   const turns: Turn[] = [];
   let next: WorkflowTriggerMessage | undefined = message;
   while (next) {
     if (turns.length > 100) throw new Error("more than 100 turns");
-    const ran: { result: TurnResult<S>; turn: Turn } = await runTurn(definition, state, next);
+    const ran: { result: TurnResult<S>; turn: Turn } = await runTurn(definition, state, next, {
+      ...(options.workflowId ? { workflowId: options.workflowId } : {}),
+      ...(options.turn !== undefined ? { turn: options.turn + turns.length } : {}),
+    });
     turns.push(ran.turn);
     state = ran.result.state;
     next = ran.result.continuation?.message;
