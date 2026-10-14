@@ -69,6 +69,8 @@ export type {
   QueryAskStreamEvent,
 } from "./namespaces.js";
 export type {
+  NamedWorkflowQueueOptions,
+  NamedWorkflowsNamespace,
   StarterWorkflowsNamespace,
   TriggeredWorkflowRef,
   TriggeredWorkflowsNamespace,
