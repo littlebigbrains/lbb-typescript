@@ -1,6 +1,7 @@
 import type { LbbClient, Schemas } from "./client.js";
 import type { CallOptions } from "./transport.js";
 import {
+  DerivationsNamespace,
   NamedWorkflowsNamespace,
   StarterWorkflowsNamespace,
   TriggeredWorkflowsNamespace,
@@ -241,15 +242,21 @@ export class WorkflowNamespace {
   readonly triggered: TriggeredWorkflowsNamespace;
   /**
    * Workflows with triggers: a target workflow type, shards, settings and
-   * a watch trigger; and the queue of what each watch has not sent yet.
-   * `triggered` is the same workflows in their older shape.
+   * a watch or content trigger; and the queue of what each trigger has not
+   * sent yet. `triggered` is the watches in their older shape.
    */
   readonly named: NamedWorkflowsNamespace;
+  /**
+   * Derivations: what one version of a workflow made of one content with
+   * one set of settings, checked before the work and recorded after.
+   */
+  readonly derivations: DerivationsNamespace;
 
   constructor(private readonly client: LbbClient) {
     this.starters = new StarterWorkflowsNamespace(client);
     this.triggered = new TriggeredWorkflowsNamespace(client);
     this.named = new NamedWorkflowsNamespace(client);
+    this.derivations = new DerivationsNamespace(client);
   }
   handle<M = unknown>(id: string): WorkflowHandle<M> {
     return new WorkflowHandle<M>(this, id);
@@ -402,6 +409,61 @@ export class WorkflowNamespace {
 }
 const suspended = Symbol("workflow sleep");
 
+/**
+ * The run of a turn this process runs: the `workflow` its activity calls
+ * name, and what those calls used, added up for the completion.
+ * @internal
+ */
+export interface ActivityTurn {
+  workflow: Schemas["ActivityWorkflow"];
+  usage: Schemas["WorkflowRunUsage"];
+}
+
+/** The turns this process runs now, by their effect prefix. */
+const runningTurns = new Map<string, ActivityTurn>();
+
+/**
+ * The turn an activity call belongs to: the turn whose effect prefix starts
+ * `effectId` (a step's `effectId`, or one made from it such as
+ * `${s.effectId}.2`); else, when this process runs one turn only, that
+ * turn. `undefined` outside a turn.
+ * @internal
+ */
+export function activityTurn(
+  effectId: string | undefined,
+): ActivityTurn | undefined {
+  if (effectId !== undefined) {
+    const slash = effectId.indexOf("/");
+    const turn =
+      slash > 0 ? runningTurns.get(effectId.slice(0, slash)) : undefined;
+    if (turn) return turn;
+  }
+  if (runningTurns.size !== 1) return undefined;
+  return runningTurns.values().next().value;
+}
+
+/** Add one activity call's usage to its turn. @internal */
+export function addTurnUsage(
+  turn: ActivityTurn,
+  used: Partial<Schemas["WorkflowRunUsage"]>,
+): void {
+  for (const key of [
+    "calls",
+    "errors",
+    "tokens_in",
+    "tokens_out",
+    "cost_micro_usd",
+  ] as const) {
+    turn.usage[key] = (turn.usage[key] ?? 0) + (used[key] ?? 0);
+  }
+}
+
+/** The usage a turn reports, or nothing when it made no activity call. */
+const reportedUsage = (turn: ActivityTurn) =>
+  (turn.usage.calls ?? 0) > 0 || (turn.usage.errors ?? 0) > 0
+    ? { usage: { ...turn.usage } }
+    : {};
+
 /** Progress writes of one step at most this often, by default. */
 const PROGRESS_EVERY_MS = 3_000;
 const UNIT = /^[\p{L}\p{N} _-]{1,32}$/u;
@@ -500,6 +562,23 @@ export class WorkflowWorker {
       turn: task.turn.number,
       token: task.token,
     };
+    // The run of this attempt: the activity calls of its steps name it,
+    // and their usage goes with the completion.
+    const turnRun: ActivityTurn = {
+      workflow: {
+        identity: task.turn.workflow_id,
+        turn: task.turn.number,
+        ...(task.turn.run?.id ? { run_id: task.turn.run.id } : {}),
+      },
+      usage: {
+        calls: 0,
+        errors: 0,
+        tokens_in: 0,
+        tokens_out: 0,
+        cost_micro_usd: 0,
+      },
+    };
+    runningTurns.set(task.effect_prefix, turnRun);
     let alive = true,
       busy = false,
       position = 0,
@@ -855,6 +934,7 @@ export class WorkflowWorker {
         continuation: result.continuation
           ? copy(result.continuation, "continuation")
           : null,
+        ...reportedUsage(turnRun),
       };
       // Serialize completion retries exactly; a lost response must not rerun effects.
       stopHeartbeat();
@@ -875,11 +955,14 @@ export class WorkflowWorker {
           ...lease,
           error: String(error).slice(0, 1000),
           non_retryable: error instanceof WorkflowError,
+          ...reportedUsage(turnRun),
         },
         retry: false,
         signal: controller.signal,
       });
     } finally {
+      if (runningTurns.get(task.effect_prefix) === turnRun)
+        runningTurns.delete(task.effect_prefix);
       controller.signal.removeEventListener("abort", onAbort);
       alive = false;
       stopHeartbeat();

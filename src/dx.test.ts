@@ -216,6 +216,21 @@ test("starter workflows and triggered workflows map each operation to its route"
   await client.workflows.triggered.refresh(ref);
   await client.workflows.triggered.delete(ref);
   await client.graph("sales").workflows.triggered.list();
+  const link = { starter: "documents.link", name: "documents-link" };
+  await client.workflows.triggered.runs(link);
+  await client.workflows.triggered.runs(link, {
+    before: "1760400000000-n1-000002",
+    limit: 20,
+    outcome: "failed",
+  });
+  await client.workflows.triggered.run(link, "1760400000000-n1-000002");
+  await client.workflows.triggered.runStats(link, { hours: 48 });
+  await client.workflows.triggered.documents(link, {
+    q: "schedule",
+    sort: "recent",
+    after: "ab12",
+    limit: 10,
+  });
   // Ontology starters keep their own namespace and routes.
   await client.ontology.starters.list();
 
@@ -230,6 +245,11 @@ test("starter workflows and triggered workflows map each operation to its route"
       "POST http://h/v1/workflows/triggered/refresh?graph=crm&starter=ontology.fit&name=interview",
       "DELETE http://h/v1/workflows/triggered?graph=crm&starter=ontology.fit&name=interview&confirm=interview",
       "GET http://h/v1/workflows/triggered?graph=sales",
+      "GET http://h/v1/workflows/triggered/runs?graph=crm&starter=documents.link&name=documents-link",
+      "GET http://h/v1/workflows/triggered/runs?graph=crm&starter=documents.link&name=documents-link&before=1760400000000-n1-000002&limit=20&outcome=failed",
+      "GET http://h/v1/workflows/triggered/runs/get?graph=crm&starter=documents.link&name=documents-link&run=1760400000000-n1-000002",
+      "GET http://h/v1/workflows/triggered/runs/stats?graph=crm&starter=documents.link&name=documents-link&hours=48",
+      "GET http://h/v1/workflows/triggered/documents?graph=crm&starter=documents.link&name=documents-link&q=schedule&sort=recent&after=ab12&limit=10",
       "GET http://h/v1/ontology/starters?graph=crm",
     ],
   );
