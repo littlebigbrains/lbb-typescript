@@ -2,6 +2,20 @@
 
 All notable changes to the `@littlebigbrain/client` package are documented here.
 
+## Unreleased
+
+- `client.workflows.named` reads and writes workflows with triggers
+  (`/v1/workflows/named`): `list`, `get`, `put` (your worker's workflow
+  type, one `watch` trigger, `shards`, `route_by`, `window`, `batch`,
+  `owns`), `run` (run now), `pause`, `delete`, and `queue` (what the
+  watch has not sent yet, each item with its shard and origin, and per
+  shard its message in flight and its inbox). `client.workflows.triggered`
+  stays as the same workflows in their older shape.
+- `WorkflowTriggerMessage` gains `origin`: the trigger, and a backfill, a
+  commit range with the watched fields that changed and the requests that
+  changed the instances, a run now or a schema change.
+  `WorkflowMessageOrigin` gains `ontology_version`.
+
 ## 0.25.0 (2026-10-13)
 
 - `client.evals.runAnswers({ runner, answers })` checks your own agent's

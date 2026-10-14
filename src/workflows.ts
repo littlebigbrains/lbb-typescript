@@ -1,6 +1,7 @@
 import type { LbbClient, Schemas } from "./client.js";
 import type { CallOptions } from "./transport.js";
 import {
+  NamedWorkflowsNamespace,
   StarterWorkflowsNamespace,
   TriggeredWorkflowsNamespace,
 } from "./triggered-workflows.js";
@@ -238,10 +239,17 @@ export class WorkflowNamespace {
    * runs when a published commit changes the class it watches.
    */
   readonly triggered: TriggeredWorkflowsNamespace;
+  /**
+   * Workflows with triggers: a target workflow type, shards, settings and
+   * a watch trigger; and the queue of what each watch has not sent yet.
+   * `triggered` is the same workflows in their older shape.
+   */
+  readonly named: NamedWorkflowsNamespace;
 
   constructor(private readonly client: LbbClient) {
     this.starters = new StarterWorkflowsNamespace(client);
     this.triggered = new TriggeredWorkflowsNamespace(client);
+    this.named = new NamedWorkflowsNamespace(client);
   }
   handle<M = unknown>(id: string): WorkflowHandle<M> {
     return new WorkflowHandle<M>(this, id);

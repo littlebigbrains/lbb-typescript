@@ -93,6 +93,111 @@ test("workflows.triggered.pause posts the flag for one triggered workflow", asyn
   );
 });
 
+test("workflows.named reads, changes, runs, pauses and deletes one workflow, and reads its queue", async () => {
+  const named = {
+    name: "notes",
+    starter: "workflow",
+    workflow: { workflow_type: "word-count", version: "v1" },
+    runs_in: "worker",
+    shards: 2,
+    window: 4,
+    owns: {},
+    triggers: [
+      { id: "watch", kind: "watch", watch: { class: "urn:Note", fields: [] } },
+    ],
+    paused: false,
+    status: { state: "ready", pending: 0 },
+  };
+  const queue = {
+    name: "notes",
+    trigger: "watch",
+    pending: 1,
+    items: [
+      {
+        iri: "https://littlebigbrain.com/e/aa",
+        reason: "changed",
+        shard: 1,
+        origin: { kind: "commit", trigger: "watch", from_seq: 4, to_seq: 5 },
+      },
+    ],
+    next_after: null,
+  };
+  const { fetch, requests } = queuedFetch([
+    { body: { workflows: [named] } },
+    { body: named },
+    { body: named },
+    { body: { workflow: named, queued: true } },
+    { body: { ...named, paused: true } },
+    { body: queue },
+    { body: { deleted: true } },
+  ]);
+  const client = new LbbClient({ baseUrl: "http://h", graph: "crm", fetch });
+  const request: Schemas["NamedWorkflowRequest"] = {
+    name: "notes",
+    workflow: { workflow_type: "word-count", version: "v1" },
+    shards: 2,
+    route_by: "author",
+    triggers: [{ watch: { class: "Note" } }],
+  };
+
+  const listed = await client.workflows.named.list();
+  const one = await client.workflows.named.get("notes");
+  await client.workflows.named.put(request);
+  const ran = await client.workflows.named.run("notes");
+  const paused = await client.workflows.named.pause("notes");
+  const waiting = await client.workflows.named.queue("notes", {
+    after: 50,
+    limit: 25,
+  });
+  await client.workflows.named.delete("notes");
+
+  assert.equal(listed.workflows[0]?.shards, 2);
+  assert.equal(one.triggers[0]?.id, "watch");
+  assert.equal(ran.queued, true);
+  assert.equal(paused.paused, true);
+  assert.equal(waiting.items[0]?.origin.kind, "commit");
+  assert.deepEqual(
+    requests.map(({ url, method, body }) => ({ url, method, body })),
+    [
+      {
+        url: "http://h/v1/workflows/named?graph=crm",
+        method: "GET",
+        body: undefined,
+      },
+      {
+        url: "http://h/v1/workflows/named?graph=crm&name=notes",
+        method: "GET",
+        body: undefined,
+      },
+      {
+        url: "http://h/v1/workflows/named?graph=crm",
+        method: "PUT",
+        body: request,
+      },
+      {
+        url: "http://h/v1/workflows/named/run?graph=crm&name=notes",
+        method: "POST",
+        body: undefined,
+      },
+      {
+        url: "http://h/v1/workflows/named/pause?graph=crm&name=notes",
+        method: "POST",
+        body: { paused: true },
+      },
+      {
+        url: "http://h/v1/workflows/named/queue?graph=crm&name=notes&after=50&limit=25",
+        method: "GET",
+        body: undefined,
+      },
+      {
+        url: "http://h/v1/workflows/named?graph=crm&name=notes&confirm=notes",
+        method: "DELETE",
+        body: undefined,
+      },
+    ],
+  );
+});
+
 test("workflows.starters.use sends the workflow, the owned outputs and the batch", async () => {
   const { fetch, requests } = queuedFetch([{ body: TRIGGERED }]);
   const client = new LbbClient({ baseUrl: "http://h", graph: "crm", fetch });

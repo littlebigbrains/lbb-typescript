@@ -179,3 +179,137 @@ export class TriggeredWorkflowsNamespace {
     });
   }
 }
+
+/** Paging of a workflow's queue (`client.workflows.named.queue`). */
+export interface NamedWorkflowQueueOptions extends CallOptions {
+  /** The trigger's id; the workflow's own when absent. */
+  trigger?: string;
+  /** The position to start from: `next_after` of the page before. */
+  after?: number;
+  /** Items per page, 1 to 100 (default 50). */
+  limit?: number;
+}
+
+/**
+ * Workflows with triggers (`/v1/workflows/named`): a named workflow of the
+ * graph has a target workflow type, shards, settings and triggers. A
+ * trigger is a watch: when a published commit adds, changes or removes
+ * instances of its class, the watch sends them as messages to the target
+ * type's instances, its shards (`starter.<name>`, `starter.<name>.<k>`),
+ * routed by `route_by` so the changes of one key stay in order, at most
+ * `window` messages queued per shard. Each message names its origin. The
+ * workflows LBB runs list here too, with their `lbb.*` target. The
+ * triggered workflows of `client.workflows.triggered` are the same
+ * workflows in their older shape.
+ */
+export class NamedWorkflowsNamespace {
+  constructor(private readonly client: LbbClient) {}
+
+  /** Every workflow with triggers of the graph, by name, with its status. */
+  list(opts: CallOptions = {}): Promise<Schemas["NamedWorkflowList"]> {
+    return this.client.request("GET", "/v1/workflows/named", opts);
+  }
+
+  /**
+   * One workflow: its target, shards, routing, window, trigger, status and
+   * each shard's engine state. A name the graph does not have fails with
+   * `404 named_workflow_not_found`.
+   */
+  get(name: string, opts: CallOptions = {}): Promise<Schemas["NamedWorkflow"]> {
+    return this.client.request("GET", "/v1/workflows/named", {
+      ...opts,
+      query: { name },
+    });
+  }
+
+  /**
+   * Create or change a workflow of your worker: `name`, `workflow` (the
+   * `workflow_type` and `version` of your worker), one `watch` trigger,
+   * and optionally `shards` (1 to 16), `route_by` (a field of the class),
+   * `window` (1 to 128, default 4), `batch` and `owns`. A change of
+   * `shards` or `route_by` needs every shard's inbox empty
+   * (`409 workflow_shards_busy`: pause, let the inboxes drain, then change
+   * it). The same request again is a no-op, so a failed call is retried.
+   */
+  put(
+    request: Schemas["NamedWorkflowRequest"],
+    opts: CallOptions = {},
+  ): Promise<Schemas["NamedWorkflow"]> {
+    return this.client.request("PUT", "/v1/workflows/named", {
+      ...opts,
+      retry: opts.retry ?? true,
+      body: request,
+    });
+  }
+
+  /**
+   * Run now: the watch reads every instance of its class again and sends
+   * them with origin `manual`. Answers at once with `queued`.
+   */
+  run(
+    name: string,
+    opts: CallOptions = {},
+  ): Promise<Schemas["NamedWorkflowRunResponse"]> {
+    return this.client.request("POST", "/v1/workflows/named/run", {
+      ...opts,
+      query: { name },
+    });
+  }
+
+  /**
+   * Pause (`paused: true`, the default) or resume a workflow: its watch,
+   * and every shard of your worker's type (no new claims). A resume
+   * catches up. The same call again changes nothing, so a failed call is
+   * retried.
+   */
+  pause(
+    name: string,
+    paused = true,
+    opts: CallOptions = {},
+  ): Promise<Schemas["NamedWorkflow"]> {
+    return this.client.request("POST", "/v1/workflows/named/pause", {
+      ...opts,
+      retry: opts.retry ?? true,
+      query: { name },
+      body: { paused } satisfies Schemas["NamedWorkflowPauseRequest"],
+    });
+  }
+
+  /**
+   * What the watch has not sent yet: each waiting instance with its
+   * reason, shard and origin (a backfill, a commit range with the watched
+   * fields and the requests that changed it, a run now, a schema change),
+   * the pass in progress, and per shard its message in flight, its first
+   * unfinished turns with their origins and its running turn's progress.
+   */
+  queue(
+    name: string,
+    opts: NamedWorkflowQueueOptions = {},
+  ): Promise<Schemas["NamedWorkflowQueue"]> {
+    const { trigger, after, limit, ...call } = opts;
+    return this.client.request("GET", "/v1/workflows/named/queue", {
+      ...call,
+      query: {
+        name,
+        ...(trigger !== undefined ? { trigger } : {}),
+        ...(after !== undefined ? { after: String(after) } : {}),
+        ...(limit !== undefined ? { limit: String(limit) } : {}),
+      },
+    });
+  }
+
+  /**
+   * Delete a workflow's triggers; the client repeats the name as
+   * `confirm`. What it wrote stays, and so do the engine identities of your
+   * worker's type.
+   */
+  delete(
+    name: string,
+    opts: CallOptions = {},
+  ): Promise<Schemas["NamedWorkflowDeleteResponse"]> {
+    return this.client.request("DELETE", "/v1/workflows/named", {
+      ...opts,
+      query: { name, confirm: name },
+    });
+  }
+}
