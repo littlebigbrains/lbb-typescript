@@ -1,0 +1,108 @@
+{
+  "format": "lbb.link.gold.v1",
+  "about": "The gold groups of the invented CRM of samples/records.json. Each group is one real thing: the mentions that name it, by record, field and span. Every name, company and address is invented.",
+  "complete": true,
+  "groups": [
+    { "id": "mira", "kind": "person", "mentions": [
+      { "record": "person-mira", "field": "name", "span": "Mira Tannenholt-Ruiz" },
+      { "record": "person-mira", "field": "email", "span": "mira.tannenholt@northbay.example" },
+      { "record": "lead-mira", "field": "first_name+last_name", "span": "Mira Ruiz" },
+      { "record": "lead-mira", "field": "email", "span": "mira.tannenholt@northbay.example" },
+      { "record": "deal-northbay", "field": "name", "span": "M. Tannenholt" },
+      { "record": "note-1", "field": "body", "span": "Mimi T." }
+    ] },
+    { "id": "robert", "kind": "person", "mentions": [
+      { "record": "person-robert", "field": "name", "span": "Robert Haldane" },
+      { "record": "person-robert", "field": "email", "span": "r.haldane@quillfield.example" },
+      { "record": "note-2", "field": "body", "span": "Bob Haldane" },
+      { "record": "note-11", "field": "body", "span": "Robert Haldane" }
+    ] },
+    { "id": "soren", "kind": "person", "mentions": [
+      { "record": "person-soren", "field": "name", "span": "Søren Vestergaard" },
+      { "record": "person-soren", "field": "email", "span": "soren@brightmoor.example" },
+      { "record": "lead-soren", "field": "first_name+last_name", "span": "Soren Vestergaard" },
+      { "record": "lead-soren", "field": "email", "span": "s.vestergaard@brightmoor.example" },
+      { "record": "note-3", "field": "body", "span": "Vestergaard, S." }
+    ] },
+    { "id": "dana", "kind": "person", "mentions": [
+      { "record": "person-dana", "field": "name", "span": "Dana Okafor" },
+      { "record": "person-dana", "field": "email", "span": "dana.okafor@northbay.example" },
+      { "record": "note-5", "field": "body", "span": "D. Okafor" }
+    ] },
+    { "id": "felix", "kind": "person", "mentions": [
+      { "record": "person-felix", "field": "name", "span": "Felix Okafor" },
+      { "record": "person-felix", "field": "email", "span": "felix.okafor@ridgeway.example" },
+      { "record": "note-4", "field": "body", "span": "F. Okafor" }
+    ] },
+    { "id": "jurgen", "kind": "person", "mentions": [
+      { "record": "person-jurgen", "field": "name", "span": "Jürgen Kessler" },
+      { "record": "person-jurgen", "field": "email", "span": "juergen.kessler@harbourline.example" },
+      { "record": "deal-harbourline", "field": "name", "span": "Jurgen Kessler" },
+      { "record": "note-6", "field": "body", "span": "Juergen Kessler" }
+    ] },
+    { "id": "zoe", "kind": "person", "mentions": [
+      { "record": "person-zoe", "field": "name", "span": "Zoë Lindqvist" },
+      { "record": "person-zoe", "field": "email", "span": "zoe@lumen-ash.example" },
+      { "record": "lead-zoe", "field": "first_name+last_name", "span": "Zoe Lindqvist" }
+    ] },
+    { "id": "kit", "kind": "person", "mentions": [
+      { "record": "person-kit", "field": "name", "span": "Kit Marsh" },
+      { "record": "person-kit", "field": "email", "span": "k.marsh@fernway.example" },
+      { "record": "lead-kit", "field": "email", "span": "k.marsh@fernway.example" },
+      { "record": "note-7", "field": "body", "span": "k.marsh@fernway.example" }
+    ] },
+    { "id": "tobias", "kind": "person", "mentions": [
+      { "record": "person-tobias", "field": "name", "span": "Tobias Wren" },
+      { "record": "person-tobias", "field": "email", "span": "tobias.wren@quillfield.example" },
+      { "record": "deal-quillfield", "field": "name", "span": "Wren, Tobias" },
+      { "record": "note-11", "field": "body", "span": "Tobias Wren" }
+    ] },
+    { "id": "priya", "kind": "person", "mentions": [
+      { "record": "person-priya", "field": "name", "span": "Priya Ramaswamy" },
+      { "record": "person-priya", "field": "email", "span": "priya.r@brightmoor.example" },
+      { "record": "note-8", "field": "body", "span": "Priya Ramaswamey" }
+    ] },
+    { "id": "alex-northbay", "kind": "person", "mentions": [
+      { "record": "person-alex-northbay", "field": "name", "span": "Alex Brandt" },
+      { "record": "person-alex-northbay", "field": "email", "span": "alex.brandt@northbay.example" }
+    ] },
+    { "id": "alex-ridgeway", "kind": "person", "mentions": [
+      { "record": "person-alex-ridgeway", "field": "name", "span": "Alex Brandt" },
+      { "record": "person-alex-ridgeway", "field": "email", "span": "a.brandt@ridgeway.example" },
+      { "record": "note-10", "field": "body", "span": "Alex Brandt" }
+    ] },
+    { "id": "casey", "kind": "person", "mentions": [
+      { "record": "lead-casey", "field": "first_name+last_name", "span": "Casey Moreau" },
+      { "record": "lead-casey", "field": "email", "span": "casey.moreau@gmail.com" }
+    ] },
+    { "id": "northbay", "kind": "organization", "mentions": [
+      { "record": "org-northbay", "field": "name", "span": "Northbay Water GmbH" },
+      { "record": "org-northbay", "field": "website", "span": "https://www.northbay.example/" },
+      { "record": "note-9", "field": "body", "span": "Northbay Water" }
+    ] },
+    { "id": "quillfield", "kind": "organization", "mentions": [
+      { "record": "org-quillfield", "field": "name", "span": "Quillfield Labs" },
+      { "record": "org-quillfield", "field": "website", "span": "https://quillfield.example" }
+    ] },
+    { "id": "brightmoor", "kind": "organization", "mentions": [
+      { "record": "org-brightmoor", "field": "name", "span": "Brightmoor Foods" },
+      { "record": "org-brightmoor", "field": "website", "span": "brightmoor.example" }
+    ] },
+    { "id": "ridgeway", "kind": "organization", "mentions": [
+      { "record": "org-ridgeway", "field": "name", "span": "Ridgeway Transit" },
+      { "record": "org-ridgeway", "field": "website", "span": "https://ridgeway.example/" }
+    ] },
+    { "id": "harbourline", "kind": "organization", "mentions": [
+      { "record": "org-harbourline", "field": "name", "span": "Harbourline Marine" },
+      { "record": "org-harbourline", "field": "website", "span": "https://www.harbourline.example" }
+    ] },
+    { "id": "lumen", "kind": "organization", "mentions": [
+      { "record": "org-lumen", "field": "name", "span": "Lumen & Ash" },
+      { "record": "org-lumen", "field": "website", "span": "https://lumen-ash.example" }
+    ] },
+    { "id": "fernway", "kind": "organization", "mentions": [
+      { "record": "org-fernway", "field": "name", "span": "Fernway Studio" },
+      { "record": "org-fernway", "field": "website", "span": "https://fernway.example" }
+    ] }
+  ]
+}

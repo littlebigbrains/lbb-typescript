@@ -21,6 +21,7 @@ export const TEMPLATES = [
   "review",
   "values-extract",
   "ontology-fit",
+  "link",
 ];
 
 const PACKAGE = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -119,15 +120,23 @@ export async function create({ template, dir, client, root = PACKAGE }) {
   const src = join(dir, "src");
   await mkdir(src, { recursive: true });
 
-  // The template's code, its test and the test support, all under src/.
-  for (const file of await readdir(from)) {
-    if (!file.endsWith(".ts")) continue;
+  // The template's code, its test and the test support, all under src/, the
+  // template's folders (`sources/`) as they are.
+  const code = await templateCode(from);
+  for (const file of code) {
     const text = await readFile(join(from, file), "utf8");
-    await writeFile(join(src, file), text.replaceAll("../_shared/testing.js", "./testing.js"));
+    const up = "../".repeat(file.split("/").length - 1);
+    await mkdir(dirname(join(src, file)), { recursive: true });
+    await writeFile(
+      join(src, file),
+      text.replaceAll(`../${up}_shared/testing.js`, `${up || "./"}testing.js`),
+    );
   }
   await cp(join(templates, "_shared", "testing.ts"), join(src, "testing.ts"));
   await cp(join(from, "samples"), join(dir, "samples"), { recursive: true });
+  // A template's own commands win: a workflow of several parts sets itself up.
   for (const file of ["worker.ts", "setup.ts", "try.ts"]) {
+    if (code.includes(file)) continue;
     const text = await readFile(join(root, "project", file), "utf8");
     await writeFile(join(src, file), text.replaceAll("__TEMPLATE__", template));
   }
@@ -144,6 +153,7 @@ export async function create({ template, dir, client, root = PACKAGE }) {
       try: "tsx src/try.ts",
       test: "tsx --test src/workflow.test.ts",
       typecheck: "tsc --noEmit",
+      ...(code.includes("grade-run.ts") ? { grade: "tsx src/grade-run.ts" } : {}),
     },
     dependencies: { "@littlebigbrain/client": client ?? `^${clientVersion(templates)}` },
     devDependencies: { "@types/node": "^22", tsx: "^4", typescript: "^5.6" },
@@ -207,6 +217,18 @@ ${projectReadme(readme).trim()}
 `,
   );
   return listFiles(dir);
+}
+
+/**
+ * The TypeScript files of a template folder, relative, in its folders too;
+ * the samples are copied on their own.
+ * @param {string} from
+ * @returns {Promise<string[]>}
+ */
+async function templateCode(from) {
+  return (await listFiles(from)).filter(
+    (file) => file.endsWith(".ts") && !file.startsWith("samples/"),
+  );
 }
 
 /** Every file under `dir`, relative and sorted. @param {string} dir @returns {Promise<string[]>} */
