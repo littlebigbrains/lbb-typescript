@@ -69,11 +69,20 @@ export type {
   QueryAskStreamEvent,
 } from "./namespaces.js";
 export type {
+  DerivationKey,
+  DerivationsNamespace,
+  DeriveOptions,
+  DeriveResult,
   NamedWorkflowQueueOptions,
   NamedWorkflowsNamespace,
   StarterWorkflowsNamespace,
+  TriggeredWorkflowDocumentsOptions,
   TriggeredWorkflowRef,
+  TriggeredWorkflowRunStatsOptions,
+  TriggeredWorkflowRunsOptions,
   TriggeredWorkflowsNamespace,
+  WorkflowRunStatsOptions,
+  WorkflowRunsOptions,
 } from "./triggered-workflows.js";
 export type {
   IntegrationsNamespace,

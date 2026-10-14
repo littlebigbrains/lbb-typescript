@@ -586,3 +586,175 @@ test("a handler reads its message's origin, and senders and the inbox carry orig
     after: "a",
   });
 });
+
+test("activity calls of a turn name its run and their usage goes with the completion", async () => {
+  const { lbbActivities } = await import("./activities.js");
+  const claimed = task();
+  claimed.turn.run = {
+    id: "0000000000001-agent-1",
+    started_at_ms: 1,
+    queue_before: 1,
+  };
+  const { client, calls } = setup([claimed], true, (path, body) => {
+    if (path.endsWith("/activities/reason"))
+      return body.effect_id === "stable/kept"
+        ? {
+            value: {},
+            model: "m",
+            tokens_in: 0,
+            tokens_out: 0,
+            cost_micro_usd: 0,
+            cached: true,
+          }
+        : {
+            value: { code: "P3" },
+            model: "m",
+            tokens_in: 120,
+            tokens_out: 30,
+            cost_micro_usd: 9,
+            cached: false,
+          };
+    if (path.endsWith("/activities/embed"))
+      return {
+        vectors: [[0.1]],
+        model: "e",
+        dim: 1,
+        tokens_in: 5,
+        cost_micro_usd: 1,
+        cached: false,
+      };
+    return {};
+  });
+  const lbb = lbbActivities(client);
+  const counter = workflow({
+    name: "counter",
+    version: "v1",
+    initialState: { count: 0 },
+    async onMessage(ctx, state) {
+      await ctx.step("define", (s) =>
+        lbb.reason(
+          { prompt: "p", schema: { type: "object" } },
+          { effectId: s.effectId, instance: "manual-px-210.pdf" },
+        ),
+      );
+      // A second call of one step, with an id made from the step's.
+      await ctx.step("embed", (s) =>
+        lbb.embed({ texts: ["t"] }, { effectId: `${s.effectId}.2` }),
+      );
+      // A kept answer is no call and costs nothing.
+      await ctx.step("kept", (s) =>
+        lbb.reason(
+          { prompt: "p", schema: { type: "object" } },
+          { effectId: s.effectId },
+        ),
+      );
+      return { state };
+    },
+  });
+  await new WorkflowWorker(client, [counter], { worker: "test" }).runOnce();
+  const activity = calls.filter((c) => c.path.includes("/activities/"));
+  assert.equal(activity.length, 3);
+  assert.deepEqual(activity[0].body.workflow, {
+    identity: "agent",
+    turn: 1,
+    run_id: "0000000000001-agent-1",
+    instance: "manual-px-210.pdf",
+  });
+  assert.deepEqual(activity[1].body.workflow, {
+    identity: "agent",
+    turn: 1,
+    run_id: "0000000000001-agent-1",
+  });
+  const done = calls.filter((c) => c.path.endsWith("/complete"));
+  // The completion's retry after a lost answer sends the same usage.
+  assert.equal(done.length, 2);
+  assert.deepEqual(done[0].body, done[1].body);
+  assert.deepEqual(done[0].body.usage, {
+    calls: 2,
+    errors: 0,
+    tokens_in: 125,
+    tokens_out: 30,
+    cost_micro_usd: 10,
+  });
+  // Outside a turn an activity names no run.
+  await lbb.reason(
+    { prompt: "p", schema: { type: "object" } },
+    { effectId: "other" },
+  );
+  assert.equal(calls.at(-1)?.body.workflow, undefined);
+});
+
+test("a turn without activity calls completes without usage, and a refused call counts as an error", async () => {
+  const { lbbActivities } = await import("./activities.js");
+  const { client, calls } = setup([task(), task()]);
+  const quiet = workflow({
+    name: "counter",
+    version: "v1",
+    initialState: { count: 0 },
+    async onMessage(_ctx, state) {
+      return { state };
+    },
+  });
+  await new WorkflowWorker(client, [quiet], { worker: "test" }).runOnce();
+  const first = calls.filter((c) => c.path.endsWith("/complete"));
+  assert.equal(first.length, 1);
+  assert.equal(first[0].body.usage, undefined);
+
+  const refusing = new LbbClient({
+    baseUrl: "http://localhost:7400",
+    maxRetries: 0,
+    fetch: async (input, init) => {
+      const path = new URL(input).pathname;
+      calls.push({ path, body: JSON.parse(String(init?.body ?? "{}")) });
+      if (path.endsWith("/claim"))
+        return new Response(JSON.stringify({ task: task() }), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        });
+      if (path.endsWith("/activities/reason"))
+        return new Response(
+          JSON.stringify({
+            error: {
+              type: "invalid_request_error",
+              code: "activity_request_refused",
+              message: "too large",
+            },
+          }),
+          { status: 422, headers: { "content-type": "application/json" } },
+        );
+      return new Response("{}", {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      });
+    },
+  });
+  const lbb = lbbActivities(refusing);
+  const splitting = workflow({
+    name: "counter",
+    version: "v1",
+    initialState: { count: 0 },
+    async onMessage(ctx, state) {
+      await ctx.step("ask", async (s) => {
+        try {
+          await lbb.reason(
+            { prompt: "p", schema: { type: "object" } },
+            { effectId: s.effectId },
+          );
+        } catch {
+          // The template splits a refused request; here it gives up.
+        }
+        return null;
+      });
+      return { state };
+    },
+  });
+  await new WorkflowWorker(refusing, [splitting], { worker: "test" }).runOnce();
+  const last = calls.filter((c) => c.path.endsWith("/complete")).at(-1);
+  assert.deepEqual(last?.body.usage, {
+    calls: 1,
+    errors: 1,
+    tokens_in: 0,
+    tokens_out: 0,
+    cost_micro_usd: 0,
+  });
+});

@@ -198,6 +198,41 @@ test("workflows.named reads, changes, runs, pauses and deletes one workflow, and
   );
 });
 
+test("workflows.named.put takes a content trigger, and a content message names its upload", async () => {
+  const content = {
+    id: "pdfs",
+    kind: "content",
+    content: { media_types: ["application/pdf"] },
+  };
+  const { fetch, requests } = queuedFetch([
+    { body: { name: "pdfs", triggers: [content] } },
+  ]);
+  const client = new LbbClient({ baseUrl: "http://h", graph: "crm", fetch });
+  const request: Schemas["NamedWorkflowRequest"] = {
+    name: "pdfs",
+    workflow: { workflow_type: "acme.parse", version: "v1" },
+    shards: 4,
+    triggers: [{ id: "pdfs", content: { media_types: ["application/pdf"] } }],
+  };
+
+  const created = await client.workflows.named.put(request);
+
+  assert.deepEqual(created.triggers[0], content);
+  assert.equal(requests[0]?.method, "PUT");
+  assert.deepEqual(requests[0]?.body, request);
+  // The message of a content trigger: one document, and the content in its
+  // origin.
+  const origin: Schemas["WorkflowMessageOrigin"] = {
+    kind: "content",
+    trigger: "pdfs",
+    sha256: "ab".repeat(32),
+    media_type: "application/pdf",
+    uploaded_at_ms: 1_791_967_651_158,
+    requests: ["file-upload:ab"],
+  };
+  assert.equal(origin.sha256?.length, 64);
+});
+
 test("workflows.starters.use sends the workflow, the owned outputs and the batch", async () => {
   const { fetch, requests } = queuedFetch([{ body: TRIGGERED }]);
   const client = new LbbClient({ baseUrl: "http://h", graph: "crm", fetch });

@@ -2,6 +2,34 @@
 
 All notable changes to the `@littlebigbrain/client` package are documented here.
 
+## Unreleased
+
+- The runs of a workflow: `client.workflows.named.runs(name, { before,
+  limit, outcome })`, `getRun(name, runId)` (a run with its model calls)
+  and `runStats(name, { hours })` read the run summaries a workflow keeps
+  for 30 days (`WorkflowRunList`, `WorkflowRunDetail`, `WorkflowRunStats`).
+  `client.workflows.triggered.runs(ref)`, `run(ref, runId)` and
+  `runStats(ref)` read the same by starter and name, and
+  `documents(ref, { q, sort, after, limit })` pages the documents of
+  `documents.link` and `documents.map`.
+- A `WorkflowWorker` turn names its run on each model activity call of
+  `lbbActivities` (`workflow`: the identity, the turn, the run's id, and
+  the `instance` option), and sends the calls' summed `usage` with the
+  completion (and with a failure). The worker's code does nothing for it.
+  This release needs a server that takes `workflow` and `usage`.
+- `client.workflows.named.put` takes a content trigger:
+  `{ content: { media_types: ["application/pdf"] } }` sends each upload of
+  those media types as it is logged, without a wait for a publication, one
+  content per message, routed by its SHA-256. `WorkflowTriggerResolved`
+  gains `content`, and its `watch` is absent for a content trigger.
+  `WorkflowMessageOrigin` gains `sha256`, `media_type` and
+  `uploaded_at_ms` (an origin of kind `content`).
+- `client.workflows.derivations.check(key)` and `.record(request)`
+  (`/v1/workflows/derivations/*`): what one version of a workflow made of
+  one content with one set of settings. `.derive(key, work, { runId })`
+  checks, runs `work` when there is no derivation, and records what it
+  returns.
+
 ## 0.26.0 (2026-10-14)
 
 - `client.workflows.named` reads and writes workflows with triggers

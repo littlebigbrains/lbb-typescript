@@ -5,7 +5,10 @@
 // step's `effectId` and a step that runs again after a crash gets the
 // answer it got the first time, at no cost. The other activities are thin
 // helpers over routes the client already has: parsed pages, SPARQL, owned
-// writes, review items and ontology changes. Reference:
+// writes, review items and ontology changes. A model activity called from
+// a step of a `WorkflowWorker` turn names the turn's run (`workflow`), so
+// the call log links the call to the run, and its usage adds up for the
+// turn's completion: the worker's code does nothing for it. Reference:
 // `docs/reference/workflow-activities.md`.
 import type { LbbClient } from "./client.js";
 import type { FilePages } from "./files.js";
@@ -21,7 +24,13 @@ import type {
   Schemas,
   SparqlResults,
 } from "./types.js";
-import type { WorkflowContext, WorkflowStepContext } from "./workflows.js";
+import {
+  activityTurn,
+  addTurnUsage,
+  type ActivityTurn,
+  type WorkflowContext,
+  type WorkflowStepContext,
+} from "./workflows.js";
 
 /** The options of a model activity (`reason`, `decide`, `embed`). */
 export interface ActivityOptions extends CallOptions {
@@ -37,12 +46,18 @@ export interface ActivityOptions extends CallOptions {
   effectId?: string;
   /** A short name for the call log, at most 64 characters. */
   label?: string;
+  /**
+   * What the call works on, for the call log and the run's page: an
+   * instance IRI or a document's name, at most 512 characters. The turn
+   * and its run are set from the step context.
+   */
+  instance?: string;
 }
 
 /** A `reason` request: the prompt, an optional system prompt, the answer's JSON Schema. */
 export type ReasonRequest = Omit<
   Schemas["ReasonActivityRequest"],
-  "effect_id" | "label"
+  "effect_id" | "label" | "workflow"
 >;
 /** A `reason` answer: `value` (typed by the caller) and the usage. */
 export type ReasonResult<T> = Omit<
@@ -52,7 +67,7 @@ export type ReasonResult<T> = Omit<
 /** A `decide` request: the state and the choice questions by id. */
 export type DecideRequest = Omit<
   Schemas["DecideActivityRequest"],
-  "effect_id" | "label"
+  "effect_id" | "label" | "workflow"
 >;
 /** One choice question: what to decide and the options by id. */
 export type DecideQuestion = Schemas["DecideActivityQuestion"];
@@ -63,7 +78,7 @@ export type DecideResult = Schemas["DecideActivityResponse"];
 /** An `embed` request: 1 to 256 texts, each at most 8,000 characters. */
 export type EmbedRequest = Omit<
   Schemas["EmbedActivityRequest"],
-  "effect_id" | "label"
+  "effect_id" | "label" | "workflow"
 >;
 /** An `embed` answer: one vector per text, the model, `dim` and the usage. */
 export type EmbedResult = Schemas["EmbedActivityResponse"];
@@ -188,19 +203,76 @@ const PAGES_PER_CALL = 50;
 function activityCall<B extends object>(
   request: B,
   options: ActivityOptions,
-): { body: B & { effect_id?: string; label?: string }; call: CallOptions } {
-  const { effectId, label, ...call } = options;
+): {
+  body: B & {
+    effect_id?: string;
+    label?: string;
+    workflow?: Schemas["ActivityWorkflow"];
+  };
+  call: CallOptions;
+  turn: ActivityTurn | undefined;
+} {
+  const { effectId, label, instance, ...call } = options;
+  // The turn of the step that makes the call (none outside a turn).
+  const turn = activityTurn(effectId);
   return {
     body: {
       ...request,
       ...(effectId !== undefined ? { effect_id: effectId } : {}),
       ...(label !== undefined ? { label } : {}),
+      ...(turn
+        ? {
+            workflow: {
+              ...turn.workflow,
+              ...(instance !== undefined ? { instance } : {}),
+            },
+          }
+        : {}),
     },
     call: {
       ...call,
       retry: call.retry ?? (effectId !== undefined ? true : "rate_limited"),
     },
+    turn,
   };
+}
+
+/** What an activity answer reports it used. */
+interface ActivityUsage {
+  tokens_in?: number;
+  tokens_out?: number;
+  cost_micro_usd?: number;
+  cached?: boolean;
+}
+
+/**
+ * Add a model activity's usage to its turn: an answer that is not `cached`
+ * is one call; a refusal (422) or a model that did not answer (5xx) is a
+ * call that failed. A kept answer cost nothing and is no call.
+ */
+async function counted<T extends ActivityUsage>(
+  turn: ActivityTurn | undefined,
+  answer: Promise<T>,
+): Promise<T> {
+  if (!turn) return answer;
+  try {
+    const answered = await answer;
+    if (!answered.cached)
+      addTurnUsage(turn, {
+        calls: 1,
+        tokens_in: answered.tokens_in ?? 0,
+        tokens_out: answered.tokens_out ?? 0,
+        cost_micro_usd: answered.cost_micro_usd ?? 0,
+      });
+    return answered;
+  } catch (error) {
+    if (
+      error instanceof LbbError &&
+      (error.status === 422 || error.status >= 500)
+    )
+      addTurnUsage(turn, { calls: 1, errors: 1 });
+    throw error;
+  }
 }
 
 /**
@@ -223,26 +295,43 @@ export function lbbActivities(client: LbbClient): LbbActivities {
       request: ReasonRequest,
       options: ActivityOptions = {},
     ): Promise<ReasonResult<T>> {
-      const { body, call } = activityCall(request, options);
-      return client.request("POST", "/v1/workflows/activities/reason", {
-        timeoutMs: REASON_TIMEOUT_MS,
-        ...call,
-        body,
-      });
+      const { body, call, turn } = activityCall(request, options);
+      return counted(
+        turn,
+        client.request<ReasonResult<T>>(
+          "POST",
+          "/v1/workflows/activities/reason",
+          {
+            timeoutMs: REASON_TIMEOUT_MS,
+            ...call,
+            body,
+          },
+        ),
+      );
     },
     decide(request, options = {}) {
-      const { body, call } = activityCall(request, options);
-      return client.request("POST", "/v1/workflows/activities/decide", {
-        ...call,
-        body,
-      });
+      const { body, call, turn } = activityCall(request, options);
+      return counted(
+        turn,
+        client.request<DecideResult>(
+          "POST",
+          "/v1/workflows/activities/decide",
+          {
+            ...call,
+            body,
+          },
+        ),
+      );
     },
     embed(request, options = {}) {
-      const { body, call } = activityCall(request, options);
-      return client.request("POST", "/v1/workflows/activities/embed", {
-        ...call,
-        body,
-      });
+      const { body, call, turn } = activityCall(request, options);
+      return counted(
+        turn,
+        client.request<EmbedResult>("POST", "/v1/workflows/activities/embed", {
+          ...call,
+          body,
+        }),
+      );
     },
     async pages(sha256, options = {}) {
       const { from = 0, to, ...call } = options;
