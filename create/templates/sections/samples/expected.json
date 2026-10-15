@@ -1,0 +1,82 @@
+{
+  "support-handbook.md": {
+    "sections": [
+      {
+        "position": 0,
+        "level": 0,
+        "title": "support-handbook",
+        "parent": null,
+        "lines": "line=0,2",
+        "why": "The text before the first heading, named after the file.",
+        "text": "This handbook says how the support team answers requests.\nThe team reviews it every quarter."
+      },
+      {
+        "position": 1,
+        "level": 1,
+        "title": "Support handbook",
+        "parent": null,
+        "lines": "line=3,6",
+        "heading_path": "Support handbook",
+        "text": "The team answers requests from customers by email and by chat."
+      },
+      {
+        "position": 2,
+        "level": 2,
+        "title": "Opening hours",
+        "parent": 1,
+        "lines": "line=7,11",
+        "heading_path": "Support handbook > Opening hours",
+        "text": "Requests are answered from 08:00 to 18:00 on weekdays.\nOn public holidays the chat is closed."
+      },
+      {
+        "position": 3,
+        "level": 2,
+        "title": "Response times",
+        "parent": 1,
+        "lines": "line=12,13",
+        "heading_path": "Support handbook > Response times",
+        "why": "A heading without text of its own: its lines are its heading line.",
+        "text": null
+      },
+      {
+        "position": 4,
+        "level": 3,
+        "title": "Email",
+        "parent": 3,
+        "lines": "line=14,17",
+        "heading_path": "Support handbook > Response times > Email",
+        "text": "Every email gets a first answer within one working day."
+      },
+      {
+        "position": 5,
+        "level": 3,
+        "title": "Chat",
+        "parent": 3,
+        "lines": "line=18,25",
+        "heading_path": "Support handbook > Response times > Chat",
+        "why": "The line with a hash in the fenced code block is text.",
+        "text": "A chat gets an answer within five minutes.\n\n```text\n# This line is in a code block: no heading.\n```"
+      },
+      {
+        "position": 6,
+        "level": 2,
+        "title": "Escalation",
+        "parent": 1,
+        "lines": "line=26,30",
+        "heading_path": "Support handbook > Escalation",
+        "why": "The closing hashes of the heading are dropped. A hash without a space after it starts no heading.",
+        "text": "A request that needs an engineer goes to the escalation queue.\n#This line is no heading: the hash has no space after it."
+      },
+      {
+        "position": 7,
+        "level": 1,
+        "title": "Glossary",
+        "parent": null,
+        "lines": "line=31,34",
+        "heading_path": "Glossary",
+        "text": "A ticket is one customer request, with every message about it."
+      }
+    ],
+    "represents": "Support handbook"
+  }
+}

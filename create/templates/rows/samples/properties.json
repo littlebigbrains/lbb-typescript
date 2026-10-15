@@ -1,0 +1,11 @@
+[
+  { "name": "customer_id", "value_type": "keyword" },
+  { "name": "email", "value_type": "keyword" },
+  { "name": "address", "value_type": "text" },
+  { "name": "city", "value_type": "keyword" },
+  { "name": "customer_since", "value_type": "date_time" },
+  { "name": "order_id", "value_type": "keyword" },
+  { "name": "placed_on", "value_type": "date_time" },
+  { "name": "total", "value_type": "f64" },
+  { "name": "status", "value_type": "keyword" }
+]

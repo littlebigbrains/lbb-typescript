@@ -1,0 +1,10 @@
+Customer ID,Name,Email,Address,City,Customer since,Account manager
+C-1001,Harbor Lane Bakery,orders@harborlane.example,12 Quay Street,Lisbon,2021-03-14,R. Silva
+C-1002,"Okafor, Ada",ada.okafor@mail.example,4 Palm Avenue,Lagos,2019-11-02,T. Bello
+C-1003,"Studio ""Nord""",hello@studionord.example,Strandgata 9,Oslo,2022-06-30,K. Berg
+C-1004,Meridian Tutoring,info@meridian.example,"Rua das Flores 21
+Floor 2",Porto,not a date,R. Silva
+C-1005,Lindqvist Maja,maja@lindqvist.example,Kungsgatan 3,Uppsala,2020-01-20,K. Berg
+
+C-1006,Calder Repair Shop,,1 Mill Lane,Leeds,2023-09-05,T. Bello
+,Walk-in customer,walkin@shop.example,,Leeds,2024-02-11,

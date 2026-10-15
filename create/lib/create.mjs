@@ -22,6 +22,8 @@ export const TEMPLATES = [
   "values-extract",
   "ontology-fit",
   "link",
+  "rows",
+  "sections",
 ];
 
 const PACKAGE = resolve(dirname(fileURLToPath(import.meta.url)), "..");

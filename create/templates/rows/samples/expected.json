@@ -1,0 +1,150 @@
+{
+  "q3-customers.csv": {
+    "settings": { "className": "Customer", "key": "Customer ID", "represents": { "class": "Report" } },
+    "rows": 8,
+    "rows_without_key": 1,
+    "values_left_out": 1,
+    "columns": [
+      "Customer ID → customer_id",
+      "Email → email",
+      "Address → address",
+      "City → city",
+      "Customer since → customer_since"
+    ],
+    "columns_left_out": ["Name", "Account manager"],
+    "represents": "Q3 customers",
+    "instances": [
+      {
+        "key": "C-1001",
+        "name": "Harbor Lane Bakery",
+        "row": 2,
+        "properties": {
+          "customer_id": "C-1001",
+          "email": "orders@harborlane.example",
+          "address": "12 Quay Street",
+          "city": "Lisbon",
+          "customer_since": "2021-03-14T00:00:00Z"
+        }
+      },
+      {
+        "key": "C-1002",
+        "name": "Okafor, Ada",
+        "row": 3,
+        "properties": {
+          "customer_id": "C-1002",
+          "email": "ada.okafor@mail.example",
+          "address": "4 Palm Avenue",
+          "city": "Lagos",
+          "customer_since": "2019-11-02T00:00:00Z"
+        }
+      },
+      {
+        "key": "C-1003",
+        "name": "Studio \"Nord\"",
+        "row": 4,
+        "properties": {
+          "customer_id": "C-1003",
+          "email": "hello@studionord.example",
+          "address": "Strandgata 9",
+          "city": "Oslo",
+          "customer_since": "2022-06-30T00:00:00Z"
+        }
+      },
+      {
+        "key": "C-1004",
+        "name": "Meridian Tutoring",
+        "row": 5,
+        "why": "The address holds a line break inside its quotes, so the row spans two lines. 'not a date' does not take the type of customer_since and is left out.",
+        "properties": {
+          "customer_id": "C-1004",
+          "email": "info@meridian.example",
+          "address": "Rua das Flores 21\nFloor 2",
+          "city": "Porto"
+        }
+      },
+      {
+        "key": "C-1005",
+        "name": "Lindqvist Maja",
+        "row": 6,
+        "properties": {
+          "customer_id": "C-1005",
+          "email": "maja@lindqvist.example",
+          "address": "Kungsgatan 3",
+          "city": "Uppsala",
+          "customer_since": "2020-01-20T00:00:00Z"
+        }
+      },
+      {
+        "key": "C-1006",
+        "name": "Calder Repair Shop",
+        "row": 8,
+        "why": "Row 7 is blank. The email cell is empty, so the instance has no email.",
+        "properties": {
+          "customer_id": "C-1006",
+          "address": "1 Mill Lane",
+          "city": "Leeds",
+          "customer_since": "2023-09-05T00:00:00Z"
+        }
+      }
+    ],
+    "leave_out": [{ "row": 9, "why": "The row has no Customer ID: no instance." }]
+  },
+  "q3-orders.tsv": {
+    "settings": { "className": "Order", "key": "Order ID", "represents": { "class": "Report" } },
+    "rows": 4,
+    "rows_without_key": 0,
+    "values_left_out": 1,
+    "represents": "Q3 orders",
+    "instances": [
+      {
+        "key": "O-5001",
+        "name": "O-5001",
+        "row": 2,
+        "properties": {
+          "order_id": "O-5001",
+          "customer_id": "C-1001",
+          "placed_on": "2026-07-03T00:00:00Z",
+          "total": 182.4,
+          "status": "paid"
+        }
+      },
+      {
+        "key": "O-5002",
+        "name": "O-5002",
+        "row": 3,
+        "why": "1250,50 has a decimal comma; the status is quoted.",
+        "properties": {
+          "order_id": "O-5002",
+          "customer_id": "C-1002",
+          "placed_on": "2026-07-19T00:00:00Z",
+          "total": 1250.5,
+          "status": "on hold"
+        }
+      },
+      {
+        "key": "O-5003",
+        "name": "O-5003",
+        "row": 4,
+        "properties": {
+          "order_id": "O-5003",
+          "customer_id": "C-1003",
+          "placed_on": "2026-08-02T00:00:00Z",
+          "total": 64,
+          "status": "paid"
+        }
+      },
+      {
+        "key": "O-5004",
+        "name": "O-5004",
+        "row": 5,
+        "why": "n/a does not take the type of total and is left out.",
+        "properties": {
+          "order_id": "O-5004",
+          "customer_id": "C-1001",
+          "placed_on": "2026-09-28T00:00:00Z",
+          "status": "cancelled"
+        }
+      }
+    ]
+  }
+}
