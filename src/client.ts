@@ -227,6 +227,34 @@ async function responseBytes(
   return new TextEncoder().encode(await response.text());
 }
 
+/**
+ * A chunk reader over a response body of bytes: its stream when it has one,
+ * else `arrayBuffer()` read whole, else `text()` (test doubles).
+ */
+function byteChunkReader(
+  response: Awaited<ReturnType<FetchLike>>,
+): BodyChunkReader {
+  const body = response.body as
+    | { getReader?: unknown; [Symbol.asyncIterator]?: unknown }
+    | null
+    | undefined;
+  const streams =
+    body &&
+    (typeof body.getReader === "function" ||
+      typeof body[Symbol.asyncIterator] === "function");
+  if (streams || typeof response.arrayBuffer !== "function")
+    return bodyChunkReader(response);
+  let consumed = false;
+  return {
+    read: async () => {
+      if (consumed) return { done: true };
+      consumed = true;
+      return { done: false, value: await responseBytes(response) };
+    },
+    cancel: async () => {},
+  };
+}
+
 /** The body a request sends: `rawBody` as is, else `body` as JSON. */
 function requestBody(opts: RequestOptions): unknown {
   return opts.rawBody !== undefined
@@ -850,6 +878,177 @@ export class LbbClient {
       if (timer !== undefined) clearTimeout(timer);
       signal?.removeEventListener("abort", abortFromCaller);
       if (!finished) stop();
+    }
+  }
+
+  /**
+   * Send a request and yield its 2xx body as bytes while they arrive (a
+   * file's content), so a large body is never held whole. A `429`, a `5xx`
+   * or a network failure before the answer starts is retried as
+   * {@link request} retries the method; the body is not retried.
+   * `timeoutMs` bounds the wait for the answer, not the body, and `signal`
+   * stops the request and the read. A non-2xx answer throws
+   * {@link LbbError}. Leaving the loop early closes the response.
+   */
+  async *requestByteStream(
+    method: string,
+    path: string,
+    opts: RequestOptions = {},
+  ): AsyncGenerator<Uint8Array, void, undefined> {
+    const url = this.buildUrl(path, opts.query);
+    const upperMethod = method.toUpperCase();
+    const headers = this.requestHeaders(opts);
+    const retry = opts.retry ?? retryAllowed(method, opts.idempotencyKey);
+    const timeoutMs = opts.timeoutMs ?? this.timeoutMs;
+    const maxRetries = opts.maxRetries ?? this.maxRetries;
+    if (!Number.isInteger(maxRetries) || maxRetries < 0) {
+      throw new RangeError("maxRetries must be a non-negative integer");
+    }
+    const startedAt = Date.now();
+    const deadline =
+      startedAt + Math.max(0, opts.retryBudgetMs ?? this.retryBudgetMs);
+    const signal = opts.signal;
+    const streamingFetch = this.fetchImpl as unknown as (
+      input: string,
+      init: Record<string, unknown>,
+    ) => ReturnType<FetchLike>;
+    let response: Awaited<ReturnType<FetchLike>> | undefined;
+    let controller: AbortController | undefined;
+    const abortFromCaller = () => controller?.abort(signal?.reason);
+    let attempts: number;
+    for (let attempt = 0; ; attempt += 1) {
+      if (signal?.aborted) throw signal.reason ?? new Error("request aborted");
+      attempts = attempt + 1;
+      controller =
+        typeof AbortController !== "undefined"
+          ? new AbortController()
+          : undefined;
+      signal?.addEventListener("abort", abortFromCaller, { once: true });
+      const attemptController = controller;
+      const timer =
+        timeoutMs > 0 && attemptController
+          ? setTimeout(() => attemptController.abort(), timeoutMs)
+          : undefined;
+      this.onRequest?.({
+        method: upperMethod,
+        url,
+        attempt: attempts,
+        maxAttempts: maxRetries + 1,
+        idempotencyKey: opts.idempotencyKey,
+      });
+      try {
+        response = await streamingFetch(url, {
+          method,
+          headers,
+          body: requestBody(opts),
+          signal: controller?.signal ?? signal,
+        });
+      } catch (error) {
+        signal?.removeEventListener("abort", abortFromCaller);
+        const callerAborted = signal?.aborted === true;
+        if (
+          !callerAborted &&
+          retriesNetworkFailure(retry) &&
+          attempt < maxRetries
+        ) {
+          const delayMs = fullJitterBackoffMs(this.retryDelayMs, attempt);
+          if (Date.now() + delayMs <= deadline) {
+            this.onRetry?.({
+              method: upperMethod,
+              url,
+              attempt: attempts,
+              status: undefined,
+              delayMs,
+              elapsedMs: Math.max(0, Date.now() - startedAt),
+            });
+            await sleep(delayMs);
+            continue;
+          }
+        }
+        throw controller?.signal.aborted && !callerAborted
+          ? Object.assign(
+              new Error(
+                `Little Big Brain request timed out after ${timeoutMs}ms`,
+                { cause: error },
+              ),
+              { name: "TimeoutError" },
+            )
+          : error;
+      } finally {
+        // The answer started (or failed): the body has no timeout.
+        if (timer !== undefined) clearTimeout(timer);
+      }
+      if (response.ok) break;
+      signal?.removeEventListener("abort", abortFromCaller);
+      const text = await response.text();
+      if (
+        retryableStatus(response.status) &&
+        retriesStatus(retry, response.status) &&
+        attempt < maxRetries &&
+        !bodyMarksTerminal(text)
+      ) {
+        const delayMs = retryDelayMs(this.retryDelayMs, attempt, {
+          retryAfterHeader: response.headers?.get("retry-after"),
+          body: text,
+        });
+        if (Date.now() + delayMs <= deadline) {
+          this.onRetry?.({
+            method: upperMethod,
+            url,
+            attempt: attempts,
+            status: response.status,
+            errorCode: errorCodeFromBody(text),
+            delayMs,
+            elapsedMs: Math.max(0, Date.now() - startedAt),
+          });
+          await sleep(delayMs);
+          continue;
+        }
+      }
+      const requestId = response.headers?.get("x-request-id") ?? undefined;
+      this.onResponse?.({
+        method: upperMethod,
+        url,
+        status: response.status,
+        requestId,
+        attempts,
+        retryCount: Math.max(0, attempts - 1),
+        elapsedMs: Math.max(0, Date.now() - startedAt),
+      });
+      throw parseLbbError(
+        response.status,
+        text.trim(),
+        requestId,
+        response.headers?.get("retry-after"),
+      );
+    }
+    this.onResponse?.({
+      method: upperMethod,
+      url,
+      status: response.status,
+      requestId: response.headers?.get("x-request-id") ?? undefined,
+      attempts,
+      retryCount: Math.max(0, attempts - 1),
+      elapsedMs: Math.max(0, Date.now() - startedAt),
+    });
+    const reader = byteChunkReader(response);
+    let finished = false;
+    try {
+      for (;;) {
+        const chunk = await reader.read();
+        if (chunk.done) break;
+        if (chunk.value === undefined) continue;
+        yield typeof chunk.value === "string"
+          ? new TextEncoder().encode(chunk.value)
+          : chunk.value;
+      }
+      finished = true;
+    } finally {
+      signal?.removeEventListener("abort", abortFromCaller);
+      if (!finished) {
+        controller?.abort();
+        await reader.cancel().catch(() => undefined);
+      }
     }
   }
 

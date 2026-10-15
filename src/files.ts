@@ -48,6 +48,32 @@ export interface FileUploadOptions extends CallOptions {
   schema?: string;
 }
 
+/**
+ * One byte range of a file: bytes `start` to `end`, both included and
+ * 0-based (`end` absent reads to the end of the file), or the last `suffix`
+ * bytes.
+ */
+export type FileByteRange =
+  { start: number; end?: number } | { suffix: number };
+
+export interface FileContentOptions extends CallOptions {
+  /**
+   * One byte range: the answer holds those bytes. A range past the end ends
+   * at the end; a range with no byte of the file throws `LbbError` 416
+   * `range_not_satisfiable`.
+   */
+  range?: FileByteRange;
+}
+
+/** What `files.head` answers: a file's length, type and digest, without its bytes. */
+export interface FileHead {
+  /** The number of bytes. */
+  bytes: number;
+  contentType: string;
+  /** The SHA-256 of the bytes (the `ETag`). */
+  sha256: string;
+}
+
 /** The page range of `files.pages`: 0-based, `to` is the first page not returned. */
 export interface FilePagesOptions extends CallOptions {
   /** The first page index. Default 0. */
@@ -66,6 +92,34 @@ function sha256Of(sha256: string): string {
       `sha256 must be 64 hexadecimal characters, got ${JSON.stringify(sha256)}`,
     );
   return value;
+}
+
+/** The `Range` header of a byte range: `bytes=a-b`, `bytes=a-` or `bytes=-n`. */
+function rangeHeader(range: FileByteRange): string {
+  const index = (value: number, name: string) => {
+    if (!Number.isSafeInteger(value) || value < 0)
+      throw new RangeError(`${name} must be a byte index (0 or more)`);
+  };
+  if ("suffix" in range) {
+    index(range.suffix, "suffix");
+    if (range.suffix === 0) throw new RangeError("suffix must be 1 or more");
+    return `bytes=-${range.suffix}`;
+  }
+  index(range.start, "start");
+  if (range.end === undefined) return `bytes=${range.start}-`;
+  index(range.end, "end");
+  if (range.end < range.start)
+    throw new RangeError("end must not be below start");
+  return `bytes=${range.start}-${range.end}`;
+}
+
+/** The headers of a content read: the caller's, and its range. */
+function contentHeaders(
+  range: FileByteRange | undefined,
+  headers: Record<string, string> | undefined,
+): Record<string, string> | undefined {
+  if (range === undefined) return headers;
+  return { ...headers, range: rangeHeader(range) };
 }
 
 function pageIndex(value: number | undefined, name: string): void {
@@ -92,9 +146,11 @@ export class FilesNamespace {
   constructor(private readonly client: LbbClient) {}
 
   /**
-   * Upload a file (`POST /v1/files?name=`, at most 64 MiB). The server
-   * stores the bytes once and commits a `Document` entity for them, with a
-   * `Content` entity for the bytes; a parse starter then reads them. The same bytes under the same name again change
+   * Upload a file (`POST /v1/files?name=`, at most 1 GiB by default; a
+   * larger file throws `LbbError` 413 `file_too_large`). An empty file is a
+   * file. The server stores the bytes once and commits a `Document` entity
+   * for them, with a `Content` entity for the bytes; a parse starter then
+   * reads them. The same bytes under the same name again change
    * nothing (`created: false`), so a failed call is retried. The same bytes
    * under another name rename the file.
    */
@@ -119,13 +175,66 @@ export class FilesNamespace {
     return this.client.request("GET", "/v1/files", opts);
   }
 
-  /** A file's bytes (`GET /v1/files/content`). */
-  async content(sha256: string, opts: CallOptions = {}): Promise<Uint8Array> {
+  /**
+   * A file's bytes (`GET /v1/files/content`), or the bytes of one `range`.
+   * The answer is held whole: read a large file with
+   * {@link FilesNamespace.contentStream}.
+   */
+  async content(
+    sha256: string,
+    options: FileContentOptions = {},
+  ): Promise<Uint8Array> {
+    const { range, ...opts } = options;
+    const headers = contentHeaders(range, opts.headers);
     return this.client.request("GET", "/v1/files/content", {
       ...opts,
+      headers,
       query: { sha256: sha256Of(sha256) },
       responseType: "bytes",
     });
+  }
+
+  /**
+   * A file's bytes (or one `range` of them) as they arrive, in chunks:
+   * `for await (const chunk of lbb.files.contentStream(sha256))`. A large
+   * file is never held whole. `timeoutMs` bounds the wait for the answer,
+   * not the transfer. Leaving the loop early closes the response.
+   */
+  contentStream(
+    sha256: string,
+    options: FileContentOptions = {},
+  ): AsyncGenerator<Uint8Array, void, undefined> {
+    const { range, ...opts } = options;
+    const headers = contentHeaders(range, opts.headers);
+    return this.client.requestByteStream("GET", "/v1/files/content", {
+      ...opts,
+      headers,
+      query: { sha256: sha256Of(sha256) },
+    });
+  }
+
+  /**
+   * A file's length, content type and SHA-256 without its bytes
+   * (`HEAD /v1/files/content`). A missing file throws `LbbError` 404.
+   */
+  async head(sha256: string, opts: CallOptions = {}): Promise<FileHead> {
+    const sha = sha256Of(sha256);
+    const response = await this.client.rawRequest<Uint8Array>(
+      "HEAD",
+      "/v1/files/content",
+      {
+        ...opts,
+        query: { sha256: sha },
+        responseType: "bytes",
+      },
+    );
+    const header = (name: string) => response.headers?.get(name) ?? null;
+    const length = Number(header("content-length"));
+    return {
+      bytes: Number.isSafeInteger(length) && length >= 0 ? length : 0,
+      contentType: header("content-type") ?? "application/octet-stream",
+      sha256: header("etag")?.replace(/^(W\/)?"|"$/g, "") || sha,
+    };
   }
 
   /**

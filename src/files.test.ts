@@ -26,6 +26,9 @@ type Answer = {
   bytes?: Uint8Array;
   contentType?: string;
   noArrayBuffer?: boolean;
+  /** The body as a stream of these chunks. */
+  chunks?: Uint8Array[];
+  headers?: Record<string, string>;
 };
 
 /** A fetch that answers `answers` in order and keeps each request as sent. */
@@ -50,8 +53,19 @@ function filesFetch(answers: Answer[]) {
       status,
       headers: {
         get: (name: string) =>
-          name.toLowerCase() === "content-type" ? contentType : null,
+          name.toLowerCase() === "content-type"
+            ? contentType
+            : (answer.headers?.[name.toLowerCase()] ?? null),
       },
+      ...(answer.chunks
+        ? {
+            body: {
+              async *[Symbol.asyncIterator]() {
+                for (const chunk of answer.chunks ?? []) yield chunk;
+              },
+            },
+          }
+        : {}),
       text: async () => text,
       ...(answer.noArrayBuffer
         ? {}
@@ -279,5 +293,128 @@ test("files.delete repeats the SHA-256 as confirm", async () => {
   assert.equal(
     seen[0].url,
     `http://h/v1/files?graph=docs&sha256=${SHA}&confirm=${SHA}`,
+  );
+});
+
+test("files.content sends one byte range and checks it first", async () => {
+  const { fetch, seen } = filesFetch([
+    { status: 206, bytes: new Uint8Array([0x37, 0x38, 0x39]) },
+    { status: 206, bytes: new Uint8Array([0x39]) },
+    { status: 206, bytes: new Uint8Array([0x32]) },
+  ]);
+  const lbb = client(fetch);
+
+  const last3 = await lbb.files.content(SHA, { range: { suffix: 3 } });
+  await lbb.files.content(SHA, { range: { start: 9 } });
+  await lbb.files.content(SHA, { range: { start: 2, end: 2 } });
+
+  assert.deepEqual([...last3], [0x37, 0x38, 0x39]);
+  assert.deepEqual(
+    seen.map(({ headers }) => headers?.range),
+    ["bytes=-3", "bytes=9-", "bytes=2-2"],
+  );
+  for (const range of [
+    { start: 5, end: 2 },
+    { start: -1 },
+    { start: 1.5 },
+    { suffix: 0 },
+  ])
+    await assert.rejects(
+      () => lbb.files.content(SHA, { range }),
+      (error: unknown) => error instanceof RangeError,
+    );
+  assert.equal(seen.length, 3, "a bad range sends nothing");
+});
+
+test("files.content throws 416 for a range with no byte of the file", async () => {
+  const { fetch } = filesFetch([
+    {
+      status: 416,
+      body: {
+        error: {
+          type: "invalid_request_error",
+          code: "range_not_satisfiable",
+          message: "no byte",
+        },
+      },
+    },
+  ]);
+  await assert.rejects(
+    () => client(fetch).files.content(SHA, { range: { start: 10 } }),
+    (error: unknown) =>
+      error instanceof LbbError &&
+      error.status === 416 &&
+      error.code === "range_not_satisfiable",
+  );
+});
+
+test("files.contentStream yields the bytes as they arrive", async () => {
+  const chunks = [new Uint8Array([1, 2, 3]), new Uint8Array([4, 5])];
+  const { fetch, seen } = filesFetch([
+    { status: 503, body: { error: { code: "server_busy", message: "busy" } } },
+    { chunks, contentType: "application/octet-stream" },
+    { chunks: [new Uint8Array([5])], status: 206 },
+  ]);
+  const lbb = client(fetch);
+
+  const got: number[][] = [];
+  for await (const chunk of lbb.files.contentStream(SHA)) got.push([...chunk]);
+  const tail: number[] = [];
+  for await (const chunk of lbb.files.contentStream(SHA, {
+    range: { suffix: 1 },
+  }))
+    tail.push(...chunk);
+
+  assert.deepEqual(got, [
+    [1, 2, 3],
+    [4, 5],
+  ]);
+  assert.deepEqual(tail, [5]);
+  assert.equal(seen.length, 3, "the 503 before the answer was retried");
+  assert.equal(seen[1].method, "GET");
+  assert.equal(
+    seen[1].url,
+    `http://h/v1/files/content?graph=docs&sha256=${SHA}`,
+  );
+  assert.equal(seen[2].headers?.range, "bytes=-1");
+});
+
+test("files.contentStream throws the server's error", async () => {
+  const { fetch } = filesFetch([
+    {
+      status: 404,
+      body: { error: { code: "file_not_found", message: "no file" } },
+    },
+  ]);
+  await assert.rejects(
+    async () => {
+      for await (const chunk of client(fetch).files.contentStream(SHA))
+        assert.fail(`unexpected ${chunk.length} bytes`);
+    },
+    (error: unknown) =>
+      error instanceof LbbError && error.code === "file_not_found",
+  );
+});
+
+test("files.head answers the length, type and digest", async () => {
+  const { fetch, seen } = filesFetch([
+    {
+      bytes: new Uint8Array(),
+      contentType: "application/pdf",
+      headers: { "content-length": "18510", etag: `"${SHA}"` },
+    },
+  ]);
+
+  const head = await client(fetch).files.head(SHA.toUpperCase());
+
+  assert.deepEqual(head, {
+    bytes: 18510,
+    contentType: "application/pdf",
+    sha256: SHA,
+  });
+  assert.equal(seen[0].method, "HEAD");
+  assert.equal(
+    seen[0].url,
+    `http://h/v1/files/content?graph=docs&sha256=${SHA}`,
   );
 });
