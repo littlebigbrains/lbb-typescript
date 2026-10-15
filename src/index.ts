@@ -40,6 +40,9 @@ export type { CdcNamespace } from "./cdc.js";
 export type {
   BlobLike,
   FileBody,
+  FileCounts,
+  FileList,
+  FileListOptions,
   FilePages,
   FilePagesOptions,
   FileRecord,

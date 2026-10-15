@@ -12,6 +12,21 @@ import type { Schemas } from "./types.js";
 export type FileRecord = Schemas["FileRecord"];
 /** The parsed pages of a file, with every line and word box. */
 export type FilePages = Schemas["FilePages"];
+/** One page of the graph's files and the cursor of the next. */
+export type FileList = Schemas["FileList"];
+/** The graph's files by parse status, as of a published commit. */
+export type FileCounts = Schemas["FileCounts"];
+
+/** The most files one `files.list` page holds, and the default. */
+export const FILE_LIST_LIMIT_MAX = 1000;
+
+/** One page of `files.list`. */
+export interface FileListOptions extends CallOptions {
+  /** Files per page, 1 to 1,000. Default 1,000. */
+  limit?: number;
+  /** The `next` cursor of the page before. */
+  after?: string;
+}
 
 /**
  * A `Blob` or `File` (browsers, Node 18+), by its shape, so the SDK needs
@@ -170,9 +185,46 @@ export class FilesNamespace {
     });
   }
 
-  /** The graph's files, the newest upload first, with what the parse made of each. */
-  list(opts: CallOptions = {}): Promise<Schemas["FileList"]> {
-    return this.client.request("GET", "/v1/files", opts);
+  /**
+   * One page of the graph's files, the newest upload first, with what the
+   * parse made of each (`GET /v1/files`). Without `limit`, the newest 1,000.
+   * Pass the answer's `next` as `after` for the next page; a page can hold
+   * fewer than `limit` files while `next` is set, and the list ends when no
+   * `next` comes back.
+   */
+  list(options: FileListOptions = {}): Promise<Schemas["FileList"]> {
+    const { limit, after, ...opts } = options;
+    if (
+      limit !== undefined &&
+      (!Number.isSafeInteger(limit) || limit < 1 || limit > FILE_LIST_LIMIT_MAX)
+    )
+      throw new RangeError(`limit must be 1 to ${FILE_LIST_LIMIT_MAX}`);
+    return this.client.request("GET", "/v1/files", {
+      ...opts,
+      query: { limit, after: after || undefined },
+    });
+  }
+
+  /**
+   * One file's record (`GET /v1/files/record`), read from one object: its
+   * name, type, size, upload time, `Document` IRI and parse. A SHA-256 the
+   * graph has no file for, or a deleted file, answers `404 file_not_found`.
+   */
+  get(sha256: string, opts: CallOptions = {}): Promise<Schemas["FileRecord"]> {
+    return this.client.request("GET", "/v1/files/record", {
+      ...opts,
+      query: { sha256: sha256Of(sha256) },
+    });
+  }
+
+  /**
+   * The graph's files by parse status (`GET /v1/files/counts`): a count over
+   * the `Document` entities of the published generation, with the commit it
+   * holds (`as_of_commit_seq`). A file with no parse yet counts as
+   * `waiting`.
+   */
+  counts(opts: CallOptions = {}): Promise<Schemas["FileCounts"]> {
+    return this.client.request("GET", "/v1/files/counts", opts);
   }
 
   /**

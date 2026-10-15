@@ -187,6 +187,60 @@ test("files.list and graph(name).files read the graph's files", async () => {
   );
 });
 
+test("files.list pages with limit and after, and files.counts reads the counts", async () => {
+  const { fetch, seen } = filesFetch([
+    { body: { files: [RECORD], next: "6162.0123456789abcdef" } },
+    { body: { files: [] } },
+    {
+      body: {
+        files: 3,
+        by_parse_status: { parsed: 2, waiting: 1 },
+        as_of_commit_seq: 41,
+      },
+    },
+  ]);
+  const lbb = client(fetch);
+
+  const first = await lbb.files.list({ limit: 1 });
+  assert.equal(first.next, "6162.0123456789abcdef");
+  const rest = await lbb.files.list({ limit: 50, after: first.next ?? "" });
+  assert.equal(rest.next, undefined);
+  const counts = await lbb.files.counts();
+  assert.equal(counts.files, 3);
+  assert.equal(counts.by_parse_status.parsed, 2);
+  assert.equal(counts.as_of_commit_seq, 41);
+  assert.deepEqual(
+    seen.map(({ method, url }) => `${method} ${url}`),
+    [
+      "GET http://h/v1/files?graph=docs&limit=1",
+      "GET http://h/v1/files?graph=docs&limit=50&after=6162.0123456789abcdef",
+      "GET http://h/v1/files/counts?graph=docs",
+    ],
+  );
+  for (const limit of [0, 1001, 1.5]) {
+    assert.throws(
+      () => lbb.files.list({ limit }),
+      (error: unknown) => error instanceof RangeError,
+    );
+  }
+  assert.equal(seen.length, 3);
+});
+
+test("files.get reads one file by its SHA-256", async () => {
+  const { fetch, seen } = filesFetch([{ body: RECORD }]);
+  const lbb = client(fetch);
+  const file = await lbb.files.get(SHA.toUpperCase());
+  assert.equal(file.name, "room-book.pdf");
+  assert.deepEqual(
+    seen.map(({ method, url }) => `${method} ${url}`),
+    [`GET http://h/v1/files/record?graph=docs&sha256=${SHA}`],
+  );
+  assert.throws(
+    () => lbb.files.get("xyz"),
+    (error: unknown) => error instanceof RangeError,
+  );
+});
+
 test("files.content returns the bytes as they arrived", async () => {
   const pdf = new Uint8Array([0x25, 0x50, 0x44, 0x46, 0xff, 0x00, 0x80]);
   const { fetch, seen } = filesFetch([
