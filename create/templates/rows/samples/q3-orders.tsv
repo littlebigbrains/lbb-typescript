@@ -1,0 +1,5 @@
+Order ID	Customer ID	Placed on	Total	Status
+O-5001	C-1001	2026-07-03	182.40	paid
+O-5002	C-1002	2026-07-19	1250,50	"on hold"
+O-5003	C-1003	2026-08-02	64	paid
+O-5004	C-1001	2026-09-28	n/a	cancelled

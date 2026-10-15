@@ -342,6 +342,122 @@ export class MockActivities implements LbbActivities {
   }
 }
 
+// ---- files and derivations ---------------------------------------------------------
+
+/** A file the mock holds: its bytes, name, media type and `Document` IRI. */
+export interface MockFile {
+  sha256: string;
+  name: string;
+  mediaType: string;
+  document: string;
+  bytes: Uint8Array;
+}
+
+/**
+ * The files and the derivations of a server, for the templates that read
+ * files: `files.content` and `workflows.derivations.check` / `record`, the
+ * shape of an `LbbClient`. `upload` puts the file's `Document` in `graph`
+ * with its name, SHA-256 and media type, as the upload route does.
+ */
+export class MockContent {
+  readonly held = new Map<string, MockFile>();
+  readonly recorded = new Map<string, Schemas["Derivation"]>();
+  /** Reads of a file's bytes. */
+  reads = 0;
+  /** Derivation checks. */
+  checks = 0;
+
+  constructor(readonly graph: MemoryGraph) {}
+
+  /** Hold a file and write its `Document`. */
+  upload(name: string, body: string | Uint8Array, mediaType: string): MockFile {
+    const bytes = typeof body === "string" ? new TextEncoder().encode(body) : body;
+    const sha256 = createHash("sha256").update(bytes).digest("hex");
+    const doc = this.graph.entity({ type: "Document", name, key: `file:${sha256}` });
+    doc.name = name;
+    Object.assign(doc.properties, {
+      name,
+      file_sha256: sha256,
+      content_type: mediaType,
+      file_bytes: bytes.length,
+    });
+    const file = { sha256, name, mediaType, document: doc.iri, bytes };
+    this.held.set(sha256, file);
+    return file;
+  }
+
+  readonly files = {
+    content: async (sha256: string): Promise<Uint8Array> => {
+      this.reads += 1;
+      const file = this.held.get(sha256);
+      if (!file)
+        throw new LbbError(404, "{}", { code: "file_not_found", message: `no file ${sha256}` });
+      return file.bytes;
+    },
+  };
+
+  readonly workflows = {
+    derivations: {
+      check: async (key: Schemas["DerivationKey"]): Promise<Schemas["DerivationCheckResponse"]> => {
+        this.checks += 1;
+        const derivation = this.recorded.get(derivationName(key));
+        return derivation ? { exists: true, derivation } : { exists: false };
+      },
+      record: async (
+        request: Schemas["DerivationRecordRequest"],
+      ): Promise<Schemas["DerivationRecordResponse"]> => {
+        const name = derivationName(request);
+        const kept = this.recorded.get(name);
+        if (kept) return { recorded: false, derivation: kept };
+        const outputs = JSON.stringify(request.outputs ?? null);
+        if (outputs.length > 16 * 1024)
+          throw new LbbError(400, "{}", {
+            code: "derivation_invalid",
+            message: "outputs over 16 KiB",
+          });
+        const derivation = {
+          sha256: request.sha256,
+          workflow_type: request.workflow_type,
+          version: request.version,
+          settings_digest: request.settings_digest,
+          run_id: request.run_id ?? null,
+          outputs: JSON.parse(outputs) as unknown,
+          recorded_at: "2026-10-15T09:00:00Z",
+        };
+        this.recorded.set(name, derivation);
+        return { recorded: true, derivation };
+      },
+    },
+  };
+}
+
+const derivationName = (key: Schemas["DerivationKey"]) =>
+  `${key.workflow_type}@${key.version}/${key.settings_digest}/${key.sha256}`;
+
+/** The message a content trigger sends for one upload: its `Document`, with origin `content`. */
+export function contentMessage(
+  workflow: string,
+  file: Pick<MockFile, "sha256" | "mediaType" | "document">,
+): WorkflowTriggerMessage {
+  return {
+    type: "instances",
+    workflow,
+    graph: "samples",
+    as_of_commit_seq: 7,
+    reason: "changed",
+    instances: [file.document],
+    removed: [],
+    origin: {
+      kind: "content",
+      trigger: workflow,
+      sha256: file.sha256,
+      media_type: file.mediaType,
+      uploaded_at_ms: 1791967651158,
+      requests: [`file-upload:${file.sha256}`],
+    },
+  };
+}
+
 function assertNever(what: string): never {
   throw new Error(`the test gives the mock no ${what} rule`);
 }
@@ -394,6 +510,27 @@ export class Crash extends Error {
 }
 
 const STEP_KEY = /^[A-Za-z0-9_.-]{1,128}$/;
+
+/**
+ * A workflow value as JSON, as the SDK's worker writes it: a value JSON
+ * cannot hold (undefined, a function, a number that is not finite) fails
+ * the turn there, so it fails here too.
+ */
+function workflowJson(value: unknown, where: string): string {
+  return JSON.stringify(value, (key, v: unknown) => {
+    const bad =
+      v === undefined ||
+      typeof v === "function" ||
+      typeof v === "symbol" ||
+      typeof v === "bigint" ||
+      (typeof v === "number" && !Number.isFinite(v));
+    if (bad)
+      throw new Error(
+        `Workflow values must be JSON serializable (use null for no result): ${where}${key ? `.${key}` : ""} is ${typeof v}`,
+      );
+    return v;
+  });
+}
 
 /**
  * Run one turn of `definition` as the workflow engine does: each step runs
@@ -457,7 +594,7 @@ export async function runTurn<S>(
           heartbeat: async () => {},
           progress: (phase, counts) => turn.progress.push(progressCall(key, phase, counts)),
         });
-        const json = JSON.stringify(output ?? null);
+        const json = workflowJson(output, `step "${key}"`);
         if (json.length > 64 * 1024)
           throw new Error(`step ${key} saves ${json.length} bytes, more than 64 KiB`);
         turn.bytes += json.length;
@@ -481,6 +618,8 @@ export async function runTurn<S>(
     }),
   } as unknown as WorkflowContext;
   const result = (await definition.execute(ctx, state, message)) as TurnResult<S>;
+  workflowJson(result.state, "state");
+  if (result.continuation) workflowJson(result.continuation, "continuation");
   return { result, turn };
 }
 

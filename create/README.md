@@ -21,9 +21,12 @@ npm test
 | `documents-map` | Maps the links of `documents-link` into the graph's own ontology, as fact proposals |
 | `review` | Writes the fact proposals at or above a gate as facts and gives the others to a person |
 | `link` | Connects the mentions of one thing across the records of a graph into one thing, and proposes records of one thing as an identity |
+| `rows` | Reads each CSV or TSV file into one instance per row, each with an edge to the file whose evidence is the row |
+| `sections` | Reads each Markdown file into its sections, each with an edge to its parent whose evidence is its lines |
 
 A template id is the id of its starter workflow, with dashes for dots:
-`documents-link` is the code of `documents.link`.
+`documents-link` is the code of `documents.link`. `link`, `rows` and
+`sections` have no LBB-run version.
 
 ## The project
 
@@ -32,7 +35,7 @@ A template id is the id of its starter workflow, with dashes for dots:
 | `src/workflow.ts` | The workflow, its settings, the triggered workflow that sends it the instances (`trigger()`) and the ontology it writes (`ontology()`) |
 | `src/*.ts` | The template's helpers and `samples.ts`, which puts the samples on a graph |
 | `src/workflow.test.ts`, `src/testing.ts` | The workflow on its samples, with mock models and no server |
-| `src/worker.ts`, `src/setup.ts`, `src/try.ts` | `npm start`, `npm run setup` and `npm run try`; a template that has its own (`link`) keeps them |
+| `src/worker.ts`, `src/setup.ts`, `src/try.ts` | `npm start`, `npm run setup` and `npm run try`; a template that has its own (`link`, `rows`, `sections`) keeps them |
 | `src/grade-run.ts` | `npm run grade`, in a template that grades a run against a gold file (`link`) |
 | `samples/` | The samples and their answer key |
 
