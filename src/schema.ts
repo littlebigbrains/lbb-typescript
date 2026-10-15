@@ -1278,7 +1278,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** The graph's files, newest upload first, with what the parse workflow (`documents.parse`) made of each */
+        /** One page of the graph's files, newest upload first, with what the parse workflow (`documents.parse`) made of each. Without `limit`, the newest 1,000. `next` is the cursor of the next page; a page can hold fewer than `limit` files while `next` is set. 400 for an invalid `limit` or `after` */
         get: operations["get_v1_files"];
         put?: never;
         /** Upload a file: the raw request body is stored once under its SHA-256, and a `Document` entity (key `file:<sha256>`) is committed for it, with its `Content` (key `content:<sha256>`) and the edge `HAS_CONTENT`. `language` and `schema` are stored on the `Document` when given. A file holds at most 1 GiB by default (the server setting `LBB_FILES_MAX_BYTES`); a larger body is refused with 413 `file_too_large` before it is read. An empty body is an empty file. The same bytes under the same name change nothing */
@@ -1308,6 +1308,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/files/counts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The graph's files by parse status: a SPARQL count over the `Document` entities of the published generation, with the commit it holds (`as_of_commit_seq`). A file with no parse yet counts as `waiting` */
+        get: operations["get_v1_files_counts"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/files/pages": {
         parameters: {
             query?: never;
@@ -1317,6 +1334,23 @@ export interface paths {
         };
         /** A parsed file's pages `from` (inclusive) to `to` (exclusive), 0-based, at most 50 (default 10): lines and words with boxes normalized to the page, origin top left. 404 `file_not_parsed` before the parse */
         get: operations["get_v1_files_pages"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/files/record": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** One file's record, read from one object: its name, type, size, upload time, `Document` IRI and parse. 404 `file_not_found` for a SHA-256 the graph has no file for, or a deleted one */
+        get: operations["get_v1_files_record"];
         put?: never;
         post?: never;
         delete?: never;
@@ -7027,6 +7061,30 @@ export interface components {
             field: string;
             missing: number;
         };
+        /**
+         * @description `GET /v1/files/counts`: the graph's files by parse status, counted over
+         *     the `Document` entities of the published generation.
+         */
+        FileCounts: {
+            /**
+             * Format: int64
+             * @description The commit the published generation holds: the counts are as of it.
+             *     Absent before the graph's first publication (all counts 0).
+             */
+            as_of_commit_seq?: number | null;
+            /**
+             * @description The files by `parse_status` (`parsed`, `unsupported`, `failed`), and
+             *     `waiting` for a file with none yet.
+             */
+            by_parse_status: {
+                [key: string]: number;
+            };
+            /**
+             * Format: int64
+             * @description The files: the `Document` entities.
+             */
+            files: number;
+        };
         /** @description `DELETE /v1/files`. */
         FileDeleteResponse: {
             deleted: boolean;
@@ -7042,9 +7100,14 @@ export interface components {
             text: string;
             words: components["schemas"]["FileWord"][];
         };
-        /** @description `GET /v1/files`: the graph's files, newest upload first. */
+        /** @description `GET /v1/files`: one page of the graph's files, newest upload first. */
         FileList: {
             files: components["schemas"]["FileRecord"][];
+            /**
+             * @description The cursor of the next page: pass it as `after`. Absent when the list
+             *     ended. A page can hold fewer than `limit` files while `next` is set.
+             */
+            next?: string | null;
         };
         /**
          * @description One parsed page. `page` is the 0-based index (the `page` of a region
@@ -30329,6 +30392,10 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description files per page, 1 to 1,000 (default 1,000) */
+                limit?: string;
+                /** @description the `next` cursor of the previous page */
+                after?: string;
             };
             header?: {
                 /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
@@ -31053,6 +31120,140 @@ export interface operations {
             };
         };
     };
+    get_v1_files_counts: {
+        parameters: {
+            query?: {
+                /** @description Graph name (default `main`) */
+                graph?: string;
+            };
+            header?: {
+                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                "Lbb-Version"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FileCounts"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Rate limit exceeded */
+            429: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Service unavailable */
+            503: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+        };
+    };
     get_v1_files_pages: {
         parameters: {
             query?: {
@@ -31085,6 +31286,142 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["FilePages"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Rate limit exceeded */
+            429: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Service unavailable */
+            503: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+        };
+    };
+    get_v1_files_record: {
+        parameters: {
+            query?: {
+                /** @description Graph name (default `main`) */
+                graph?: string;
+                /** @description the file's SHA-256, hex */
+                sha256?: string;
+            };
+            header?: {
+                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                "Lbb-Version"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FileRecord"];
                 };
             };
             /** @description Bad request */

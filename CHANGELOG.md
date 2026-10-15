@@ -4,6 +4,17 @@ All notable changes to the `@littlebigbrain/client` package are documented here.
 
 ## Unreleased
 
+- `client.files.list({ limit, after })` reads one page of the graph's
+  files, the newest upload first: `limit` is 1 to 1,000 (default 1,000),
+  and the answer's `next` (`FileList.next`) is the `after` of the next
+  page. A page can hold fewer than `limit` files while `next` is set.
+  `client.files.counts()` (`GET /v1/files/counts`) counts the files by
+  parse status over the `Document` entities of the published generation,
+  with the commit it counted (`FileCounts`). The package exports
+  `FileList`, `FileListOptions` and `FileCounts`.
+- `client.files.get(sha256)` (`GET /v1/files/record`) reads one file's
+  record from one object; a SHA-256 the graph has no file for, or a deleted
+  file, answers `404 file_not_found`.
 - Files of up to 1 GiB. `client.files.content(sha256, { range })` reads one
   byte range (`{ start, end }` with both bytes included, `{ start }` to the
   end, or `{ suffix }` for the last bytes) and still returns a
