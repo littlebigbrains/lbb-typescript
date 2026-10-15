@@ -4,6 +4,14 @@ All notable changes to the `@littlebigbrain/client` package are documented here.
 
 ## Unreleased
 
+- `client.files.upload(data, { name, language, schema })`: an upload can
+  state the content's `language` (the natural language of the content, a
+  BCP 47 tag such as `en` or `de-CH`, at most 64 characters) and `schema`
+  (at most 256), which the file's `Document` stores. `FileRecord` gains
+  `language` and `schema`. An upload also writes the file's `Content`
+  (`content:<sha256>`) and the edge `HAS_CONTENT`, and the ontology gains
+  `REPRESENTS`. `SuggestionLinkSummary.document` is the `Document`'s IRI
+  for a link written since, and the file's name for one written before.
 - The runs of a workflow: `client.workflows.named.runs(name, { before,
   limit, outcome })`, `getRun(name, runId)` (a run with its model calls)
   and `runStats(name, { hours })` read the run summaries a workflow keeps

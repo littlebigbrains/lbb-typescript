@@ -34,6 +34,18 @@ export interface FileUploadOptions extends CallOptions {
    * `application/octet-stream`; the server recognizes a PDF by its bytes.
    */
   contentType?: string;
+  /**
+   * The natural language of the content, a BCP 47 tag such as `en` or
+   * `de-CH`, at most 64 characters. The
+   * `Document` stores it when given, and keeps the earlier upload's when a
+   * later one gives none.
+   */
+  language?: string;
+  /**
+   * The schema the content follows (a name or a URL), at most 256
+   * characters. Stored like `language`.
+   */
+  schema?: string;
 }
 
 /** The page range of `files.pages`: 0-based, `to` is the first page not returned. */
@@ -81,8 +93,8 @@ export class FilesNamespace {
 
   /**
    * Upload a file (`POST /v1/files?name=`, at most 64 MiB). The server
-   * stores the bytes once and commits a `Document` entity for them; a parse
-   * starter then reads them. The same bytes under the same name again change
+   * stores the bytes once and commits a `Document` entity for them, with a
+   * `Content` entity for the bytes; a parse starter then reads them. The same bytes under the same name again change
    * nothing (`created: false`), so a failed call is retried. The same bytes
    * under another name rename the file.
    */
@@ -90,13 +102,13 @@ export class FilesNamespace {
     data: FileBody,
     options: FileUploadOptions,
   ): Promise<Schemas["FileUploadResponse"]> {
-    const { name, contentType, ...opts } = options;
+    const { name, contentType, language, schema, ...opts } = options;
     if (!name?.trim())
       throw new TypeError("files.upload needs the file's name");
     return this.client.request("POST", "/v1/files", {
       ...opts,
       retry: opts.retry ?? true,
-      query: { name },
+      query: { name, language, schema },
       rawBody: data,
       contentType: uploadContentType(data, contentType),
     });
