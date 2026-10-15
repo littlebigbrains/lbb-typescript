@@ -1281,7 +1281,7 @@ export interface paths {
         /** The graph's files, newest upload first, with what the parse workflow (`documents.parse`) made of each */
         get: operations["get_v1_files"];
         put?: never;
-        /** Upload a file: the raw request body (at most 64 MiB) is stored once under its SHA-256, and a `Document` entity (key `file:<sha256>`) is committed for it, with its `Content` (key `content:<sha256>`) and the edge `HAS_CONTENT`. `language` and `schema` are stored on the `Document` when given. The same bytes under the same name change nothing */
+        /** Upload a file: the raw request body is stored once under its SHA-256, and a `Document` entity (key `file:<sha256>`) is committed for it, with its `Content` (key `content:<sha256>`) and the edge `HAS_CONTENT`. `language` and `schema` are stored on the `Document` when given. A file holds at most 1 GiB by default (the server setting `LBB_FILES_MAX_BYTES`); a larger body is refused with 413 `file_too_large` before it is read. An empty body is an empty file. The same bytes under the same name change nothing */
         post: operations["post_v1_files"];
         /** Remove a file from the list and retract its `Document` entity */
         delete: operations["delete_v1_files"];
@@ -1297,13 +1297,14 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** A file's bytes, with its content type. 404 `file_not_found` */
+        /** A file's bytes with its content type, streamed from storage. One `Range: bytes=a-b`, `bytes=a-` or `bytes=-n` answers 206 with `Content-Range`; a range with no byte of the file answers 416 `range_not_satisfiable` with `Content-Range: bytes *\/<length>`; several ranges answer the whole file. `ETag` is the SHA-256 in quotes; `Accept-Ranges: bytes`. 404 `file_not_found` */
         get: operations["get_v1_files_content"];
         put?: never;
         post?: never;
         delete?: never;
         options?: never;
-        head?: never;
+        /** A file's length (`Content-Length`), content type and SHA-256 (`ETag`, in quotes), with no body. 404 `file_not_found` */
+        head: operations["head_v1_files_content"];
         patch?: never;
         trace?: never;
     };
@@ -7092,7 +7093,10 @@ export interface components {
             content_type: string;
             /** @description The IRI of its `Document` entity (key `file:<sha256>`). */
             document: string;
-            /** @description The language of the content, as an upload stated it (`de`, `rust`). */
+            /**
+             * @description The natural language of the content, a BCP 47 tag such as `en` or
+             *     `de-CH`.
+             */
             language?: string | null;
             /** @description The name it was uploaded under (the last upload's). */
             name: string;
@@ -30461,7 +30465,7 @@ export interface operations {
                 graph?: string;
                 /** @description the file's name */
                 name?: string;
-                /** @description the content's language (`de`, `rust`), at most 64 characters */
+                /** @description the natural language of the content, a BCP 47 tag such as `en` or `de-CH` */
                 language?: string;
                 /** @description the schema the content follows (a name or a URL), at most 256 characters */
                 schema?: string;
@@ -30475,7 +30479,7 @@ export interface operations {
             path?: never;
             cookie?: never;
         };
-        /** @description The file's bytes, at most 64 MiB. `Content-Type` names its type; without one, a PDF is recognized by its bytes. */
+        /** @description The file's bytes, at most 1 GiB by default (`LBB_FILES_MAX_BYTES`); an empty body is an empty file. `Content-Type` names its type; without one, a PDF is recognized by its bytes. */
         requestBody: {
             content: {
                 "application/octet-stream": string;
@@ -30752,14 +30756,48 @@ export interface operations {
             header?: {
                 /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
                 "Lbb-Version"?: string;
+                /** @description One byte range: `bytes=a-b`, `bytes=a-` or `bytes=-n` (RFC 9110) */
+                Range?: string;
             };
             path?: never;
             cookie?: never;
         };
         requestBody?: never;
         responses: {
-            /** @description OK */
+            /** @description The file's bytes */
             200: {
+                headers: {
+                    /** @description `bytes` */
+                    "Accept-Ranges"?: string;
+                    /** @description The bytes of the body; for `HEAD`, the bytes a `GET` sends */
+                    "Content-Length"?: number;
+                    /** @description The file's SHA-256 in quotes */
+                    ETag?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/octet-stream": string;
+                };
+            };
+            /** @description One range of the file's bytes */
+            206: {
+                headers: {
+                    /** @description `bytes` */
+                    "Accept-Ranges"?: string;
+                    /** @description The bytes of the body; for `HEAD`, the bytes a `GET` sends */
+                    "Content-Length"?: number;
+                    /** @description `bytes <first>-<last>/<length>` */
+                    "Content-Range"?: string;
+                    /** @description The file's SHA-256 in quotes */
+                    ETag?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/octet-stream": string;
+                };
+            };
+            /** @description Bad request */
+            400: {
                 headers: {
                     /** @description API contract version used for the response */
                     "Lbb-Version"?: string;
@@ -30768,8 +30806,146 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": Record<string, never>;
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
                 };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Range not satisfiable: no byte of the file is in it */
+            416: {
+                headers: {
+                    /** @description `bytes *\/<length>` */
+                    "Content-Range"?: string;
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Rate limit exceeded */
+            429: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Service unavailable */
+            503: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+        };
+    };
+    head_v1_files_content: {
+        parameters: {
+            query?: {
+                /** @description Graph name (default `main`) */
+                graph?: string;
+                /** @description the file's SHA-256, hex */
+                sha256?: string;
+            };
+            header?: {
+                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                "Lbb-Version"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The file's length, type and digest; no body */
+            200: {
+                headers: {
+                    /** @description `bytes` */
+                    "Accept-Ranges"?: string;
+                    /** @description The bytes of the body; for `HEAD`, the bytes a `GET` sends */
+                    "Content-Length"?: number;
+                    /** @description The file's SHA-256 in quotes */
+                    ETag?: string;
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Bad request */
             400: {

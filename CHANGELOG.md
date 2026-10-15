@@ -4,6 +4,16 @@ All notable changes to the `@littlebigbrain/client` package are documented here.
 
 ## Unreleased
 
+- Files of up to 1 GiB. `client.files.content(sha256, { range })` reads one
+  byte range (`{ start, end }` with both bytes included, `{ start }` to the
+  end, or `{ suffix }` for the last bytes) and still returns a
+  `Uint8Array`. `client.files.contentStream(sha256, { range })` yields the
+  bytes in chunks as they arrive, so a large file is never held whole.
+  `client.files.head(sha256)` returns `{ bytes, contentType, sha256 }`
+  without the bytes. A range with no byte of the file throws `LbbError`
+  416 `range_not_satisfiable`; an upload above the server's limit throws
+  413 `file_too_large`. `client.requestByteStream(method, path, opts)`
+  streams any 2xx body.
 - `client.files.upload(data, { name, language, schema })`: an upload can
   state the content's `language` (the natural language of the content, a
   BCP 47 tag such as `en` or `de-CH`, at most 64 characters) and `schema`
