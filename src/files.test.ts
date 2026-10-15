@@ -125,6 +125,28 @@ test("files.upload takes a Blob's own type, else octet-stream, and retries a 503
   assert.equal(seen[2].headers?.["content-type"], "application/octet-stream");
 });
 
+test("files.upload sends the language and schema when given", async () => {
+  const { fetch, seen } = filesFetch([
+    { body: { file: { ...RECORD, language: "de" }, created: true } },
+    { body: { file: RECORD, created: false } },
+  ]);
+  const lbb = client(fetch);
+
+  const answer = await lbb.files.upload(new Uint8Array([1]), {
+    name: "plan.pdf",
+    language: "de",
+    schema: "urn:x:plan",
+  });
+  await lbb.files.upload(new Uint8Array([1]), { name: "plan.pdf" });
+
+  assert.equal(answer.file.language, "de");
+  assert.equal(
+    seen[0].url,
+    "http://h/v1/files?graph=docs&name=plan.pdf&language=de&schema=urn%3Ax%3Aplan",
+  );
+  assert.equal(seen[1].url, "http://h/v1/files?graph=docs&name=plan.pdf");
+});
+
 test("files.upload needs a name", async () => {
   const { fetch, seen } = filesFetch([]);
   await assert.rejects(

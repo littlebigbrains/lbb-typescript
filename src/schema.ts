@@ -1281,7 +1281,7 @@ export interface paths {
         /** The graph's files, newest upload first, with what the parse workflow (`documents.parse`) made of each */
         get: operations["get_v1_files"];
         put?: never;
-        /** Upload a file: the raw request body (at most 64 MiB) is stored once under its SHA-256, and a `Document` entity (key `file:<sha256>`) is committed for it. The same bytes under the same name change nothing. 400 `rdf_native_graph` on an RDF-native graph */
+        /** Upload a file: the raw request body (at most 64 MiB) is stored once under its SHA-256, and a `Document` entity (key `file:<sha256>`) is committed for it, with its `Content` (key `content:<sha256>`) and the edge `HAS_CONTENT`. `language` and `schema` are stored on the `Document` when given. The same bytes under the same name change nothing */
         post: operations["post_v1_files"];
         /** Remove a file from the list and retract its `Document` entity */
         delete: operations["delete_v1_files"];
@@ -7092,9 +7092,16 @@ export interface components {
             content_type: string;
             /** @description The IRI of its `Document` entity (key `file:<sha256>`). */
             document: string;
+            /** @description The language of the content, as an upload stated it (`de`, `rust`). */
+            language?: string | null;
             /** @description The name it was uploaded under (the last upload's). */
             name: string;
             parse?: null | components["schemas"]["FileParse"];
+            /**
+             * @description The schema the content follows, as an upload stated it (a name or
+             *     a URL).
+             */
+            schema?: string | null;
             /** @description The SHA-256 of the bytes, lowercase hex: the file's identity. */
             sha256: string;
             /** @description RFC 3339 time of the first upload. */
@@ -16594,7 +16601,12 @@ export interface components {
              */
             confidence?: number | null;
             decision: components["schemas"]["SuggestionLinkDecision"];
-            /** @description The mention's document, page (from 1) and line. */
+            /**
+             * @description The mention's document, page (from 1) and line. The document is the
+             *     `Document`'s IRI that the link's evidence names (without its
+             *     `#page=` fragment), or the file name in evidence written before
+             *     typed content.
+             */
             document?: string | null;
             line?: string | null;
             line_id?: string | null;
@@ -30449,6 +30461,10 @@ export interface operations {
                 graph?: string;
                 /** @description the file's name */
                 name?: string;
+                /** @description the content's language (`de`, `rust`), at most 64 characters */
+                language?: string;
+                /** @description the schema the content follows (a name or a URL), at most 256 characters */
+                schema?: string;
             };
             header?: {
                 /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
