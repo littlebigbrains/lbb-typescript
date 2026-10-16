@@ -10,7 +10,7 @@
 // instances to a workflow of your worker as messages; handle them with
 // `triggeredWorkflow()` and write with `writeOwned()`.
 import type { LbbClient, Schemas } from "./client.js";
-import type { CallOptions } from "./transport.js";
+import { LbbError, type CallOptions } from "./transport.js";
 
 /** One triggered workflow: its starter workflow's catalog id and its name. */
 export interface TriggeredWorkflowRef {
@@ -486,14 +486,34 @@ export interface DeriveOptions extends CallOptions {
 }
 
 /**
- * What `derive` did: `ran` when this call did the work and recorded it;
- * otherwise a derivation existed (or another run recorded one first), and
- * `outputs` are the stored ones.
+ * What `derive` did. `ran` is true when this call did the work and recorded
+ * it. Otherwise a derivation existed (or another run recorded one first),
+ * and `outputs` are the stored ones.
+ *
+ * `uploadChanged` is true when this call did the work, but the file was
+ * deleted (or deleted and uploaded again) since the check. Then nothing was
+ * recorded, `outputs` are this call's and `derivation` is null. The run of
+ * the current upload works on the file again.
  */
-export interface DeriveResult<T> {
-  ran: boolean;
-  outputs: T;
-  derivation: Schemas["Derivation"];
+export type DeriveResult<T> =
+  | {
+      ran: boolean;
+      uploadChanged: false;
+      outputs: T;
+      derivation: Schemas["Derivation"];
+    }
+  | { ran: false; uploadChanged: true; outputs: T; derivation: null };
+
+/**
+ * Whether an error is the answer of a derivation record whose upload
+ * changed (`409 derivation_upload_changed`). The record named the upload
+ * of its check, and the file was deleted (or deleted and uploaded again)
+ * since. Nothing was recorded; end the run without an error.
+ */
+export function isDerivationUploadChanged(error: unknown): boolean {
+  return (
+    error instanceof LbbError && error.code === "derivation_upload_changed"
+  );
 }
 
 /**
@@ -504,13 +524,19 @@ export interface DeriveResult<T> {
  * when a derivation exists; record one after. Identical bytes under two
  * names are then worked on once, and a new version or new settings work
  * again. `derive` does the three steps.
+ *
+ * A derivation belongs to one upload of the file. The check answers it
+ * (`content_uploaded_at`); send it back with the record. A record of a
+ * file deleted since then records nothing (`isDerivationUploadChanged`).
  */
 export class DerivationsNamespace {
   constructor(private readonly client: LbbClient) {}
 
   /**
    * Whether the key has a derivation: `exists`, and the derivation when
-   * there is one. A read, so a failed call is retried.
+   * there is one. `content_uploaded_at` names the upload of the
+   * content's live file; a deleted file has neither. A read, so a failed
+   * call is retried.
    */
   check(
     key: Schemas["DerivationKey"],
@@ -527,6 +553,9 @@ export class DerivationsNamespace {
    * Record a derivation once: the key, `run_id` (your run's id) and
    * `outputs` (at most 16 KiB of JSON). A second record of the key answers
    * the stored one with `recorded: false`, so a failed call is retried.
+   * Send the check's `content_uploaded_at` too. When the file was deleted
+   * since the check, nothing is recorded and the call throws `LbbError`
+   * 409 `derivation_upload_changed` (`isDerivationUploadChanged`).
    */
   record(
     request: Schemas["DerivationRecordRequest"],
@@ -545,7 +574,10 @@ export class DerivationsNamespace {
    * running `work`; else run `work` and record what it returns (at most
    * 16 KiB of JSON). Identical bytes under two names are worked on once. A
    * run that stops after `work` and before the record runs `work` again,
-   * so make `work`'s writes idempotent (effect ids, owned writes).
+   * so make `work`'s writes idempotent (effect ids, owned writes). The
+   * record names the upload the check answered. When the file was deleted
+   * during `work`, nothing is recorded and the result has
+   * `uploadChanged: true`.
    *
    * ```ts
    * const sha = message.origin?.sha256;
@@ -566,21 +598,31 @@ export class DerivationsNamespace {
     if (checked.exists && checked.derivation) {
       return {
         ran: false,
+        uploadChanged: false,
         outputs: checked.derivation.outputs as T,
         derivation: checked.derivation,
       };
     }
     const outputs = await work();
-    const recorded = await this.record(
-      {
-        ...key,
-        ...(runId !== undefined ? { run_id: runId } : {}),
-        outputs: outputs ?? null,
-      },
-      call,
-    );
+    const upload = checked.content_uploaded_at;
+    let recorded: Schemas["DerivationRecordResponse"];
+    try {
+      recorded = await this.record(
+        {
+          ...key,
+          ...(runId !== undefined ? { run_id: runId } : {}),
+          outputs: outputs ?? null,
+          ...(upload ? { content_uploaded_at: upload } : {}),
+        },
+        call,
+      );
+    } catch (error) {
+      if (!isDerivationUploadChanged(error)) throw error;
+      return { ran: false, uploadChanged: true, outputs, derivation: null };
+    }
     return {
       ran: recorded.recorded,
+      uploadChanged: false,
       outputs: (recorded.recorded ? outputs : recorded.derivation.outputs) as T,
       derivation: recorded.derivation,
     };

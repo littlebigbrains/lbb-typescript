@@ -2,6 +2,22 @@
 
 All notable changes to the `@littlebigbrain/client` package are documented here.
 
+## Unreleased
+
+- A derivation belongs to one upload of its file.
+  `client.workflows.derivations.check` names the upload of the live file
+  as `content_uploaded_at`. A deleted file has no upload there, and no
+  derivation. Send it back in `record`'s `content_uploaded_at`.
+  Say the file was deleted since the check, or deleted and uploaded again.
+  Then the record writes nothing. It throws `LbbError` 409
+  `derivation_upload_changed`, which `isDerivationUploadChanged(error)`
+  names. Then the run of the new upload does the work.
+- `derive` sends the check's upload with its record. `DeriveResult` has
+  `uploadChanged`: `true` when the file was deleted during `work`. Then
+  nothing was recorded, `ran` is `false`, `outputs` are `work`'s and
+  `derivation` is `null`. `DeriveResult` is now a union on
+  `uploadChanged`: test it before you read `derivation`.
+
 ## 0.27.0 (2026-10-16)
 
 - `client.files.list({ parseStatus, name })` filters the list: `parseStatus`

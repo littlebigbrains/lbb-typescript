@@ -526,6 +526,62 @@ test("a turn that continues starts at the byte offset where the last one stopped
   assert.equal(restarted.turn.keys[0], "check");
 });
 
+test("a file deleted and uploaded again while it is read records nothing; the new upload's run reads it", async () => {
+  const csv = customerList(10);
+  const settings = { ...EVERY_FILE, rowsPerTurn: 4 };
+  const { lbb, content, definition } = setup(settings, []);
+  const file = content.upload("customers-ten.csv", csv, "text/csv");
+  const first = content.uploadedAt(file.sha256);
+
+  // Turn 1 checks the file; the turns after it carry the upload the check named.
+  const one = await runTurn<RowsState>(definition, {}, contentMessage("rows", file));
+  type Continued = { cursor: { plan: { uploadedAt?: string } } };
+  const carried = one.result.continuation!.message as unknown as Continued;
+  assert.equal(carried.cursor.plan.uploadedAt, first);
+
+  // The file is deleted and uploaded again; the old run reads on to its end.
+  content.remove(file.sha256);
+  const again = content.upload("customers-ten.csv", csv, "text/csv");
+  assert.notEqual(content.uploadedAt(again.sha256), first);
+  const old = await runMessage<RowsState>(
+    definition,
+    one.result.continuation!.message,
+    one.result.state,
+  );
+  assert.deepEqual(old.state, { contents: 0, skipped: 1, rows: 10, instances: 10, represents: 0 });
+  assert.equal(content.records.at(-1)?.content_uploaded_at, first);
+  assert.equal(content.recorded.size, 0, "nothing is recorded for the deleted upload");
+
+  // The run of the new upload checks, reads the file and records its derivation.
+  const fresh = await runMessage<RowsState>(definition, contentMessage("rows", again));
+  assert.equal(fresh.state.contents, 1);
+  assert.equal(fresh.state.skipped, 0);
+  assert.equal(content.records.at(-1)?.content_uploaded_at, content.uploadedAt(again.sha256));
+  assert.equal(content.recorded.size, 1);
+  assertEveryRow(lbb.graph, again, csv);
+});
+
+test("a file deleted while it is read, and not uploaded again, ends the run as skipped", async () => {
+  const csv = customerList(10);
+  const settings = { ...EVERY_FILE, rowsPerTurn: 4 };
+  const { content, definition } = setup(settings, []);
+  const file = content.upload("customers-ten.csv", csv, "text/csv");
+  const one = await runTurn<RowsState>(definition, {}, contentMessage("rows", file));
+  assert.equal(one.result.state.rows, 4);
+
+  // The next read of the bytes answers 404: the run ends without an error.
+  content.remove(file.sha256);
+  const old = await runMessage<RowsState>(
+    definition,
+    one.result.continuation!.message,
+    one.result.state,
+  );
+  assert.equal(old.turns.length, 1, "the run ends at the turn that read nothing");
+  assert.deepEqual(old.state, { contents: 0, skipped: 1, rows: 4, instances: 4, represents: 0 });
+  assert.equal(content.records.length, 0, "no derivation is recorded");
+  assert.equal(content.recorded.size, 0);
+});
+
 test("a row longer than the longest row stops the read: a quote that never closes", async () => {
   const bytes = new TextEncoder().encode(`a,b\n1,"open${"x".repeat(500)}`);
   await assert.rejects(

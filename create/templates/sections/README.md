@@ -54,7 +54,14 @@ The text before the first heading, when it is not blank, is the section at
 position 0, of level 0, titled with the file's name without its extension.
 A section's lines run from its heading to its last line that is not
 blank. The last turn records the derivation: the sections, their count per
-level, the instance the file represents, and the commits of the writes.
+level, the instance the file represents, and the commits of the writes. The record names the upload the check
+answered (`content_uploaded_at`). The cursor carries it from turn to turn.
+When the file was deleted while the run read it, the record writes nothing
+(`409 derivation_upload_changed`). The run ends and counts the file as
+skipped. The run of a new upload reads the file again. Say the file was
+deleted and not uploaded again. The next read of its bytes answers
+`404 file_not_found`. The run ends there too, and counts the file as
+skipped.
 
 ## Settings
 

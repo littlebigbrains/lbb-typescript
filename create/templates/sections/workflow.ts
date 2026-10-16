@@ -19,13 +19,19 @@
 //    to 44);
 // 4. with `represents`, writes `Document REPRESENTS <instance>` when the
 //    file's name names exactly one instance of that class;
-// 5. records the derivation.
+// 5. records the derivation, for the upload its check named. When the file
+//    was deleted (or deleted and uploaded again) since, nothing is recorded,
+//    and the run of the new upload reads the file again. A file deleted and
+//    not uploaded again answers 404 to the next read of its bytes: the run
+//    ends there and counts the file as skipped.
 //
 // A turn writes at most `sectionsPerTurn` sections; the rest goes to a new
 // turn (`ctx.continue`).
 import { createHash } from "node:crypto";
 import {
+  LbbError,
   entityRef,
+  isDerivationUploadChanged,
   triggeredWorkflow,
   type LbbActivities,
   type Schemas,
@@ -121,7 +127,7 @@ export interface ContentPorts {
 export interface SectionsState {
   /** Files read to their end. */
   contents: number;
-  /** Files skipped: read before with these settings, another name or type, or no file. */
+  /** Files skipped: read before with these settings, another name or type, no file, or deleted while read. */
   skipped: number;
   sections: number;
   represents: number;
@@ -135,9 +141,11 @@ interface FileInfo {
   mediaType: string;
 }
 
-/** What the check of a file found: the file to read, or why it is skipped. */
+/** What the check of a file found: the file to read and its upload, or why it is skipped. */
 interface Checked {
   file?: FileInfo;
+  /** The `content_uploaded_at` of the check: absent without a file record. */
+  uploadedAt?: string;
   skip?: string;
 }
 
@@ -148,6 +156,8 @@ interface Plan {
   name: string;
   count: number;
   represents: string | null;
+  /** The upload of the file the check named: the record names it. */
+  uploadedAt?: string;
 }
 
 /** Where a file's next turn starts, and the commits of its writes so far. */
@@ -173,6 +183,10 @@ const LABEL = "http://www.w3.org/2000/01/rdf-schema#label";
 
 /** The media type without parameters, in lower case. */
 const baseType = (mediaType: string) => mediaType.split(";")[0]!.trim().toLowerCase();
+
+/** Whether an error is the 404 of a file's bytes: the file was deleted and not uploaded again. */
+export const fileGone = (error: unknown) =>
+  error instanceof LbbError && error.status === 404 && error.code === "file_not_found";
 
 /** A file name without its last extension. */
 export const stem = (name: string) => name.replace(/\.[^./\\]*$/, "");
@@ -244,108 +258,133 @@ export function createWorkflow(
         delete plain.cursor;
         return ctx.continue(next, plain);
       };
-      const document = message.instances[0];
-      if (!document) return { state };
-      let split: Promise<Section[]> | undefined;
-      const sectionsOf = (sha256: string, name: string) =>
-        (split ??= ports.files
-          .content(sha256)
-          .then((bytes) => markdownSections(new TextDecoder().decode(bytes), stem(name))));
+      try {
+        const document = message.instances[0];
+        if (!document) return { state };
+        let split: Promise<Section[]> | undefined;
+        const sectionsOf = (sha256: string, name: string) =>
+          (split ??= ports.files
+            .content(sha256)
+            .then((bytes) => markdownSections(new TextDecoder().decode(bytes), stem(name))));
 
-      let cursor = message.cursor;
-      if (!cursor) {
-        const checked = await ctx.step("check", async (s): Promise<Checked> => {
-          s.progress("checking the file", { done: 0, total: 1, unit: "documents" });
-          const file = await readDocument(message, document);
-          if (!file) return { skip: "no file" };
-          if (!isMarkdown(file.mediaType, file.name)) return { skip: "media type" };
-          if (match && !match.test(file.name)) return { skip: "name" };
-          const found = await ports.workflows.derivations.check(
-            derivationKey(file.sha256, settings),
-          );
-          return found.exists ? { skip: "derived" } : { file };
-        });
-        if (!checked.file) return rest({ ...state, skipped: state.skipped + 1 });
-        const file = checked.file;
-        const planned = await ctx.step("plan", async (s) => {
-          s.progress("reading sections", { done: 0, unit: "sections" });
-          const count = (await sectionsOf(file.sha256, file.name)).length;
-          s.progress("reading sections", { done: count, total: count, unit: "sections" });
-          const found = settings.represents ? await representsOf(file.name) : null;
-          const plan: Plan = { ...file, count, represents: found?.iri ?? null };
-          return { plan, label: found?.label ?? null };
-        });
-        const commits: number[] = [];
-        const p = planned.plan;
-        if (p.represents) {
-          const written = await lbb.writeOwned(ctx, "represents", (s) => {
-            s.progress("writing facts", { done: 0, total: 1, unit: "documents" });
-            return {
-              subjects: [entityRef(p.document, "Document", p.name)],
-              relations: [REPRESENTS],
-              triplets: [
-                {
-                  source: entityRef(p.document, "Document", p.name),
-                  relation: REPRESENTS,
-                  target: entityRef(
-                    p.represents!,
-                    settings.represents!.class,
-                    planned.label ?? undefined,
-                  ),
-                  confidence: 1,
-                  evidence: { text: p.name, source_id: p.document },
-                },
-              ],
+        let cursor = message.cursor;
+        if (!cursor) {
+          const checked = await ctx.step("check", async (s): Promise<Checked> => {
+            s.progress("checking the file", { done: 0, total: 1, unit: "documents" });
+            const file = await readDocument(message, document);
+            if (!file) return { skip: "no file" };
+            if (!isMarkdown(file.mediaType, file.name)) return { skip: "media type" };
+            if (match && !match.test(file.name)) return { skip: "name" };
+            const found = await ports.workflows.derivations.check(
+              derivationKey(file.sha256, settings),
+            );
+            if (found.exists) return { skip: "derived" };
+            const uploadedAt = found.content_uploaded_at ?? undefined;
+            return uploadedAt ? { file, uploadedAt } : { file };
+          });
+          if (!checked.file) return rest({ ...state, skipped: state.skipped + 1 });
+          const file = checked.file;
+          const planned = await ctx.step("plan", async (s) => {
+            s.progress("reading sections", { done: 0, unit: "sections" });
+            const count = (await sectionsOf(file.sha256, file.name)).length;
+            s.progress("reading sections", { done: count, total: count, unit: "sections" });
+            const found = settings.represents ? await representsOf(file.name) : null;
+            const plan: Plan = {
+              ...file,
+              count,
+              represents: found?.iri ?? null,
+              ...(checked.uploadedAt ? { uploadedAt: checked.uploadedAt } : {}),
             };
+            return { plan, label: found?.label ?? null };
+          });
+          const commits: number[] = [];
+          const p = planned.plan;
+          if (p.represents) {
+            const written = await lbb.writeOwned(ctx, "represents", (s) => {
+              s.progress("writing facts", { done: 0, total: 1, unit: "documents" });
+              return {
+                subjects: [entityRef(p.document, "Document", p.name)],
+                relations: [REPRESENTS],
+                triplets: [
+                  {
+                    source: entityRef(p.document, "Document", p.name),
+                    relation: REPRESENTS,
+                    target: entityRef(
+                      p.represents!,
+                      settings.represents!.class,
+                      planned.label ?? undefined,
+                    ),
+                    confidence: 1,
+                    evidence: { text: p.name, source_id: p.document },
+                  },
+                ],
+              };
+            });
+            if (written.commit_seq !== null) commits.push(written.commit_seq);
+          }
+          cursor = { next: 0, plan: p, commits };
+        }
+
+        // The sections of this turn, written in parts.
+        const { plan, next: from } = cursor;
+        const to = Math.min(plan.count, from + settings.sectionsPerTurn);
+        const commits = [...cursor.commits];
+        for (let n = 0; from + n * PART < to; n++) {
+          const written = await lbb.writeOwned(ctx, `write-${n}`, async (s) => {
+            s.progress("writing facts", { done: n * PART, total: to - from, unit: "sections" });
+            const all = await sectionsOf(plan.sha256, plan.name);
+            const start = from + n * PART;
+            return partWrite(plan, all, all.slice(start, Math.min(to, start + PART)));
           });
           if (written.commit_seq !== null) commits.push(written.commit_seq);
         }
-        cursor = { next: 0, plan: p, commits };
-      }
+        const counted = { ...state, sections: state.sections + (to - from) };
+        if (to < plan.count)
+          return ctx.continue(counted, {
+            ...message,
+            removed: [],
+            cursor: { next: to, plan, commits: commits.slice(0, 256) },
+          });
 
-      // The sections of this turn, written in parts.
-      const { plan, next: from } = cursor;
-      const to = Math.min(plan.count, from + settings.sectionsPerTurn);
-      const commits = [...cursor.commits];
-      for (let n = 0; from + n * PART < to; n++) {
-        const written = await lbb.writeOwned(ctx, `write-${n}`, async (s) => {
-          s.progress("writing facts", { done: n * PART, total: to - from, unit: "sections" });
-          const all = await sectionsOf(plan.sha256, plan.name);
-          const start = from + n * PART;
-          return partWrite(plan, all, all.slice(start, Math.min(to, start + PART)));
+        const recorded = await ctx.step("record", async (s) => {
+          s.progress("recording the derivation", { done: 0, total: 1, unit: "documents" });
+          const all = plan.count ? await sectionsOf(plan.sha256, plan.name) : [];
+          const levels: Record<string, number> = {};
+          for (const section of all) levels[section.level] = (levels[section.level] ?? 0) + 1;
+          try {
+            const answer = await ports.workflows.derivations.record({
+              ...derivationKey(plan.sha256, settings),
+              run_id: ctx.messageId,
+              outputs: {
+                sections: plan.count,
+                levels,
+                represents: plan.represents,
+                commits: commits.slice(0, 256),
+              },
+              ...(plan.uploadedAt ? { content_uploaded_at: plan.uploadedAt } : {}),
+            });
+            return answer.recorded;
+          } catch (error) {
+            // The file was deleted while this run read it: nothing is
+            // recorded, and the run of a new upload reads it again.
+            if (isDerivationUploadChanged(error)) return "upload changed";
+            throw error;
+          }
         });
-        if (written.commit_seq !== null) commits.push(written.commit_seq);
+        if (recorded === "upload changed")
+          return rest({ ...counted, skipped: counted.skipped + 1 });
+        return rest({
+          ...counted,
+          contents: counted.contents + 1,
+          represents: counted.represents + (plan.represents ? 1 : 0),
+        });
+      } catch (error) {
+        // The file was deleted while this run read it, and not uploaded
+        // again: its bytes answer 404. Nothing is recorded, and the file
+        // counts as skipped.
+        if (!fileGone(error)) throw error;
+        return rest({ ...state, skipped: state.skipped + 1 });
       }
-      const counted = { ...state, sections: state.sections + (to - from) };
-      if (to < plan.count)
-        return ctx.continue(counted, {
-          ...message,
-          removed: [],
-          cursor: { next: to, plan, commits: commits.slice(0, 256) },
-        });
-
-      await ctx.step("record", async (s) => {
-        s.progress("recording the derivation", { done: 0, total: 1, unit: "documents" });
-        const all = plan.count ? await sectionsOf(plan.sha256, plan.name) : [];
-        const levels: Record<string, number> = {};
-        for (const section of all) levels[section.level] = (levels[section.level] ?? 0) + 1;
-        const recorded = await ports.workflows.derivations.record({
-          ...derivationKey(plan.sha256, settings),
-          run_id: ctx.messageId,
-          outputs: {
-            sections: plan.count,
-            levels,
-            represents: plan.represents,
-            commits: commits.slice(0, 256),
-          },
-        });
-        return recorded.recorded;
-      });
-      return rest({
-        ...counted,
-        contents: counted.contents + 1,
-        represents: counted.represents + (plan.represents ? 1 : 0),
-      });
     },
   });
 

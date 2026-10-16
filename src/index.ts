@@ -74,6 +74,7 @@ export type {
   QueryAskResult,
   QueryAskStreamEvent,
 } from "./namespaces.js";
+export { isDerivationUploadChanged } from "./triggered-workflows.js";
 export type {
   DerivationKey,
   DerivationsNamespace,

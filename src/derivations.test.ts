@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { LbbClient, type FetchLike } from "./client.js";
+import { LbbClient, LbbError, type FetchLike } from "./client.js";
+import { isDerivationUploadChanged } from "./triggered-workflows.js";
 
 interface Seen {
   method: string;
@@ -117,8 +118,9 @@ test("derive answers the stored derivation when another run recorded first", asy
   const result = await api.derive(KEY, async () => ({ pages: 1 }));
 
   assert.equal(result.ran, false);
+  assert.equal(result.uploadChanged, false);
   assert.deepEqual(result.outputs, { pages: 12 });
-  assert.equal(result.derivation.run_id, "starter-pdfs-1");
+  assert.equal(result.derivation?.run_id, "starter-pdfs-1");
 });
 
 test("a derivation check is retried after a server error", async () => {
@@ -134,4 +136,92 @@ test("a derivation check is retried after a server error", async () => {
   assert.equal(checked.exists, false);
   assert.equal(seen.length, 2);
   assert.equal(seen[1]?.path, "/v1/workflows/derivations/check");
+});
+
+const UPLOAD = "2026-10-15T09:00:00.123456+00:00";
+
+test("derive records for the upload its check named", async () => {
+  const { derivations: api, seen } = derivations([
+    { body: { exists: false, content_uploaded_at: UPLOAD } },
+    { body: { recorded: true, derivation: DERIVATION } },
+  ]);
+  const result = await api.derive(KEY, async () => ({ pages: 12 }), {
+    runId: "starter-pdfs-1",
+  });
+
+  assert.equal(result.ran, true);
+  assert.equal(result.uploadChanged, false);
+  assert.deepEqual(seen[1]?.body, {
+    ...KEY,
+    run_id: "starter-pdfs-1",
+    outputs: { pages: 12 },
+    content_uploaded_at: UPLOAD,
+  });
+});
+
+test("derive reports a file deleted during the work: nothing recorded, no retry", async () => {
+  const { derivations: api, seen } = derivations([
+    { body: { exists: false, content_uploaded_at: UPLOAD } },
+    {
+      status: 409,
+      body: {
+        error: {
+          code: "derivation_upload_changed",
+          message: "the file was deleted since the upload",
+          param: "content_uploaded_at",
+          retryable: false,
+        },
+      },
+    },
+  ]);
+  const result = await api.derive(KEY, async () => ({ pages: 3 }));
+
+  assert.equal(result.uploadChanged, true);
+  assert.equal(result.ran, false);
+  assert.equal(result.derivation, null);
+  assert.deepEqual(result.outputs, { pages: 3 });
+  assert.equal(seen.length, 2, "the record is not sent again");
+});
+
+test("derive throws the other refusals of a record", async () => {
+  const { derivations: api } = derivations([
+    { body: { exists: false } },
+    {
+      status: 400,
+      body: {
+        error: {
+          code: "derivation_invalid",
+          message: "outputs",
+          retryable: false,
+        },
+      },
+    },
+  ]);
+  await assert.rejects(
+    api.derive(KEY, async () => ({ pages: 1 })),
+    (error: unknown) =>
+      error instanceof LbbError && error.code === "derivation_invalid",
+  );
+});
+
+test("isDerivationUploadChanged names the 409 of a record whose upload changed", () => {
+  assert.equal(
+    isDerivationUploadChanged(
+      new LbbError(409, "{}", {
+        code: "derivation_upload_changed",
+        message: "x",
+      }),
+    ),
+    true,
+  );
+  assert.equal(
+    isDerivationUploadChanged(
+      new LbbError(409, "{}", { code: "conflict", message: "x" }),
+    ),
+    false,
+  );
+  assert.equal(
+    isDerivationUploadChanged(new Error("derivation_upload_changed")),
+    false,
+  );
 });
