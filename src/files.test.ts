@@ -338,15 +338,50 @@ test("files.pages sends the range and checks it first", async () => {
 test("files.delete repeats the SHA-256 as confirm", async () => {
   const { fetch, seen } = filesFetch([
     { body: { deleted: true, sha256: SHA } },
+    { body: { deleted: true, sha256: SHA, purged_edges: 2 } },
   ]);
+  const lbb = client(fetch);
 
-  const answer = await client(fetch).files.delete(` ${SHA.toUpperCase()} `);
+  const answer = await lbb.files.delete(` ${SHA.toUpperCase()} `);
+  const purged = await lbb.files.delete(SHA, { purge: true });
 
   assert.equal(answer.deleted, true);
+  assert.equal(purged.purged_edges, 2);
   assert.equal(seen[0].method, "DELETE");
+  assert.deepEqual(
+    seen.map(({ url }) => url),
+    [
+      `http://h/v1/files?graph=docs&sha256=${SHA}&confirm=${SHA}`,
+      `http://h/v1/files?graph=docs&sha256=${SHA}&confirm=${SHA}&purge=true`,
+    ],
+  );
+});
+
+test("files.get reads a deleted file with the facts that cite it", async () => {
+  const citation = {
+    statement: "https://littlebigbrain.com/s/9f3c",
+    subject: "https://littlebigbrain.com/e/1",
+    predicate: "https://littlebigbrain.com/r/calls",
+    object: "https://littlebigbrain.com/e/2",
+    source: "https://littlebigbrain.com/e/41ab#page=3",
+  };
+  const { fetch, seen } = filesFetch([
+    {
+      body: {
+        ...RECORD,
+        deleted_at: "2026-10-15T09:00:00+00:00",
+        cited_by: [citation],
+      },
+    },
+  ]);
+
+  const file = await client(fetch).files.get(SHA, { deleted: true });
+
+  assert.equal(file.deleted_at, "2026-10-15T09:00:00+00:00");
+  assert.deepEqual(file.cited_by, [citation]);
   assert.equal(
     seen[0].url,
-    `http://h/v1/files?graph=docs&sha256=${SHA}&confirm=${SHA}`,
+    `http://h/v1/files/record?graph=docs&sha256=${SHA}&deleted=true`,
   );
 });
 

@@ -1281,9 +1281,9 @@ export interface paths {
         /** One page of the graph's files, newest upload first, with what the parse workflow (`documents.parse`) made of each. Without `limit`, the newest 1,000. `next` is the cursor of the next page; a page can hold fewer than `limit` files while `next` is set. 400 for an invalid `limit` or `after` */
         get: operations["get_v1_files"];
         put?: never;
-        /** Upload a file: the raw request body is stored once under its SHA-256, and a `Document` entity (key `file:<sha256>`) is committed for it, with its `Content` (key `content:<sha256>`) and the edge `HAS_CONTENT`. `language` and `schema` are stored on the `Document` when given. A file holds at most 1 GiB by default (the server setting `LBB_FILES_MAX_BYTES`); a larger body is refused with 413 `file_too_large` before it is read. An empty body is an empty file. The same bytes under the same name change nothing */
+        /** Upload a file: the raw request body is stored once under its SHA-256, and a `Document` entity (key `file:<sha256>`) is committed for it, with its `Content` (key `content:<sha256>`) and the edge `HAS_CONTENT`. `language` and `schema` are stored on the `Document` when given. A file holds at most 1 GiB by default (the server setting `LBB_FILES_MAX_BYTES`); a larger body is refused with 413 `file_too_large` before it is read. An empty body is an empty file. The same bytes under the same name change nothing. 429 `file_reclaim_in_progress` while a reclaim pass deletes the same bytes of a deleted file (seconds) */
         post: operations["post_v1_files"];
-        /** Remove a file from the list and retract its `Document` entity */
+        /** Remove a file from the list and retract its `Document` entity. The facts whose evidence names the file stay, and keep its content from the reclaim, which deletes a deleted file's bytes, pages and derivations after a grace (30 days by default). With `purge=true` the delete also retracts the edges whose evidence names the file (`purged_edges`, at most 10,000, found at the published generation); a deleted file can be purged. 429 `file_reclaim_in_progress` while a reclaim pass holds the content */
         delete: operations["delete_v1_files"];
         options?: never;
         head?: never;
@@ -1349,7 +1349,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** One file's record, read from one object: its name, type, size, upload time, `Document` IRI and parse. 404 `file_not_found` for a SHA-256 the graph has no file for, or a deleted one */
+        /** One file's record, read from one object: its name, type, size, upload time, `Document` IRI and parse. 404 `file_not_found` for a SHA-256 the graph has no file for, or a deleted one. With `deleted=true`, a deleted file whose content is not reclaimed yet answers too, with `deleted_at` and `cited_by`: the current facts whose evidence names the file (at most 20, at the published generation) */
         get: operations["get_v1_files_record"];
         put?: never;
         post?: never;
@@ -7062,6 +7062,20 @@ export interface components {
             missing: number;
         };
         /**
+         * @description One fact whose evidence names a file: the edge's statement node, the
+         *     edge, and the evidence source (the file's `Document` IRI with the
+         *     fragment of the place).
+         */
+        FileCitation: {
+            object: string;
+            predicate: string;
+            /** @description The evidence source, `<Document IRI>#<fragment>`. */
+            source: string;
+            /** @description The statement node (`https://littlebigbrain.com/s/…`). */
+            statement: string;
+            subject: string;
+        };
+        /**
          * @description `GET /v1/files/counts`: the graph's files by parse status, counted over
          *     the `Document` entities of the published generation.
          */
@@ -7088,6 +7102,12 @@ export interface components {
         /** @description `DELETE /v1/files`. */
         FileDeleteResponse: {
             deleted: boolean;
+            /**
+             * Format: int64
+             * @description With `purge=true`: the edges whose evidence names the file that the
+             *     delete retracted (at most [`FILE_PURGE_EDGES_MAX`]).
+             */
+            purged_edges?: number | null;
             sha256: string;
         };
         /**
@@ -7153,7 +7173,19 @@ export interface components {
         FileRecord: {
             /** Format: int64 */
             bytes: number;
+            /**
+             * @description The current facts whose evidence names this deleted file, at most
+             *     [`FILE_CITATIONS_MAX`], read at the published generation. While one
+             *     exists the reclaim keeps the bytes. Empty for a live file.
+             */
+            cited_by?: components["schemas"]["FileCitation"][];
             content_type: string;
+            /**
+             * @description RFC 3339 time of the delete. Only `GET /v1/files/record` with
+             *     `deleted=true` answers a deleted file; every other answer holds live
+             *     files and leaves this out.
+             */
+            deleted_at?: string | null;
             /** @description The IRI of its `Document` entity (key `file:<sha256>`). */
             document: string;
             /**
@@ -30681,6 +30713,8 @@ export interface operations {
                 sha256?: string;
                 /** @description the SHA-256 again */
                 confirm?: string;
+                /** @description `true` also retracts the edges whose evidence names the file */
+                purge?: string;
             };
             header?: {
                 /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
@@ -30819,6 +30853,8 @@ export interface operations {
                 graph?: string;
                 /** @description the file's SHA-256, hex */
                 sha256?: string;
+                /** @description `true` also reads a deleted file whose content is not reclaimed yet */
+                deleted?: string;
             };
             header?: {
                 /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
@@ -31265,6 +31301,8 @@ export interface operations {
                 from?: string;
                 /** @description the page index after the last one */
                 to?: string;
+                /** @description `true` also reads a deleted file whose content is not reclaimed yet */
+                deleted?: string;
             };
             header?: {
                 /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
@@ -31401,6 +31439,8 @@ export interface operations {
                 graph?: string;
                 /** @description the file's SHA-256, hex */
                 sha256?: string;
+                /** @description `true` also answers a deleted file whose content is not reclaimed yet */
+                deleted?: string;
             };
             header?: {
                 /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */

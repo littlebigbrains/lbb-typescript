@@ -16,6 +16,28 @@ export type FilePages = Schemas["FilePages"];
 export type FileList = Schemas["FileList"];
 /** The graph's files by parse status, as of a published commit. */
 export type FileCounts = Schemas["FileCounts"];
+/** A fact whose evidence names a deleted file: its statement node and edge. */
+export type FileCitation = Schemas["FileCitation"];
+
+/** The options of `files.get`. */
+export interface FileGetOptions extends CallOptions {
+  /**
+   * Also answer a deleted file whose content is not reclaimed yet, with
+   * `deleted_at` and `cited_by`: the facts whose evidence still names it.
+   */
+  deleted?: boolean;
+}
+
+/** The options of `files.delete`. */
+export interface FileDeleteOptions extends CallOptions {
+  /**
+   * Also retract the edges whose evidence names the file
+   * (`purged_edges`), so the reclaim frees the bytes after the grace. A
+   * deleted file can be purged. Without it those facts stay, and keep the
+   * bytes.
+   */
+  purge?: boolean;
+}
 
 /** The most files one `files.list` page holds, and the default. */
 export const FILE_LIST_LIMIT_MAX = 1000;
@@ -208,12 +230,18 @@ export class FilesNamespace {
   /**
    * One file's record (`GET /v1/files/record`), read from one object: its
    * name, type, size, upload time, `Document` IRI and parse. A SHA-256 the
-   * graph has no file for, or a deleted file, answers `404 file_not_found`.
+   * graph has no file for, or a deleted file, answers `404 file_not_found`;
+   * with `{ deleted: true }` a deleted file answers until its content is
+   * reclaimed, with `deleted_at` and the facts that cite it (`cited_by`).
    */
-  get(sha256: string, opts: CallOptions = {}): Promise<Schemas["FileRecord"]> {
+  get(
+    sha256: string,
+    options: FileGetOptions = {},
+  ): Promise<Schemas["FileRecord"]> {
+    const { deleted, ...opts } = options;
     return this.client.request("GET", "/v1/files/record", {
       ...opts,
-      query: { sha256: sha256Of(sha256) },
+      query: { sha256: sha256Of(sha256), deleted: deleted ? true : undefined },
     });
   }
 
@@ -313,18 +341,21 @@ export class FilesNamespace {
 
   /**
    * Remove a file from the list and retract its `Document` entity; the
-   * client repeats the SHA-256 as `confirm`. The bytes and what the document
-   * starters stored stay in storage; an installed `documents.link` retracts
-   * the entries and mentions it wrote for the document.
+   * client repeats the SHA-256 as `confirm`. An installed `documents.link`
+   * retracts the entries and mentions it wrote for the document. The bytes
+   * and what the workflows stored stay for the grace (30 days by default),
+   * then the reclaim frees them, unless a fact's evidence still names the
+   * file. `{ purge: true }` also retracts those facts (`purged_edges`).
    */
   async delete(
     sha256: string,
-    opts: CallOptions = {},
+    options: FileDeleteOptions = {},
   ): Promise<Schemas["FileDeleteResponse"]> {
+    const { purge, ...opts } = options;
     const sha = sha256Of(sha256);
     return this.client.request("DELETE", "/v1/files", {
       ...opts,
-      query: { sha256: sha, confirm: sha },
+      query: { sha256: sha, confirm: sha, purge: purge ? true : undefined },
     });
   }
 }
