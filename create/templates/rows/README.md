@@ -23,8 +23,9 @@ Each message holds one file. The first turn of a file:
    name are read once. So is a file whose name the settings' `match` does
    not match. Other settings are another derivation, and read the file
    again.
-2. **Plan.** Reads the bytes (`client.files.content`) and the header row.
-   Each column maps to a property: the settings' `columns`, else each
+2. **Plan.** Reads the header row: the first window of the file, by byte
+   range (`client.files.content(sha256, { range })`). Each column maps to
+   a property: the settings' `columns`, else each
    column whose header is a property of the graph by its normalized name
    (`Customer ID` and `customer_id` match). A property must be in the
    graph's property registry with a scalar type. The key column keys each
@@ -37,7 +38,12 @@ Each message holds one file. The first turn of a file:
    proposes nothing.
 
 Then each turn reads at most `rowsPerTurn` rows and writes them in owned
-writes of 400 rows. A row is one instance of the settings' class:
+writes of 400 rows. A turn reads from the byte offset where the last one
+stopped, a window of 4 MiB per read, and parses only complete rows. A row
+that a window does not end, such as a quoted field with a line break across
+the window's edge, is read on in the next window. The first turn reads on
+from the bytes of its header read, so a file is read about once in all. A
+row is one instance of the settings' class:
 
 - its key: the key column's value, else `<sha256>:<row>`. A row whose key
   column is empty is left out;
@@ -49,7 +55,11 @@ writes of 400 rows. A row is one instance of the settings' class:
 
 Rows count as RFC 7111 counts them: from 1, and the header is row 1. A
 blank row counts and writes nothing. When the file has more rows, the turn
-continues (`ctx.continue`) at the offset of the next row. The last turn
+continues (`ctx.continue`): the message's cursor keeps the byte offset of
+the next row (`byte`) and its row number (`row`), so the row numbers stay
+exact. A turn that runs again after a crash reads its rows again from the
+same offset. A cursor without `byte`, from an earlier version of the
+template, reads the file again from its start. The last turn
 records the derivation with what it wrote: the rows, the instances, the
 columns it mapped and left out, the instance the file represents, and the
 commits of its writes.
@@ -57,7 +67,10 @@ commits of its writes.
 The parser follows RFC 4180: fields in double quotes can hold the
 delimiter, line breaks and quotes (`""`). A row whose quoted field holds a
 line break spans two lines and keeps one row number. TSV takes the same
-quotes, with a tab as the delimiter. A byte order mark is dropped.
+quotes, with a tab as the delimiter. A byte order mark is dropped. The
+parser reads bytes: the delimiter, the quote and the line breaks are ASCII,
+so a window's edge inside a character of UTF-8 or between CR and LF changes
+no row.
 
 ## Settings
 
@@ -81,9 +94,12 @@ from the graph: add them with `lbb.evolve` before the first file.
 The settings digest is the SHA-256 of the settings' canonical JSON: a
 change of any setting reads every file again.
 
-Run one workflow that writes `REPRESENTS` per graph. Two content workflows
-that own one relation are refused with `409 workflow_owns_conflict`, so
-`rows` and `sections` both with `represents` do not go on one graph.
+Two content workflows own one relation when no upload can reach both:
+`rows` and `sections`, both with `represents`, go on one graph, because no
+media type of one meets a media type of the other. A second workflow that
+writes `REPRESENTS` for a type that meets one of these, such as `text/*`, is
+refused with `409 workflow_owns_conflict`
+([starter-workflows.md](../../../docs/reference/starter-workflows.md#cycles-and-conflicts)).
 
 ## Commands
 
@@ -91,16 +107,21 @@ that own one relation are refused with `409 workflow_owns_conflict`, so
 `npm run setup` creates the named workflow with
 `client.workflows.named.put(trigger())`, and `npm start` serves
 `createWorkflow(lbbActivities(client), client)`: the client reads the
-files' bytes and the derivations. `npm run try` creates the graph
+files' bytes and the derivations. A fourth argument sets how the workflow
+reads: `{ window, maxRecord }`, the bytes of one read (default 4 MiB, at
+least 64) and of the longest row (default 16 MiB). They change no output,
+so they are not settings and enter no settings digest. `npm run try` creates the graph
 `try-rows`, adds the sample properties and reports, uploads the two sample
 files and creates the workflow. A content trigger reads the uploads from
 before its creation too.
 
 ## Limits
 
-- `GET /v1/files/content` returns the whole file, so each turn reads the
-  whole file and parses from the offset of its first row: a large file is
-  read once per turn.
+- A turn holds at most one window and the longest row in memory. A row
+  longer than 16 MiB, such as a quote that never closes, stops the file:
+  the turn fails with an error that names the row and its byte offset.
+- A turn that stops at `rowsPerTurn` in the middle of a window reads the
+  rest of that window again in the next turn.
 - A file deleted later keeps the instances it gave; its `READ_FROM` edges
   go with its `Document`.
 - A message that comes again while a large file is still in progress (a
@@ -122,4 +143,8 @@ the evidence of each row, the skip by derivation and by name, a file of
 more rows than a turn reads, parts of 400 rows, a header-only file and an
 empty file, `represents` with zero, one and two matching instances, keys
 without a key column, the `columns` setting, the phases, and the parser
-on RFC 4180's cases.
+on RFC 4180's cases. The reads by range: a file of many windows read once
+with exact row numbers, every window size from 64 to 200 bytes over
+quoted fields, letters beyond ASCII and the three line breaks, a CRLF file
+whose window ends between CR and LF, a turn that continues from its byte
+offset (also after a crash), and a row longer than the longest row.

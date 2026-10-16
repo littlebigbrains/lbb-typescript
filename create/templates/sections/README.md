@@ -75,9 +75,12 @@ properties and `PART_OF`.
 The settings digest is the SHA-256 of the settings' canonical JSON: a
 change of any setting reads every file again.
 
-Run one workflow that writes `REPRESENTS` per graph. Two content workflows
-that own one relation are refused with `409 workflow_owns_conflict`, so
-`rows` and `sections` both with `represents` do not go on one graph.
+Two content workflows own one relation when no upload can reach both:
+`rows` and `sections`, both with `represents`, go on one graph, because no
+media type of one meets a media type of the other. A second workflow that
+writes `REPRESENTS` for a type that meets one of these, such as `text/*`, is
+refused with `409 workflow_owns_conflict`
+([starter-workflows.md](../../../docs/reference/starter-workflows.md#cycles-and-conflicts)).
 
 ## Commands
 

@@ -21,16 +21,32 @@
 // 5. records the derivation.
 //
 // A turn reads at most `rowsPerTurn` rows; the rest goes to a new turn
-// (`ctx.continue`) that starts where the last one stopped.
+// (`ctx.continue`) that starts where the last one stopped. The file is read
+// by byte range, a window of at most 4 MiB per read: the first turn reads
+// the header, and each turn reads on from the byte offset where the last
+// one stopped, so a large file is read about once in all.
 import { createHash } from "node:crypto";
 import {
+  LbbError,
   entityRef,
   triggeredWorkflow,
   type LbbActivities,
   type Schemas,
   type WorkflowTriggerMessage,
 } from "@littlebigbrain/client";
-import { csvRecords, delimiterOf, isBlank, normalizeName, type CsvRecord } from "./csv.js";
+import {
+  MAX_RECORD_BYTES,
+  WINDOW_BYTES,
+  delimiterOf,
+  isBlank,
+  normalizeName,
+  readRecords,
+  type CsvRecord,
+  type HeldBytes,
+  type ReadRange,
+  type RecordsRead,
+  type WindowOptions,
+} from "./csv.js";
 
 export type ValueType = "text" | "keyword" | "i64" | "f64" | "bool" | "date_time";
 
@@ -101,7 +117,13 @@ export function ontology(settings: Settings = defaults): Schemas["OntologyEvolve
 
 /** What a client reads for the workflow beside the activities. An `LbbClient` has both. */
 export interface ContentPorts {
-  files: { content(sha256: string): Promise<Uint8Array> };
+  files: {
+    /** The file's bytes; with `range`, bytes `start` to `end` (both included), answered `206`. */
+    content(
+      sha256: string,
+      options?: { range?: { start: number; end?: number } },
+    ): Promise<Uint8Array>;
+  };
   workflows: {
     derivations: {
       check(key: Schemas["DerivationKey"]): Promise<Schemas["DerivationCheckResponse"]>;
@@ -147,8 +169,8 @@ interface Plan {
 
 /** Where a file's next turn starts, and what its turns did so far. */
 interface Cursor {
-  /** The character offset of the next row. */
-  at: number;
+  /** The byte offset of the next row. */
+  byte: number;
   /** The row number of the next row. */
   row: number;
   plan: Plan;
@@ -304,17 +326,47 @@ export function mapColumns(
   return { columns: mapped, left: header.filter((_, i) => !used.has(i)).slice(0, 100) };
 }
 
+/**
+ * How the workflow reads a file: bytes per read (default 4 MiB, at least
+ * 64) and the longest row (default 16 MiB). They change no output, so they
+ * are no settings and enter no derivation key.
+ */
+export type ReadOptions = Partial<WindowOptions>;
+
 /** The workflow, for a `WorkflowWorker`. `lbb` is `lbbActivities(client)` and `ports` the client, or mocks in a test. */
 export function createWorkflow(
   lbb: LbbActivities,
   ports: ContentPorts,
   settings: Settings = defaults,
+  reading: ReadOptions = {},
 ) {
   if (!(Number.isSafeInteger(settings.rowsPerTurn) && settings.rowsPerTurn >= 1))
     throw new RangeError("rowsPerTurn is a whole number from 1");
   if (settings.rowsPerTurn > 20_000)
     throw new RangeError("rowsPerTurn is at most 20,000: a turn holds 64 steps");
+  const windows: WindowOptions = {
+    window: reading.window ?? WINDOW_BYTES,
+    maxRecord: reading.maxRecord ?? MAX_RECORD_BYTES,
+  };
+  if (!(Number.isSafeInteger(windows.window) && windows.window >= 64))
+    throw new RangeError("window is a whole number of bytes from 64");
+  if (!(Number.isSafeInteger(windows.maxRecord) && windows.maxRecord >= 1))
+    throw new RangeError("maxRecord is a whole number of bytes from 1");
   const match = settings.match ? new RegExp(settings.match, "u") : null;
+
+  /** Bytes `start` to `end` of a content: none from its end on (the server answers 416 there). */
+  const rangeOf =
+    (sha256: string): ReadRange =>
+    async (start, end) => {
+      try {
+        const bytes = await ports.files.content(sha256, { range: { start, end } });
+        // A server or proxy that ignores Range answers the whole file.
+        return bytes.length > end - start + 1 ? bytes.subarray(start, end + 1) : bytes;
+      } catch (error) {
+        if (error instanceof LbbError && error.status === 416) return new Uint8Array(0);
+        throw error;
+      }
+    };
 
   return triggeredWorkflow<RowsState>({
     name: workflowType.workflow_type,
@@ -331,10 +383,12 @@ export function createWorkflow(
       };
       const document = message.instances[0];
       if (!document) return { state };
-      let cursor = message.cursor;
-      let read: Promise<string> | undefined;
-      const text = (sha256: string) =>
-        (read ??= ports.files.content(sha256).then((bytes) => new TextDecoder().decode(bytes)));
+      // A cursor without a byte offset (a message of an earlier version of
+      // this template) reads the file again from its start.
+      let cursor = typeof message.cursor?.byte === "number" ? message.cursor : undefined;
+      // The bytes the header read holds after the header, for the rows of
+      // the same turn: they are not read again.
+      let held: HeldBytes | undefined;
 
       if (!cursor) {
         const checked = await ctx.step("check", async (s): Promise<Checked> => {
@@ -356,7 +410,10 @@ export function createWorkflow(
         const file = checked.file;
         const planned = await ctx.step("plan", async (s) => {
           s.progress("reading the header", { done: 0, total: 1, unit: "documents" });
-          return plan(file, await text(file.sha256));
+          const delimiter = delimiterOf(file.mediaType, file.name);
+          const header = await readRecords(rangeOf(file.sha256), delimiter, 0, 1, 1, windows);
+          held = header.held;
+          return plan(file, delimiter, header);
         });
         const first: number[] = [];
         if (planned.plan.represents) {
@@ -384,32 +441,35 @@ export function createWorkflow(
           if (written.commit_seq !== null) first.push(written.commit_seq);
         }
         cursor = {
-          at: planned.at,
+          byte: planned.at,
           row: 2,
           plan: planned.plan,
           done: { rows: 0, instances: 0, keyless: 0, rejected: 0, commits: first },
         };
       }
 
-      // The rows of this turn, then their writes in parts.
+      // The rows of this turn, read from the byte offset where the last turn
+      // stopped, then their writes in parts. A turn run again after a crash
+      // reads its rows again from the same offset.
       const from = cursor;
       const filePlan = from.plan;
-      let records: Promise<CsvRecord[]> | undefined;
-      const windowRecords = () =>
-        (records ??= text(filePlan.sha256).then((all) => {
-          const out: CsvRecord[] = [];
-          for (const record of csvRecords(all, filePlan.delimiter, from.at, from.row)) {
-            out.push(record);
-            if (out.length >= settings.rowsPerTurn) break;
-          }
-          return out;
-        }));
+      let rows: Promise<RecordsRead> | undefined;
+      const turnRows = () =>
+        (rows ??= readRecords(
+          rangeOf(filePlan.sha256),
+          filePlan.delimiter,
+          from.byte,
+          from.row,
+          settings.rowsPerTurn,
+          windows,
+          held,
+        ));
+      const windowRecords = async (): Promise<CsvRecord[]> => (await turnRows()).records;
       const window = await ctx.step("rows", async (s) => {
         s.progress("reading rows", { done: 0, unit: "rows" });
-        const taken = await windowRecords();
+        const read = await turnRows();
+        const taken = read.records;
         s.progress("reading rows", { done: taken.length, unit: "rows" });
-        const last = taken[taken.length - 1];
-        const all = await text(filePlan.sha256);
         const counts = { instances: 0, keyless: 0, rejected: 0 };
         for (const record of taken) {
           const built = rowFacts(filePlan, record);
@@ -420,13 +480,7 @@ export function createWorkflow(
             counts.rejected += built.rejected;
           }
         }
-        return {
-          count: taken.length,
-          at: last ? last.next : from.at,
-          row: last ? last.row + 1 : from.row,
-          end: !last || last.next >= all.length,
-          ...counts,
-        };
+        return { count: taken.length, byte: read.next, row: read.row, end: read.end, ...counts };
       });
       const commits: number[] = [];
       for (let n = 0; n * PART < window.count; n++) {
@@ -453,7 +507,7 @@ export function createWorkflow(
         return ctx.continue(counted, {
           ...message,
           removed: [],
-          cursor: { at: window.at, row: window.row, plan: filePlan, done },
+          cursor: { byte: window.byte, row: window.row, plan: filePlan, done },
         });
 
       await ctx.step("record", async (s) => {
@@ -504,10 +558,9 @@ export function createWorkflow(
   }
 
   /** The plan of a file: its delimiter, the mapped columns, the key and label columns, and what it represents. */
-  async function plan(file: FileInfo, all: string) {
-    const delimiter = delimiterOf(file.mediaType, file.name);
-    const first = csvRecords(all, delimiter).next();
-    const header = first.done ? [] : first.value.fields.map((h) => h.trim());
+  async function plan(file: FileInfo, delimiter: string, read: RecordsRead) {
+    const first = read.records[0];
+    const header = first ? first.fields.map((h) => h.trim()) : [];
     const registry = header.length ? ((await lbb.ontology()).property_defs ?? []) : [];
     const mapped = mapColumns(header, registry, settings.columns);
     const key = settings.key ? headerIndex(header, settings.key) : -1;
@@ -515,7 +568,7 @@ export function createWorkflow(
     const label = labelAt >= 0 ? labelAt : key >= 0 ? key : null;
     const found = settings.represents ? await representsOf(file.name) : null;
     return {
-      at: first.done ? all.length : first.value.next,
+      at: read.next,
       label: found?.label ?? null,
       plan: {
         sha256: file.sha256,
