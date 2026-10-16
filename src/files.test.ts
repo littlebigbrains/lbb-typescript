@@ -226,6 +226,32 @@ test("files.list pages with limit and after, and files.counts reads the counts",
   assert.equal(seen.length, 3);
 });
 
+test("files.list filters by parse status and name", async () => {
+  const { fetch, seen } = filesFetch([
+    {
+      body: {
+        files: [RECORD],
+        next: "71.0123456789abcdef",
+        as_of_commit_seq: 12,
+      },
+    },
+  ]);
+  const lbb = client(fetch);
+  const page = await lbb.files.list({
+    limit: 50,
+    parseStatus: "failed",
+    name: "Q3 report",
+  });
+  assert.equal(page.as_of_commit_seq, 12);
+  assert.equal(page.next, "71.0123456789abcdef");
+  assert.deepEqual(
+    seen.map(({ method, url }) => `${method} ${url}`),
+    [
+      "GET http://h/v1/files?graph=docs&limit=50&parse_status=failed&name=Q3%20report",
+    ],
+  );
+});
+
 test("files.get reads one file by its SHA-256", async () => {
   const { fetch, seen } = filesFetch([{ body: RECORD }]);
   const lbb = client(fetch);
