@@ -1349,7 +1349,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** One file's record, read from one object: its name, type, size, upload time, `Document` IRI and parse. 404 `file_not_found` for a SHA-256 the graph has no file for, or a deleted one. With `deleted=true`, a deleted file whose content is not reclaimed yet answers too, with `deleted_at` and `cited_by`: the current facts whose evidence names the file (at most 20, at the published generation) */
+        /** One file's record, read from one object: its name, type, size, upload time, `Document` IRI and parse. 404 `file_not_found` for a SHA-256 the graph has no file for, or a deleted one. With `deleted=true`, a deleted file whose content is not reclaimed yet answers too, with `deleted_at`, and every answer holds `cited_by`: the current facts whose evidence names the file (at most 20, at the published generation), which a delete with `purge=true` retracts */
         get: operations["get_v1_files_record"];
         put?: never;
         post?: never;
@@ -7174,9 +7174,11 @@ export interface components {
             /** Format: int64 */
             bytes: number;
             /**
-             * @description The current facts whose evidence names this deleted file, at most
-             *     [`FILE_CITATIONS_MAX`], read at the published generation. While one
-             *     exists the reclaim keeps the bytes. Empty for a live file.
+             * @description With `deleted=true`: the current facts whose evidence names this
+             *     file, at most [`FILE_CITATIONS_MAX`], read at the published
+             *     generation. A delete with `purge=true` retracts them; while one cites
+             *     a deleted file the reclaim keeps its bytes. Empty in every other
+             *     answer.
              */
             cited_by?: components["schemas"]["FileCitation"][];
             content_type: string;
@@ -31439,7 +31441,7 @@ export interface operations {
                 graph?: string;
                 /** @description the file's SHA-256, hex */
                 sha256?: string;
-                /** @description `true` also answers a deleted file whose content is not reclaimed yet */
+                /** @description `true` also answers a deleted file whose content is not reclaimed yet, and names the facts that cite the file */
                 deleted?: string;
             };
             header?: {
