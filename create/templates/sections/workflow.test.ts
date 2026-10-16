@@ -12,6 +12,7 @@ import {
   phases,
   readJson,
   runMessage,
+  runTurn,
   samplesDir,
   type MemoryGraph,
   type MockFile,
@@ -74,7 +75,7 @@ function setup(settings: Settings = WITH_GUIDES, guides = GUIDES.map((g) => g.na
   const definition = createWorkflow(lbb, content, settings);
   const run = (file: MockFile, state: unknown = {}) =>
     runMessage<SectionsState>(definition, contentMessage("sections", file), state);
-  return { lbb, content, run };
+  return { lbb, content, run, definition };
 }
 
 /** The written sections by position. */
@@ -205,6 +206,55 @@ test("a content with a derivation for these settings is skipped, under any name"
   assert.equal(lbb.graph.commits, commits);
   assert.equal(content.reads, 1);
   assert.deepEqual(again.turns[0]!.keys, ["check"]);
+});
+
+test("a file deleted and uploaded again while it is read records nothing; the new upload's run reads it", async () => {
+  const { lbb, content, definition } = setup({ ...WITH_GUIDES, sectionsPerTurn: 3 });
+  const file = content.upload("support-handbook.md", HANDBOOK, "text/markdown");
+  const first = content.uploadedAt(file.sha256);
+
+  // Turn 1 checks the file; the turns after it carry the upload the check named.
+  const one = await runTurn<SectionsState>(definition, {}, contentMessage("sections", file));
+  type Continued = { cursor: { plan: { uploadedAt?: string } } };
+  const carried = one.result.continuation!.message as unknown as Continued;
+  assert.equal(carried.cursor.plan.uploadedAt, first);
+
+  // The file is deleted and uploaded again; the old run writes on to its end.
+  content.remove(file.sha256);
+  const again = content.upload("support-handbook.md", HANDBOOK, "text/markdown");
+  const old = await runMessage<SectionsState>(
+    definition,
+    one.result.continuation!.message,
+    one.result.state,
+  );
+  assert.deepEqual(old.state, { contents: 0, skipped: 1, sections: 8, represents: 0 });
+  assert.equal(content.records.at(-1)?.content_uploaded_at, first);
+  assert.equal(content.recorded.size, 0, "nothing is recorded for the deleted upload");
+
+  // The run of the new upload checks, writes the sections and records.
+  const fresh = await runMessage<SectionsState>(definition, contentMessage("sections", again));
+  assert.deepEqual(fresh.state, { contents: 1, skipped: 0, sections: 8, represents: 1 });
+  assert.equal(content.records.at(-1)?.content_uploaded_at, content.uploadedAt(again.sha256));
+  assert.equal(content.recorded.size, 1);
+  assert.equal(written(lbb.graph).length, EXPECTED.sections.length);
+});
+
+test("a file deleted while it is read, and not uploaded again, ends the run as skipped", async () => {
+  const { content, definition } = setup({ ...WITH_GUIDES, sectionsPerTurn: 3 });
+  const file = content.upload("support-handbook.md", HANDBOOK, "text/markdown");
+  const one = await runTurn<SectionsState>(definition, {}, contentMessage("sections", file));
+  assert.equal(one.result.state.sections, 3);
+
+  // The next read of the bytes answers 404: the run ends without an error.
+  content.remove(file.sha256);
+  const old = await runMessage<SectionsState>(
+    definition,
+    one.result.continuation!.message,
+    one.result.state,
+  );
+  assert.equal(old.turns.length, 1, "the run ends at the turn that read nothing");
+  assert.deepEqual(old.state, { contents: 0, skipped: 1, sections: 3, represents: 0 });
+  assert.equal(content.records.length, 0, "no derivation is recorded");
 });
 
 test("REPRESENTS needs exactly one instance whose label is the file's name", async () => {

@@ -18,7 +18,11 @@
 //    header is row 1);
 // 4. with `represents`, writes `Document REPRESENTS <instance>` when the
 //    file's name names exactly one instance of that class;
-// 5. records the derivation.
+// 5. records the derivation, for the upload its check named. When the file
+//    was deleted (or deleted and uploaded again) since, nothing is recorded,
+//    and the run of the new upload reads the file again. A file deleted and
+//    not uploaded again answers 404 to the next read of its bytes: the run
+//    ends there and counts the file as skipped.
 //
 // A turn reads at most `rowsPerTurn` rows; the rest goes to a new turn
 // (`ctx.continue`) that starts where the last one stopped. The file is read
@@ -29,6 +33,7 @@ import { createHash } from "node:crypto";
 import {
   LbbError,
   entityRef,
+  isDerivationUploadChanged,
   triggeredWorkflow,
   type LbbActivities,
   type Schemas,
@@ -138,7 +143,7 @@ export interface ContentPorts {
 export interface RowsState {
   /** Files read to their end. */
   contents: number;
-  /** Files skipped: read before with these settings, another name, or no file. */
+  /** Files skipped: read before with these settings, another name, no file, or deleted while read. */
   skipped: number;
   rows: number;
   instances: number;
@@ -165,6 +170,8 @@ interface Plan {
   key: number | null;
   label: number | null;
   represents: string | null;
+  /** The upload of the file the check named: the record names it. */
+  uploadedAt?: string;
 }
 
 /** Where a file's next turn starts, and what its turns did so far. */
@@ -196,9 +203,11 @@ interface FileInfo {
   mediaType: string;
 }
 
-/** What the check of a file found: the file to read, or why it is skipped. */
+/** What the check of a file found: the file to read and its upload, or why it is skipped. */
 interface Checked {
   file?: FileInfo;
+  /** The `content_uploaded_at` of the check: absent without a file record. */
+  uploadedAt?: string;
   skip?: string;
 }
 
@@ -226,6 +235,10 @@ const SCALAR: Record<string, ValueType> = {
 
 /** The media type without parameters, in lower case. */
 const baseType = (mediaType: string) => mediaType.split(";")[0]!.trim().toLowerCase();
+
+/** Whether an error is the 404 of a file's bytes: the file was deleted and not uploaded again. */
+export const fileGone = (error: unknown) =>
+  error instanceof LbbError && error.status === 404 && error.code === "file_not_found";
 
 /** A file name without its last extension. */
 export const stem = (name: string) => name.replace(/\.[^./\\]*$/, "");
@@ -381,158 +394,178 @@ export function createWorkflow(
         delete plain.cursor;
         return ctx.continue(next, plain);
       };
-      const document = message.instances[0];
-      if (!document) return { state };
-      // A cursor without a byte offset (a message of an earlier version of
-      // this template) reads the file again from its start.
-      let cursor = typeof message.cursor?.byte === "number" ? message.cursor : undefined;
-      // The bytes the header read holds after the header, for the rows of
-      // the same turn: they are not read again.
-      let held: HeldBytes | undefined;
+      try {
+        const document = message.instances[0];
+        if (!document) return { state };
+        // A cursor without a byte offset (a message of an earlier version of
+        // this template) reads the file again from its start.
+        let cursor = typeof message.cursor?.byte === "number" ? message.cursor : undefined;
+        // The bytes the header read holds after the header, for the rows of
+        // the same turn: they are not read again.
+        let held: HeldBytes | undefined;
 
-      if (!cursor) {
-        const checked = await ctx.step("check", async (s): Promise<Checked> => {
-          s.progress("checking the file", { done: 0, total: 1, unit: "documents" });
-          const file = await readDocument(message, document);
-          if (!file) return { skip: "no file" };
-          const named = /\.(csv|tsv)$/i.test(file.name);
-          if (!MEDIA_TYPES.includes(file.mediaType) && !named) return { skip: "media type" };
-          if (match && !match.test(file.name)) return { skip: "name" };
-          const found = await ports.workflows.derivations.check(
-            derivationKey(file.sha256, settings),
-          );
-          return found.exists ? { skip: "derived" } : { file };
-        });
-        if (!checked.file) {
-          const next = { ...state, skipped: state.skipped + 1 };
-          return rest(next);
-        }
-        const file = checked.file;
-        const planned = await ctx.step("plan", async (s) => {
-          s.progress("reading the header", { done: 0, total: 1, unit: "documents" });
-          const delimiter = delimiterOf(file.mediaType, file.name);
-          const header = await readRecords(rangeOf(file.sha256), delimiter, 0, 1, 1, windows);
-          held = header.held;
-          return plan(file, delimiter, header);
-        });
-        const first: number[] = [];
-        if (planned.plan.represents) {
-          const written = await lbb.writeOwned(ctx, "represents", (s) => {
-            s.progress("writing facts", { done: 0, total: 1, unit: "documents" });
-            const p = planned.plan;
-            return {
-              subjects: [entityRef(p.document, "Document", p.name)],
-              relations: [REPRESENTS],
-              triplets: [
-                {
-                  source: entityRef(p.document, "Document", p.name),
-                  relation: REPRESENTS,
-                  target: entityRef(
-                    p.represents!,
-                    settings.represents!.class,
-                    planned.label ?? undefined,
-                  ),
-                  confidence: 1,
-                  evidence: { text: p.name, source_id: p.document },
-                },
-              ],
-            };
+        if (!cursor) {
+          const checked = await ctx.step("check", async (s): Promise<Checked> => {
+            s.progress("checking the file", { done: 0, total: 1, unit: "documents" });
+            const file = await readDocument(message, document);
+            if (!file) return { skip: "no file" };
+            const named = /\.(csv|tsv)$/i.test(file.name);
+            if (!MEDIA_TYPES.includes(file.mediaType) && !named) return { skip: "media type" };
+            if (match && !match.test(file.name)) return { skip: "name" };
+            const found = await ports.workflows.derivations.check(
+              derivationKey(file.sha256, settings),
+            );
+            if (found.exists) return { skip: "derived" };
+            const uploadedAt = found.content_uploaded_at ?? undefined;
+            return uploadedAt ? { file, uploadedAt } : { file };
           });
-          if (written.commit_seq !== null) first.push(written.commit_seq);
-        }
-        cursor = {
-          byte: planned.at,
-          row: 2,
-          plan: planned.plan,
-          done: { rows: 0, instances: 0, keyless: 0, rejected: 0, commits: first },
-        };
-      }
-
-      // The rows of this turn, read from the byte offset where the last turn
-      // stopped, then their writes in parts. A turn run again after a crash
-      // reads its rows again from the same offset.
-      const from = cursor;
-      const filePlan = from.plan;
-      let rows: Promise<RecordsRead> | undefined;
-      const turnRows = () =>
-        (rows ??= readRecords(
-          rangeOf(filePlan.sha256),
-          filePlan.delimiter,
-          from.byte,
-          from.row,
-          settings.rowsPerTurn,
-          windows,
-          held,
-        ));
-      const windowRecords = async (): Promise<CsvRecord[]> => (await turnRows()).records;
-      const window = await ctx.step("rows", async (s) => {
-        s.progress("reading rows", { done: 0, unit: "rows" });
-        const read = await turnRows();
-        const taken = read.records;
-        s.progress("reading rows", { done: taken.length, unit: "rows" });
-        const counts = { instances: 0, keyless: 0, rejected: 0 };
-        for (const record of taken) {
-          const built = rowFacts(filePlan, record);
-          if (built === "blank") continue;
-          if (built === "keyless") counts.keyless += 1;
-          else {
-            counts.instances += 1;
-            counts.rejected += built.rejected;
+          if (!checked.file) {
+            const next = { ...state, skipped: state.skipped + 1 };
+            return rest(next);
           }
+          const file = checked.file;
+          const planned = await ctx.step("plan", async (s) => {
+            s.progress("reading the header", { done: 0, total: 1, unit: "documents" });
+            const delimiter = delimiterOf(file.mediaType, file.name);
+            const header = await readRecords(rangeOf(file.sha256), delimiter, 0, 1, 1, windows);
+            held = header.held;
+            return plan(file, delimiter, header, checked.uploadedAt);
+          });
+          const first: number[] = [];
+          if (planned.plan.represents) {
+            const written = await lbb.writeOwned(ctx, "represents", (s) => {
+              s.progress("writing facts", { done: 0, total: 1, unit: "documents" });
+              const p = planned.plan;
+              return {
+                subjects: [entityRef(p.document, "Document", p.name)],
+                relations: [REPRESENTS],
+                triplets: [
+                  {
+                    source: entityRef(p.document, "Document", p.name),
+                    relation: REPRESENTS,
+                    target: entityRef(
+                      p.represents!,
+                      settings.represents!.class,
+                      planned.label ?? undefined,
+                    ),
+                    confidence: 1,
+                    evidence: { text: p.name, source_id: p.document },
+                  },
+                ],
+              };
+            });
+            if (written.commit_seq !== null) first.push(written.commit_seq);
+          }
+          cursor = {
+            byte: planned.at,
+            row: 2,
+            plan: planned.plan,
+            done: { rows: 0, instances: 0, keyless: 0, rejected: 0, commits: first },
+          };
         }
-        return { count: taken.length, byte: read.next, row: read.row, end: read.end, ...counts };
-      });
-      const commits: number[] = [];
-      for (let n = 0; n * PART < window.count; n++) {
-        const written = await lbb.writeOwned(ctx, `write-${n}`, async (s) => {
-          s.progress("writing facts", { done: n * PART, total: window.count, unit: "rows" });
-          const part = (await windowRecords()).slice(n * PART, (n + 1) * PART);
-          return partWrite(filePlan, part);
-        });
-        if (written.commit_seq !== null) commits.push(written.commit_seq);
-      }
-      const done: Done = {
-        rows: from.done.rows + window.count,
-        instances: from.done.instances + window.instances,
-        keyless: from.done.keyless + window.keyless,
-        rejected: from.done.rejected + window.rejected,
-        commits: [...from.done.commits, ...commits].slice(0, 256),
-      };
-      const counted = {
-        ...state,
-        rows: state.rows + window.count,
-        instances: state.instances + window.instances,
-      };
-      if (!window.end)
-        return ctx.continue(counted, {
-          ...message,
-          removed: [],
-          cursor: { byte: window.byte, row: window.row, plan: filePlan, done },
-        });
 
-      await ctx.step("record", async (s) => {
-        s.progress("recording the derivation", { done: 0, total: 1, unit: "documents" });
-        const recorded = await ports.workflows.derivations.record({
-          ...derivationKey(filePlan.sha256, settings),
-          run_id: ctx.messageId,
-          outputs: {
-            rows: done.rows,
-            instances: done.instances,
-            rows_without_key: done.keyless,
-            values_left_out: done.rejected,
-            columns: filePlan.columns.slice(0, 100).map((c) => `${c.header} → ${c.property}`),
-            columns_left_out: filePlan.left,
-            represents: filePlan.represents,
-            commits: done.commits,
-          },
+        // The rows of this turn, read from the byte offset where the last turn
+        // stopped, then their writes in parts. A turn run again after a crash
+        // reads its rows again from the same offset.
+        const from = cursor;
+        const filePlan = from.plan;
+        let rows: Promise<RecordsRead> | undefined;
+        const turnRows = () =>
+          (rows ??= readRecords(
+            rangeOf(filePlan.sha256),
+            filePlan.delimiter,
+            from.byte,
+            from.row,
+            settings.rowsPerTurn,
+            windows,
+            held,
+          ));
+        const windowRecords = async (): Promise<CsvRecord[]> => (await turnRows()).records;
+        const window = await ctx.step("rows", async (s) => {
+          s.progress("reading rows", { done: 0, unit: "rows" });
+          const read = await turnRows();
+          const taken = read.records;
+          s.progress("reading rows", { done: taken.length, unit: "rows" });
+          const counts = { instances: 0, keyless: 0, rejected: 0 };
+          for (const record of taken) {
+            const built = rowFacts(filePlan, record);
+            if (built === "blank") continue;
+            if (built === "keyless") counts.keyless += 1;
+            else {
+              counts.instances += 1;
+              counts.rejected += built.rejected;
+            }
+          }
+          return { count: taken.length, byte: read.next, row: read.row, end: read.end, ...counts };
         });
-        return recorded.recorded;
-      });
-      return rest({
-        ...counted,
-        contents: counted.contents + 1,
-        represents: counted.represents + (filePlan.represents ? 1 : 0),
-      });
+        const commits: number[] = [];
+        for (let n = 0; n * PART < window.count; n++) {
+          const written = await lbb.writeOwned(ctx, `write-${n}`, async (s) => {
+            s.progress("writing facts", { done: n * PART, total: window.count, unit: "rows" });
+            const part = (await windowRecords()).slice(n * PART, (n + 1) * PART);
+            return partWrite(filePlan, part);
+          });
+          if (written.commit_seq !== null) commits.push(written.commit_seq);
+        }
+        const done: Done = {
+          rows: from.done.rows + window.count,
+          instances: from.done.instances + window.instances,
+          keyless: from.done.keyless + window.keyless,
+          rejected: from.done.rejected + window.rejected,
+          commits: [...from.done.commits, ...commits].slice(0, 256),
+        };
+        const counted = {
+          ...state,
+          rows: state.rows + window.count,
+          instances: state.instances + window.instances,
+        };
+        if (!window.end)
+          return ctx.continue(counted, {
+            ...message,
+            removed: [],
+            cursor: { byte: window.byte, row: window.row, plan: filePlan, done },
+          });
+
+        const recorded = await ctx.step("record", async (s) => {
+          s.progress("recording the derivation", { done: 0, total: 1, unit: "documents" });
+          try {
+            const answer = await ports.workflows.derivations.record({
+              ...derivationKey(filePlan.sha256, settings),
+              run_id: ctx.messageId,
+              outputs: {
+                rows: done.rows,
+                instances: done.instances,
+                rows_without_key: done.keyless,
+                values_left_out: done.rejected,
+                columns: filePlan.columns.slice(0, 100).map((c) => `${c.header} → ${c.property}`),
+                columns_left_out: filePlan.left,
+                represents: filePlan.represents,
+                commits: done.commits,
+              },
+              ...(filePlan.uploadedAt ? { content_uploaded_at: filePlan.uploadedAt } : {}),
+            });
+            return answer.recorded;
+          } catch (error) {
+            // The file was deleted while this run read it: nothing is
+            // recorded, and the run of a new upload reads it again.
+            if (isDerivationUploadChanged(error)) return "upload changed";
+            throw error;
+          }
+        });
+        if (recorded === "upload changed")
+          return rest({ ...counted, skipped: counted.skipped + 1 });
+        return rest({
+          ...counted,
+          contents: counted.contents + 1,
+          represents: counted.represents + (filePlan.represents ? 1 : 0),
+        });
+      } catch (error) {
+        // The file was deleted while this run read it, and not uploaded
+        // again: its bytes answer 404. Nothing is recorded, and the file
+        // counts as skipped.
+        if (!fileGone(error)) throw error;
+        return rest({ ...state, skipped: state.skipped + 1 });
+      }
     },
   });
 
@@ -557,8 +590,8 @@ export function createWorkflow(
     };
   }
 
-  /** The plan of a file: its delimiter, the mapped columns, the key and label columns, and what it represents. */
-  async function plan(file: FileInfo, delimiter: string, read: RecordsRead) {
+  /** The plan of a file: its delimiter, the mapped columns, the key and label columns, what it represents, and its upload. */
+  async function plan(file: FileInfo, delimiter: string, read: RecordsRead, uploadedAt?: string) {
     const first = read.records[0];
     const header = first ? first.fields.map((h) => h.trim()) : [];
     const registry = header.length ? ((await lbb.ontology()).property_defs ?? []) : [];
@@ -580,6 +613,7 @@ export function createWorkflow(
         key: key >= 0 ? key : null,
         label,
         represents: found?.iri ?? null,
+        ...(uploadedAt ? { uploadedAt } : {}),
       } satisfies Plan,
     };
   }

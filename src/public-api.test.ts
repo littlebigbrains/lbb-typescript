@@ -17,6 +17,7 @@ test("the runtime entrypoint exposes only the supported public values", () => {
     "entityRef",
     "googleDrive",
     "isActivityRefused",
+    "isDerivationUploadChanged",
     "lbbActivities",
     "parseSparqlResults",
     "parseTriggerMessage",

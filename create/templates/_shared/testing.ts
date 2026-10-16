@@ -358,10 +358,23 @@ export interface MockFile {
  * files: `files.content` and `workflows.derivations.check` / `record`, the
  * shape of an `LbbClient`. `upload` puts the file's `Document` in `graph`
  * with its name, SHA-256 and media type, as the upload route does.
+ *
+ * Each upload has its `uploaded_at`, as the server's file record: an upload
+ * of a live file keeps it, an upload after `remove` gets a new one. A
+ * derivation belongs to the upload of its record. The check names the
+ * upload of a live file; a removed file has no upload and no derivation.
+ * A record that names another upload than the live one throws `LbbError`
+ * 409 `derivation_upload_changed`.
  */
 export class MockContent {
   readonly held = new Map<string, MockFile>();
   readonly recorded = new Map<string, Schemas["Derivation"]>();
+  /** The upload of each content's file, live or removed. */
+  readonly uploads = new Map<string, { uploadedAt: string; live: boolean }>();
+  /** The upload each recorded derivation belongs to. */
+  private readonly stamps = new Map<string, string | undefined>();
+  /** Every derivation record request, in order. */
+  readonly records: Schemas["DerivationRecordRequest"][] = [];
   /** Reads of a file's bytes. */
   reads = 0;
   /** Derivation checks. */
@@ -373,6 +386,11 @@ export class MockContent {
   upload(name: string, body: string | Uint8Array, mediaType: string): MockFile {
     const bytes = typeof body === "string" ? new TextEncoder().encode(body) : body;
     const sha256 = createHash("sha256").update(bytes).digest("hex");
+    if (!this.uploads.get(sha256)?.live) {
+      this.newUploads += 1;
+      const at = new Date(Date.UTC(2026, 9, 15, 9) + this.newUploads * 1_000);
+      this.uploads.set(sha256, { uploadedAt: at.toISOString(), live: true });
+    }
     const doc = this.graph.entity({ type: "Document", name, key: `file:${sha256}` });
     doc.name = name;
     Object.assign(doc.properties, {
@@ -384,6 +402,22 @@ export class MockContent {
     const file = { sha256, name, mediaType, document: doc.iri, bytes };
     this.held.set(sha256, file);
     return file;
+  }
+
+  /** Uploads that gave a content a new `uploaded_at`. */
+  private newUploads = 0;
+
+  /** Delete a file, as `DELETE /v1/files`: its bytes are no longer read; its `Document` stays here. */
+  remove(sha256: string): void {
+    const upload = this.uploads.get(sha256);
+    if (!upload?.live) throw new Error(`no live file ${sha256}`);
+    this.uploads.set(sha256, { ...upload, live: false });
+    this.held.delete(sha256);
+  }
+
+  /** The `uploaded_at` of a content's file. */
+  uploadedAt(sha256: string): string | undefined {
+    return this.uploads.get(sha256)?.uploadedAt;
   }
 
   /** The byte range of each read, `null` for a whole file, in order. */
@@ -428,14 +462,30 @@ export class MockContent {
     derivations: {
       check: async (key: Schemas["DerivationKey"]): Promise<Schemas["DerivationCheckResponse"]> => {
         this.checks += 1;
-        const derivation = this.recorded.get(derivationName(key));
-        return derivation ? { exists: true, derivation } : { exists: false };
+        const file = this.uploads.get(key.sha256);
+        const upload = file?.live ? file.uploadedAt : undefined;
+        const derivation =
+          file && !file.live ? undefined : this.current(derivationName(key), key.sha256);
+        return {
+          exists: Boolean(derivation),
+          ...(derivation ? { derivation } : {}),
+          ...(upload ? { content_uploaded_at: upload } : {}),
+        };
       },
       record: async (
         request: Schemas["DerivationRecordRequest"],
       ): Promise<Schemas["DerivationRecordResponse"]> => {
+        this.records.push(request);
+        const named = request.content_uploaded_at;
+        const upload = this.uploads.get(request.sha256);
+        if (named && !(upload?.live && upload.uploadedAt === named))
+          throw new LbbError(409, "{}", {
+            code: "derivation_upload_changed",
+            message: `the file was deleted since upload ${named}: nothing was recorded`,
+            param: "content_uploaded_at",
+          });
         const name = derivationName(request);
-        const kept = this.recorded.get(name);
+        const kept = this.current(name, request.sha256);
         if (kept) return { recorded: false, derivation: kept };
         const outputs = JSON.stringify(request.outputs ?? null);
         if (outputs.length > 16 * 1024)
@@ -453,10 +503,19 @@ export class MockContent {
           recorded_at: "2026-10-15T09:00:00Z",
         };
         this.recorded.set(name, derivation);
+        this.stamps.set(name, upload?.uploadedAt);
         return { recorded: true, derivation };
       },
     },
   };
+
+  /** The derivation `name` when it belongs to the current upload of its content. */
+  private current(name: string, sha256: string): Schemas["Derivation"] | undefined {
+    const derivation = this.recorded.get(name);
+    const upload = this.uploadedAt(sha256);
+    if (!derivation || (upload !== undefined && this.stamps.get(name) !== upload)) return undefined;
+    return derivation;
+  }
 }
 
 const derivationName = (key: Schemas["DerivationKey"]) =>

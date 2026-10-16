@@ -3324,7 +3324,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Whether one workflow version made something of one content with one set of settings: the key (`sha256`, `workflow_type`, `version`, `settings_digest`) answers `exists` and the derivation when there is one. A worker checks before it works on a content and skips it when it exists, so identical bytes under two names are worked on once. 400 `derivation_invalid` for a key outside its characters */
+        /** Whether one workflow version made something of one content with one set of settings: the key (`sha256`, `workflow_type`, `version`, `settings_digest`) answers `exists` and the derivation when there is one. A worker checks before it works on a content and skips it when it exists, so identical bytes under two names are worked on once. The answer also names the upload of the content's live file (`content_uploaded_at`): send it back with the record. A file that is not live (deleted, or not written yet) has no derivation and no upload. 400 `derivation_invalid` for a key outside its characters */
         post: operations["post_v1_workflows_derivations_check"];
         delete?: never;
         options?: never;
@@ -3341,7 +3341,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Record a derivation once: the key, the run that made it (`run_id`, optional) and what it made (`outputs`, at most 16 KiB of JSON). A second record of the same key answers the stored one with `recorded: false`. Only LBB's own worker records LBB's `lbb.*` types (403 `reserved_workflow_type`); a work token records nothing else (403 `worker_credential_scope`). 400 `derivation_invalid` */
+        /** Record a derivation once: the key, the run that made it (`run_id`, optional) and what it made (`outputs`, at most 16 KiB of JSON). A second record of the same key answers the stored one with `recorded: false`. With `content_uploaded_at` (the upload the check answered), the record writes only while that upload is the file's live one. When the file was deleted since, or deleted and uploaded again, nothing is written: 409 `derivation_upload_changed`, and the run of the current upload does the work. Only LBB's own worker records LBB's `lbb.*` types (403 `reserved_workflow_type`); a work token records nothing else (403 `worker_credential_scope`). 400 `derivation_invalid` */
         post: operations["post_v1_workflows_derivations_record"];
         delete?: never;
         options?: never;
@@ -5432,6 +5432,13 @@ export interface components {
          *     derivation.
          */
         DerivationCheckResponse: {
+            /**
+             * @description The upload of the content's live file: its `uploaded_at`, RFC 3339.
+             *     Send it back with the record. Then a run of a file deleted since the
+             *     check records nothing. Absent when the file is not live: deleted,
+             *     reclaimed, not written yet, or no file at all.
+             */
+            content_uploaded_at?: string | null;
             derivation?: null | components["schemas"]["Derivation"];
             exists: boolean;
         };
@@ -5458,6 +5465,14 @@ export interface components {
         };
         /** @description `POST /v1/workflows/derivations/record`: record a derivation once. */
         DerivationRecordRequest: components["schemas"]["DerivationKey"] & {
+            /**
+             * @description The upload the work was done for: the `content_uploaded_at` of the
+             *     check. The record writes only while it is the file's live upload.
+             *     When the file was deleted since, it records nothing and answers
+             *     `409 derivation_upload_changed`. Without it, the record belongs to
+             *     the upload at the time of the record.
+             */
+            content_uploaded_at?: string | null;
             /** @description What it made, at most 16 KiB of JSON. */
             outputs?: unknown;
             /** @description The run that made it, at most 256 characters. */
