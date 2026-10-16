@@ -386,13 +386,41 @@ export class MockContent {
     return file;
   }
 
+  /** The byte range of each read, `null` for a whole file, in order. */
+  readonly ranges: Array<{ start: number; end: number | null } | null> = [];
+  /** The bytes all reads answered. */
+  bytesRead = 0;
+
+  /**
+   * A file's bytes, or with `range` bytes `start` to `end` (both included),
+   * as `GET /v1/files/content` answers: a range past the end ends at the
+   * end, and a range from the end on (a file without bytes too) throws
+   * `LbbError` 416 `range_not_satisfiable`.
+   */
   readonly files = {
-    content: async (sha256: string): Promise<Uint8Array> => {
+    content: async (
+      sha256: string,
+      options: { range?: { start: number; end?: number } } = {},
+    ): Promise<Uint8Array> => {
       this.reads += 1;
       const file = this.held.get(sha256);
       if (!file)
         throw new LbbError(404, "{}", { code: "file_not_found", message: `no file ${sha256}` });
-      return file.bytes;
+      const range = options.range;
+      this.ranges.push(range ? { start: range.start, end: range.end ?? null } : null);
+      if (!range) {
+        this.bytesRead += file.bytes.length;
+        return file.bytes;
+      }
+      if (range.start >= file.bytes.length)
+        throw new LbbError(416, "{}", {
+          code: "range_not_satisfiable",
+          message: `no byte of the file from ${range.start} on`,
+        });
+      const end = Math.min(range.end ?? file.bytes.length - 1, file.bytes.length - 1);
+      const bytes = file.bytes.slice(range.start, end + 1);
+      this.bytesRead += bytes.length;
+      return bytes;
     },
   };
 

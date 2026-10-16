@@ -16271,9 +16271,9 @@ export interface components {
             /**
              * @description The template a developer can copy to run this work in their own
              *     worker: a folder of `sdk/templates/`, the catalog id with dashes
-             *     (`documents-link`, `values-extract`, `ontology-fit`). Null when there
-             *     is none (`search.embed` and `documents.parse` run in LBB only, and
-             *     `workflow` is the developer's own code).
+             *     (`documents-link`, `values-extract`, `ontology-fit`, `rows`). Null
+             *     when there is none (`search.embed` and `documents.parse` run in LBB
+             *     only, and `workflow` is the developer's own code).
              */
             code?: string | null;
             fixed_watch?: null | components["schemas"]["WorkflowWatch"];
@@ -16282,19 +16282,34 @@ export interface components {
              *     `search`, `ontology`, `developer`.
              */
             group: string;
-            /** @description `search.embed`, `ontology.fit`, `workflow`, … */
+            /** @description `search.embed`, `ontology.fit`, `workflow`, `rows`, … */
             id: string;
+            /**
+             * @description The media types of the content trigger that feeds its workflow, for
+             *     a template your worker runs on files (`rows`, `sections`; `watch` is
+             *     `none`): `type/subtype`, `type/*` or `*\/*`. Its workflow is created
+             *     with `PUT /v1/workflows/named` and this content trigger, as the
+             *     template's `trigger()` makes it. Empty for a starter workflow that
+             *     watches a class.
+             */
+            media_types?: string[];
             /**
              * @description The outputs it owns when they are fixed. A developer workflow
              *     declares its own when it is created.
              */
             owns?: components["schemas"]["WorkflowOwns"];
+            /**
+             * @description The parameters it takes in `params`. For a template your worker runs
+             *     on files, the settings of the template's code (`defaults` in its
+             *     `workflow.ts`): no route takes them.
+             */
             params?: components["schemas"]["StarterWorkflowParam"][];
             runs_in: components["schemas"]["WorkflowRunsIn"];
             /**
              * @description The names of the sample files that Try on samples loads
              *     (`POST /v1/workflows/starters/try`), as the template's `samples/`
-             *     folder names them. Empty for `workflow`.
+             *     folder names them. For a template your worker runs on files, the
+             *     files its own `npm run try` loads. Empty for `workflow`.
              */
             samples?: string[];
             /** @description The older route family that reads and writes the same documents. */
@@ -16305,8 +16320,9 @@ export interface components {
             truth: string[];
             /**
              * @description Whether this server can run Try on samples for it now: SaaS mode, a
-             *     sample set, and the models (and for the document starter workflows,
-             *     the parser) the run needs.
+             *     sample set, a version LBB runs, and the models (and for the document
+             *     starter workflows, the parser) the run needs. Always false for a
+             *     template your worker runs on files.
              */
             try_on_samples?: boolean;
             /** @description Why not: `fit_models_unavailable`, `workflows_disabled`, … */

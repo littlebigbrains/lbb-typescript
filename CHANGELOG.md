@@ -4,6 +4,14 @@ All notable changes to the `@littlebigbrain/client` package are documented here.
 
 ## Unreleased
 
+- The starter workflow catalog (`client.workflows.starters.list()`) lists
+  `rows` and `sections`, the templates your worker runs on files.
+  `StarterWorkflow.media_types` names the media types of their content
+  trigger, and their `watch` is `none`; their `params` are the settings of
+  the template's code. Create their workflow with
+  `client.workflows.named.put(trigger())`, as the template's
+  `npm run setup` does: `client.workflows.starters.use` answers `400
+  template_runs_in_worker` for them, and they have no Try on samples.
 - `client.files.get(sha256, { deleted: true })` names the facts that cite
   a live file too (`cited_by`, at most 20): what
   `delete(sha256, { purge: true })` would retract.

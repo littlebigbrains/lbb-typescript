@@ -7,17 +7,19 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import type { Schemas } from "@littlebigbrain/client";
 import {
+  Crash,
   MockActivities,
   MockContent,
   contentMessage,
   phases,
   readJson,
   runMessage,
+  runTurn,
   samplesDir,
   type MemoryGraph,
   type MockFile,
 } from "../_shared/testing.js";
-import { csvRecords, normalizeName } from "./csv.js";
+import { csvRecords, normalizeName, readRecords, type ReadRange } from "./csv.js";
 import {
   READ_FROM,
   createWorkflow,
@@ -25,6 +27,7 @@ import {
   derivationKey,
   labelKey,
   typed,
+  type ReadOptions,
   type RowsState,
   type Settings,
 } from "./workflow.js";
@@ -79,14 +82,18 @@ const ONTOLOGY = {
 } as unknown as Schemas["OntologyView"];
 
 /** A run of the workflow on a graph with the sample reports. */
-function setup(settings: Settings = defaults, reports = REPORTS.map((r) => r.name)) {
+function setup(
+  settings: Settings = defaults,
+  reports = REPORTS.map((r) => r.name),
+  reading: ReadOptions = {},
+) {
   const lbb = new MockActivities({ sparql, ontology: ONTOLOGY });
   for (const name of reports) lbb.graph.entity({ type: "Report", name });
   const content = new MockContent(lbb.graph);
-  const definition = createWorkflow(lbb, content, settings);
+  const definition = createWorkflow(lbb, content, settings, reading);
   const run = (file: MockFile, state: unknown = {}) =>
     runMessage<RowsState>(definition, contentMessage("rows", file), state);
-  return { lbb, content, run };
+  return { lbb, content, run, definition };
 }
 
 const instancesOf = (graph: MemoryGraph, type: string) =>
@@ -347,4 +354,188 @@ test("values take their property's type; names compare by letters and digits", (
   assert.equal(normalizeName("Customer ID"), normalizeName("customer_id"));
   assert.equal(normalizeName("Straße"), "straße");
   assert.equal(labelKey("q3-customers"), labelKey("Q3  customers"));
+});
+
+// ---- reading by range ------------------------------------------------------------
+
+/** Settings that read every file and write no REPRESENTS. */
+const EVERY_FILE: Settings = { ...defaults, match: undefined, represents: undefined };
+
+/**
+ * A customer list of `n` data rows with `eol` after each record: every third
+ * name is quoted and holds a comma and letters beyond ASCII, every fifth
+ * holds a line break (CRLF) and quotes inside its quotes.
+ */
+function customerList(n: number, eol = "\r\n"): string {
+  const lines = ["Customer ID,Name,City"];
+  for (let i = 1; i <= n; i++) {
+    const name =
+      i % 5 === 0
+        ? `"Line ${i}\r\nsecond ""part"""`
+        : i % 3 === 0
+          ? `"Müller, Jürgen ${i}"`
+          : `Ana ${i}`;
+    lines.push(`C-${i},${name},Zürich`);
+  }
+  return lines.join(eol) + eol;
+}
+
+/** A read of `bytes` as the server answers a range: fewer at the end, none from the end on. */
+const rangeOver =
+  (bytes: Uint8Array): ReadRange =>
+  async (start, end) =>
+    bytes.slice(start, Math.min(end + 1, bytes.length));
+
+/** Each data row of `csv` has its instance, whose edge cites its exact row and text. */
+function assertEveryRow(graph: MemoryGraph, file: MockFile, csv: string) {
+  const rows = [...csvRecords(csv)].slice(1);
+  assert.equal(graph.ofType("Customer").length, rows.length);
+  for (const record of rows) {
+    const edge = graph.edges.find(
+      (e) =>
+        (e.evidence as { source_id: string }).source_id === `${file.document}#row=${record.row}`,
+    );
+    assert.ok(edge, `row ${record.row} has its edge`);
+    assert.equal((edge.evidence as { text: string }).text, record.text, `row ${record.row}`);
+    const instance = graph.entities.get(edge.source)!;
+    assert.equal(instance.name, record.fields[1]!.trim(), `row ${record.row}`);
+  }
+}
+
+test("a file larger than one window is read once, window by window, with exact row numbers", async () => {
+  const csv = customerList(200);
+  const { lbb, content, run } = setup(EVERY_FILE, [], { window: 256 });
+  const file = content.upload("customers-big.csv", csv, "text/csv");
+  assert.ok(file.bytes.length > 256 * 20, "the file holds many windows");
+  const { state, turns } = await run(file);
+
+  assert.equal(turns.length, 1);
+  assert.equal(state.rows, 200);
+  assertEveryRow(lbb.graph, file, csv);
+  // The header's window goes on into the rows: each read asks for the next
+  // window, and each byte is read once.
+  content.ranges.forEach((range, n) =>
+    assert.deepEqual(range, { start: n * 256, end: n * 256 + 255 }, `read ${n}`),
+  );
+  assert.equal(content.bytesRead, file.bytes.length);
+});
+
+test("a quoted field and a letter beyond ASCII across a window edge read as one row", async () => {
+  // Every window size from 64 to 200 bytes, so window edges fall inside
+  // quoted fields, between the bytes of `ü`, and between CR and LF; with the
+  // three line breaks, and in turns of 3 records.
+  for (const eol of ["\r\n", "\n", "\r"]) {
+    const bytes = new TextEncoder().encode(customerList(40, eol));
+    const whole = [...csvRecords(bytes)];
+    assert.equal(whole.length, 41);
+    for (let window = 64; window <= 200; window++) {
+      const options = { window, maxRecord: 1 << 20 };
+      const read = await readRecords(rangeOver(bytes), ",", 0, 1, 10_000, options);
+      assert.deepEqual(read.records, whole, `window ${window}`);
+      assert.equal(read.end, true);
+      const turns = [];
+      let at = 0;
+      let row = 1;
+      for (let end = false; !end;) {
+        const turn = await readRecords(rangeOver(bytes), ",", at, row, 3, options);
+        turns.push(...turn.records);
+        ({ next: at, row, end } = turn);
+      }
+      assert.deepEqual(turns, whole, `window ${window} in turns of 3`);
+    }
+  }
+
+  // The workflow, on a window that ends inside the quoted field of row 6.
+  const csv = customerList(12);
+  const edge = Buffer.from(csv).indexOf("Line 5") + 3;
+  assert.ok(edge > 64);
+  const { lbb, content, run } = setup(EVERY_FILE, [], { window: edge });
+  const file = content.upload("customers-quoted.csv", csv, "text/csv");
+  await run(file);
+  assertEveryRow(lbb.graph, file, csv);
+  const quoted = lbb.graph.ofType("Customer").find((e) => e.name.startsWith("Line 5"));
+  assert.equal(quoted?.name, 'Line 5\r\nsecond "part"');
+});
+
+test("a CRLF file whose window ends between CR and LF keeps one row per line", async () => {
+  const csv = customerList(30);
+  // A window that ends after the CR of the line break that ends row 4.
+  const bytes = Buffer.from(csv);
+  const cr = bytes.indexOf("\r\nC-4,") + 1;
+  const rowEnd = bytes.indexOf("\r\n", cr + 1) + 1;
+  const { lbb, content, run } = setup(EVERY_FILE, [], { window: rowEnd });
+  const file = content.upload("customers-crlf.csv", csv, "text/csv");
+  const { state } = await run(file);
+  assert.equal(content.ranges[0]!.end, rowEnd - 1, "the first window ends with the CR");
+  assert.equal(bytes[rowEnd - 1], 0x0d);
+  assert.equal(state.rows, 30, "no blank row between CR and LF");
+  assertEveryRow(lbb.graph, file, csv);
+});
+
+test("a turn that continues starts at the byte offset where the last one stopped", async () => {
+  const csv = customerList(10);
+  const whole = [...csvRecords(csv)];
+  const settings = { ...EVERY_FILE, rowsPerTurn: 4 };
+  const { lbb, content, definition } = setup(settings, [], { window: 64 });
+  const file = content.upload("customers-ten.csv", csv, "text/csv");
+
+  // Turn 1 reads the header and rows 2 to 5, and continues at row 6.
+  let message = contentMessage("rows", file);
+  const first = await runTurn<RowsState>(definition, {}, message);
+  type Continued = typeof message & { cursor: { byte: number; row: number } };
+  message = first.result.continuation!.message;
+  const cursor = (message as Continued).cursor;
+  assert.deepEqual([cursor.byte, cursor.row], [whole[5]!.start, 6]);
+
+  // Turn 2 stops after its rows (a crash) and runs again: each time its
+  // first read starts at the cursor's byte, and it writes rows 6 to 9.
+  const reads = content.ranges.length;
+  const stopped = await runTurn<RowsState>(definition, first.result.state, message, {
+    crashAfter: 1,
+  }).then(
+    () => assert.fail("the turn should stop"),
+    (error: unknown) => error,
+  );
+  assert.ok(stopped instanceof Crash);
+  assert.deepEqual(stopped.turn.keys, ["rows"]);
+  assert.equal(content.ranges[reads]!.start, cursor.byte);
+  const again = content.ranges.length;
+  const second = await runTurn<RowsState>(definition, first.result.state, message, {
+    saved: stopped.turn,
+  });
+  assert.deepEqual(second.turn.keys, ["rows", "write-0"]);
+  assert.equal(content.ranges[again]!.start, cursor.byte);
+  const next = (second.result.continuation!.message as Continued).cursor;
+  assert.deepEqual([next.byte, next.row], [whole[9]!.start, 10]);
+
+  // Turn 3 writes rows 10 and 11 and records the derivation.
+  const third = await runTurn<RowsState>(
+    definition,
+    second.result.state,
+    second.result.continuation!.message,
+  );
+  assert.deepEqual(third.turn.keys, ["rows", "write-0", "record"]);
+  assert.equal(third.result.continuation, undefined);
+  assert.equal(third.result.state.rows, 10);
+  assertEveryRow(lbb.graph, file, csv);
+
+  // A cursor without a byte offset (an earlier version of the template)
+  // reads the file again from its start.
+  const old = { ...message, cursor: { at: 120, row: 6 } } as unknown as typeof message;
+  const restarted = await runTurn<RowsState>(definition, {}, old);
+  assert.equal(restarted.turn.keys[0], "check");
+});
+
+test("a row longer than the longest row stops the read: a quote that never closes", async () => {
+  const bytes = new TextEncoder().encode(`a,b\n1,"open${"x".repeat(500)}`);
+  await assert.rejects(
+    readRecords(rangeOver(bytes), ",", 4, 2, 10, { window: 64, maxRecord: 200 }),
+    /row 2 is longer than 200 bytes from byte 4/,
+  );
+  // Within the limit, the open quote runs to the end of the file, as RFC 4180 parsers read it.
+  const read = await readRecords(rangeOver(bytes), ",", 4, 2, 10, { window: 64, maxRecord: 1_000 });
+  assert.deepEqual(
+    read.records.map((r) => [r.row, r.fields[0], r.fields[1]!.length]),
+    [[2, "1", 504]],
+  );
 });
