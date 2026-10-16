@@ -2,7 +2,7 @@
 
 All notable changes to the `@littlebigbrain/client` package are documented here.
 
-## Unreleased
+## 0.27.0 (2026-10-16)
 
 - `client.files.list({ parseStatus, name })` filters the list: `parseStatus`
   (`parsed`, `unsupported`, `failed`, or `waiting` for a file without one)
