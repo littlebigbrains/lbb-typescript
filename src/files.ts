@@ -48,8 +48,15 @@ export const FILE_LIST_LIMIT_MAX = 1000;
 export interface FileListOptions extends CallOptions {
   /** Files per page, 1 to 1,000. Default 1,000. */
   limit?: number;
-  /** The `next` cursor of the page before. */
+  /** The `next` cursor of the page before, of a list with the same filters. */
   after?: string;
+  /**
+   * Only the files of this parse status: `parsed`, `unsupported`, `failed`,
+   * or `waiting` for a file without one.
+   */
+  parseStatus?: string;
+  /** Only the files whose name contains this text, in any case. */
+  name?: string;
 }
 
 /**
@@ -215,9 +222,14 @@ export class FilesNamespace {
    * Pass the answer's `next` as `after` for the next page; a page can hold
    * fewer than `limit` files while `next` is set, and the list ends when no
    * `next` comes back.
+   *
+   * With `parseStatus` or `name`, the server reads the `Document` facts of
+   * the published generation for the page, and `as_of_commit_seq` names
+   * the commit it read: a file uploaded, renamed or parsed since matches
+   * once a generation holds the change.
    */
   list(options: FileListOptions = {}): Promise<Schemas["FileList"]> {
-    const { limit, after, ...opts } = options;
+    const { limit, after, parseStatus, name, ...opts } = options;
     if (
       limit !== undefined &&
       (!Number.isSafeInteger(limit) || limit < 1 || limit > FILE_LIST_LIMIT_MAX)
@@ -225,7 +237,12 @@ export class FilesNamespace {
       throw new RangeError(`limit must be 1 to ${FILE_LIST_LIMIT_MAX}`);
     return this.client.request("GET", "/v1/files", {
       ...opts,
-      query: { limit, after: after || undefined },
+      query: {
+        limit,
+        after: after || undefined,
+        parse_status: parseStatus || undefined,
+        name: name || undefined,
+      },
     });
   }
 

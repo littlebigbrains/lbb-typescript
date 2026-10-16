@@ -1278,7 +1278,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** One page of the graph's files, newest upload first, with what the parse workflow (`documents.parse`) made of each. Without `limit`, the newest 1,000. `next` is the cursor of the next page; a page can hold fewer than `limit` files while `next` is set. 400 for an invalid `limit` or `after` */
+        /** One page of the graph's files, newest upload first, with what the parse workflow (`documents.parse`) made of each. Without `limit`, the newest 1,000. `next` is the cursor of the next page; a page can hold fewer than `limit` files while `next` is set. With `parse_status` or `name`, one SPARQL read of the `Document` facts at the published generation finds the page, and `as_of_commit_seq` names the commit it read; a file whose record no longer matches (a rename or a parse since) is left out. 400 for an invalid `limit`, `after`, `parse_status` or `name` */
         get: operations["get_v1_files"];
         put?: never;
         /** Upload a file: the raw request body is stored once under its SHA-256, and a `Document` entity (key `file:<sha256>`) is committed for it, with its `Content` (key `content:<sha256>`) and the edge `HAS_CONTENT`. `language` and `schema` are stored on the `Document` when given. A file holds at most 1 GiB by default (the server setting `LBB_FILES_MAX_BYTES`); a larger body is refused with 413 `file_too_large` before it is read. An empty body is an empty file. The same bytes under the same name change nothing. 429 `file_reclaim_in_progress` while a reclaim pass deletes the same bytes of a deleted file (seconds) */
@@ -7122,6 +7122,15 @@ export interface components {
         };
         /** @description `GET /v1/files`: one page of the graph's files, newest upload first. */
         FileList: {
+            /**
+             * Format: int64
+             * @description With `parse_status` or `name`: the commit of the published
+             *     generation whose `Document` facts the filter read. A file uploaded,
+             *     renamed or parsed after it matches once a generation holds the
+             *     change. Absent for the plain list, and before the graph's first
+             *     publication (a filtered list is then empty).
+             */
+            as_of_commit_seq?: number | null;
             files: components["schemas"]["FileRecord"][];
             /**
              * @description The cursor of the next page: pass it as `after`. Absent when the list
@@ -16725,6 +16734,13 @@ export interface components {
              *     typed content.
              */
             document?: string | null;
+            /**
+             * @description The file's name: for a `document` IRI, its `Document`'s `name` at
+             *     the published generation (absent before the generation holds the
+             *     file, or after its delete); for evidence written before typed
+             *     content, the name the evidence holds.
+             */
+            document_name?: string | null;
             line?: string | null;
             line_id?: string | null;
             /**
@@ -30444,8 +30460,12 @@ export interface operations {
                 graph?: string;
                 /** @description files per page, 1 to 1,000 (default 1,000) */
                 limit?: string;
-                /** @description the `next` cursor of the previous page */
+                /** @description the `next` cursor of the previous page of the same list */
                 after?: string;
+                /** @description only the files of this parse status: `parsed`, `unsupported`, `failed`, or `waiting` for a file without one */
+                parse_status?: string;
+                /** @description only the files whose name contains this text, in any case (at most 255 characters) */
+                name?: string;
             };
             header?: {
                 /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
@@ -30596,7 +30616,7 @@ export interface operations {
             path?: never;
             cookie?: never;
         };
-        /** @description The file's bytes, at most 1 GiB by default (`LBB_FILES_MAX_BYTES`); an empty body is an empty file. `Content-Type` names its type; without one, a PDF is recognized by its bytes. */
+        /** @description The file's bytes, at most 1 GiB by default (`LBB_FILES_MAX_BYTES`); an empty body is an empty file. `Content-Type` names its type; without one (or with `application/octet-stream`), the server detects PDF, PNG, JPEG, GIF and WebP by their bytes, `.xlsx`, `.docx` and `.pptx` files by the ZIP signature and the name, and UTF-8 text named `.csv`, `.tsv`, `.md`, `.json` or `.txt` by the name. */
         requestBody: {
             content: {
                 "application/octet-stream": string;
