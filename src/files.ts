@@ -22,8 +22,10 @@ export type FileCitation = Schemas["FileCitation"];
 /** The options of `files.get`. */
 export interface FileGetOptions extends CallOptions {
   /**
-   * Also answer a deleted file whose content is not reclaimed yet, with
-   * `deleted_at` and `cited_by`: the facts whose evidence still names it.
+   * Also answer a deleted file whose content is not reclaimed yet (with
+   * `deleted_at`), and name the facts whose evidence cites the file
+   * (`cited_by`, at most 20): what `delete(sha256, { purge: true })`
+   * retracts.
    */
   deleted?: boolean;
 }
@@ -232,7 +234,8 @@ export class FilesNamespace {
    * name, type, size, upload time, `Document` IRI and parse. A SHA-256 the
    * graph has no file for, or a deleted file, answers `404 file_not_found`;
    * with `{ deleted: true }` a deleted file answers until its content is
-   * reclaimed, with `deleted_at` and the facts that cite it (`cited_by`).
+   * reclaimed (`deleted_at`), and every answer names the facts that cite
+   * the file (`cited_by`).
    */
   get(
     sha256: string,
