@@ -54,12 +54,12 @@ function fakeFetch(replies: Reply[] = []): { fetch: FetchLike; calls: Call[] } {
 }
 
 function client(fetch: FetchLike, extra: { integrationsUrl?: string } = {}) {
-  // A graph and stack scope on the client must not reach the integrations API.
+  // A graph and environment scope on the client must not reach the integrations API.
   return new LbbClient({
     baseUrl: DATA_PLANE,
     apiKey: KEY,
     graph: "main",
-    stack: "production",
+    environment: "production",
     fetch,
     retryDelayMs: 0,
     ...extra,

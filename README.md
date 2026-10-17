@@ -7,7 +7,7 @@ so you can check it later.
 
 The client has no runtime dependencies and includes generated request and response
 types. It uses `fetch` and supports Node.js 18+, browsers, and edge workers.
-Keep stack API keys on your server or local machine, outside browser bundles.
+Keep environment API keys on your server or local machine, outside browser bundles.
 
 [Documentation](https://docs.littlebigbrain.com/sdks/typescript/) ·
 [Quickstart](https://docs.littlebigbrain.com/start/quickstart/) ·
@@ -21,12 +21,12 @@ npm install @littlebigbrain/client
 
 ## Load facts and run a query
 
-Create a stack in the [console](https://cloud.littlebigbrain.com) and open
-**Connect**. Copy its complete endpoint and a stack API key:
+Create an environment in the [console](https://cloud.littlebigbrain.com) and open
+**Connect**. Copy its complete endpoint and an environment API key:
 
 ```sh
-export LBB_URL="https://<your-complete-stack-host>"
-export LBB_API_KEY="<your-stack-api-key>"
+export LBB_URL="https://<your-complete-environment-host>"
+export LBB_API_KEY="<your-environment-api-key>"
 ```
 
 This example creates a graph named `quickstart` on its first write. It stores
@@ -255,7 +255,7 @@ const answer = await ctx.step("define-p3", (s) =>
 console.log(answer.value.code, answer.cost_micro_usd);
 ```
 
-The calls count against the stack's model budget for workflows
+The calls count against the environment's model budget for workflows
 (`429 workflow_budget_exceeded` past it). A request that is too large for
 the model fails with `422 activity_request_refused`: `isActivityRefused`
 names that error, and `splitInHalves(items)` splits the items of a request
@@ -282,7 +282,7 @@ use opt-in developer-owned apps: register your app in the console, then create
 a customer consent link from your backend. Its routes are on the
 integrations API, `https://api.littlebigbrain.com` by default
 (`integrationsUrl`). They take the
-same stack API key. An operator turns on developer access per stack; ask us
+same environment API key. An operator turns on developer access per environment; ask us
 first.
 
 ```ts
@@ -367,3 +367,32 @@ The request and response types are generated from the API contract. See
 ## License
 
 [Apache-2.0](LICENSE).
+
+## Environment scope
+
+An environment API key already selects its environment. For an account-scoped
+session token, pass `environment: "production"` to the client. This uses the
+existing `stack` query parameter and does not change the endpoint or grant access.
+The older `stack` option remains supported; conflicting values throw locally.
+`withScope` and `graph(name, options)` also accept `environment`.
+
+## Optional application catalog and reference reads
+
+Start with a graph and an environment API key. Your backend chooses the graph
+for an authorized user; the environment key can access every graph in its environment.
+Catalog ownership and short-lived delegated read tokens are optional. They require
+separately enabled `application_catalog_v1` and `scoped_graph_reads_v1` support.
+The `reference_dataset_reads_v1` capability adds explicit SELECT/ASK reads over one
+primary graph and up to four authorized reference graphs in the same environment.
+Capabilities describe support, not whether a deployment enabled the feature.
+
+Use `client.catalog` to create namespaces, adopt an existing graph at its exact
+`expected_graph_epoch`, page membership, and inspect or repair pending operations.
+Use `client.access.createReadToken` and `revokeToken` to manage delegated reads.
+`client.sparqlDataset` takes the primary epoch and explicit references; its `sources`
+vector identifies the independently pinned versions. Epochs are decimal strings,
+not JavaScript numbers. Catalog pages can be empty with a non-null `next_cursor`;
+continue until that cursor is null.
+
+These helpers do not move graph ownership, grant writes, or create an atomic
+cross-graph snapshot. See [How to model your app](https://docs.littlebigbrain.com/start/model-your-app/).

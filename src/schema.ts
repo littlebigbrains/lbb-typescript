@@ -4,6 +4,211 @@
  */
 
 export interface paths {
+    "/v1/access/tokens": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Mint a short-lived read-only token for exact graphs or immutable namespace subtrees (environment administrator only) */
+        post: operations["post_v1_access_tokens"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/access/tokens/revoke": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Revoke one application token; new admissions require fresh credential state (environment administrator only) */
+        post: operations["post_v1_access_tokens_revoke"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/catalog/graph": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read the selected graph's catalog binding (environment administrator only) */
+        get: operations["get_v1_catalog_graph"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/catalog/graphs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Page catalog graph bindings, including incomplete adoption; legacy unregistered graphs are absent */
+        get: operations["get_v1_catalog_graphs"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/catalog/graphs/adopt": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Register the selected existing graph and exact epoch under one immutable owner; requires Idempotency-Key and an environment administrator */
+        post: operations["post_v1_catalog_graphs_adopt"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/catalog/indexes/repair": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Repair one bounded page of derived catalog directories from authoritative records (environment administrator only) */
+        post: operations["post_v1_catalog_indexes_repair"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/catalog/namespace": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read one namespace by stable identity (environment administrator only) */
+        get: operations["get_v1_catalog_namespace"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/catalog/namespaces": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Page registered namespaces; empty pages may have a continuation (environment administrator only) */
+        get: operations["get_v1_catalog_namespaces"];
+        put?: never;
+        /** Create an optional namespace with immutable ownership; requires Idempotency-Key and an environment administrator */
+        post: operations["post_v1_catalog_namespaces"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/catalog/namespaces/resolve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Resolve a bounded canonical namespace path to a stable identity; does not change graph object keys */
+        get: operations["get_v1_catalog_namespaces_resolve"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/catalog/operations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Page pending durable catalog requests without private fingerprints (environment administrator only) */
+        get: operations["get_v1_catalog_operations"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/catalog/operations/repair": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Replay one exact durable catalog request; conflicting claims remain pending (environment administrator only) */
+        post: operations["post_v1_catalog_operations_repair"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/catalog/root": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read the environment's implicit catalog root identity (environment administrator only) */
+        get: operations["get_v1_catalog_root"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/cdc/activate": {
         parameters: {
             query?: never;
@@ -2868,6 +3073,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/query/dataset": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Preview: SELECT or ASK over one primary graph and up to four authorized named references in the same environment; exact epochs and independently pinned published versions; no FROM or SERVICE */
+        post: operations["post_v1_query_dataset"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/query/describe": {
         parameters: {
             query?: never;
@@ -4735,6 +4957,96 @@ export interface components {
             /** Format: int64 */
             count: number;
             name: string;
+        };
+        /** @enum {string} */
+        CatalogBindingState: "preparing" | "ready";
+        CatalogGraph: {
+            ancestors: components["schemas"]["CatalogNamespaceIdentity"][];
+            /** Format: int64 */
+            binding_revision: number;
+            external_key?: string | null;
+            graph_epoch: string;
+            graph_id: string;
+            owner: components["schemas"]["CatalogNamespaceIdentity"];
+            state: components["schemas"]["CatalogBindingState"];
+        };
+        CatalogGraphAdoptRequest: {
+            /** @description Must match the existing live graph. Adoption never creates graph truth. */
+            expected_graph_epoch: string;
+            external_key?: string | null;
+            /** @description Omit to use the implicit environment root. */
+            owner_id?: string | null;
+        };
+        CatalogGraphPage: {
+            items: components["schemas"]["CatalogGraph"][];
+            next_cursor?: string | null;
+            scanned: number;
+        };
+        /** @enum {string} */
+        CatalogIndexKind: "graphs" | "namespaces";
+        CatalogIndexRepairRequest: {
+            cursor?: string | null;
+            kind: components["schemas"]["CatalogIndexKind"];
+            limit?: number;
+        };
+        /**
+         * @description A page checks derived directories against authoritative catalog records.
+         *     Continue through empty pages until next_cursor is null.
+         */
+        CatalogIndexRepairResponse: {
+            indexed: number;
+            next_cursor?: string | null;
+            scanned: number;
+        };
+        /** @description Stable ownership metadata. Paths are optional addresses, not storage keys. */
+        CatalogNamespace: {
+            ancestors: components["schemas"]["CatalogNamespaceIdentity"][];
+            external_key?: string | null;
+            identity: components["schemas"]["CatalogNamespaceIdentity"];
+            name: string;
+            parent?: null | components["schemas"]["CatalogNamespaceIdentity"];
+        };
+        CatalogNamespaceCreateRequest: {
+            external_key?: string | null;
+            name: string;
+            /** @description Omit to use the implicit environment root. */
+            parent_id?: string | null;
+        };
+        CatalogNamespaceIdentity: {
+            /** Format: int64 */
+            authority_revision: number;
+            id: string;
+            incarnation: string;
+        };
+        CatalogNamespacePage: {
+            items: components["schemas"]["CatalogNamespace"][];
+            /** @description Opaque continuation; an empty page may still have a continuation. */
+            next_cursor?: string | null;
+            scanned: number;
+        };
+        /** @enum {string} */
+        CatalogOperationKind: "namespace" | "graph";
+        CatalogOperationPage: {
+            items: components["schemas"]["CatalogPendingOperation"][];
+            next_cursor?: string | null;
+            scanned: number;
+        };
+        CatalogOperationRepairRequest: {
+            operation_id: string;
+        };
+        CatalogOperationRepairResponse: {
+            completed: boolean;
+            operation_id: string;
+            target: string;
+        };
+        /**
+         * @description Summary of a durable pending request. Private request fingerprints and
+         *     idempotency keys are not part of the public inventory.
+         */
+        CatalogPendingOperation: {
+            kind: components["schemas"]["CatalogOperationKind"];
+            operation_id: string;
+            target: string;
         };
         CdcActivateRequest: {
             mapping: components["schemas"]["MappingPlan"];
@@ -13320,6 +13632,43 @@ export interface components {
             /** @description The model's answer: JSON that follows the request's `schema`. */
             value: unknown;
         };
+        ReferenceDatasetRequest: {
+            as_of_commit_seq?: null | components["schemas"]["CommitSeq"];
+            /** @description The primary graph is selected by the usual graph query parameter. */
+            expected_graph_epoch: string;
+            /** @description SELECT or ASK. Sources come only from this request's explicit selection. */
+            query: string;
+            /** @description At most four reference graphs in the initial HTTP contract. */
+            references: components["schemas"]["ReferenceDatasetSource"][];
+        };
+        ReferenceDatasetResponse: {
+            /**
+             * Format: int64
+             * @description Aggregate logical read bytes charged across metadata and all sources.
+             */
+            charged_read_bytes: number;
+            /** @description Standard SPARQL Results JSON serialized as a string, as in sparql-text. */
+            results: string;
+            /** @description Independently pinned versions, not an atomic cross-graph snapshot. */
+            sources: components["schemas"]["ReferenceDatasetVersion"][];
+        };
+        ReferenceDatasetSource: {
+            as_of_commit_seq?: null | components["schemas"]["CommitSeq"];
+            expected_graph_epoch: string;
+            graph_id: string;
+            /** @description Absolute IRI used by GRAPH in this request only. */
+            name: string;
+        };
+        ReferenceDatasetVersion: {
+            commit_seq: components["schemas"]["CommitSeq"];
+            /** Format: int64 */
+            generation: number;
+            graph_epoch: string;
+            graph_id: string;
+            /** @description Absent for the primary default graph; reference names match the request. */
+            name?: string | null;
+            snapshot_token: string;
+        };
         /**
          * @description A page-region provenance anchor on a fact's evidence (region provenance
          *     §4.1/§6.4(b) BYO import): where the evidence appears in the source
@@ -13942,6 +14291,52 @@ export interface components {
          * @enum {string}
          */
         SchemaWriteEnforcementTiming: "write_time" | "write_time_full_scan" | "after_publication";
+        /**
+         * @description An environment administrator selects resources; the server resolves their
+         *     current incarnations and authority revisions before signing the credential.
+         */
+        ScopedGrantRequest: {
+            graph_id: string;
+            kind: components["schemas"]["ScopedGraphGrantKind"];
+        } | {
+            kind: components["schemas"]["ScopedNamespaceGrantKind"];
+            namespace_id: string;
+        };
+        /** @enum {string} */
+        ScopedGraphGrantKind: "graph";
+        /** @enum {string} */
+        ScopedNamespaceGrantKind: "namespace";
+        /**
+         * @description Mint a short-lived, read-only credential. Issuing credentials requires an
+         *     environment administrator; a scoped token cannot mint another token.
+         */
+        ScopedTokenRequest: {
+            grants: components["schemas"]["ScopedGrantRequest"][];
+            /** Format: int32 */
+            ttl_seconds?: number;
+        };
+        ScopedTokenResponse: {
+            credential_id: string;
+            /** Format: int64 */
+            expires_at_ms: number;
+            /** @description The initial release supports only `read` on its documented route set. */
+            operations: string[];
+            /** @description Secret bearer value, returned only by issuance. */
+            token: string;
+        };
+        ScopedTokenRevokeRequest: {
+            credential_id: string;
+        };
+        ScopedTokenRevokeResponse: {
+            credential_id: string;
+            /**
+             * Format: int64
+             * @description Revocation stops new admissions. It does not retract an already returned
+             *     response or cancel a request admitted before this time.
+             */
+            effective_at_ms: number;
+            revoked: boolean;
+        };
         /**
          * @description One scored retrieval candidate on the wire: which entity matched and its raw
          *     (pre-calibration) score from whatever channel produced it. The entity is
@@ -18929,11 +19324,1909 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    post_v1_access_tokens: {
+        parameters: {
+            query?: {
+                /** @description Graph name (default `main`) */
+                graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
+            };
+            header?: {
+                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                "Lbb-Version"?: string;
+                /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
+                "Idempotency-Key"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ScopedTokenRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScopedTokenResponse"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Rate limit exceeded */
+            429: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Service unavailable */
+            503: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+        };
+    };
+    post_v1_access_tokens_revoke: {
+        parameters: {
+            query?: {
+                /** @description Graph name (default `main`) */
+                graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
+            };
+            header?: {
+                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                "Lbb-Version"?: string;
+                /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
+                "Idempotency-Key"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ScopedTokenRevokeRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScopedTokenRevokeResponse"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Rate limit exceeded */
+            429: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Service unavailable */
+            503: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+        };
+    };
+    get_v1_catalog_graph: {
+        parameters: {
+            query?: {
+                /** @description Graph name (default `main`) */
+                graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
+            };
+            header?: {
+                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                "Lbb-Version"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CatalogGraph"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Rate limit exceeded */
+            429: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Service unavailable */
+            503: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+        };
+    };
+    get_v1_catalog_graphs: {
+        parameters: {
+            query?: {
+                /** @description Graph name (default `main`) */
+                graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
+                /** @description optional stable owner namespace id */
+                owner_id?: string;
+                /** @description true includes immutable descendants of owner_id (default root) */
+                include_descendants?: string;
+                /** @description opaque catalog continuation */
+                cursor?: string;
+                /** @description maximum scanned records, 1 through 100 (default 100) */
+                limit?: string;
+            };
+            header?: {
+                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                "Lbb-Version"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CatalogGraphPage"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Rate limit exceeded */
+            429: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Service unavailable */
+            503: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+        };
+    };
+    post_v1_catalog_graphs_adopt: {
+        parameters: {
+            query?: {
+                /** @description Graph name (default `main`) */
+                graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
+            };
+            header: {
+                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                "Lbb-Version"?: string;
+                /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CatalogGraphAdoptRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CatalogGraph"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Rate limit exceeded */
+            429: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Service unavailable */
+            503: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+        };
+    };
+    post_v1_catalog_indexes_repair: {
+        parameters: {
+            query?: {
+                /** @description Graph name (default `main`) */
+                graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
+            };
+            header?: {
+                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                "Lbb-Version"?: string;
+                /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
+                "Idempotency-Key"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CatalogIndexRepairRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CatalogIndexRepairResponse"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Rate limit exceeded */
+            429: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Service unavailable */
+            503: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+        };
+    };
+    get_v1_catalog_namespace: {
+        parameters: {
+            query?: {
+                /** @description Graph name (default `main`) */
+                graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
+                /** @description stable namespace id */
+                id?: string;
+            };
+            header?: {
+                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                "Lbb-Version"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CatalogNamespace"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Rate limit exceeded */
+            429: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Service unavailable */
+            503: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+        };
+    };
+    get_v1_catalog_namespaces: {
+        parameters: {
+            query?: {
+                /** @description Graph name (default `main`) */
+                graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
+                /** @description optional stable parent namespace id for the bounded child directory */
+                parent_id?: string;
+                /** @description opaque catalog continuation */
+                cursor?: string;
+                /** @description maximum scanned records, 1 through 100 (default 100) */
+                limit?: string;
+            };
+            header?: {
+                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                "Lbb-Version"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CatalogNamespacePage"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Rate limit exceeded */
+            429: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Service unavailable */
+            503: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+        };
+    };
+    post_v1_catalog_namespaces: {
+        parameters: {
+            query?: {
+                /** @description Graph name (default `main`) */
+                graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
+            };
+            header: {
+                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                "Lbb-Version"?: string;
+                /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CatalogNamespaceCreateRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CatalogNamespace"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Rate limit exceeded */
+            429: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Service unavailable */
+            503: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+        };
+    };
+    get_v1_catalog_namespaces_resolve: {
+        parameters: {
+            query?: {
+                /** @description Graph name (default `main`) */
+                graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
+                /** @description slash-separated namespace names below the environment root */
+                path?: string;
+            };
+            header?: {
+                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                "Lbb-Version"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CatalogNamespace"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Rate limit exceeded */
+            429: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Service unavailable */
+            503: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+        };
+    };
+    get_v1_catalog_operations: {
+        parameters: {
+            query?: {
+                /** @description Graph name (default `main`) */
+                graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
+                /** @description opaque continuation */
+                cursor?: string;
+                /** @description maximum scanned requests, 1 through 100 */
+                limit?: string;
+            };
+            header?: {
+                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                "Lbb-Version"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CatalogOperationPage"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Rate limit exceeded */
+            429: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Service unavailable */
+            503: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+        };
+    };
+    post_v1_catalog_operations_repair: {
+        parameters: {
+            query?: {
+                /** @description Graph name (default `main`) */
+                graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
+            };
+            header?: {
+                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                "Lbb-Version"?: string;
+                /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
+                "Idempotency-Key"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CatalogOperationRepairRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CatalogOperationRepairResponse"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Rate limit exceeded */
+            429: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Service unavailable */
+            503: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+        };
+    };
+    get_v1_catalog_root: {
+        parameters: {
+            query?: {
+                /** @description Graph name (default `main`) */
+                graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
+            };
+            header?: {
+                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                "Lbb-Version"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CatalogNamespaceIdentity"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Rate limit exceeded */
+            429: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Service unavailable */
+            503: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+        };
+    };
     post_v1_cdc_activate: {
         parameters: {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
             };
             header?: {
                 /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
@@ -19074,6 +21367,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
             };
             header?: {
                 /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
@@ -19214,6 +21514,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
             };
             header?: {
                 /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
@@ -19354,6 +21661,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
             };
             header?: {
                 /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
@@ -19494,6 +21808,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
             };
             header?: {
                 /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
@@ -19634,6 +21955,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
             };
             header?: {
                 /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
@@ -19774,6 +22102,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
             };
             header?: {
                 /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
@@ -19914,6 +22249,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
             };
             header?: {
                 /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
@@ -20054,6 +22396,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
             };
             header?: {
                 /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
@@ -20188,6 +22537,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
             };
             header?: {
                 /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
@@ -20328,6 +22684,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
             };
             header?: {
                 /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
@@ -20468,6 +22831,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
             };
             header?: {
                 /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
@@ -20608,6 +22978,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
             };
             header?: {
                 /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
@@ -20748,6 +23125,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
             };
             header?: {
                 /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
@@ -20888,6 +23272,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
             };
             header?: {
                 /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
@@ -21028,6 +23419,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
             };
             header?: {
                 /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
@@ -21168,6 +23566,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
             };
             header?: {
                 /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
@@ -21302,6 +23707,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
             };
             header?: {
                 /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
@@ -21442,6 +23854,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
             };
             header?: {
                 /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
@@ -21582,6 +24001,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
             };
             header?: {
                 /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
@@ -21716,6 +24142,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
             };
             header?: {
                 /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
@@ -21856,6 +24289,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
             };
             header?: {
                 /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
@@ -21996,6 +24436,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
             };
             header?: {
                 /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
@@ -22136,6 +24583,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
             };
             header?: {
                 /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
@@ -22276,6 +24730,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
             };
             header?: {
                 /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
@@ -22416,6 +24877,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
             };
             header?: {
                 /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
@@ -22556,6 +25024,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
             };
             header?: {
                 /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
@@ -22696,6 +25171,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
             };
             header?: {
                 /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
@@ -22830,6 +25312,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
             };
             header?: {
                 /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
@@ -22970,6 +25459,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
             };
             header?: {
                 /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
@@ -23110,6 +25606,13 @@ export interface operations {
             query: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
                 /** @description Required graph incarnation */
                 graph_epoch: string;
                 /** @description Required health, setup-health, control or op-<64 lowercase hex> name */
@@ -23248,6 +25751,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
             };
             header?: {
                 /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
@@ -23401,6 +25911,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
             };
             header?: {
                 /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
@@ -23535,6 +26052,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
             };
             header?: {
                 /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
@@ -23673,6 +26197,13 @@ export interface operations {
     get_v1_cdc_source_discovery: {
         parameters: {
             query: {
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
                 /** @description Required connection identity in the authenticated storage tenant */
                 connection_id: string;
             };
@@ -23807,6 +26338,13 @@ export interface operations {
     post_v1_cdc_source_discovery: {
         parameters: {
             query: {
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
                 /** @description Required connection identity in the authenticated storage tenant */
                 connection_id: string;
             };
@@ -23947,6 +26485,13 @@ export interface operations {
     post_v1_cdc_source_discovery_cancel: {
         parameters: {
             query: {
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
                 /** @description Required connection identity in the authenticated storage tenant */
                 connection_id: string;
             };
@@ -24087,6 +26632,13 @@ export interface operations {
     post_v1_cdc_source_discovery_claim: {
         parameters: {
             query: {
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
                 /** @description Required connection identity in the authenticated storage tenant */
                 connection_id: string;
             };
@@ -24227,6 +26779,13 @@ export interface operations {
     post_v1_cdc_source_discovery_complete: {
         parameters: {
             query: {
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
                 /** @description Required connection identity in the authenticated storage tenant */
                 connection_id: string;
             };
@@ -24367,6 +26926,13 @@ export interface operations {
     post_v1_cdc_source_discovery_fail: {
         parameters: {
             query: {
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
                 /** @description Required connection identity in the authenticated storage tenant */
                 connection_id: string;
             };
@@ -24507,6 +27073,13 @@ export interface operations {
     get_v1_cdc_source_discovery_input: {
         parameters: {
             query: {
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
                 /** @description Required connection identity in the authenticated storage tenant */
                 connection_id: string;
             };
@@ -24643,6 +27216,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
                 /** @description Required source connection identity in the authenticated tenant */
                 connection_id?: string;
             };
@@ -24785,6 +27365,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
                 /** @description Required source connection identity in the authenticated tenant */
                 connection_id?: string;
             };
@@ -24927,6 +27514,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
                 /** @description Required source connection identity in the authenticated tenant */
                 connection_id?: string;
             };
@@ -25069,6 +27663,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
                 /** @description Required source connection identity in the authenticated tenant */
                 connection_id?: string;
             };
@@ -25211,6 +27812,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
                 /** @description Required source connection identity in the authenticated tenant */
                 connection_id?: string;
             };
@@ -25353,6 +27961,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
                 /** @description Required source connection identity in the authenticated tenant */
                 connection_id?: string;
             };
@@ -25495,6 +28110,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
                 /** @description Required source connection identity in the authenticated tenant */
                 connection_id?: string;
             };
@@ -25637,6 +28259,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
                 /** @description Required source connection identity in the authenticated tenant */
                 connection_id?: string;
             };
@@ -25773,6 +28402,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
                 /** @description Required source connection identity in the authenticated tenant */
                 connection_id?: string;
             };
@@ -25915,6 +28551,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
                 /** @description Required source connection identity in the authenticated tenant */
                 connection_id?: string;
             };
@@ -26057,6 +28700,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
                 /** @description Required source connection identity in the authenticated tenant */
                 connection_id?: string;
             };
@@ -26199,6 +28849,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
                 /** @description Required source connection identity in the authenticated tenant */
                 connection_id?: string;
             };
@@ -26335,6 +28992,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
                 /** @description Required source connection identity in the authenticated tenant */
                 connection_id?: string;
             };
@@ -26477,6 +29141,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
                 /** @description Required source connection identity in the authenticated tenant */
                 connection_id?: string;
             };
@@ -26615,6 +29286,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
                 /** @description Required source connection identity in the authenticated tenant */
                 connection_id?: string;
             };
@@ -26757,6 +29435,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
                 /** @description Required source connection identity in the authenticated tenant */
                 connection_id?: string;
             };
@@ -26893,6 +29578,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
             };
             header?: {
                 /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
@@ -27027,6 +29719,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
             };
             header?: {
                 /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
@@ -27161,6 +29860,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
                 /** @description Public dataset id */
                 dataset?: string;
             };
@@ -27299,6 +30005,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
                 /** @description Dataset id */
                 dataset?: string;
                 /** @description Build indexes after loading */
@@ -27439,6 +30152,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
             };
             header?: {
                 /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
@@ -27573,6 +30293,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
                 /** @description Dataset id */
                 dataset?: string;
             };
@@ -27711,6 +30438,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
                 /** @description one embedding (returns EmbeddingStatus) */
                 name?: string;
             };
@@ -27847,6 +30581,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
             };
             header?: {
                 /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
@@ -27985,6 +30726,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
                 /** @description the embedding */
                 name?: string;
                 /** @description the embedding name again */
@@ -28125,6 +30873,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
             };
             header?: {
                 /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
@@ -28263,6 +31018,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
             };
             header?: {
                 /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
@@ -28403,6 +31165,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
                 /** @description the embedding */
                 name?: string;
             };
@@ -28541,6 +31310,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
             };
             header?: {
                 /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
@@ -28675,6 +31451,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
             };
             header?: {
                 /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
@@ -28809,6 +31592,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
             };
             header?: {
                 /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
@@ -28949,6 +31739,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
                 /** @description the golden id */
                 id?: string;
             };
@@ -29087,6 +31884,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
                 /** @description the golden id */
                 id?: string;
                 /** @description eventual (default) reads the last published commit; strong reads the head */
@@ -29227,6 +32031,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
                 /** @description one trace id; omit to judge a batch of unlabeled traces */
                 trace?: string;
                 /** @description batch size when no trace is named (default 20) */
@@ -29367,6 +32178,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
                 /** @description the trace id returned by the query */
                 trace?: string;
             };
@@ -29509,6 +32327,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
                 /** @description runs to return (default 20, at most 40) */
                 limit?: string;
                 /** @description the app whose runs to return (`POST /v1/evals/run/answers`); omit for the server's runs */
@@ -29647,6 +32472,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
                 /** @description eventual (default) checks the last published commit; strong checks the head */
                 consistency?: string;
             };
@@ -29785,6 +32617,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
                 /** @description eventual (default) checks the last published commit; strong checks the head */
                 consistency?: string;
             };
@@ -29927,6 +32766,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
             };
             header?: {
                 /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
@@ -30061,6 +32907,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
             };
             header?: {
                 /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
@@ -30199,6 +33052,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
                 /** @description the trace id returned by the query */
                 id?: string;
             };
@@ -30335,6 +33195,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
                 /** @description traces to return (default 50, at most 200) */
                 limit?: string;
                 /** @description true to return only traces with a result nobody labeled yet */
@@ -30473,6 +33340,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
                 /** @description files per page, 1 to 1,000 (default 1,000) */
                 limit?: string;
                 /** @description the `next` cursor of the previous page of the same list */
@@ -30615,6 +33489,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
                 /** @description the file's name */
                 name?: string;
                 /** @description the natural language of the content, a BCP 47 tag such as `en` or `de-CH` */
@@ -30762,6 +33643,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
                 /** @description the file's SHA-256, hex */
                 sha256?: string;
                 /** @description the SHA-256 again */
@@ -30904,6 +33792,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
                 /** @description the file's SHA-256, hex */
                 sha256?: string;
                 /** @description `true` also reads a deleted file whose content is not reclaimed yet */
@@ -31078,6 +33973,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
                 /** @description the file's SHA-256, hex */
                 sha256?: string;
             };
@@ -31214,6 +34116,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
             };
             header?: {
                 /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
@@ -31348,6 +34257,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
                 /** @description the file's SHA-256, hex */
                 sha256?: string;
                 /** @description the first page index (default 0) */
@@ -31490,6 +34406,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
                 /** @description the file's SHA-256, hex */
                 sha256?: string;
                 /** @description `true` also answers a deleted file whose content is not reclaimed yet, and names the facts that cite the file */
@@ -31628,6 +34551,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
             };
             header?: {
                 /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
@@ -31762,6 +34692,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
                 /** @description Optional decimal u64 graph incarnation from /v1/workflows/scope. A changed incarnation returns 409 graph_epoch_changed; a graph missing at admission returns 404. Synchronous writes and CAS retries cannot mutate a replacement incarnation; detached jobs are outside this precondition. */
                 expected_graph_epoch?: string;
                 /** @description Validate only and return a GraphCommitDryRunResponse without writing (no Idempotency-Key required) */
@@ -31906,6 +34843,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
                 /** @description YYYY-MM-DD: the last commit written by the end of that day, UTC */
                 date?: string;
                 /** @description RFC 3339: the last commit written at or before it */
@@ -32044,6 +34988,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
                 /** @description Minimum tail commits before compaction */
                 min_tail_commits?: string;
                 /** @description Merge into at most this many segments */
@@ -32184,6 +35135,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
             };
             header?: {
                 /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
@@ -32320,6 +35278,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
                 /** @description Must equal the target graph id to authorize deletion */
                 confirm?: string;
             };
@@ -32458,6 +35423,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
                 /** @description Entity id */
                 id?: string;
                 /** @description Entity type for name-addressed lookup */
@@ -32608,6 +35580,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
                 /** @description The export job id returned by the enqueue call */
                 job_id?: string;
             };
@@ -32744,6 +35723,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
                 /** @description Pin the export to a past snapshot commit_seq */
                 as_of_commit_seq?: string;
             };
@@ -32882,6 +35868,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
                 /** @description Source graph id to fork from */
                 src?: string;
                 /** @description Destination graph id to create (must not exist) */
@@ -33024,6 +36017,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
                 /** @description Optional decimal u64 graph incarnation from /v1/workflows/scope. A changed incarnation returns 409 graph_epoch_changed; a graph missing at admission returns 404. Synchronous writes and CAS retries cannot mutate a replacement incarnation; detached jobs are outside this precondition. */
                 expected_graph_epoch?: string;
                 /** @description Records per internal commit (default 1000, clamped 1-10000) */
@@ -33168,6 +36168,13 @@ export interface operations {
             query: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
                 /** @description Stable job id returned by the submit call */
                 job_id: string;
             };
@@ -33304,6 +36311,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
                 /** @description Records per grouped commit (default and maximum 10000; minimum 1) */
                 batch?: string;
                 /** @description Fail the durable job on the first malformed line instead of recording and skipping it */
@@ -33464,6 +36478,13 @@ export interface operations {
             query: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
                 /** @description Stable job id returned by the submit call */
                 job_id: string;
             };
@@ -33602,6 +36623,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
                 /** @description RDF statements per internal commit (default 1000000, the cap: one commit per fully-buffered request; clamped 1-1000000) */
                 batch?: string;
                 /** @description Abort on the first malformed RDF parse error instead of reporting it */
@@ -33758,6 +36786,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
                 /** @description Versioned build recipe (defaults to the current recipe) */
                 target?: string;
             };
@@ -33894,6 +36929,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
             };
             header?: {
                 /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
@@ -34034,6 +37076,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
                 /** @description Returned durable job identifier */
                 job_id?: string;
             };
@@ -34170,6 +37219,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
                 /** @description Optional decimal u64 graph incarnation from /v1/workflows/scope. A changed incarnation returns 409 graph_epoch_changed; a graph missing at admission returns 404. Synchronous writes and CAS retries cannot mutate a replacement incarnation; detached jobs are outside this precondition. */
                 expected_graph_epoch?: string;
             };
@@ -34306,6 +37362,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
                 /** @description Predicates per page, 1 to 500 (default 200) */
                 limit?: string;
                 /** @description Opaque cursor from the previous page; refused with 400 once a newer generation is published */
@@ -34444,6 +37507,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
             };
             header?: {
                 /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
@@ -34578,6 +37648,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
             };
             header?: {
                 /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
@@ -34712,6 +37789,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
                 /** @description Must equal the target graph id (reload is semi-destructive) */
                 confirm?: string;
                 /** @description true = preview the delta; nothing durable changes */
@@ -34856,6 +37940,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
                 /** @description Optional decimal u64 graph incarnation from /v1/workflows/scope. A changed incarnation returns 409 graph_epoch_changed; a graph missing at admission returns 404. Synchronous writes and CAS retries cannot mutate a replacement incarnation; detached jobs are outside this precondition. */
                 expected_graph_epoch?: string;
             };
@@ -34998,6 +38089,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
             };
             header?: {
                 /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
@@ -35132,6 +38230,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
             };
             header?: {
                 /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
@@ -35266,6 +38371,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
                 /** @description Max rows */
                 limit?: string;
                 /** @description Opaque cursor from the previous page */
@@ -35404,6 +38516,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
             };
             header?: {
                 /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
@@ -35538,6 +38657,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
                 /** @description yyyy-mm (UTC); default: the current month */
                 month?: string;
             };
@@ -35674,6 +38800,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
                 /** @description Model kind */
                 kind?: string;
             };
@@ -35810,6 +38943,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
                 /** @description sessions, 1 to 50; default 20 */
                 limit?: string;
             };
@@ -35946,6 +39086,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
             };
             header?: {
                 /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
@@ -36086,6 +39233,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
                 /** @description the session id */
                 id?: string;
             };
@@ -36228,6 +39382,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
                 /** @description the session id */
                 id?: string;
             };
@@ -36370,6 +39531,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
                 /** @description the session id */
                 id?: string;
             };
@@ -36506,6 +39674,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
                 /** @description rerank, route, rewrite, fit, propose, label, embed, answer or ask */
                 job?: string;
                 /** @description yyyy-mm-dd (UTC) to start from; default: today */
@@ -36650,6 +39825,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
                 /** @description the call id */
                 id?: string;
             };
@@ -36788,6 +39970,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
                 /** @description the call id */
                 id?: string;
             };
@@ -36924,6 +40113,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
                 /** @description rerank, route, rewrite, fit, propose, label, embed, answer or ask */
                 job?: string;
                 /** @description yyyy-mm (UTC); default: the current month */
@@ -37070,6 +40266,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
                 /** @description rerank, route, rewrite, fit, propose, label, embed, answer or ask */
                 job?: string;
                 /** @description yyyy-mm (UTC); default: the current month */
@@ -37208,6 +40411,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
                 /** @description the call id */
                 id?: string;
             };
@@ -37350,6 +40560,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
                 /** @description yyyy-mm (UTC); default: the current month */
                 month?: string;
             };
@@ -37486,6 +40703,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
                 /** @description Max episodes (default 200, cap 500) */
                 limit?: string;
                 /** @description Maximum fact sequence included */
@@ -37624,6 +40848,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
                 /** @description Model kind (embedding|calibration|fusion|suggest_ranker|planner|extractor) */
                 kind?: string;
                 /** @description Run number to promote */
@@ -37764,6 +40995,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
                 /** @description The extractor_lora training run to promote */
                 run_id?: string;
                 /** @description Promote even when tuned fact F1 regressed */
@@ -37904,6 +41142,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
             };
             header?: {
                 /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
@@ -38044,6 +41289,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
                 /** @description Model kind */
                 kind?: string;
             };
@@ -38180,6 +41432,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
                 /** @description Model kind */
                 kind?: string;
                 /** @description Most-recent runs to keep besides the promoted one (default 3) */
@@ -38320,6 +41579,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
             };
             header?: {
                 /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
@@ -38460,6 +41726,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
                 /** @description Model kind */
                 kind?: string;
                 /** @description Run number */
@@ -38598,6 +41871,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
                 /** @description Max probes (default 100, cap 200) */
                 limit?: string;
                 /** @description Maximum signal sequence included */
@@ -38736,6 +42016,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
             };
             header?: {
                 /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
@@ -38870,6 +42157,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
             };
             header?: {
                 /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
@@ -39010,6 +42304,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
                 /** @description the task: ask or route */
                 job?: string;
             };
@@ -39148,6 +42449,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
                 /** @description Max probes (default 100, max 500) */
                 limit?: string;
             };
@@ -39284,6 +42592,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
             };
             header?: {
                 /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
@@ -39418,6 +42733,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
                 /** @description Stable job id returned by the submit call */
                 job_id?: string;
             };
@@ -39554,6 +42876,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
             };
             header?: {
                 /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
@@ -39694,6 +43023,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
             };
             header?: {
                 /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
@@ -39834,6 +43170,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
             };
             header?: {
                 /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
@@ -39968,6 +43311,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
             };
             header?: {
                 /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
@@ -40108,6 +43458,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
                 /** @description route, fit, rerank, label or ask */
                 job?: string;
                 /** @description trials, 1 to 50; default 20 */
@@ -40246,6 +43603,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
             };
             header?: {
                 /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
@@ -40386,6 +43750,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
                 /** @description the trial id */
                 id?: string;
                 /** @description the call id */
@@ -40524,6 +43895,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
                 /** @description the trial id */
                 id?: string;
             };
@@ -40660,6 +44038,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
             };
             header?: {
                 /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
@@ -40794,6 +44179,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
                 /** @description the trial id */
                 id?: string;
             };
@@ -40932,6 +44324,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
                 /** @description Optional decimal u64 graph incarnation from /v1/workflows/scope. A changed incarnation returns 409 graph_epoch_changed; a graph missing at admission returns 404. Synchronous writes and CAS retries cannot mutate a replacement incarnation; detached jobs are outside this precondition. */
                 expected_graph_epoch?: string;
             };
@@ -41068,6 +44467,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
                 /** @description eventual (default) serves the selected base sidecar; strong requires an exact-head sidecar with current ontology/shapes */
                 consistency?: string;
                 /** @description Maximum returned result rows; result_count remains exact */
@@ -41206,6 +44612,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
                 /** @description Optional decimal u64 graph incarnation from /v1/workflows/scope. A changed incarnation returns 409 graph_epoch_changed; a graph missing at admission returns 404. Synchronous writes and CAS retries cannot mutate a replacement incarnation; detached jobs are outside this precondition. */
                 expected_graph_epoch?: string;
                 /** @description Validate and return the exact predicted definition without creating a graph, writing an ontology object, or changing the graph head */
@@ -41350,6 +44763,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
                 /** @description Stable ontology draft identifier */
                 draft_id?: string;
             };
@@ -41486,6 +44906,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
             };
             header?: {
                 /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
@@ -41626,6 +45053,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
                 /** @description Stable ontology draft identifier */
                 draft_id?: string;
             };
@@ -41764,6 +45198,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
                 /** @description Stable ontology draft identifier */
                 draft_id?: string;
                 /** @description Auditable rejection reason */
@@ -41904,6 +45345,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
                 /** @description Stable ontology draft identifier */
                 draft_id?: string;
             };
@@ -42042,6 +45490,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
                 /** @description Optional decimal u64 graph incarnation from /v1/workflows/scope. A changed incarnation returns 409 graph_epoch_changed; a graph missing at admission returns 404. Synchronous writes and CAS retries cannot mutate a replacement incarnation; detached jobs are outside this precondition. */
                 expected_graph_epoch?: string;
                 /** @description Validate and return the exact predicted evolution without writing an ontology object or graph head */
@@ -42186,6 +45641,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
                 /** @description one fit source (returns FitSourceStatus) */
                 name?: string;
             };
@@ -42322,6 +45784,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
             };
             header?: {
                 /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
@@ -42460,6 +45929,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
                 /** @description the fit source */
                 name?: string;
                 /** @description the fit source name again */
@@ -42600,6 +46076,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
             };
             header?: {
                 /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
@@ -42740,6 +46223,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
                 /** @description the fit source */
                 name?: string;
             };
@@ -42878,6 +46368,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
             };
             header?: {
                 /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
@@ -43018,6 +46515,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
             };
             header?: {
                 /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
@@ -43158,6 +46662,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
             };
             header?: {
                 /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
@@ -43298,6 +46809,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
                 /** @description Optional decimal u64 graph incarnation from /v1/workflows/scope. A changed incarnation returns 409 graph_epoch_changed; a graph missing at admission returns 404. Synchronous writes and CAS retries cannot mutate a replacement incarnation; detached jobs are outside this precondition. */
                 expected_graph_epoch?: string;
             };
@@ -43434,6 +46952,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
                 /** @description Optional decimal u64 graph incarnation from /v1/workflows/scope. A changed incarnation returns 409 graph_epoch_changed; a graph missing at admission returns 404. Synchronous writes and CAS retries cannot mutate a replacement incarnation; detached jobs are outside this precondition. */
                 expected_graph_epoch?: string;
             };
@@ -43576,6 +47101,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
                 /** @description Optional decimal u64 graph incarnation from /v1/workflows/scope. A changed incarnation returns 409 graph_epoch_changed; a graph missing at admission returns 404. Synchronous writes and CAS retries cannot mutate a replacement incarnation; detached jobs are outside this precondition. */
                 expected_graph_epoch?: string;
                 /** @description Starter id, for example crm */
@@ -43714,6 +47246,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
             };
             header?: {
                 /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
@@ -43854,6 +47393,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
                 /** @description Optional decimal u64 graph incarnation from /v1/workflows/scope. A changed incarnation returns 409 graph_epoch_changed; a graph missing at admission returns 404. Synchronous writes and CAS retries cannot mutate a replacement incarnation; detached jobs are outside this precondition. */
                 expected_graph_epoch?: string;
                 /** @description open | accepted | dismissed | superseded */
@@ -44002,6 +47548,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
                 /** @description Optional decimal u64 graph incarnation from /v1/workflows/scope. A changed incarnation returns 409 graph_epoch_changed; a graph missing at admission returns 404. Synchronous writes and CAS retries cannot mutate a replacement incarnation; detached jobs are outside this precondition. */
                 expected_graph_epoch?: string;
             };
@@ -44144,6 +47697,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
                 /** @description Optional decimal u64 graph incarnation from /v1/workflows/scope. A changed incarnation returns 409 graph_epoch_changed; a graph missing at admission returns 404. Synchronous writes and CAS retries cannot mutate a replacement incarnation; detached jobs are outside this precondition. */
                 expected_graph_epoch?: string;
                 /** @description Suggestion identifier */
@@ -44288,6 +47848,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
             };
             header?: {
                 /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
@@ -44428,6 +47995,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
                 /** @description Optional decimal u64 graph incarnation from /v1/workflows/scope. A changed incarnation returns 409 graph_epoch_changed; a graph missing at admission returns 404. Synchronous writes and CAS retries cannot mutate a replacement incarnation; detached jobs are outside this precondition. */
                 expected_graph_epoch?: string;
                 /** @description Suggestion identifier */
@@ -44572,6 +48146,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
                 /** @description Optional decimal u64 graph incarnation from /v1/workflows/scope. A changed incarnation returns 409 graph_epoch_changed; a graph missing at admission returns 404. Synchronous writes and CAS retries cannot mutate a replacement incarnation; detached jobs are outside this precondition. */
                 expected_graph_epoch?: string;
                 /** @description Suggestion identifier */
@@ -44710,6 +48291,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
                 /** @description Optional decimal u64 graph incarnation from /v1/workflows/scope. A changed incarnation returns 409 graph_epoch_changed; a graph missing at admission returns 404. Synchronous writes and CAS retries cannot mutate a replacement incarnation; detached jobs are outside this precondition. */
                 expected_graph_epoch?: string;
                 /** @description Suggestion identifier */
@@ -44854,6 +48442,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
             };
             header?: {
                 /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
@@ -44994,6 +48589,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
                 /** @description open | accepted | dismissed | superseded */
                 status?: string;
                 /** @description Producer id, for example `starter:documents-link` */
@@ -45134,6 +48736,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
                 /** @description Optional decimal u64 graph incarnation from /v1/workflows/scope. A changed incarnation returns 409 graph_epoch_changed; a graph missing at admission returns 404. Synchronous writes and CAS retries cannot mutate a replacement incarnation; detached jobs are outside this precondition. */
                 expected_graph_epoch?: string;
                 /** @description Suggestion identifier */
@@ -45278,6 +48887,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
                 /** @description Optional decimal u64 graph incarnation from /v1/workflows/scope. A changed incarnation returns 409 graph_epoch_changed; a graph missing at admission returns 404. Synchronous writes and CAS retries cannot mutate a replacement incarnation; detached jobs are outside this precondition. */
                 expected_graph_epoch?: string;
                 /** @description Suggestion identifier */
@@ -45418,6 +49034,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
                 /** @description eventual (default) reads the last published commit; strong reads the head */
                 consistency?: string;
             };
@@ -45561,6 +49184,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
                 /** @description eventual (default) reads the last published commit; strong reads the head */
                 consistency?: string;
             };
@@ -45698,11 +49328,167 @@ export interface operations {
             };
         };
     };
+    post_v1_query_dataset: {
+        parameters: {
+            query?: {
+                /** @description Graph name (default `main`) */
+                graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
+                /** @description Optional decimal u64 graph incarnation from /v1/workflows/scope. A changed incarnation returns 409 graph_epoch_changed; a graph missing at admission returns 404. Synchronous writes and CAS retries cannot mutate a replacement incarnation; detached jobs are outside this precondition. */
+                expected_graph_epoch?: string;
+            };
+            header?: {
+                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                "Lbb-Version"?: string;
+                /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
+                "Idempotency-Key"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReferenceDatasetRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReferenceDatasetResponse"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Rate limit exceeded */
+            429: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Service unavailable */
+            503: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+        };
+    };
     post_v1_query_describe: {
         parameters: {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
             };
             header?: {
                 /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
@@ -45843,6 +49629,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
             };
             header?: {
                 /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
@@ -45983,6 +49776,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
             };
             header?: {
                 /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
@@ -46117,6 +49917,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
                 /** @description true checks the profile and answers what a write would store, without storing it */
                 dry_run?: string;
             };
@@ -46257,6 +50064,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
             };
             header?: {
                 /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
@@ -46397,6 +50211,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
             };
             header?: {
                 /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
@@ -46537,6 +50358,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
                 /** @description Optional decimal u64 graph incarnation from /v1/workflows/scope. A changed incarnation returns 409 graph_epoch_changed; a graph missing at admission returns 404. Synchronous writes and CAS retries cannot mutate a replacement incarnation; detached jobs are outside this precondition. */
                 expected_graph_epoch?: string;
             };
@@ -46673,6 +50501,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
                 /** @description Optional decimal u64 graph incarnation from /v1/workflows/scope. A changed incarnation returns 409 graph_epoch_changed; a graph missing at admission returns 404. Synchronous writes and CAS retries cannot mutate a replacement incarnation; detached jobs are outside this precondition. */
                 expected_graph_epoch?: string;
                 /** @description Parse and check compatibility without activation; returns activated=false and predicted schema versions. Does not run whole-graph conformance */
@@ -46817,6 +50652,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
             };
             header?: {
                 /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
@@ -46957,6 +50799,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
             };
             header?: {
                 /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
@@ -47097,6 +50946,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
             };
             header?: {
                 /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
@@ -47231,6 +51087,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
             };
             header?: {
                 /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
@@ -47365,6 +51228,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
             };
             header?: {
                 /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
@@ -47499,6 +51369,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
             };
             header?: {
                 /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
@@ -47637,6 +51514,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
                 /** @description sessions, 1 to 50; default 10 */
                 limit?: string;
             };
@@ -47773,6 +51657,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
             };
             header?: {
                 /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
@@ -47913,6 +51804,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
                 /** @description the session id */
                 id?: string;
             };
@@ -48051,6 +51949,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
                 /** @description the session id */
                 id?: string;
             };
@@ -48187,6 +52092,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
                 /** @description Inclusive lower flush seq (default 0) */
                 from?: string;
                 /** @description Inclusive upper flush seq (default unbounded) */
@@ -48327,6 +52239,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
             };
             header: {
                 /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
@@ -48467,6 +52386,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
             };
             header?: {
                 /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
@@ -48601,6 +52527,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
                 /** @description Key prefix */
                 prefix?: string;
                 /** @description Max keys */
@@ -48741,6 +52674,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
                 /** @description Optional decimal u64 graph incarnation from /v1/workflows/scope. A changed incarnation returns 409 graph_epoch_changed; a graph missing at admission returns 404. Synchronous writes and CAS retries cannot mutate a replacement incarnation; detached jobs are outside this precondition. */
                 expected_graph_epoch?: string;
                 /** @description Run-id cursor */
@@ -48881,6 +52821,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
                 /** @description Optional decimal u64 graph incarnation from /v1/workflows/scope. A changed incarnation returns 409 graph_epoch_changed; a graph missing at admission returns 404. Synchronous writes and CAS retries cannot mutate a replacement incarnation; detached jobs are outside this precondition. */
                 expected_graph_epoch?: string;
             };
@@ -49023,6 +52970,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
             };
             header?: {
                 /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
@@ -49163,6 +53117,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
             };
             header?: {
                 /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
@@ -49303,6 +53264,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
             };
             header?: {
                 /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
@@ -49443,6 +53411,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
                 /** @description Optional decimal u64 graph incarnation from /v1/workflows/scope. A changed incarnation returns 409 graph_epoch_changed; a graph missing at admission returns 404. Synchronous writes and CAS retries cannot mutate a replacement incarnation; detached jobs are outside this precondition. */
                 expected_graph_epoch?: string;
             };
@@ -49581,6 +53556,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
                 /** @description Optional decimal u64 graph incarnation from /v1/workflows/scope. A changed incarnation returns 409 graph_epoch_changed; a graph missing at admission returns 404. Synchronous writes and CAS retries cannot mutate a replacement incarnation; detached jobs are outside this precondition. */
                 expected_graph_epoch?: string;
                 /** @description Workflow run id */
@@ -49721,6 +53703,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
                 /** @description Optional decimal u64 graph incarnation from /v1/workflows/scope. A changed incarnation returns 409 graph_epoch_changed; a graph missing at admission returns 404. Synchronous writes and CAS retries cannot mutate a replacement incarnation; detached jobs are outside this precondition. */
                 expected_graph_epoch?: string;
             };
@@ -49863,6 +53852,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
                 /** @description Optional decimal u64 graph incarnation from /v1/workflows/scope. A changed incarnation returns 409 graph_epoch_changed; a graph missing at admission returns 404. Synchronous writes and CAS retries cannot mutate a replacement incarnation; detached jobs are outside this precondition. */
                 expected_graph_epoch?: string;
             };
@@ -50005,6 +54001,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
                 /** @description Optional decimal u64 graph incarnation from /v1/workflows/scope. A changed incarnation returns 409 graph_epoch_changed; a graph missing at admission returns 404. Synchronous writes and CAS retries cannot mutate a replacement incarnation; detached jobs are outside this precondition. */
                 expected_graph_epoch?: string;
             };
@@ -50147,6 +54150,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
                 /** @description Optional decimal u64 graph incarnation from /v1/workflows/scope. A changed incarnation returns 409 graph_epoch_changed; a graph missing at admission returns 404. Synchronous writes and CAS retries cannot mutate a replacement incarnation; detached jobs are outside this precondition. */
                 expected_graph_epoch?: string;
             };
@@ -50289,6 +54299,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
                 /** @description Optional decimal u64 graph incarnation from /v1/workflows/scope. A changed incarnation returns 409 graph_epoch_changed; a graph missing at admission returns 404. Synchronous writes and CAS retries cannot mutate a replacement incarnation; detached jobs are outside this precondition. */
                 expected_graph_epoch?: string;
             };
@@ -50431,6 +54448,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
                 /** @description Optional decimal u64 graph incarnation from /v1/workflows/scope. A changed incarnation returns 409 graph_epoch_changed; a graph missing at admission returns 404. Synchronous writes and CAS retries cannot mutate a replacement incarnation; detached jobs are outside this precondition. */
                 expected_graph_epoch?: string;
                 /** @description Workflow type */
@@ -50575,6 +54599,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
                 /** @description Optional decimal u64 graph incarnation from /v1/workflows/scope. A changed incarnation returns 409 graph_epoch_changed; a graph missing at admission returns 404. Synchronous writes and CAS retries cannot mutate a replacement incarnation; detached jobs are outside this precondition. */
                 expected_graph_epoch?: string;
                 /** @description Workflow id cursor */
@@ -50715,6 +54746,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
                 /** @description Optional decimal u64 graph incarnation from /v1/workflows/scope. A changed incarnation returns 409 graph_epoch_changed; a graph missing at admission returns 404. Synchronous writes and CAS retries cannot mutate a replacement incarnation; detached jobs are outside this precondition. */
                 expected_graph_epoch?: string;
             };
@@ -50857,6 +54895,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
                 /** @description Optional decimal u64 graph incarnation from /v1/workflows/scope. A changed incarnation returns 409 graph_epoch_changed; a graph missing at admission returns 404. Synchronous writes and CAS retries cannot mutate a replacement incarnation; detached jobs are outside this precondition. */
                 expected_graph_epoch?: string;
             };
@@ -50999,6 +55044,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
                 /** @description Optional decimal u64 graph incarnation from /v1/workflows/scope. A changed incarnation returns 409 graph_epoch_changed; a graph missing at admission returns 404. Synchronous writes and CAS retries cannot mutate a replacement incarnation; detached jobs are outside this precondition. */
                 expected_graph_epoch?: string;
             };
@@ -51141,6 +55193,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
                 /** @description Optional decimal u64 graph incarnation from /v1/workflows/scope. A changed incarnation returns 409 graph_epoch_changed; a graph missing at admission returns 404. Synchronous writes and CAS retries cannot mutate a replacement incarnation; detached jobs are outside this precondition. */
                 expected_graph_epoch?: string;
                 /** @description Workflow id */
@@ -51279,6 +55338,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
                 /** @description Optional decimal u64 graph incarnation from /v1/workflows/scope. A changed incarnation returns 409 graph_epoch_changed; a graph missing at admission returns 404. Synchronous writes and CAS retries cannot mutate a replacement incarnation; detached jobs are outside this precondition. */
                 expected_graph_epoch?: string;
                 /** @description Workflow id */
@@ -51421,6 +55487,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
                 /** @description Optional decimal u64 graph incarnation from /v1/workflows/scope. A changed incarnation returns 409 graph_epoch_changed; a graph missing at admission returns 404. Synchronous writes and CAS retries cannot mutate a replacement incarnation; detached jobs are outside this precondition. */
                 expected_graph_epoch?: string;
                 /** @description Workflow id */
@@ -51565,6 +55638,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
                 /** @description Optional decimal u64 graph incarnation from /v1/workflows/scope. A changed incarnation returns 409 graph_epoch_changed; a graph missing at admission returns 404. Synchronous writes and CAS retries cannot mutate a replacement incarnation; detached jobs are outside this precondition. */
                 expected_graph_epoch?: string;
             };
@@ -51707,6 +55787,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
                 /** @description the workflow instance's id */
                 id?: string;
                 /** @description the `next_before` of the previous page */
@@ -51849,6 +55936,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
                 /** @description the workflow instance's id */
                 id?: string;
                 /** @description the run id */
@@ -51987,6 +56081,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
                 /** @description the workflow instance's id */
                 id?: string;
                 /** @description hours, 1 to 168; default 24 */
@@ -52125,6 +56226,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
                 /** @description Optional decimal u64 graph incarnation from /v1/workflows/scope. A changed incarnation returns 409 graph_epoch_changed; a graph missing at admission returns 404. Synchronous writes and CAS retries cannot mutate a replacement incarnation; detached jobs are outside this precondition. */
                 expected_graph_epoch?: string;
                 /** @description Workflow id */
@@ -52265,6 +56373,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
                 /** @description the workflow's name, for one workflow */
                 name?: string;
             };
@@ -52401,6 +56516,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
             };
             header?: {
                 /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
@@ -52539,6 +56661,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
                 /** @description the workflow's name */
                 name?: string;
                 /** @description the name again */
@@ -52679,6 +56808,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
                 /** @description the workflow's name */
                 name?: string;
             };
@@ -52821,6 +56957,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
                 /** @description the workflow's name */
                 name?: string;
                 /** @description the trigger's id (404 for another) */
@@ -52963,6 +57106,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
                 /** @description the workflow's name */
                 name?: string;
             };
@@ -53101,6 +57251,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
                 /** @description the workflow's name */
                 name?: string;
                 /** @description the `next_before` of the previous page */
@@ -53243,6 +57400,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
                 /** @description the workflow's name */
                 name?: string;
                 /** @description the run id */
@@ -53381,6 +57545,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
                 /** @description the workflow's name */
                 name?: string;
                 /** @description hours, 1 to 168; default 24 */
@@ -53519,6 +57690,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
                 /** @description Optional decimal u64 graph incarnation from /v1/workflows/scope. A changed incarnation returns 409 graph_epoch_changed; a graph missing at admission returns 404. Synchronous writes and CAS retries cannot mutate a replacement incarnation; detached jobs are outside this precondition. */
                 expected_graph_epoch?: string;
                 /** @description Workflow run id */
@@ -53657,6 +57835,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
                 /** @description Optional decimal u64 graph incarnation from /v1/workflows/scope. A changed incarnation returns 409 graph_epoch_changed; a graph missing at admission returns 404. Synchronous writes and CAS retries cannot mutate a replacement incarnation; detached jobs are outside this precondition. */
                 expected_graph_epoch?: string;
             };
@@ -53793,6 +57978,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
                 /** @description Optional decimal u64 graph incarnation from /v1/workflows/scope. A changed incarnation returns 409 graph_epoch_changed; a graph missing at admission returns 404. Synchronous writes and CAS retries cannot mutate a replacement incarnation; detached jobs are outside this precondition. */
                 expected_graph_epoch?: string;
             };
@@ -53935,6 +58127,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
             };
             header?: {
                 /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
@@ -54069,6 +58268,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
             };
             header?: {
                 /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
@@ -54209,6 +58415,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
                 /** @description Optional decimal u64 graph incarnation from /v1/workflows/scope. A changed incarnation returns 409 graph_epoch_changed; a graph missing at admission returns 404. Synchronous writes and CAS retries cannot mutate a replacement incarnation; detached jobs are outside this precondition. */
                 expected_graph_epoch?: string;
             };
@@ -54345,6 +58558,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
                 /** @description the starter workflow's catalog id, for one triggered workflow */
                 starter?: string;
                 /** @description the triggered workflow's name */
@@ -54485,6 +58705,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
             };
             header?: {
                 /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
@@ -54623,6 +58850,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
                 /** @description the starter workflow's catalog id */
                 starter?: string;
                 /** @description the triggered workflow's name */
@@ -54767,6 +59001,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
                 /** @description `true` puts the labels of batch decisions on unseen items into the bands */
                 include_batch?: string;
             };
@@ -54903,6 +59144,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
             };
             header?: {
                 /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
@@ -55043,6 +59291,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
                 /** @description `documents.link` or `documents.map` */
                 starter?: string;
                 /** @description the triggered workflow's name */
@@ -55189,6 +59444,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
                 /** @description the starter workflow's catalog id */
                 starter?: string;
                 /** @description the triggered workflow's name */
@@ -55333,6 +59595,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
             };
             header?: {
                 /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
@@ -55473,6 +59742,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
                 /** @description the starter workflow's catalog id */
                 starter?: string;
                 /** @description the triggered workflow's name */
@@ -55613,6 +59889,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
                 /** @description the starter workflow's catalog id */
                 starter?: string;
                 /** @description the triggered workflow's name */
@@ -55757,6 +60040,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
                 /** @description the starter workflow's catalog id */
                 starter?: string;
                 /** @description the triggered workflow's name */
@@ -55897,6 +60187,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
                 /** @description the starter workflow's catalog id */
                 starter?: string;
                 /** @description the triggered workflow's name */
@@ -56037,6 +60334,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
                 /** @description Optional decimal u64 graph incarnation from /v1/workflows/scope. A changed incarnation returns 409 graph_epoch_changed; a graph missing at admission returns 404. Synchronous writes and CAS retries cannot mutate a replacement incarnation; detached jobs are outside this precondition. */
                 expected_graph_epoch?: string;
             };
@@ -56179,6 +60483,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
                 /** @description Optional decimal u64 graph incarnation from /v1/workflows/scope. A changed incarnation returns 409 graph_epoch_changed; a graph missing at admission returns 404. Synchronous writes and CAS retries cannot mutate a replacement incarnation; detached jobs are outside this precondition. */
                 expected_graph_epoch?: string;
             };
@@ -56321,6 +60632,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
                 /** @description Optional decimal u64 graph incarnation from /v1/workflows/scope. A changed incarnation returns 409 graph_epoch_changed; a graph missing at admission returns 404. Synchronous writes and CAS retries cannot mutate a replacement incarnation; detached jobs are outside this precondition. */
                 expected_graph_epoch?: string;
             };
@@ -56463,6 +60781,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
                 /** @description Optional decimal u64 graph incarnation from /v1/workflows/scope. A changed incarnation returns 409 graph_epoch_changed; a graph missing at admission returns 404. Synchronous writes and CAS retries cannot mutate a replacement incarnation; detached jobs are outside this precondition. */
                 expected_graph_epoch?: string;
             };
@@ -56605,6 +60930,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
                 /** @description Optional decimal u64 graph incarnation from /v1/workflows/scope. A changed incarnation returns 409 graph_epoch_changed; a graph missing at admission returns 404. Synchronous writes and CAS retries cannot mutate a replacement incarnation; detached jobs are outside this precondition. */
                 expected_graph_epoch?: string;
             };
@@ -56747,6 +61079,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
                 /** @description Optional decimal u64 graph incarnation from /v1/workflows/scope. A changed incarnation returns 409 graph_epoch_changed; a graph missing at admission returns 404. Synchronous writes and CAS retries cannot mutate a replacement incarnation; detached jobs are outside this precondition. */
                 expected_graph_epoch?: string;
             };
@@ -56889,6 +61228,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
                 /** @description Optional decimal u64 graph incarnation from /v1/workflows/scope. A changed incarnation returns 409 graph_epoch_changed; a graph missing at admission returns 404. Synchronous writes and CAS retries cannot mutate a replacement incarnation; detached jobs are outside this precondition. */
                 expected_graph_epoch?: string;
             };
@@ -57031,6 +61377,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
                 /** @description Optional decimal u64 graph incarnation from /v1/workflows/scope. A changed incarnation returns 409 graph_epoch_changed; a graph missing at admission returns 404. Synchronous writes and CAS retries cannot mutate a replacement incarnation; detached jobs are outside this precondition. */
                 expected_graph_epoch?: string;
             };
@@ -57173,6 +61526,13 @@ export interface operations {
             query?: {
                 /** @description Graph name (default `main`) */
                 graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
                 /** @description Optional decimal u64 graph incarnation from /v1/workflows/scope. A changed incarnation returns 409 graph_epoch_changed; a graph missing at admission returns 404. Synchronous writes and CAS retries cannot mutate a replacement incarnation; detached jobs are outside this precondition. */
                 expected_graph_epoch?: string;
             };

@@ -38,6 +38,13 @@ export type { components, paths, operations } from "./schema.js";
 export * as starters from "./starters.js";
 export type { CdcNamespace } from "./cdc.js";
 export type {
+  AccessNamespace,
+  CatalogNamespace,
+  CatalogPageOptions,
+  CatalogNamespacePageOptions,
+  CatalogGraphPageOptions,
+} from "./catalog.js";
+export type {
   BlobLike,
   FileBody,
   FileCitation,
