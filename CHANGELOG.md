@@ -2,6 +2,21 @@
 
 All notable changes to the `@littlebigbrain/client` package are documented here.
 
+## Unreleased
+
+- Environment selectors are trimmed and case-insensitive, including the legacy
+  `stack` alias. A selector supplied with an environment API key must match that
+  key's environment; a leftover selector for another environment now returns 403
+  instead of being ignored. Remove it or select the authenticated environment.
+
+- `environment` is the preferred scope option in `LbbClient`, `withScope`,
+  and `graph(name, options)`. The deprecated `stack` option remains compatible;
+  conflicting values fail before a request. The wire parameter stays `stack`.
+- Optional `catalog` and `access` helpers organize existing graphs and issue or
+  revoke scoped read tokens. `sparqlDataset` queries explicitly authorized primary
+  and reference graphs with exact decimal-string epochs. These require separately
+  enabled server capabilities; they add no delegated writes or automatic capacity.
+
 ## 0.28.0 (2026-10-16)
 
 - A derivation belongs to one upload of its file.

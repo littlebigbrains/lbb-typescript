@@ -1,6 +1,7 @@
 import { WorkflowNamespace } from "./workflows.js";
 import { CdcNamespace } from "./cdc.js";
 import { FilesNamespace } from "./files.js";
+import { AccessNamespace, CatalogNamespace } from "./catalog.js";
 import {
   DEFAULT_INTEGRATIONS_URL,
   IntegrationsNamespace,
@@ -39,6 +40,7 @@ import {
   retryDelayMs,
   sleep,
   type Query,
+  type CallOptions,
   type RequestOptions,
 } from "./transport.js";
 import { LbbCapabilityError } from "./transport.js";
@@ -264,6 +266,21 @@ function requestBody(opts: RequestOptions): unknown {
       : undefined;
 }
 
+function environmentScope(
+  options: Pick<LbbClientOptions, "environment" | "stack">,
+): string | undefined {
+  if (
+    options.environment !== undefined &&
+    options.stack !== undefined &&
+    options.environment !== options.stack
+  ) {
+    throw new RangeError(
+      "environment and stack must name the same environment",
+    );
+  }
+  return options.environment ?? options.stack;
+}
+
 /**
  * A typed HTTP client for a little big brain graph server. One instance is scoped to a
  * single graph; construct another for a different scope. All methods
@@ -276,7 +293,7 @@ export class LbbClient {
   private readonly apiKey?: string;
   private readonly graphName?: string;
   private readonly expectedGraphEpoch?: string;
-  private readonly stack?: string;
+  private readonly environment?: string;
   private readonly fetchImpl: FetchLike;
   private readonly apiVersion: string;
   private readonly maxRetries: number;
@@ -306,6 +323,8 @@ export class LbbClient {
    * bytes and its parsed pages (lines and words with their boxes), delete.
    */
   readonly files: FilesNamespace;
+  readonly catalog: CatalogNamespace;
+  readonly access: AccessNamespace;
   readonly workflows: WorkflowNamespace;
   readonly cdc: CdcNamespace;
   /** Hosted integrations for your end customers, at `integrationsUrl`. */
@@ -315,7 +334,7 @@ export class LbbClient {
     const baseUrl = options.baseUrl?.trim();
     if (!baseUrl) {
       throw new Error(
-        "baseUrl is required; copy endpoint_url from the stack's Connect page for hosted use",
+        "baseUrl is required; copy endpoint_url from the environment's Connect page for hosted use",
       );
     }
     this.baseUrl = baseUrl.replace(/\/+$/, "");
@@ -330,7 +349,7 @@ export class LbbClient {
       !/^[0-9]+$/.test(this.expectedGraphEpoch)
     )
       throw new RangeError("expectedGraphEpoch must be a decimal epoch string");
-    this.stack = options.stack;
+    this.environment = environmentScope(options);
     this.apiVersion = options.apiVersion ?? "2026-07-23";
     this.maxRetries = options.maxRetries ?? 6;
     this.retryDelayMs = options.retryDelayMs ?? 100;
@@ -369,16 +388,22 @@ export class LbbClient {
     this.models = new ModelsNamespace(this);
     this.embeddings = new EmbeddingsNamespace(this);
     this.files = new FilesNamespace(this);
+    this.catalog = new CatalogNamespace(this);
+    this.access = new AccessNamespace(this);
     this.workflows = new WorkflowNamespace(this);
     this.cdc = new CdcNamespace(this);
     this.integrations = new IntegrationsNamespace(this);
   }
 
-  graph(name: string, opts: { stack?: string } = {}): GraphNamespace {
+  graph(
+    name: string,
+    opts: Pick<LbbClientOptions, "environment" | "stack"> = {},
+  ): GraphNamespace {
     return new GraphNamespace(
       this.withScope({
         graph: name,
-        stack: opts.stack ?? this.stack,
+        environment: opts.environment,
+        stack: opts.stack,
       }),
     );
   }
@@ -390,6 +415,8 @@ export class LbbClient {
    */
   withScope(scope: {
     graph?: string;
+    environment?: string;
+    /** @deprecated Use `environment`. */
     stack?: string;
     expectedGraphEpoch?: string;
   }): LbbClient {
@@ -399,7 +426,7 @@ export class LbbClient {
       apiKey: this.apiKey,
       graph: scope.graph ?? this.graphName,
       expectedGraphEpoch: scope.expectedGraphEpoch ?? this.expectedGraphEpoch,
-      stack: scope.stack ?? this.stack,
+      environment: environmentScope(scope) ?? this.environment,
       fetch: this.fetchImpl,
       apiVersion: this.apiVersion,
       maxRetries: this.maxRetries,
@@ -459,7 +486,7 @@ export class LbbClient {
         `${encodeURIComponent(key)}=${encodeURIComponent(String(value))}`,
       );
     if (this.graphName !== undefined) push("graph", this.graphName);
-    if (this.stack !== undefined) push("stack", this.stack);
+    if (this.environment !== undefined) push("stack", this.environment);
     if (this.expectedGraphEpoch !== undefined)
       push("expected_graph_epoch", this.expectedGraphEpoch);
     for (const [key, value] of Object.entries(query ?? {})) {
@@ -1726,6 +1753,18 @@ export class LbbClient {
   ): Promise<Schemas["SparqlSelectResponse"]> {
     return this.request("POST", "/v1/query/sparql", {
       body: profileBody(this.mergeReadConsistency(body, opts)),
+    });
+  }
+
+  /** SELECT/ASK over exact primary and reference epochs; returns the source version vector. */
+  sparqlDataset(
+    body: Schemas["ReferenceDatasetRequest"],
+    opts: CallOptions = {},
+  ): Promise<Schemas["ReferenceDatasetResponse"]> {
+    return this.request("POST", "/v1/query/dataset", {
+      ...opts,
+      body,
+      retry: opts.retry ?? "rate_limited",
     });
   }
 

@@ -304,24 +304,28 @@ export function attributeFilter(
 }
 
 export interface LbbClientOptions {
-  /** Hosted stack endpoint, e.g. `https://7k3m9q2x--production.db.eu.littlebigbrain.com`. */
+  /** Hosted environment endpoint, e.g. `https://7k3m9q2x--production.db.eu.littlebigbrain.com`. */
   baseUrl: string;
   /**
    * The integrations API that `client.integrations` calls. Defaults to
    * `https://api.littlebigbrain.com`. It takes the same `apiKey`.
    */
   integrationsUrl?: string;
-  /** Stack API key (`lbb_sk_test_…` / `lbb_sk_live_…`) or single-mode token. */
+  /** Environment API key (`lbb_sk_test_…` / `lbb_sk_live_…`) or single-mode token. */
   apiKey?: string;
   /** Graph name (sent as `?graph=`; server default is `main`). */
   graph?: string;
   /** Pin synchronous graph/workflow requests to one graph incarnation (decimal u64). */
   expectedGraphEpoch?: string;
   /**
-   * Stack slug (sent as `?stack=`). Needed only with a session-token `apiKey`
-   * (`lbb_ses_…`), which authorizes an account rather than a single stack; a
-   * stack API key (`lbb_sk_test_…` / `lbb_sk_live_…`) already fixes the stack and ignores this.
+   * Environment slug. Needed only with an account-scoped session token
+   * (`lbb_ses_…`); an environment API key already fixes the environment.
+   * Uses the compatible `?stack=` wire parameter. Does not change the endpoint
+   * or expand the credential's access. Conflicting `stack` and `environment`
+   * values throw before sending a request.
    */
+  environment?: string;
+  /** @deprecated Use `environment`. Retained as a compatibility alias. */
   stack?: string;
   /** Override the fetch implementation (defaults to the global `fetch`). */
   fetch?: FetchLike;

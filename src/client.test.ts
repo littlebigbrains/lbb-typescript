@@ -2340,6 +2340,68 @@ test("reload accepts a pre-built NDJSON string unchanged", async () => {
   assert.doesNotMatch(call.input, /observed_at=/);
 });
 
+test("environment and legacy stack options preserve scope and wire compatibility", async () => {
+  const { fetch, calls } = recordingFetch({ body: "{}" });
+  const client = new LbbClient({
+    baseUrl: "http://h",
+    apiKey: "session",
+    graph: "main",
+    environment: "production",
+    stack: "production",
+    fetch,
+  });
+  await client.request("GET", "/v1/ontology");
+  await client.withScope({ graph: "second" }).request("GET", "/v1/ontology");
+  await client
+    .withScope({ environment: "preview" })
+    .request("GET", "/v1/ontology");
+  await client.withScope({ stack: "legacy" }).request("GET", "/v1/ontology");
+  await client.graph("third", { environment: "test" }).facts.importRdf("", {});
+  await client.graph("fourth", { stack: "old" }).facts.importRdf("", {});
+  await client.graph("fifth").facts.importRdf("", {});
+  await client.request("GET", "/v1/ontology");
+  assert.deepEqual(
+    calls.map(({ input }) => {
+      const url = new URL(input);
+      assert.equal(url.searchParams.has("environment"), false);
+      assert.equal(url.searchParams.getAll("stack").length, 1);
+      return [url.searchParams.get("graph"), url.searchParams.get("stack")];
+    }),
+    [
+      ["main", "production"],
+      ["second", "production"],
+      ["main", "preview"],
+      ["main", "legacy"],
+      ["third", "test"],
+      ["fourth", "old"],
+      ["fifth", "production"],
+      ["main", "production"],
+    ],
+  );
+  for (const call of calls)
+    assert.equal(call.init.headers?.authorization, "Bearer session");
+
+  const old = new LbbClient({ baseUrl: "http://h", stack: "legacy", fetch });
+  await old.request("GET", "/v1/ontology");
+  assert.equal(
+    new URL(calls.at(-1)!.input).searchParams.get("stack"),
+    "legacy",
+  );
+});
+
+test("conflicting environment aliases fail before sending a request", () => {
+  const { fetch, calls } = recordingFetch({ body: "{}" });
+  const conflict = { environment: "production", stack: "preview" };
+  assert.throws(
+    () => new LbbClient({ baseUrl: "http://h", fetch, ...conflict }),
+    /same environment/,
+  );
+  const client = new LbbClient({ baseUrl: "http://h", fetch });
+  assert.throws(() => client.withScope(conflict), /same environment/);
+  assert.throws(() => client.graph("main", conflict), /same environment/);
+  assert.equal(calls.length, 0);
+});
+
 test("a scoped graph incarnation pins all requests and cannot be overridden", async () => {
   const { fetch, calls } = recordingFetch({ body: "{}" });
   const base = new LbbClient({ baseUrl: "http://h", graph: "customer", fetch });

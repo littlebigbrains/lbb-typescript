@@ -46,7 +46,7 @@ export class LbbError extends Error {
   readonly docUrl?: string | null;
   readonly retryable?: boolean;
   readonly retryAfterSeconds?: number;
-  /** Actionable guidance for composite stack-endpoint routing errors. */
+  /** Actionable guidance for composite environment-endpoint routing errors. */
   readonly endpointHint?: string;
   /** Per-item reasons for a refusal, for example `conflicts` of `starter_conflict`. */
   readonly details?: Record<string, unknown>;
@@ -82,10 +82,10 @@ export class LbbCapabilityError extends Error {
 
 function endpointMigrationHint(code: string | undefined): string | undefined {
   if (code === "stack_endpoint_required") {
-    return "Copy endpoint_url from the stack's Connect page and use it as baseUrl.";
+    return "Copy endpoint_url from the environment's Connect page and use it as baseUrl.";
   }
   if (code === "stack_endpoint_mismatch") {
-    return "Use the endpoint_url and API key from the same stack.";
+    return "Use the endpoint_url and API key from the same environment.";
   }
   return undefined;
 }
