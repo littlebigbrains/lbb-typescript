@@ -1,6 +1,12 @@
 import type { LbbClient, Schemas } from "./client.js";
 import type { CallOptions } from "./transport.js";
 import {
+  WorkflowExecutionError,
+  WorkflowTurnReader,
+  type WorkflowReadRequest,
+  type WorkflowReadOptions,
+} from "./workflow-execution.js";
+import {
   DerivationsNamespace,
   NamedWorkflowsNamespace,
   StarterWorkflowsNamespace,
@@ -123,6 +129,13 @@ export interface WorkflowContext {
   readonly workflowId: string;
   readonly messageId: string;
   readonly turn: number;
+  /** SELECT/ASK for this live attempt, using its execution credential. Requires
+   * the worker's executionReads opt-in. Optional for compatibility with custom
+   * contexts; feature-check before calling inside ctx.step to checkpoint it. */
+  sparql?(
+    request: WorkflowReadRequest | string,
+    options?: WorkflowReadOptions,
+  ): Promise<Schemas["SparqlTextResponse"]>;
   /** Where the message came from, when its sender named it. */
   readonly origin?: Schemas["WorkflowMessageOrigin"] | null;
   /** Sequential named effects only. Pass effectId to the external service as its idempotency key. */
@@ -506,6 +519,8 @@ export class WorkflowWorker {
     private readonly definitions: readonly RegisteredWorkflow[],
     private readonly options: {
       worker: string;
+      /** Opt into turn-scoped SELECT/ASK. Disabled servers refuse before claim. */
+      executionReads?: boolean;
       /** A step's `progress` writes at most this often (default 3000 ms). */
       progressEveryMs?: number;
     },
@@ -534,6 +549,9 @@ export class WorkflowWorker {
       retry: false,
       body: {
         worker: this.options.worker,
+        ...(this.options.executionReads
+          ? { include_execution_credential: true }
+          : {}),
         workflows: this.definitions.map((d) => ({
           workflow_type: d.name,
           version: d.version,
@@ -866,11 +884,20 @@ export class WorkflowWorker {
         busy = false;
       }
     };
+    let executionReader: WorkflowTurnReader | undefined;
     const ctx: WorkflowContext = {
       signal: controller.signal,
       workflowId: lease.workflow_id,
       messageId: task.turn.message_id,
       turn: lease.turn,
+      sparql: async (request, options) => {
+        check();
+        if (!executionReader)
+          throw new WorkflowExecutionError(
+            "Enable executionReads on this worker; no query was sent",
+          );
+        return executionReader.sparql(request, options);
+      },
       origin: task.turn.origin ?? null,
       step: async <T>(
         key: string,
@@ -917,6 +944,13 @@ export class WorkflowWorker {
     // Race cancellation even when a provider ignores AbortSignal. Late managed writes are fenced.
     try {
       check();
+      if (this.options.executionReads)
+        executionReader = new WorkflowTurnReader(
+          this.client,
+          task,
+          controller.signal,
+          check,
+        );
       const result = await Promise.race([
         definition.execute(ctx, copy(task.state), copy(task.turn.message)),
         aborted,
@@ -954,7 +988,9 @@ export class WorkflowWorker {
         body: {
           ...lease,
           error: String(error).slice(0, 1000),
-          non_retryable: error instanceof WorkflowError,
+          non_retryable:
+            error instanceof WorkflowError ||
+            error instanceof WorkflowExecutionError,
           ...reportedUsage(turnRun),
         },
         retry: false,

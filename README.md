@@ -396,3 +396,42 @@ continue until that cursor is null.
 
 These helpers do not move graph ownership, grant writes, or create an atomic
 cross-graph snapshot. See [How to model your app](https://docs.littlebigbrain.com/start/model-your-app/).
+
+
+## Optional workflow execution reads
+
+With workflow execution and batch admission enabled on the server, opt a worker
+in with `executionReads: true`. `ctx.sparql` accepts bounded SELECT/ASK for the
+claimed graph and attempt; custom `WorkflowContext` implementations may omit it.
+Feature-check it, then checkpoint the small materialized result as an ordinary
+named step:
+
+```ts
+import { workflow, WorkflowWorker } from "@littlebigbrain/client";
+
+const analyse = workflow({
+  name: "app.analyse", version: "v1", initialState: {},
+  async onMessage(ctx) {
+    if (!ctx.sparql) throw new Error("This context does not support execution reads");
+    const read = ctx.sparql.bind(ctx);
+    const input = await ctx.step("capture", () =>
+      read("SELECT ?s WHERE { ?s a <urn:Document> } LIMIT 20", { timeoutMs: 10_000 }),
+    );
+    return { state: {}, result: input.results };
+  },
+});
+await new WorkflowWorker(client, [analyse], {
+  worker: "analysis-worker", executionReads: true,
+}).runOnce();
+```
+
+The reader refreshes through the control client before its first read and when
+remaining lifetime is at most the next read's budget (capped at 30 seconds) plus
+one second. It uses monotonic elapsed time from the refresh request's start,
+not the worker's wall clock. A shorter lease still caps the query timeout.
+The server must supply `issued_at_ms` with `expires_at_ms`; absent lifetime or an
+already elapsed refresh throws an ordinary retryable error without sending the
+query. Upgrade servers before enabling this helper. Queries never automatically
+replay on 401/403 or fall back to the control bearer. The ordinary worker failure
+policy may retry a turn; only acknowledged checkpoints prevent redoing a step.
+Keep checkpoints below 64 KiB; a row LIMIT does not bound response bytes.
