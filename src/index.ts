@@ -206,3 +206,12 @@ export type {
   ReasonResult,
   ReviewRequest,
 } from "./activities.js";
+
+export {
+  WorkflowExecutionError,
+  WorkflowTurnReader,
+} from "./workflow-execution.js";
+export type {
+  WorkflowReadOptions,
+  WorkflowReadRequest,
+} from "./workflow-execution.js";

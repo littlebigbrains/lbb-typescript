@@ -4,6 +4,16 @@ All notable changes to the `@littlebigbrain/client` package are documented here.
 
 ## Unreleased
 
+- Release 2 adds opt-in `WorkflowWorker({ executionReads: true })`, task-bound
+  `WorkflowTurnReader`, and optional `WorkflowContext.sparql` for bounded
+  SELECT/ASK. Custom contexts remain compatible without the method; feature-check
+  it before use. Reads refresh credentials before first use and when the next
+  read budget needs it, using monotonic elapsed time and server-issued lifetime.
+  The server must return `issued_at_ms`; missing lifetime or elapsed refreshes
+  fail retryably without sending a query. No query is automatically replayed.
+  Named, acknowledged step outputs remain the workflow's retry-stable input;
+  this does not add file/parser/import execution or snapshot retention.
+
 - Environment selectors are trimmed and case-insensitive, including the legacy
   `stack` alias. A selector supplied with an environment API key must match that
   key's environment; a leftover selector for another environment now returns 403

@@ -4214,7 +4214,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Message workflows: claim_turn */
+        /** Message workflows: claim_turn; include_execution_credential opts into a short-lived SELECT/ASK bearer and is refused before claim mutation when disabled */
         post: operations["post_v1_workflows_turns_claim"];
         delete?: never;
         options?: never;
@@ -4233,6 +4233,23 @@ export interface paths {
         put?: never;
         /** Message workflows: complete_turn. `usage` (optional): what the turn's model calls used, which its run summary keeps; it is no part of the completion's identity, so a repeat with other usage is the same completion */
         post: operations["post_v1_workflows_turns_complete"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/workflows/turns/execution-credential": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Issue or refresh a SELECT/ASK credential for the exact live turn attempt. Requires the original control credential and lease token; execution bearers cannot refresh or control workflows. */
+        post: operations["post_v1_workflows_turns_execution_credential"];
         delete?: never;
         options?: never;
         head?: never;
@@ -17990,6 +18007,55 @@ export interface components {
             media_types: string[];
         };
         /**
+         * @description Short-lived data-plane authority for one validated workflow turn attempt.
+         *     The bearer is distinct from the original workflow control credential and
+         *     contains no raw turn lease secret. Do not persist it in workflow state or
+         *     checkpoints. Every execution still freshly validates the live lease.
+         */
+        WorkflowExecutionCredential: {
+            /** Format: int32 */
+            attempt: number;
+            /**
+             * Format: int64
+             * @description Unix milliseconds; at most the current lease deadline and 60 seconds
+             *     after issue. Refresh uses the original control client and lease request.
+             */
+            expires_at_ms: number;
+            /** @description Exact main-branch incarnation; send as expected_graph_epoch with reads. */
+            graph_epoch: string;
+            graph_id: string;
+            /**
+             * Format: int64
+             * @description Server issue time. Together with expiry this provides a clock-independent
+             *     lifetime; optional when decoding responses from older servers.
+             */
+            issued_at_ms?: number | null;
+            /** @description Exactly one explicitly requested operation; no general read/write grant. */
+            operations: components["schemas"]["WorkflowExecutionOperation"][];
+            run_id: string;
+            token: string;
+            /** Format: int64 */
+            turn: number;
+            workflow_id: string;
+        };
+        /**
+         * @description Issue or refresh one operation credential using the original control bearer.
+         *     Omitted operation preserves the SELECT/ASK contract. This is deliberately
+         *     distinct from heartbeat/checkpoint lease requests.
+         */
+        WorkflowExecutionCredentialRequest: {
+            operation?: components["schemas"]["WorkflowExecutionOperation"];
+            token: string;
+            /** Format: int64 */
+            turn: number;
+            workflow_id: string;
+        };
+        /**
+         * @description One explicit operation of a workflow execution credential.
+         * @enum {string}
+         */
+        WorkflowExecutionOperation: "sparql_read";
+        /**
          * @description Outputs whose confidence is below `below` go to the review inbox instead
          *     of the graph.
          */
@@ -19072,6 +19138,12 @@ export interface components {
             workflow_id: string;
         };
         WorkflowTurnClaimRequest: {
+            /**
+             * @description Request a short-lived SELECT/ASK execution credential for the claimed
+             *     turn. Disabled servers refuse this opt-in before changing a claim.
+             *     Ordinary workflow control and SDK defaults remain unchanged.
+             */
+            include_execution_credential?: boolean;
             /** Format: int64 */
             wait_ms?: number;
             worker: string;
@@ -19217,6 +19289,7 @@ export interface components {
         WorkflowTurnTask: {
             /** @description Stable across attempt retries and recovery; SDK appends the named step key. */
             effect_prefix: string;
+            execution_credential?: null | components["schemas"]["WorkflowExecutionCredential"];
             /** Format: int64 */
             lease_ms: number;
             state: unknown;
@@ -50218,6 +50291,8 @@ export interface operations {
                  * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
                  */
                 stack?: string;
+                /** @description Optional decimal u64 graph incarnation for workflow execution credentials only; it must equal their claimed epoch. A mismatch returns 409 graph_epoch_changed. Ordinary credentials do not support this URL precondition. */
+                expected_graph_epoch?: string;
             };
             header?: {
                 /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
@@ -50273,6 +50348,19 @@ export interface operations {
                     "application/json": components["schemas"]["LbbErrorEnvelope"];
                 };
             };
+            /** @description Billing quota exceeded; the workflow execution lease remains valid */
+            402: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
             /** @description Forbidden */
             403: {
                 headers: {
@@ -50301,6 +50389,19 @@ export interface operations {
             };
             /** @description Conflict */
             409: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Workflow execution query body exceeds 1 MiB */
+            413: {
                 headers: {
                     /** @description API contract version used for the response */
                     "Lbb-Version"?: string;
@@ -60668,6 +60769,155 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["WorkflowTurn"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Rate limit exceeded */
+            429: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Service unavailable */
+            503: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+        };
+    };
+    post_v1_workflows_turns_execution_credential: {
+        parameters: {
+            query?: {
+                /** @description Graph name (default `main`) */
+                graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
+                /** @description Optional decimal u64 graph incarnation from /v1/workflows/scope. A changed incarnation returns 409 graph_epoch_changed; a graph missing at admission returns 404. Synchronous writes and CAS retries cannot mutate a replacement incarnation; detached jobs are outside this precondition. */
+                expected_graph_epoch?: string;
+            };
+            header?: {
+                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                "Lbb-Version"?: string;
+                /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
+                "Idempotency-Key"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WorkflowExecutionCredentialRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkflowExecutionCredential"];
                 };
             };
             /** @description Bad request */
