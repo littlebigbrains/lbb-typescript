@@ -8513,6 +8513,7 @@ export interface components {
              *     per branch. Empty when reclaim is turned off on the server.
              */
             reclaims?: components["schemas"]["GraphReclaimSchedule"][];
+            workflow_cleanup?: null | components["schemas"]["GraphWorkflowCleanup"];
         };
         GraphEdgeRow: {
             /** Format: float */
@@ -9035,6 +9036,15 @@ export interface components {
             full_text_loaded: boolean;
             object_gets: number;
             snapshot: components["schemas"]["SnapshotView"];
+        };
+        GraphWorkflowCleanup: {
+            job_ids: string[];
+            /**
+             * @description At least one exact source-cleanup job has not succeeded. This does not
+             *     assert physical closure of every late immutable payload publication.
+             */
+            pending: boolean;
+            retains_source_terminals: boolean;
         };
         /** @enum {string} */
         GroundabilityRecommendation: "narrow+finetune" | "narrow" | "lexical-first";
@@ -18847,8 +18857,8 @@ export interface components {
             error?: string | null;
             /**
              * @description `<started_at_ms:013>-<identity>-<turn>` for an engine run: sortable
-             *     by time and unique, since an identity runs one turn at a time. A
-             *     step of the Rust path keeps its own id,
+             *     by time. Selected source lifetimes append `~<64-hex-incarnation>`;
+             *     use the exact ID returned by the claimed task. A step of the Rust path keeps its own id,
              *     `<started_at_ms:013>-<node>-<seq:06>`.
              */
             id: string;
@@ -19291,8 +19301,9 @@ export interface components {
              */
             ended_at_ms?: number | null;
             /**
-             * @description The run summary's id: `<started_at_ms:013>-<identity>-<turn>`. An
-             *     activity call names it in `workflow.run_id`.
+             * @description The run summary's id: `<started_at_ms:013>-<identity>-<turn>`, with
+             *     `~<64-hex-incarnation>` for a selected source lifetime. Activity calls
+             *     use this exact value in `workflow.run_id`.
              */
             id: string;
             /** @description The phases of the attempt's progress, oldest first, at most 32. */
