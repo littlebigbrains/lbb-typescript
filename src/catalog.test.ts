@@ -218,3 +218,45 @@ test("catalog/access/dataset helpers respect retry false on retryable responses"
     assert.equal(calls, 1);
   }
 });
+
+test("saved dataset views preserve immutable selection and exact primary epoch", async () => {
+  const seen: { url: URL; body: unknown }[] = [];
+  const definition = {
+    primary_graph_id: "project",
+    expected_graph_epoch: "18446744073709551615",
+    references: [],
+  };
+  const revision = "a".repeat(64);
+  const reply = { revision, definition };
+  const fetch: FetchLike = async (url, init) => {
+    seen.push({
+      url: new URL(url),
+      body: init?.body ? JSON.parse(String(init.body)) : null,
+    });
+    return {
+      ok: true,
+      status: 200,
+      headers: { get: () => "application/json" },
+      text: async () => JSON.stringify(reply),
+    };
+  };
+  const client = new LbbClient({
+    baseUrl: "https://example.test",
+    graph: "project",
+    fetch,
+  });
+  assert.deepEqual(await client.saveDatasetView(definition), reply);
+  assert.deepEqual(await client.getDatasetView(revision), reply);
+  const body = {
+    query: "ASK {}",
+    expected_graph_epoch: definition.expected_graph_epoch,
+    references: [],
+    view_revision: revision,
+  };
+  await client.sparqlDataset(body);
+  assert.equal(seen[0].url.pathname, "/v1/catalog/views");
+  assert.deepEqual(seen[0].body, definition);
+  assert.equal(seen[1].url.searchParams.get("revision"), revision);
+  assert.equal(seen[2].url.searchParams.get("graph"), "project");
+  assert.deepEqual(seen[2].body, body);
+});

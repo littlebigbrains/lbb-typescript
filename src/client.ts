@@ -1756,6 +1756,25 @@ export class LbbClient {
     });
   }
 
+  /** Publish an immutable source selection; it grants no source access. Administrator only. */
+  saveDatasetView(
+    body: Schemas["SavedDatasetViewDefinition"],
+    opts: CallOptions = {},
+  ): Promise<Schemas["SavedDatasetView"]> {
+    return this.request("POST", "/v1/catalog/views", { ...opts, body });
+  }
+
+  /** Read an immutable saved source selection. Administrator only. */
+  getDatasetView(
+    revision: string,
+    opts: CallOptions = {},
+  ): Promise<Schemas["SavedDatasetView"]> {
+    return this.request("GET", "/v1/catalog/view", {
+      ...opts,
+      query: { revision },
+    });
+  }
+
   /** SELECT/ASK over exact primary and reference epochs; returns the source version vector. */
   sparqlDataset(
     body: Schemas["ReferenceDatasetRequest"],
