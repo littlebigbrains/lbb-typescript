@@ -209,6 +209,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/catalog/usage": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read bounded owner usage in an explicit evidence domain (environment administrator only) */
+        get: operations["get_v1_catalog_usage"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/catalog/view": {
         parameters: {
             query?: never;
@@ -5098,6 +5115,78 @@ export interface components {
             kind: components["schemas"]["CatalogOperationKind"];
             operation_id: string;
             target: string;
+        };
+        CatalogRawUsagePage: {
+            /**
+             * Format: int64
+             * @description Always null for raw historical projection.
+             */
+            complete_through_micros?: number | null;
+            /** Format: int64 */
+            end_micros: number;
+            gaps: string[];
+            /** Format: int64 */
+            matching_executions: number;
+            next_cursor?: string | null;
+            page_totals: components["schemas"]["CatalogUsageTotals"];
+            /** @description raw-resource-receipts-v1; never add this to registered-profile totals. */
+            profile: string;
+            provenance: components["schemas"]["CatalogRawUsageProvenance"][];
+            scanned: number;
+            /** Format: int64 */
+            start_micros: number;
+            /** @description Always partial or unavailable; discovery cannot prove all traffic. */
+            status: string;
+            /** @description execution_completion_time; pages select one UTC day. */
+            time_basis: string;
+        };
+        CatalogRawUsageProvenance: {
+            /** Format: int64 */
+            event_timestamp_micros: number;
+            receipt_id: string;
+            /** @description Opaque content evidence; never an object key or native ETag. */
+            source_evidence: string;
+        };
+        CatalogRegisteredUsagePage: {
+            /** Format: int64 */
+            admission_count: number;
+            /**
+             * Format: int64
+             * @description Selected interval's end when its frozen denominator is fully proven.
+             *     This is not a global or contiguous historical watermark.
+             */
+            complete_through_micros?: number | null;
+            completion_evidence?: string | null;
+            /** Format: int64 */
+            end_micros: number;
+            gaps: string[];
+            historical_projection_status: string;
+            /** Format: int64 */
+            matching_executions: number;
+            next_cursor?: string | null;
+            /** @description Totals for this page, not the entire interval. Follow every next_cursor. */
+            page_totals: components["schemas"]["CatalogUsageTotals"];
+            /** @description registered-request-resource-v1; excludes raw historical and other lanes. */
+            profile: string;
+            scanned: number;
+            /** Format: int64 */
+            start_micros: number;
+            /** @description unavailable, open, closing, partial or complete for this interval only. */
+            status: string;
+            /** @description admission_time; late outcomes retain the original hour. */
+            time_basis: string;
+            /** @description returned_owner_index_page: native inventory is not a total-completeness proof. */
+            totals_scope: string;
+        };
+        CatalogUsagePage: components["schemas"]["CatalogRegisteredUsagePage"] | components["schemas"]["CatalogRawUsagePage"];
+        CatalogUsageTotals: {
+            /** @description Exact unsigned integer decimal string; never a floating-point estimate. */
+            cpu_nanos: string;
+            invalid: boolean;
+            memory_byte_nanos: string;
+            /** Format: int64 */
+            operation_count: number;
+            work_byte_nanos: string;
         };
         CdcActivateRequest: {
             mapping: components["schemas"]["MappingPlan"];
@@ -21346,6 +21435,159 @@ export interface operations {
             };
         };
     };
+    get_v1_catalog_usage: {
+        parameters: {
+            query: {
+                /** @description Graph name (default `main`) */
+                graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
+                /** @description Required exact catalog namespace ID captured with the operation */
+                owner_id: string;
+                /** @description Required exact owner incarnation; names are not identities */
+                owner_incarnation: string;
+                /** @description Required integer UTC hour start for registered profile, or UTC day start for raw profile */
+                period_start_micros: string;
+                /** @description registered-request-resource-v1 (default) or raw-resource-receipts-v1; do not add these domains together */
+                profile?: string;
+                /** @description Opaque page continuation bound to owner, environment and selected period */
+                cursor?: string;
+                /** @description Page work bound: registered profile 1..4 (default4), raw profile 1..32 (default16); totals are page totals */
+                limit?: string;
+            };
+            header?: {
+                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                "Lbb-Version"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CatalogUsagePage"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Owner reporting page rate limit: application_usage_rate_limited, Retry-After: 1. Per environment burst 8, refill 2 requests/second. */
+            429: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Service unavailable */
+            503: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+        };
+    };
     get_v1_catalog_view: {
         parameters: {
             query?: {
@@ -22062,7 +22304,7 @@ export interface operations {
                     "application/json": components["schemas"]["LbbErrorEnvelope"];
                 };
             };
-            /** @description Service unavailable */
+            /** @description Service unavailable. On metered routes, application_usage_unavailable refuses admission before execution and is retryable. On writes, application_usage_handoff_unconfirmed means execution ran but its measurement was not durably confirmed: retryable is false and clients must inspect operation state before retrying. A saved measurement preserves success even if settlement needs recovery. Completed public reads preserve their response and hand reporting to a bounded background task; an unconfirmed handoff remains an explicit reporting gap. An original rejected request keeps its original status if its NoCharge acknowledgement fails. */
             503: {
                 headers: {
                     /** @description API contract version used for the response */
@@ -23085,7 +23327,7 @@ export interface operations {
                     "application/json": components["schemas"]["LbbErrorEnvelope"];
                 };
             };
-            /** @description Service unavailable */
+            /** @description Service unavailable. On metered routes, application_usage_unavailable refuses admission before execution and is retryable. On writes, application_usage_handoff_unconfirmed means execution ran but its measurement was not durably confirmed: retryable is false and clients must inspect operation state before retrying. A saved measurement preserves success even if settlement needs recovery. Completed public reads preserve their response and hand reporting to a bounded background task; an unconfirmed handoff remains an explicit reporting gap. An original rejected request keeps its original status if its NoCharge acknowledgement fails. */
             503: {
                 headers: {
                     /** @description API contract version used for the response */
@@ -23967,7 +24209,7 @@ export interface operations {
                     "application/json": components["schemas"]["LbbErrorEnvelope"];
                 };
             };
-            /** @description Service unavailable */
+            /** @description Service unavailable. On metered routes, application_usage_unavailable refuses admission before execution and is retryable. On writes, application_usage_handoff_unconfirmed means execution ran but its measurement was not durably confirmed: retryable is false and clients must inspect operation state before retrying. A saved measurement preserves success even if settlement needs recovery. Completed public reads preserve their response and hand reporting to a bounded background task; an unconfirmed handoff remains an explicit reporting gap. An original rejected request keeps its original status if its NoCharge acknowledgement fails. */
             503: {
                 headers: {
                     /** @description API contract version used for the response */
@@ -27766,7 +28008,7 @@ export interface operations {
                     "application/json": components["schemas"]["LbbErrorEnvelope"];
                 };
             };
-            /** @description Service unavailable */
+            /** @description Service unavailable. On metered routes, application_usage_unavailable refuses admission before execution and is retryable. On writes, application_usage_handoff_unconfirmed means execution ran but its measurement was not durably confirmed: retryable is false and clients must inspect operation state before retrying. A saved measurement preserves success even if settlement needs recovery. Completed public reads preserve their response and hand reporting to a bounded background task; an unconfirmed handoff remains an explicit reporting gap. An original rejected request keeps its original status if its NoCharge acknowledgement fails. */
             503: {
                 headers: {
                     /** @description API contract version used for the response */
@@ -28660,7 +28902,7 @@ export interface operations {
                     "application/json": components["schemas"]["LbbErrorEnvelope"];
                 };
             };
-            /** @description Service unavailable */
+            /** @description Service unavailable. On metered routes, application_usage_unavailable refuses admission before execution and is retryable. On writes, application_usage_handoff_unconfirmed means execution ran but its measurement was not durably confirmed: retryable is false and clients must inspect operation state before retrying. A saved measurement preserves success even if settlement needs recovery. Completed public reads preserve their response and hand reporting to a bounded background task; an unconfirmed handoff remains an explicit reporting gap. An original rejected request keeps its original status if its NoCharge acknowledgement fails. */
             503: {
                 headers: {
                     /** @description API contract version used for the response */
@@ -34044,7 +34286,7 @@ export interface operations {
                     "application/json": components["schemas"]["LbbErrorEnvelope"];
                 };
             };
-            /** @description Service unavailable */
+            /** @description Service unavailable. On metered routes, application_usage_unavailable refuses admission before execution and is retryable. On writes, application_usage_handoff_unconfirmed means execution ran but its measurement was not durably confirmed: retryable is false and clients must inspect operation state before retrying. A saved measurement preserves success even if settlement needs recovery. Completed public reads preserve their response and hand reporting to a bounded background task; an unconfirmed handoff remains an explicit reporting gap. An original rejected request keeps its original status if its NoCharge acknowledgement fails. */
             503: {
                 headers: {
                     /** @description API contract version used for the response */
@@ -35244,7 +35486,7 @@ export interface operations {
                     "application/json": components["schemas"]["LbbErrorEnvelope"];
                 };
             };
-            /** @description Service unavailable */
+            /** @description Service unavailable. On metered routes, application_usage_unavailable refuses admission before execution and is retryable. On writes, application_usage_handoff_unconfirmed means execution ran but its measurement was not durably confirmed: retryable is false and clients must inspect operation state before retrying. A saved measurement preserves success even if settlement needs recovery. Completed public reads preserve their response and hand reporting to a bounded background task; an unconfirmed handoff remains an explicit reporting gap. An original rejected request keeps its original status if its NoCharge acknowledgement fails. */
             503: {
                 headers: {
                     /** @description API contract version used for the response */
@@ -36569,7 +36811,7 @@ export interface operations {
                     "application/json": components["schemas"]["LbbErrorEnvelope"];
                 };
             };
-            /** @description Service unavailable */
+            /** @description Service unavailable. On metered routes, application_usage_unavailable refuses admission before execution and is retryable. On writes, application_usage_handoff_unconfirmed means execution ran but its measurement was not durably confirmed: retryable is false and clients must inspect operation state before retrying. A saved measurement preserves success even if settlement needs recovery. Completed public reads preserve their response and hand reporting to a bounded background task; an unconfirmed handoff remains an explicit reporting gap. An original rejected request keeps its original status if its NoCharge acknowledgement fails. */
             503: {
                 headers: {
                     /** @description API contract version used for the response */
@@ -37187,7 +37429,7 @@ export interface operations {
                     "application/json": components["schemas"]["LbbErrorEnvelope"];
                 };
             };
-            /** @description Service unavailable */
+            /** @description Service unavailable. On metered routes, application_usage_unavailable refuses admission before execution and is retryable. On writes, application_usage_handoff_unconfirmed means execution ran but its measurement was not durably confirmed: retryable is false and clients must inspect operation state before retrying. A saved measurement preserves success even if settlement needs recovery. Completed public reads preserve their response and hand reporting to a bounded background task; an unconfirmed handoff remains an explicit reporting gap. An original rejected request keeps its original status if its NoCharge acknowledgement fails. */
             503: {
                 headers: {
                     /** @description API contract version used for the response */
@@ -38341,7 +38583,7 @@ export interface operations {
                     "application/json": components["schemas"]["LbbErrorEnvelope"];
                 };
             };
-            /** @description Service unavailable */
+            /** @description Service unavailable. On metered routes, application_usage_unavailable refuses admission before execution and is retryable. On writes, application_usage_handoff_unconfirmed means execution ran but its measurement was not durably confirmed: retryable is false and clients must inspect operation state before retrying. A saved measurement preserves success even if settlement needs recovery. Completed public reads preserve their response and hand reporting to a bounded background task; an unconfirmed handoff remains an explicit reporting gap. An original rejected request keeps its original status if its NoCharge acknowledgement fails. */
             503: {
                 headers: {
                     /** @description API contract version used for the response */
@@ -38490,7 +38732,7 @@ export interface operations {
                     "application/json": components["schemas"]["LbbErrorEnvelope"];
                 };
             };
-            /** @description Service unavailable */
+            /** @description Service unavailable. On metered routes, application_usage_unavailable refuses admission before execution and is retryable. On writes, application_usage_handoff_unconfirmed means execution ran but its measurement was not durably confirmed: retryable is false and clients must inspect operation state before retrying. A saved measurement preserves success even if settlement needs recovery. Completed public reads preserve their response and hand reporting to a bounded background task; an unconfirmed handoff remains an explicit reporting gap. An original rejected request keeps its original status if its NoCharge acknowledgement fails. */
             503: {
                 headers: {
                     /** @description API contract version used for the response */
@@ -45164,7 +45406,7 @@ export interface operations {
                     "application/json": components["schemas"]["LbbErrorEnvelope"];
                 };
             };
-            /** @description Service unavailable */
+            /** @description Service unavailable. On metered routes, application_usage_unavailable refuses admission before execution and is retryable. On writes, application_usage_handoff_unconfirmed means execution ran but its measurement was not durably confirmed: retryable is false and clients must inspect operation state before retrying. A saved measurement preserves success even if settlement needs recovery. Completed public reads preserve their response and hand reporting to a bounded background task; an unconfirmed handoff remains an explicit reporting gap. An original rejected request keeps its original status if its NoCharge acknowledgement fails. */
             503: {
                 headers: {
                     /** @description API contract version used for the response */
@@ -46042,7 +46284,7 @@ export interface operations {
                     "application/json": components["schemas"]["LbbErrorEnvelope"];
                 };
             };
-            /** @description Service unavailable */
+            /** @description Service unavailable. On metered routes, application_usage_unavailable refuses admission before execution and is retryable. On writes, application_usage_handoff_unconfirmed means execution ran but its measurement was not durably confirmed: retryable is false and clients must inspect operation state before retrying. A saved measurement preserves success even if settlement needs recovery. Completed public reads preserve their response and hand reporting to a bounded background task; an unconfirmed handoff remains an explicit reporting gap. An original rejected request keeps its original status if its NoCharge acknowledgement fails. */
             503: {
                 headers: {
                     /** @description API contract version used for the response */
@@ -49883,7 +50125,7 @@ export interface operations {
                     "application/json": components["schemas"]["LbbErrorEnvelope"];
                 };
             };
-            /** @description Service unavailable */
+            /** @description Service unavailable. On metered routes, application_usage_unavailable refuses admission before execution and is retryable. On writes, application_usage_handoff_unconfirmed means execution ran but its measurement was not durably confirmed: retryable is false and clients must inspect operation state before retrying. A saved measurement preserves success even if settlement needs recovery. Completed public reads preserve their response and hand reporting to a bounded background task; an unconfirmed handoff remains an explicit reporting gap. An original rejected request keeps its original status if its NoCharge acknowledgement fails. */
             503: {
                 headers: {
                     /** @description API contract version used for the response */
@@ -50612,7 +50854,7 @@ export interface operations {
                     "application/json": components["schemas"]["LbbErrorEnvelope"];
                 };
             };
-            /** @description Service unavailable */
+            /** @description Service unavailable. On metered routes, application_usage_unavailable refuses admission before execution and is retryable. On writes, application_usage_handoff_unconfirmed means execution ran but its measurement was not durably confirmed: retryable is false and clients must inspect operation state before retrying. A saved measurement preserves success even if settlement needs recovery. Completed public reads preserve their response and hand reporting to a bounded background task; an unconfirmed handoff remains an explicit reporting gap. An original rejected request keeps its original status if its NoCharge acknowledgement fails. */
             503: {
                 headers: {
                     /** @description API contract version used for the response */
@@ -50787,7 +51029,7 @@ export interface operations {
                     "application/json": components["schemas"]["LbbErrorEnvelope"];
                 };
             };
-            /** @description Service unavailable */
+            /** @description Service unavailable. On metered routes, application_usage_unavailable refuses admission before execution and is retryable. On writes, application_usage_handoff_unconfirmed means execution ran but its measurement was not durably confirmed: retryable is false and clients must inspect operation state before retrying. A saved measurement preserves success even if settlement needs recovery. Completed public reads preserve their response and hand reporting to a bounded background task; an unconfirmed handoff remains an explicit reporting gap. An original rejected request keeps its original status if its NoCharge acknowledgement fails. */
             503: {
                 headers: {
                     /** @description API contract version used for the response */

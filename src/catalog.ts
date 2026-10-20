@@ -16,6 +16,18 @@ export interface CatalogGraphPageOptions extends CatalogPageOptions {
   includeDescendants?: boolean;
 }
 
+export type CatalogUsageProfile =
+  "registered-request-resource-v1" | "raw-resource-receipts-v1";
+export type CatalogUsagePage = Schemas["CatalogUsagePage"];
+
+export interface CatalogUsageOptions extends CatalogPageOptions {
+  ownerId: string;
+  ownerIncarnation: string;
+  /** Exact UTC hour (registered) or day (raw) start, in microseconds. */
+  periodStartMicros: number | string;
+  profile?: CatalogUsageProfile;
+}
+
 /** Optional application ownership. Every method requires an environment key. */
 export class CatalogNamespace {
   constructor(private readonly client: LbbClient) {}
@@ -61,6 +73,38 @@ export class CatalogNamespace {
     return this.client.request("GET", "/v1/catalog/namespaces", {
       ...opts,
       query: { cursor, limit, parent_id: parentId },
+    });
+  }
+
+  /** One owner page. Keep decimal quantities exact and never sum profiles together. */
+  usage(options: CatalogUsageOptions): Promise<CatalogUsagePage> {
+    const {
+      ownerId,
+      ownerIncarnation,
+      periodStartMicros,
+      profile,
+      cursor,
+      limit,
+      ...opts
+    } = options;
+    if (
+      typeof periodStartMicros === "number" &&
+      !Number.isSafeInteger(periodStartMicros)
+    ) {
+      throw new RangeError(
+        "periodStartMicros must be an exact integer; use a decimal string",
+      );
+    }
+    return this.client.request("GET", "/v1/catalog/usage", {
+      ...opts,
+      query: {
+        owner_id: ownerId,
+        owner_incarnation: ownerIncarnation,
+        period_start_micros: periodStartMicros,
+        profile,
+        cursor,
+        limit,
+      },
     });
   }
 

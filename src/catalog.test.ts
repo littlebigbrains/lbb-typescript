@@ -219,6 +219,135 @@ test("catalog/access/dataset helpers respect retry false on retryable responses"
   }
 });
 
+test("owner usage preserves exact scope, profile, cursor and decimal quantities", async () => {
+  const seen: { url: URL; headers?: Record<string, string> }[] = [];
+  const cpu = "340282366920938463463374607431768211455";
+  const fetch: FetchLike = async (url, init) => {
+    seen.push({ url: new URL(url), headers: init?.headers });
+    assert.equal(init?.method, "GET");
+    assert.equal(init?.body, undefined);
+    return {
+      ok: true,
+      status: 200,
+      headers: { get: () => "application/json" },
+      text: async () =>
+        JSON.stringify({
+          profile: "raw-resource-receipts-v1",
+          status: "partial",
+          page_totals: { cpu_nanos: cpu },
+          next_cursor: "opaque+/=",
+          complete_through_micros: null,
+        }),
+    };
+  };
+  const client = new LbbClient({
+    baseUrl: "https://example.test",
+    environment: "prod",
+    apiKey: "environment-key",
+    fetch,
+  });
+  const first = await client.catalog.usage({
+    ownerId: "ns_customer",
+    ownerIncarnation: "inc_original",
+    periodStartMicros: 1800000000000000,
+    limit: 1,
+  });
+  const second = await client.catalog.usage({
+    ownerId: "ns_customer",
+    ownerIncarnation: "inc_original",
+    periodStartMicros: "9007200000000000",
+    profile: "raw-resource-receipts-v1",
+    cursor: first.next_cursor ?? undefined,
+    limit: 2,
+  });
+  assert.equal(second.page_totals.cpu_nanos, cpu);
+  assert.equal(second.complete_through_micros, null);
+  assert.equal(seen[0].url.pathname, "/v1/catalog/usage");
+  assert.equal(seen[0].url.searchParams.has("profile"), false);
+  assert.equal(seen[0].url.searchParams.get("owner_id"), "ns_customer");
+  assert.equal(
+    seen[0].url.searchParams.get("owner_incarnation"),
+    "inc_original",
+  );
+  assert.equal(
+    seen[0].url.searchParams.get("period_start_micros"),
+    "1800000000000000",
+  );
+  assert.equal(seen[0].url.searchParams.get("stack"), "prod");
+  assert.equal(seen[0].headers?.authorization, "Bearer environment-key");
+  assert.equal(
+    seen[1].url.searchParams.get("period_start_micros"),
+    "9007200000000000",
+  );
+  assert.equal(
+    seen[1].url.searchParams.get("profile"),
+    "raw-resource-receipts-v1",
+  );
+  assert.equal(seen[1].url.searchParams.get("cursor"), "opaque+/=");
+  assert.equal(seen[1].url.searchParams.get("limit"), "2");
+  assert.throws(
+    () =>
+      client.catalog.usage({
+        ownerId: "owner",
+        ownerIncarnation: "inc",
+        periodStartMicros: Number.MAX_SAFE_INTEGER + 1,
+      }),
+    RangeError,
+  );
+  assert.equal(
+    seen.length,
+    2,
+    "unsafe timestamp must not send a rounded request",
+  );
+});
+
+test("completed execution with unconfirmed reporting handoff is not automatically replayed", async () => {
+  let calls = 0;
+  const fetch: FetchLike = async (url, init) => {
+    calls += 1;
+    assert.equal(new URL(url).pathname, "/v1/query/dataset");
+    assert.equal(init?.method, "POST");
+    return {
+      ok: false,
+      status: 503,
+      headers: { get: () => null },
+      text: async () =>
+        JSON.stringify({
+          error: {
+            code: "application_usage_handoff_unconfirmed",
+            retryable: false,
+            message: "Execution completed; check operation state before retry.",
+          },
+        }),
+    };
+  };
+  const client = new LbbClient({ baseUrl: "https://example.test", fetch });
+  await assert.rejects(
+    client.sparqlDataset({
+      query: "SELECT ?s WHERE { ?s ?p ?o } LIMIT 1",
+      expected_graph_epoch: "0",
+      references: [],
+    }),
+    (error: unknown) => {
+      const value = error as {
+        status?: number;
+        code?: string;
+        retryable?: boolean;
+      };
+      return (
+        value.status === 503 &&
+        value.code === "application_usage_handoff_unconfirmed" &&
+        value.retryable === false
+      );
+    },
+  );
+  assert.equal(
+    calls,
+    1,
+    "original measured execution must not be silently repeated",
+  );
+});
+
 test("saved dataset views preserve immutable selection and exact primary epoch", async () => {
   const seen: { url: URL; body: unknown }[] = [];
   const definition = {

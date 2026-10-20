@@ -398,6 +398,48 @@ These helpers do not move graph ownership, grant writes, or create an atomic
 cross-graph snapshot. See [How to model your app](https://docs.littlebigbrain.com/start/model-your-app/).
 
 
+## Optional owner usage reports
+
+On deployments with reporting activated, an environment administrator can read
+one bounded owner page. Keep that key on the backend; scoped query tokens cannot
+read reports. Replace the example owner and timestamp with your catalog identity
+and selected period.
+
+```ts
+const owner = await client.catalog.resolve("acme");
+const page = await client.catalog.usage({
+  ownerId: owner.identity.id,
+  ownerIncarnation: owner.identity.incarnation,
+  periodStartMicros: "1800000000000000", // a UTC-hour boundary
+  profile: "registered-request-resource-v1",
+  limit: 16,
+});
+const pageCpuNanos = BigInt(page.page_totals.cpu_nanos);
+// Repeat with cursor: page.next_cursor until that value is null.
+```
+
+`CatalogUsageOptions`, `CatalogUsageProfile` and `CatalogUsagePage` are exported.
+Use a decimal timestamp string if it cannot be represented as a safe integer.
+
+Every result contains **page totals**. Preserve decimal resource quantities as
+exact integers and follow all continuations, including empty pages. The default
+`registered-request-resource-v1` profile selects an admission-time hour; a complete
+result certifies only that registered profile and selected hour. Missing/crashed
+outcomes, partial activation and unattributed work remain gaps. For raw history,
+choose `raw-resource-receipts-v1` and a UTC-day boundary; it always remains partial
+with no completeness watermark. These domains overlap: **never add their totals
+together**. Erased reports are unavailable, not zero. This is resource reporting,
+not a new billing charge. See [How to model your app](https://docs.littlebigbrain.com/start/model-your-app/#optional-owner-usage-reports).
+
+An opted-in request can finish its execution but fail to confirm the durable
+reporting handoff. The server then returns HTTP 503
+`application_usage_handoff_unconfirmed` with `retryable: false` and no
+`Retry-After`. The original measured execution is retained once; this response
+does not mean that no work ran. The SDK surfaces it without automatic replay.
+Check operation state before explicitly retrying, because a new request can
+execute and be measured again. A pre-execution `application_usage_unavailable`
+response remains retryable.
+
 ## Optional workflow execution reads
 
 With workflow execution and batch admission enabled on the server, opt a worker
