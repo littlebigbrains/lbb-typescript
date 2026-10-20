@@ -8,7 +8,9 @@
 // 1. asks the reasoning model (`reason`) for the values of the properties the
 //    text states, each with the words that state it;
 // 2. checks each value without a model: it takes its property's type, and its
-//    quote is in the text;
+//    quote is in the text. A number of a property with a unit must come in
+//    that unit, with the unit in its quote; otherwise it goes to review at
+//    most (the LBB-run values.extract converts it instead);
 // 3. asks the decision model (`decide`) how well each quote supports its
 //    value;
 // 4. writes the values at or above the gate, each with a `ValueSource` whose
@@ -39,6 +41,8 @@ export interface Settings {
   context: string;
   /** A value whose support is below this goes to review (from 0.5) or is dropped. */
   gate: number;
+  /** The unit of each number property (`cm`, `mm`, `kg`, `m2`, …), declared in the ontology by `ontology()`. */
+  units?: Record<string, string>;
 }
 
 /** The settings: edit them for your class. These fit the samples. */
@@ -48,6 +52,7 @@ export const defaults: Settings = {
   properties: { width_cm: "f64", depth_cm: "f64", material: "text", water_supply: "keyword" },
   context: "Entries of the sanitary equipment list of a school building tender, in German.",
   gate: 0.8,
+  units: { width_cm: "cm", depth_cm: "cm" },
 };
 
 /** The workflow type and version the triggered workflow names. */
@@ -71,16 +76,19 @@ export function trigger(settings: Settings = defaults): Schemas["TriggeredWorkfl
 
 /** The classes, properties and relation the workflow reads and writes, for `lbb.evolve`. */
 export function ontology(settings: Settings = defaults): Schemas["OntologyEvolveOp"][] {
-  const property = (name: string, value_type: string) => ({
+  const property = (name: string, value_type: string, unit?: string) => ({
     op: "add_property" as const,
     name,
     value_type,
+    ...(unit ? { unit } : {}),
   });
   return [
     { op: "add_entity_type", name: settings.className },
     { op: "add_entity_type", name: "ValueSource" },
     property(settings.textField, "text"),
-    ...Object.entries(settings.properties).map(([name, type]) => property(name, type)),
+    ...Object.entries(settings.properties).map(([name, type]) =>
+      property(name, type, unitOf(settings, name)),
+    ),
     property("property", "keyword"),
     property("value", "text"),
     property("support", "f64"),
@@ -106,6 +114,8 @@ interface Value {
   value: string | number | boolean;
   quote: string;
   support?: number;
+  /** Why the unit of a number is not confirmed: the value goes to review at most. */
+  unconfirmed?: string;
 }
 
 const SYSTEM = `You read the text of one record of a knowledge graph and fill in property values the text states. Rules:
@@ -113,7 +123,8 @@ const SYSTEM = `You read the text of one record of a knowledge graph and fill in
 - Give the values of the record's own item in its base version. Leave out the values of a part, an accessory or an alternative the text names (the battery of a drill, the shade of a lamp), and the values of a variant that holds only under a condition ("if …", "when used with …").
 - A value the text gives as approximate ("about 40 kg", "approx. 2 m") is stated: give it without the approximation.
 - Each value quotes the words of the text that state it in \`quote\`, copied exactly, character for character. A value without an exact quote is dropped.
-- Write each value in its property's type: a number for i64 and f64 (digits, a dot for decimals, no unit), true or false for bool, YYYY-MM-DD for date_time, and the words of the text for text and keyword.
+- Write each value in its property's type: a number for i64 and f64 (digits, a dot for decimals, without its unit), true or false for bool, YYYY-MM-DD for date_time, and the words of the text for text and keyword.
+- Give a number as the text states it, and in \`unit\` the unit the text states it in, as a symbol (mm, cm, m, m2, l, kg, kW, h). Do not convert it to the property's unit. Give an empty \`unit\` when the text states no unit, and for a value that is not a number.
 - Give at most one value per property. Leave a property out when the text does not state it.`;
 
 const SUPPORT: Record<string, string> = {
@@ -153,6 +164,30 @@ export function typed(raw: string, type: ValueType): string | number | boolean |
   }
 }
 
+/** The unit a number property holds, from the settings; none for other types. */
+export function unitOf(settings: Settings, property: string): string | undefined {
+  const type = settings.properties[property];
+  return type === "i64" || type === "f64" ? settings.units?.[property] : undefined;
+}
+
+const unitText = (text: string) =>
+  text.trim().replace(/\.+$/, "").toLowerCase().replace(/²/g, "2").replace(/³/g, "3");
+
+/**
+ * Why a number of a property that holds `unit` cannot be confirmed in that unit: the text states
+ * no unit or another one, or the quote does not hold it. Undefined when it is confirmed.
+ */
+export function unitProblem(unit: string, stated: string, quote: string): string | undefined {
+  const want = unitText(unit);
+  const got = unitText(stated);
+  if (!got) return `the text states no unit; the property holds ${unit}`;
+  if (got !== want) return `the text states ${stated.trim()}; the property holds ${unit}`;
+  const token = want.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return new RegExp(`(?<!\\p{L})${token}(?![\\p{L}\\p{N}])`, "u").test(unitText(quote))
+    ? undefined
+    : `the quote does not state the unit ${unit}`;
+}
+
 /** A quote must be in the text, with at least three words or the value in it. */
 export function quoteHolds(quote: string, value: string, text: string): boolean {
   const q = normalize(quote);
@@ -173,10 +208,18 @@ export function createWorkflow(lbb: LbbActivities, settings: Settings = defaults
         items: {
           type: "object",
           additionalProperties: false,
-          required: ["property", "value", "quote"],
+          required: ["property", "value", "unit", "quote"],
           properties: {
             property: { type: "string", enum: names },
-            value: { type: "string", description: "The value in the property's type." },
+            value: {
+              type: "string",
+              description: "The value in the property's type; a number as the text states it.",
+            },
+            unit: {
+              type: "string",
+              description:
+                "The unit the text states a number in, as a symbol; empty when it states none or the value is not a number.",
+            },
             quote: {
               type: "string",
               description: "The words of the text that state the value, copied exactly.",
@@ -212,11 +255,14 @@ export function createWorkflow(lbb: LbbActivities, settings: Settings = defaults
             class: settings.className,
             instance: record.label,
             context: settings.context,
-            properties: names.map((name) => ({ name, type: settings.properties[name] })),
+            properties: names.map((name) => {
+              const unit = unitOf(settings, name);
+              return { name, type: settings.properties[name], ...(unit ? { unit } : {}) };
+            }),
             text: record.text,
           });
           const answer = await lbb.reason<{
-            values: { property: string; value: string; quote: string }[];
+            values: { property: string; value: string; unit?: string; quote: string }[];
           }>(
             { system: SYSTEM, prompt, schema, max_tokens: 8_000 },
             { effectId: s.effectId, label: `${record.label.slice(0, 50)} values` },
@@ -233,7 +279,16 @@ export function createWorkflow(lbb: LbbActivities, settings: Settings = defaults
             )
               return [];
             seen.add(v.property);
-            return [{ property: v.property, value, quote: v.quote }];
+            const unit = unitOf(settings, v.property);
+            const unconfirmed = unit ? unitProblem(unit, v.unit ?? "", v.quote) : undefined;
+            return [
+              {
+                property: v.property,
+                value,
+                quote: v.quote,
+                ...(unconfirmed ? { unconfirmed } : {}),
+              },
+            ];
           });
         });
         read.push(
@@ -277,11 +332,13 @@ export function createWorkflow(lbb: LbbActivities, settings: Settings = defaults
         );
       }
 
-      // The gate: written, review, or dropped.
+      // The gate: written, review, or dropped. A number whose unit is not confirmed goes to review
+      // at most.
       const at = (i: number) => ({ iri: batch[i]!, values: read[i]! });
+      const passes = (v: Value) => v.support! >= settings.gate && !v.unconfirmed;
       const below = batch.flatMap((_, i) =>
         at(i)
-          .values.filter((v) => v.support! < settings.gate && v.support! >= 0.5)
+          .values.filter((v) => !passes(v) && v.support! >= 0.5)
           .map((v) => ({ i, v })),
       );
       const accepted = await ctx.step("review", async (s) => {
@@ -294,7 +351,9 @@ export function createWorkflow(lbb: LbbActivities, settings: Settings = defaults
             workflow: message.workflow,
             key: `starter:${message.workflow}:value:${entityIdFromIri(batch[i]!)}:${v.property}`,
             title: `Set ${v.property} of ${record.label} to ${v.value}`.slice(0, 200),
-            rationale: `The text supports the value with ${v.support!.toFixed(2)}, below the gate ${settings.gate}: "${v.quote.slice(0, 600)}"`,
+            rationale: v.unconfirmed
+              ? `The unit is not confirmed: ${v.unconfirmed}. The text supports the value with ${v.support!.toFixed(2)}: "${v.quote.slice(0, 600)}"`
+              : `The text supports the value with ${v.support!.toFixed(2)}, below the gate ${settings.gate}: "${v.quote.slice(0, 600)}"`,
             facts: {
               entity_properties: facts.properties,
               triplets: [facts.edge],
@@ -322,9 +381,7 @@ export function createWorkflow(lbb: LbbActivities, settings: Settings = defaults
           const label = records[iri]?.label ?? iri;
           write.subjects.push(entityRef(iri, settings.className, label));
           const kept = at(i).values.filter(
-            (v) =>
-              v.support! >= settings.gate ||
-              accepted.some((a) => a.i === i && a.property === v.property),
+            (v) => passes(v) || accepted.some((a) => a.i === i && a.property === v.property),
           );
           for (const v of kept) {
             const facts = valueFacts(iri, label, v);
@@ -347,10 +404,7 @@ export function createWorkflow(lbb: LbbActivities, settings: Settings = defaults
       const values = read.flat();
       const next: ValuesState = {
         instances: state.instances + batch.length,
-        written:
-          state.written +
-          values.filter((v) => v.support! >= settings.gate).length +
-          accepted.length,
+        written: state.written + values.filter(passes).length + accepted.length,
         review: state.review + below.length - accepted.length,
         dropped: state.dropped + values.filter((v) => v.support! < 0.5).length,
       };

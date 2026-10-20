@@ -4613,6 +4613,15 @@ export interface components {
             /** @description Advisory required flag recorded on the field (not enforced on commit). */
             required?: boolean;
             /**
+             * @description Optional unit of an `i64` or `f64` field: the symbol of a known
+             *     unit (`mm`, `cm`, `dm`, `m`, `km`, `mm2`, `cm2`, `dm2`, `m2`, `ml`,
+             *     `cl`, `dl`, `l`, `cm3`, `dm3`, `m3`, `mg`, `g`, `kg`, `t`, `w`,
+             *     `kw`, `wh`, `kwh`, `s`, `min`, `h`). Metadata: commits are not
+             *     converted. Writers that read text convert to it. Use
+             *     `set_property_unit` to change it on an existing field.
+             */
+            unit?: string | null;
+            /**
              * @description `bool` | `i64` | `f64` | `date_time` | `keyword` | `text` (default) |
              *     `bytes`. The commit path rejects values whose type doesn't match.
              */
@@ -11824,7 +11833,7 @@ export interface components {
          *     Every variant rejects unknown fields: a misspelled field fails the request
          *     with `400 invalid_request` instead of reading as an empty change.
          */
-        OntologyEvolveOp: components["schemas"]["WidenRelationOp"] | components["schemas"]["AddEntityTypeOp"] | components["schemas"]["AddSuperTypesOp"] | components["schemas"]["AddRelationOp"] | components["schemas"]["AddPropertyOp"] | components["schemas"]["SetPropertyConstraintOp"] | components["schemas"]["RenameEntityTypeOp"] | components["schemas"]["RenameRelationOp"] | components["schemas"]["SetRelationInverseOp"] | components["schemas"]["SetRelationCardinalityOp"] | components["schemas"]["NarrowRelationOp"] | components["schemas"]["RemoveEntityTypeOp"] | components["schemas"]["RemoveRelationOp"];
+        OntologyEvolveOp: components["schemas"]["WidenRelationOp"] | components["schemas"]["AddEntityTypeOp"] | components["schemas"]["AddSuperTypesOp"] | components["schemas"]["AddRelationOp"] | components["schemas"]["AddPropertyOp"] | components["schemas"]["SetPropertyConstraintOp"] | components["schemas"]["SetPropertyUnitOp"] | components["schemas"]["RenameEntityTypeOp"] | components["schemas"]["RenameRelationOp"] | components["schemas"]["SetRelationInverseOp"] | components["schemas"]["SetRelationCardinalityOp"] | components["schemas"]["NarrowRelationOp"] | components["schemas"]["RemoveEntityTypeOp"] | components["schemas"]["RemoveRelationOp"];
         /**
          * @description Apply a list of additive ontology changes in order, writing a new ontology
          *     version when anything actually changes. Ops are applied against the
@@ -11889,6 +11898,12 @@ export interface components {
             allowed_values?: string[];
             name: string;
             required: boolean;
+            /**
+             * @description The unit an `i64` or `f64` field holds its numbers in (`mm`, `cm`,
+             *     `kg`, `m2`, …), absent when none is declared. Writers that read text,
+             *     such as `values.extract`, convert a number to this unit.
+             */
+            unit?: string | null;
             /**
              * @description Lowercase value type: bool | i64 | f64 | datetime | keyword | text |
              *     bytes | vector_f32 | keyword_set | i64_set. The `*_set` types hold a
@@ -15638,6 +15653,24 @@ export interface components {
             op: "set_property_constraint";
             /** @description Name of the existing property field to constrain. */
             property: string;
+        };
+        /**
+         * @description Set (or clear, with no `unit`) the unit of an **existing** `i64` or
+         *     `f64` property field. Metadata only: stored values are not converted,
+         *     so change a unit only to state what the values already are. Errors
+         *     on an unknown field, a field that is not a number, or a unit LBB does
+         *     not know. Bumps the ontology version.
+         */
+        SetPropertyUnitOp: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            op: "set_property_unit";
+            /** @description Name of the existing property field. */
+            property: string;
+            /** @description The unit's symbol (see `add_property`); absent clears it. */
+            unit?: string | null;
         };
         /**
          * @description Change a relation's cardinality (`one_to_one` | `one_to_many` |
