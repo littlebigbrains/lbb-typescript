@@ -43,6 +43,9 @@ export type {
   CatalogPageOptions,
   CatalogNamespacePageOptions,
   CatalogGraphPageOptions,
+  CatalogUsageOptions,
+  CatalogUsageProfile,
+  CatalogUsagePage,
 } from "./catalog.js";
 export type {
   BlobLike,
