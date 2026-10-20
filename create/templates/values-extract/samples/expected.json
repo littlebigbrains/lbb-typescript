@@ -12,6 +12,7 @@
       "material": "text",
       "water_supply": "keyword"
     },
+    "units": { "width_cm": "cm", "depth_cm": "cm" },
     "context": "Entries of the sanitary equipment list of a school building tender, in German."
   },
   "records": [

@@ -1,6 +1,6 @@
 // values-extract on its samples, with mock models whose rules are fixed:
-// the reasoning model reads the first size (`60x40 cm`, or `Breite 60 cm`),
-// the first material and the water supply of each text, and the decision
+// the reasoning model reads the first size (`60x40 cm`, or `Breite 60 cm`)
+// with its unit, the first material and the water supply of each text, and the decision
 // model says a quote from a sentence about an accessory (`Zubehör`) or a
 // conditional variant (`Bei Einsatz`) does not support its value. The
 // expected values come from samples/expected.json.
@@ -18,7 +18,15 @@ import {
   triggerMessage,
   type MockRules,
 } from "../_shared/testing.js";
-import { createWorkflow, defaults, quoteHolds, typed } from "./workflow.js";
+import {
+  createWorkflow,
+  defaults,
+  ontology,
+  quoteHolds,
+  typed,
+  unitOf,
+  unitProblem,
+} from "./workflow.js";
 
 const SAMPLES = samplesDir(import.meta.url, "values-extract");
 const RECORDS = readJson<{ name: string; text: string }[]>(join(SAMPLES, "records.json"));
@@ -46,27 +54,30 @@ const MATERIALS = [
 
 /** The mock reasoning model: the first size, material and water supply of a text. */
 function readValues(text: string) {
-  const values: { property: string; value: string; quote: string }[] = [];
+  const values: { property: string; value: string; unit: string; quote: string }[] = [];
   const size = text.match(/(?:ca\. )?(\d+)x(\d+) cm/);
   const width = text.match(/Breite (\d+) cm/);
   if (size)
     values.push(
-      { property: "width_cm", value: size[1]!, quote: size[0] },
-      { property: "depth_cm", value: size[2]!, quote: size[0] },
+      { property: "width_cm", value: size[1]!, unit: "cm", quote: size[0] },
+      { property: "depth_cm", value: size[2]!, unit: "cm", quote: size[0] },
     );
-  else if (width) values.push({ property: "width_cm", value: width[1]!, quote: width[0] });
+  else if (width)
+    values.push({ property: "width_cm", value: width[1]!, unit: "cm", quote: width[0] });
   const material = MATERIALS.map((m) => ({
     m,
     at: text.search(new RegExp(`(?<![\\p{L}])${m}(?![\\p{L}])`, "u")),
   }))
     .filter((found) => found.at >= 0)
     .sort((a, b) => a.at - b.at)[0];
-  if (material) values.push({ property: "material", value: material.m, quote: material.m });
+  if (material)
+    values.push({ property: "material", value: material.m, unit: "", quote: material.m });
   const water = text.match(/Anschluss[^.]*?(Kalt- und Warmwasser|Kaltwasser)/);
   if (water)
     values.push({
       property: "water_supply",
       value: water[1] === "Kaltwasser" ? "kalt" : "kalt und warm",
+      unit: "",
       quote: water[0],
     });
   return values;
@@ -201,10 +212,10 @@ test("a value below the gate goes to review, and the checks drop wrong types and
     text: "S 9.1 Becken aus Kunststoff. Breite etwa 70 cm, Tiefe 40 cm.",
   };
   const proposals = [
-    { property: "width_cm", value: "70", quote: "Breite etwa 70 cm" },
-    { property: "depth_cm", value: "vierzig", quote: "Tiefe 40 cm" },
-    { property: "material", value: "Holz", quote: "aus Holz gefertigt" },
-    { property: "material", value: "Kunststoff", quote: "Becken aus Kunststoff" },
+    { property: "width_cm", value: "70", unit: "cm", quote: "Breite etwa 70 cm" },
+    { property: "depth_cm", value: "vierzig", unit: "cm", quote: "Tiefe 40 cm" },
+    { property: "material", value: "Holz", unit: "", quote: "aus Holz gefertigt" },
+    { property: "material", value: "Kunststoff", unit: "", quote: "Becken aus Kunststoff" },
   ];
   const lbb = new MockActivities(rules([record], { reason: () => ({ values: proposals }) }));
   const { state, turns } = await runMessage(
@@ -276,4 +287,49 @@ test("values take their property's type, and a quote is in the text", () => {
   assert.ok(quoteHolds("ca.  60x40 cm", "60", "Waschtisch, ca. 60x40 cm, weiß"));
   assert.ok(!quoteHolds("weiß", "Keramik", "Waschtisch, weiß"));
   assert.ok(!quoteHolds("aus Holz gefertigt", "Holz", "Waschtisch aus Keramik"));
+});
+
+test("a number in another unit, or with none, goes to review and is not written", async () => {
+  const record = {
+    name: "S 9.2",
+    text: "S 9.2 Waschtisch, Breite 600 mm, Tiefe 45, aus Keramik.",
+  };
+  const proposals = [
+    { property: "width_cm", value: "600", unit: "mm", quote: "Breite 600 mm" },
+    { property: "depth_cm", value: "45", unit: "", quote: "Waschtisch, Breite 600 mm, Tiefe 45" },
+    { property: "material", value: "Keramik", unit: "", quote: "aus Keramik" },
+  ];
+  const lbb = new MockActivities(rules([record], { reason: () => ({ values: proposals }) }));
+  const { state } = await runMessage(
+    createWorkflow(lbb),
+    triggerMessage("values-extract", [iriOf(record.name)]),
+  );
+  assert.deepEqual(written(lbb, record.name), { material: "Keramik" });
+  assert.deepEqual(state, { instances: 1, written: 1, review: 2, dropped: 0 });
+  const rationales = [...lbb.reviews.values()].map((item) => item.rationale).sort();
+  assert.match(
+    rationales[0]!,
+    /^The unit is not confirmed: the text states mm; the property holds cm\./,
+  );
+  assert.match(
+    rationales[1]!,
+    /^The unit is not confirmed: the text states no unit; the property holds cm\./,
+  );
+});
+
+test("the ontology declares the unit of each number property", () => {
+  const ops = ontology();
+  assert.deepEqual(
+    ops.flatMap((op) => (op.op === "add_property" && op.unit ? [[op.name, op.unit]] : [])),
+    [
+      ["width_cm", "cm"],
+      ["depth_cm", "cm"],
+    ],
+  );
+  assert.equal(unitOf(defaults, "material"), undefined);
+  assert.equal(unitOf({ ...defaults, units: { material: "cm" } }, "material"), undefined);
+  assert.equal(unitProblem("cm", "cm", "ca. 60x40cm"), undefined);
+  assert.equal(unitProblem("m2", "m²", "20 m²"), undefined);
+  assert.equal(unitProblem("cm", "cm", "Breite 60"), "the quote does not state the unit cm");
+  assert.equal(unitProblem("m", "m", "600 mm"), "the quote does not state the unit m");
 });

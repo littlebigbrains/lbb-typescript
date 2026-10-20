@@ -15,13 +15,16 @@ The triggered workflow watches the class and its text field. For each
 instance of a trigger message, two steps:
 
 1. **Values.** The reasoning model reads the text and returns
-   `{values: [{property, value, quote}]}`; the schema allows only the
-   settings' property names. The prompt is the LBB version's: the values of
+   `{values: [{property, value, unit, quote}]}`; the schema allows only the
+   settings' property names. A number comes as the text states it, with
+   its unit, and the model never converts it. The prompt is the LBB version's: the values of
    the instance's own item in its base version, not those of a part, an
    accessory, an alternative or a variant under a condition; an approximate
    value is stated. Then the checks without a model: a value takes its
    property's type (`typed`), its quote is in the text with at least three
-   words or the value in it (`quoteHolds`), and one value per property.
+   words or the value in it (`quoteHolds`), and one value per property. A
+   number of a property with a unit must come in that unit, with the unit
+   in its quote (`unitProblem`); otherwise it goes to review at most.
 2. **Support.** The decision model scores how well each quote supports its
    value: `supported`, `weak` or `not_supported`. The support is the
    probability of `supported`.
@@ -48,6 +51,7 @@ A turn reads at most 24 instances; the rest of a message goes to a new turn
 | `properties` | `width_cm`, `depth_cm` (`f64`), `material` (`text`), `water_supply` (`keyword`) | The properties to fill, with their types (`text`, `keyword`, `i64`, `f64`, `bool`, `date_time`) |
 | `context` | the samples' | One sentence about what the text is |
 | `gate` | 0.8 | The support a value needs to be written |
+| `units` | `width_cm`, `depth_cm`: `cm` | The unit of each number property; `ontology()` declares it on the property |
 
 `trigger(settings)` names the triggered workflow `values-extract` and
 owns the class `ValueSource`, the relation `HAS_VALUE_SOURCE` and the
@@ -65,6 +69,9 @@ relation.
   a type it can write.
 - Its own monthly budget, a preview with the values of up to 3 instances,
   and counters per outcome in the workflow's status.
+- Unit conversion: a number the text states in another unit of the same
+  kind (`600 mm` for a property in `cm`) is converted to the unit the
+  property declares, where this template sends it to review.
 
 ## Samples and test
 
