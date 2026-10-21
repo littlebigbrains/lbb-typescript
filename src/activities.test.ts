@@ -557,9 +557,9 @@ test("waitForReview files the item with the waiting run and waits for its signal
     { timeoutMs: 60_000 },
   );
 
-  assert.deepEqual(keys, ["floor:ask"]);
+  assert.deepEqual(keys, ["floor.ask"]);
   assert.deepEqual(waits, [
-    { key: "floor:answer", name: "review.rev_2", timeoutMs: 60_000 },
+    { key: "floor.answer", name: "review.rev_2", timeoutMs: 60_000 },
   ]);
   assert.equal(result.answered, true);
   assert.deepEqual(result.answer, { decision: "choose", option: "tiles" });
@@ -611,7 +611,7 @@ test("waitForReview reads the item again when its wait times out", async () => {
     },
     { timeoutMs: 1_000 },
   );
-  assert.deepEqual(keys, ["floor:ask", "floor:read"]);
+  assert.deepEqual(keys, ["floor.ask", "floor.read"]);
   assert.equal(seen[1]?.path, "/v1/reviews/detail");
   assert.equal(result.answered, true);
   assert.deepEqual(result.answer, { decision: "choose", option: "b" });

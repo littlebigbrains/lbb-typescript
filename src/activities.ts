@@ -269,9 +269,11 @@ export interface LbbActivities {
   ): Promise<Schemas["ReviewItem"][]>;
   /**
    * Ask a person and wait for the answer without holding a worker: files
-   * the item in the step `key` with this run as the one that waits, then
-   * waits for the answer's signal. An answer that came before the wait is
-   * taken at once. Only for a run with its own identity: a trigger shard
+   * the item in the step `<key>.ask` with this run as the one that waits,
+   * then waits for the answer's signal (`<key>.answer`). An answer that came
+   * before the wait is taken at once. When the wait times out, the step
+   * `<key>.read` reads the item again, so an answer whose signal was lost
+   * still counts. Only for a run with its own identity: a trigger shard
    * (`starter.<name>`) serves many inputs, and a wait would hold them all,
    * so it is refused there; file with `review` and take the answer with a
    * review trigger instead.
@@ -523,12 +525,8 @@ export function lbbActivities(client: LbbClient): LbbActivities {
       return out;
     },
     async waitForReview(ctx, key, request, { timeoutMs }) {
-      if (ctx.workflowId.startsWith("starter.")) {
-        throw new WorkflowError(
-          `waitForReview needs a run with its own identity: ${ctx.workflowId} serves many inputs, and a wait would hold them all. File the item with review() and take the answer with a review trigger.`,
-        );
-      }
-      const item = await ctx.step(`${key}:ask`, () =>
+      refuseTriggerShard(ctx);
+      const item = await ctx.step(`${key}.ask`, () =>
         client.reviews.create(
           reviewItemBody(request, {
             identity: ctx.workflowId,
@@ -546,13 +544,13 @@ export function lbbActivities(client: LbbClient): LbbActivities {
         );
       }
       const got = await ctx.waitForSignal<Schemas["ReviewAnswer"]>(
-        `${key}:answer`,
+        `${key}.answer`,
         { name: signal, timeoutMs },
       );
       if (got.received) return { answered: true, answer: got.value, item };
       // The wait timed out: the answer may have come and its signal not
       // (a dropped event). Read the item again.
-      const now = await ctx.step(`${key}:read`, () =>
+      const now = await ctx.step(`${key}.read`, () =>
         client.reviews.get(item.id),
       );
       return now.status === "answered" && now.answer
@@ -583,6 +581,18 @@ export function lbbActivities(client: LbbClient): LbbActivities {
   // `captureActivities` checks writes with this client.
   Object.defineProperty(activities, ACTIVITIES_CLIENT, { value: client });
   return activities;
+}
+
+/**
+ * A trigger shard (`starter.<name>`) serves many inputs, and a wait would
+ * hold them all: `waitForReview` refuses it, live and in a capture.
+ */
+function refuseTriggerShard(ctx: WorkflowContext): void {
+  if (ctx.workflowId.startsWith("starter.")) {
+    throw new WorkflowError(
+      `waitForReview needs a run with its own identity: ${ctx.workflowId} serves many inputs, and a wait would hold them all. File the item with review() and take the answer with a review trigger.`,
+    );
+  }
 }
 
 /** The client {@link lbbActivities} made the activities with. */
@@ -763,7 +773,8 @@ function capturedSuggestion(
  * check of its shape, then the commit's dry run,
  * `POST /v1/graph/commit?dry_run=true`) and kept, each `review` of every
  * kind is kept and filed nowhere, `waitForReview` keeps its item and ends
- * at once without an answer, `requeue` sends nothing back to the watch (it
+ * at once without an answer (a trigger shard is refused, as live), `requeue`
+ * sends nothing back to the watch (it
  * answers `null`), and `evolve` runs as a dry run. The reads
  * (`reviewItems`, `listReviews`, `reviewItem`) run. On an RDF-native graph
  * the dry run refuses the write, as the commit would (`rdf_native_graph`).
@@ -875,7 +886,9 @@ export function captureActivities(
         : capturedSuggestion(request, filed);
     }) as LbbActivities["review"],
     // An item a test asks is kept and never answered: the wait ends at once.
-    async waitForReview(_ctx, _key, request) {
+    // A trigger shard is refused, as the live call refuses it.
+    async waitForReview(ctx, _key, request) {
+      refuseTriggerShard(ctx);
       reviews.push({ request });
       filed += 1;
       return {
