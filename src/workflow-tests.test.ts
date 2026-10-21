@@ -144,8 +144,10 @@ test("wait reads the test until it ends", async () => {
 });
 
 /** A step context that runs each step once and names its effect id. */
-function context(keys: string[]): WorkflowContext {
+function context(keys: string[], workflowId = "asker"): WorkflowContext {
   return {
+    workflowId,
+    turn: 1,
     step: async <T>(
       key: string,
       effect: (s: { effectId: string }) => Promise<T>,
@@ -332,6 +334,17 @@ test("a capture keeps review items of every kind and files none", async () => {
     { timeoutMs: 60_000 },
   );
   assert.equal(waited.answered, false);
+  // A trigger shard is refused, as the live call refuses it, and nothing is
+  // kept.
+  await assert.rejects(
+    capture.activities.waitForReview(
+      context([], "starter.sinks"),
+      "ask",
+      { ...question, key: "sinks:s41:height_cm" },
+      { timeoutMs: 60_000 },
+    ),
+    /needs a run with its own identity/,
+  );
   assert.equal(seen.length, 0, "nothing is filed");
   assert.deepEqual(
     capture.result().reviews.map((review) => review.request.title),

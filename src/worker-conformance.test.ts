@@ -9,11 +9,17 @@ import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { LbbClient, type FetchLike } from "./client.js";
-import { lbbActivities } from "./activities.js";
 import {
-  requeueFailed,
+  captureActivities,
+  lbbActivities,
+  type ActivityCapture,
+  type ActivityCaptureResult,
+  type LbbActivities,
+  type ReviewItemRequest,
+  type ReviewRequest,
+} from "./activities.js";
+import {
   triggeredWorkflow,
-  writeOwned,
   type OwnedWrite,
   type TriggeredWorkflowTurn,
 } from "./triggered-workflow-worker.js";
@@ -35,7 +41,7 @@ interface Exchange {
     method: string;
     path: string;
     query?: Record<string, string>;
-    headers?: Record<string, string>;
+    headers?: Record<string, string | null>;
     body?: Json;
     raw?: string;
     same_body_as?: number;
@@ -65,12 +71,14 @@ interface Scenario {
   task: Obj;
   runs?: number;
   client_graph?: string;
+  capture?: { workflow: string };
   exchanges: Exchange[];
   expect: {
     outcomes: string[];
     ran?: string[];
     effect_ids?: string[];
     settle_ms?: number;
+    captured?: Json;
   };
 }
 
@@ -206,11 +214,39 @@ function server(scenario: Scenario) {
   return { fetch, bodies, problems };
 }
 
-/** The scenario's handler program, run with the SDK's context. */
+/** What a capture kept, in the suite's names. */
+function captured(result: ActivityCaptureResult): Json {
+  return {
+    writes: result.writes.map((write) => ({
+      step_key: write.stepKey,
+      ...(write.graph ? { graph: write.graph } : {}),
+      body: write.body,
+      check: write.check,
+      errors: write.errors,
+      ...(write.report ? { report: write.report } : {}),
+    })),
+    reviews: result.reviews.map((review) => ({ request: review.request })),
+  };
+}
+
+/**
+ * The scenario's handler program, run with the SDK's context: the
+ * activities of the client, or of a capture when the scenario names one.
+ */
 class Program {
   ran: string[] = [];
   effectIds: string[] = [];
-  constructor(private readonly client: LbbClient) {}
+  readonly capture: ActivityCapture | undefined;
+  readonly activities: LbbActivities;
+  constructor(
+    private readonly client: LbbClient,
+    capture?: { workflow: string },
+  ) {
+    this.capture = capture
+      ? captureActivities(lbbActivities(client), capture)
+      : undefined;
+    this.activities = this.capture?.activities ?? lbbActivities(client);
+  }
 
   resolve(value: Json, outputs: Obj, state: Json, message: Json): Json {
     if (isObj(value)) {
@@ -258,7 +294,7 @@ class Program {
         prompt: string;
         schema: Record<string, unknown>;
       };
-      await lbbActivities(this.client).reason(request, {
+      await this.activities.reason(request, {
         ...(action.effect_id ? { effectId: step.effectId } : {}),
       });
     } else if ("blob_put" in action)
@@ -310,8 +346,7 @@ class Program {
         );
       } else if ("write_owned" in op) {
         const graph = value(op.graph) as string | undefined;
-        outputs[String(op.write_owned)] = await writeOwned(
-          this.client,
+        outputs[String(op.write_owned)] = await this.activities.writeOwned(
           ctx,
           String(op.write_owned),
           op.write as OwnedWrite,
@@ -319,12 +354,27 @@ class Program {
         );
       } else if ("requeue" in op) {
         const graph = value(op.graph) as string | undefined;
-        outputs[String(op.requeue)] = await requeueFailed(
-          this.client,
+        outputs[String(op.requeue)] = await this.activities.requeue(
           ctx,
           String(op.requeue),
           op.failed as { instance: string; error?: string }[],
           graph ? { graph } : {},
+        );
+      } else if ("wait_for_review" in op) {
+        outputs[String(op.wait_for_review)] =
+          await this.activities.waitForReview(
+            ctx,
+            String(op.wait_for_review),
+            op.request as ReviewItemRequest,
+            { timeoutMs: op.timeout_ms as number },
+          );
+      } else if ("review" in op) {
+        outputs[String(op.review)] = await this.activities.review(
+          op.request as ReviewRequest,
+        );
+      } else if ("review_items" in op) {
+        outputs[String(op.review_items)] = await this.activities.reviewItems(
+          op.keys as string[],
         );
       } else if ("wait" in op) throw new WorkflowWait(op.wait as number);
       else if ("raise" in op) {
@@ -396,7 +446,7 @@ async function run(scenario: Scenario) {
     retryDelayMs: 0,
     fetch: scripted.fetch,
   });
-  const program = new Program(client);
+  const program = new Program(client, scenario.capture);
   const options = scenario.workflow.worker ?? {};
   const worker = new WorkflowWorker(client, [definition(scenario, program)], {
     worker: "conformance",
@@ -431,6 +481,14 @@ async function run(scenario: Scenario) {
     JSON.stringify(program.effectIds) !== JSON.stringify(expect.effect_ids)
   )
     problems.push(`effect ids ${program.effectIds}, not ${expect.effect_ids}`);
+  if (expect.captured !== undefined) {
+    assert.ok(program.capture, "the scenario expects a capture and names none");
+    const got = captured(program.capture.result());
+    if (!matches(expect.captured, got, 0))
+      problems.push(
+        `captured ${JSON.stringify(got)} does not match ${JSON.stringify(expect.captured)}`,
+      );
+  }
   assert.deepEqual(problems, [], `${scenario.name}: ${scenario.rule}`);
 }
 
@@ -455,6 +513,8 @@ test("the conformance suite covers the named rules", () => {
     "fan-in",
     "signal",
     "timeout",
+    "review",
+    "captured",
   ])
     assert.ok(
       files.some((name) => name.includes(rule)),

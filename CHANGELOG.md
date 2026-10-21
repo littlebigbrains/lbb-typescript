@@ -4,6 +4,15 @@ All notable changes to the `@littlebigbrain/client` package are documented here.
 
 ## Unreleased
 
+- `lbbActivities(client).waitForReview` names its steps `<key>.ask`,
+  `<key>.answer` and `<key>.read`. A step key holds no `:`, so a worker
+  refused the old names `<key>:ask`, `<key>:answer` and `<key>:read`. The
+  scenarios of `sdk/conformance/workflow-worker` now pin the steps of
+  `waitForReview` and of `captureActivities`.
+- `captureActivities`: `waitForReview` on a trigger shard (`starter.<name>`)
+  is refused with the live call's `WorkflowError`, and keeps nothing. Before,
+  it ended unanswered, so a test passed where the live run fails.
+
 - `files.putPages(sha256, parser, upload)` stores what a parser outside the
   server made of one upload of a file (`PUT /v1/files/pages`, with the
   upload's `uploaded_at`). `WorkflowTurnReader` gains the hosted workers'
