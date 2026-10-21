@@ -41,17 +41,31 @@ instance of a trigger message, two steps:
 
 Then the gate: a value at or above `gate` is `written`, one from 0.5 to the
 gate goes to `review`, one below 0.5 or without an answer is
-`weak_support` and is dropped. A review item's key is LBB's,
-`starter:<workflow>:value:<hash of instance, property and value>`
-(`stableHashHex`), so a new value files a new item and the same value
-updates its item. One owned write per turn replaces the values of the
+`weak_support` and is dropped. A value in review becomes a `value` review
+item (`lbb.review({ kind: "value" })`) with the property's unit and the
+quote, one per property of an instance, under LBB's key
+`starter:<workflow>:value:<hash of instance and property>` (`valueItemKey`,
+with `stableHashHex`). One owned write per turn replaces the values of the
 turn's instances: a property the workflow does not write again loses its
 value and its source. Each value's evidence is its quote, with the
 instance's page box as its region when the instance has one (`page`, `x0`,
-`y0`, `x1`, `y1`, as a `DocEntry` has). An accepted review item's value is
-written with the others the next time its instance is read. An instance
-that leaves the class keeps its values: they go with its fields when it is
-retracted.
+`y0`, `x1`, `y1`, as a `DocEntry` has).
+
+Before it writes, the workflow reads the items (`lbb.reviewItems(keys)`): a
+person's answer wins over the model, for the evidence it was given on
+(`evidence_hash`: a hash of the value's quote and of the unit the text
+states, `evidenceOf`). With the same evidence, the value in force, or the
+value the person decided on, a value a person accepted, or corrected with
+a number in the property's unit, is written as answered. New evidence that
+reads another value asks the person again, and the answered value and its
+source link stay (the instance is written on its own, without that
+property) until a new answer is written. A value a person rejected is
+not written again, nor is one the graph refused (`effects.commit_error`; the
+item is open again for the person). An earlier version filed a value in
+review as a suggestion, one per value (`legacyValueKey`): an accepted one is
+written again, an open one stays the question, and a dismissed one is a
+reject of its value. An instance that leaves the class keeps its values:
+they go with its fields when it is retracted.
 
 The write's request id is its step's effect id, which no other turn
 repeats, so a value that changes back (A, then B, then A) is written again.
@@ -100,8 +114,8 @@ template sends the instance back to the watch and keeps them. And it
 converts a number the text states in another unit of the same kind (`600 mm`
 for a property in `cm`) to the unit the property declares, and refuses a
 unit it does not know or of another kind; the template sends such a number
-to review. So the review key and title of such a number differ: LBB keys
-its item by the converted value, the template by the value as stated.
+to review. So the question of such a number differs: LBB's item asks the
+converted value, the template's the value as stated.
 
 ## Samples and test
 

@@ -20,8 +20,19 @@
 //    value;
 // 4. writes the values at or above the gate, each with a `ValueSource` whose
 //    evidence is the quote (with the instance's page box as its region, when
-//    the instance has one), and files a review item for each value between
-//    0.5 and the gate. A value below 0.5 is dropped.
+//    the instance has one), and asks a person about each value between 0.5
+//    and the gate: a `value` review item in the property's unit, one per
+//    property of an instance. A value below 0.5 is dropped.
+//
+// A person's answer wins over the model, for the evidence it was given on
+// (the value's quote and the unit the text states). A value a person
+// accepted or corrected is written as answered (a correction is a number in
+// the property's unit, as entered); one a person rejected, or one the graph
+// refused, is not written again. New evidence with another value asks again,
+// and the answered value and its source stay until the person answers. A
+// value an earlier version filed as a suggestion keeps working: an accepted
+// one is written again, an open one stays the question, and a dismissed one
+// is a reject of its value.
 //
 // Every model call runs in a step with the step's effect id, so a turn that
 // runs again after a crash pays for nothing twice. The write's request id is
@@ -167,7 +178,23 @@ export interface Checked {
   support?: number;
   /** Why the unit of a number is not confirmed: the value goes to review at most. */
   unconfirmed?: string;
+  /**
+   * The unit the text states, folded (`cm` for `CM`): part of the value's evidence. LBB maps the
+   * names of a unit (`centimetres`) to its symbol too.
+   */
+  statedUnit?: string;
 }
+
+/** What a person's answer decides for a value. */
+type Decision =
+  /** Write the answered value. */
+  | { kind: "write"; value: string | number | boolean; corrected: boolean }
+  /** Keep the property as it is in the graph (and ask again when `ask`). */
+  | { kind: "hold"; ask: boolean }
+  /** Write nothing for the value. */
+  | { kind: "skip" }
+  /** Write the facts of a suggestion an earlier version filed and a person accepted. */
+  | { kind: "facts"; facts: Schemas["SuggestedFacts"] };
 
 /** The text of one instance as the workflow reads it. */
 interface Instance {
@@ -353,8 +380,26 @@ export function check(
       value: String(coerced.value),
       typed: coerced.value,
       ...(unconfirmed ? { unconfirmed } : {}),
+      ...(stated ? { statedUnit: unitText(stated) } : {}),
     };
   });
+}
+
+/** The key of the value item of a property of an instance, as LBB's values.extract gives it. */
+export function valueItemKey(workflow: string, iri: string, property: string): string {
+  const hash = stableHashHex(["value_item_v2", entityIdFromIri(iri), property]).slice(0, 24);
+  return `starter:${workflow}:value:${hash}`;
+}
+
+/** The key an earlier version filed a value under, as a suggestion: one per value. */
+export function legacyValueKey(workflow: string, iri: string, v: Checked): string {
+  const hash = stableHashHex([entityIdFromIri(iri), v.property, v.value]).slice(0, 24);
+  return `starter:${workflow}:value:${hash}`;
+}
+
+/** The evidence a value is read from, as LBB marks it: its quote and the unit the text states. */
+export function evidenceOf(v: Checked): string {
+  return stableHashHex(["values_evidence_v2", normalize(v.quote), v.statedUnit ?? ""]).slice(0, 32);
 }
 
 /** The workflow, for a `WorkflowWorker`. `lbb` is `lbbActivities(client)`, or a mock in a test. */
@@ -527,51 +572,180 @@ export function createWorkflow(lbb: LbbActivities, settings: Settings = defaults
         );
       }
 
-      // The review items: one per value between 0.5 and the gate, keyed by
-      // its instance, property and value. An accepted one is written again.
-      const below = reads.flatMap((read, i) =>
-        read.values.filter((v) => v.outcome === "review").map((v) => ({ i, v })),
+      // A person's answer wins over the model, for the evidence it was given
+      // on. One read of the items of the turn's values: the value item of each
+      // property of an instance, and the suggestion an earlier version filed
+      // for each value.
+      const candidates = reads.flatMap((read, i) =>
+        read.values
+          .filter((v) => v.outcome === "written" || v.outcome === "review")
+          .map((v) => ({ i, v })),
       );
-      const accepted = await ctx.step("review", async (s) => {
-        const kept: { i: number; property: string; facts: Schemas["SuggestedFacts"] }[] = [];
-        for (const [n, { i, v }] of below.entries()) {
-          s.progress("filing review items", { done: n, total: below.length, unit: "items" });
+      const keyOf = (i: number, property: string) =>
+        valueItemKey(message.workflow, batch[i]!, property);
+      const legacyKeyOf = (i: number, v: Checked) => legacyValueKey(message.workflow, batch[i]!, v);
+      const known = await ctx.step("answers", async () => {
+        const items: Record<string, Schemas["ReviewItem"]> = {};
+        const legacy: Record<string, { status: string; facts: Schemas["SuggestedFacts"] | null }> =
+          {};
+        if (!candidates.length) return { items, legacy };
+        const found = await lbb.reviewItems(
+          candidates.flatMap(({ i, v }) => [keyOf(i, v.property), legacyKeyOf(i, v)]),
+        );
+        for (const item of found) {
+          if (item.kind === "value") items[item.key] = item;
+          else if (item.kind === "change") {
+            const accepted = item.status === "answered" && item.answer?.decision === "accept";
+            const status = accepted
+              ? "accepted"
+              : item.status === "answered"
+                ? "dismissed"
+                : item.status;
+            // An accepted suggestion is written again with its facts.
+            const filed = accepted ? await lbb.reviewItem(item.key) : null;
+            legacy[item.key] = { status, facts: filed?.facts ?? null };
+          }
+        }
+        return { items, legacy };
+      });
+      const decide = (i: number, v: Checked): Decision | undefined => {
+        const item = known.items[keyOf(i, v.property)];
+        if (item) {
+          // The same evidence, the value in force, or the value the item proposed when it was
+          // answered (the person decided on it) asks nothing.
+          const inForce = valueInForce(item);
+          if (inForce !== undefined) {
+            const same = !item.evidence_hash || item.evidence_hash === evidenceOf(v);
+            return same || inForce.value === v.typed || item.question?.value === v.typed
+              ? { kind: "write", ...inForce }
+              : { kind: "hold", ask: true };
+          }
+          // Asked again: hold, and update the question only for a value it does not ask yet.
+          if (item.previous_answer)
+            return {
+              kind: "hold",
+              ask: item.question?.value !== v.typed && rejectedValue(item) !== v.typed,
+            };
+          // A value a person rejected, or one the graph refused, is not written again.
+          if (rejectedValue(item) === v.typed || refusedValue(item) === v.typed)
+            return { kind: "skip" };
+          return undefined;
+        }
+        const legacy = known.legacy[legacyKeyOf(i, v)];
+        if (legacy?.status === "accepted")
+          return legacy.facts ? { kind: "facts", facts: legacy.facts } : { kind: "skip" };
+        if (legacy?.status === "dismissed") return { kind: "skip" };
+        // An open suggestion stays the question.
+        if (legacy?.status === "open" && v.outcome === "review") return { kind: "skip" };
+        return undefined;
+      };
+
+      // The value items: one per property of an instance, for a value between
+      // 0.5 and the gate, or new evidence against an answer in force.
+      const asking = candidates.filter(({ i, v }) => {
+        const decision = decide(i, v);
+        return decision ? decision.kind === "hold" && decision.ask : v.outcome === "review";
+      });
+      const answered = await ctx.step("review", async (s) => {
+        const kept: {
+          i: number;
+          property: string;
+          value: string | number | boolean;
+          corrected: boolean;
+        }[] = [];
+        for (const [n, { i, v }] of asking.entries()) {
+          s.progress("filing review items", { done: n, total: asking.length, unit: "items" });
           const iri = batch[i]!;
           const record = (await texts())[iri]!;
           const facts = valueFacts(iri, record, v);
-          const filed = await lbb.review({
-            workflow: message.workflow,
-            key: `starter:${message.workflow}:value:${stableHashHex([entityIdFromIri(iri), v.property, v.value]).slice(0, 24)}`,
+          const unit = unitOf(settings, v.property);
+          const support = v.support ?? 0;
+          const item = await lbb.review({
+            kind: "value",
+            workflow: { name: message.workflow },
+            origin: { kind: "agent", id: `starter:${message.workflow}`, label: "values.extract" },
+            key: keyOf(i, v.property),
             title: chars(`Set ${v.property} of ${record.label} to ${v.value}`, 200),
             rationale: v.unconfirmed
-              ? `The unit is not confirmed: ${v.unconfirmed}. The text supports the value with ${(v.support ?? 0).toFixed(2)}: "${chars(v.quote, 600)}"`
-              : `The text supports the value with ${(v.support ?? 0).toFixed(2)}, below the gate ${settings.gate}: "${chars(v.quote, 600)}"`,
-            origin: {
-              kind: "agent",
-              id: `starter:${message.workflow}`,
-              label: "values.extract",
+              ? `The unit is not confirmed: ${v.unconfirmed}. The text supports the value with ${support.toFixed(2)}.`
+              : `The text supports the value with ${support.toFixed(2)}, below the gate ${settings.gate}.`,
+            subject: { iri, type: settings.className, name: record.label },
+            question: {
+              property: v.property,
+              value: v.typed!,
+              ...(unit ? { unit } : {}),
+              confidence: support,
             },
+            // The quote, with the instance's page box as its region.
+            evidence: [
+              {
+                quote: chars(v.quote, 600),
+                source_id: iri,
+                ...(facts.edge.evidence.region ? { region: facts.edge.evidence.region } : {}),
+                confidence: support,
+              },
+            ],
+            evidence_hash: evidenceOf(v),
             facts: {
               triplets: [facts.edge],
               entity_properties: [facts.onInstance, facts.onSource],
               summary: chars(`${v.property} = ${v.value}`, 500),
             },
-            evidence: {
-              records: 1,
-              samples: [{ entity: iri, quote: chars(v.quote, 600), support: v.support ?? null }],
-            },
           });
-          if (filed.status === "accepted" && filed.facts)
-            kept.push({ i, property: v.property, facts: filed.facts });
+          if (decide(i, v)) continue; // asked again: the answered value holds
+          // Answered already (a person answered between the read and now).
+          const inForce = valueInForce(item);
+          if (inForce) kept.push({ i, property: v.property, ...inForce });
         }
         return kept;
       });
 
-      const failed = batch.flatMap((iri, i) =>
-        reads[i]!.failed !== undefined ? [{ instance: iri, error: reads[i]!.failed }] : [],
-      );
-      const write = await lbb.writeOwned(ctx, "write", async (s) => {
-        s.progress("writing facts", { done: 0, total: batch.length, unit: "instances" });
+      /** What the write sets on instance `i`, and the properties it keeps as they are in the graph. */
+      const plan = (i: number, record: Instance) => {
+        const entity_properties: Schemas["EntityPropertiesInput"][] = [];
+        const triplets: Schemas["TripletInput"][] = [];
+        const written = new Set<string>();
+        const held = new Set<string>();
+        for (const v of reads[i]!.values) {
+          if (v.outcome !== "written" && v.outcome !== "review") continue;
+          const decision = decide(i, v);
+          if (decision?.kind === "hold") held.add(v.property);
+          if (decision?.kind === "facts") {
+            entity_properties.push(...(decision.facts.entity_properties ?? []));
+            triplets.push(...(decision.facts.triplets ?? []));
+            written.add(v.property);
+            continue;
+          }
+          const answer =
+            decision?.kind === "write"
+              ? decision
+              : decision
+                ? undefined
+                : answered.find((a) => a.i === i && a.property === v.property);
+          const kept =
+            answer !== undefined
+              ? answeredAs(v, answer)
+              : !decision && v.outcome === "written"
+                ? v
+                : undefined;
+          if (!kept) continue;
+          const facts = valueFacts(batch[i]!, record, kept);
+          entity_properties.push(facts.onInstance, facts.onSource);
+          triplets.push(facts.edge);
+          written.add(v.property);
+        }
+        return { entity_properties, triplets, written, held };
+      };
+      /** The properties of instance `i` whose answered value stays as it is in the graph. */
+      const heldOf = (i: number) =>
+        new Set(
+          reads[i]!.values.filter(
+            (v) =>
+              (v.outcome === "written" || v.outcome === "review") && decide(i, v)?.kind === "hold",
+          ).map((v) => v.property),
+        );
+      /** One owned write of instances; a held property is neither set nor replaced. */
+      const ownedWrite = async (indexes: number[], held: Set<string>) => {
         const records = await texts();
         const out = {
           subjects: [] as Schemas["NamedEntityInput"][],
@@ -579,34 +753,53 @@ export function createWorkflow(lbb: LbbActivities, settings: Settings = defaults
           triplets: [] as Schemas["TripletInput"][],
           retract: [] as Schemas["NamedEntityInput"][],
         };
-        for (const [i, iri] of batch.entries()) {
-          const read = reads[i]!;
+        for (const i of indexes) {
+          const iri = batch[i]!;
           const record = records[iri];
-          if (read.missing || read.failed !== undefined || !record) continue;
+          if (!record) continue;
           out.subjects.push(entityRef(iri, settings.className, record.label));
-          const written = new Set<string>();
-          for (const v of read.values.filter((v) => v.outcome === "written")) {
-            const facts = valueFacts(iri, record, v);
-            out.entity_properties.push(facts.onInstance, facts.onSource);
-            out.triplets.push(facts.edge);
-            written.add(v.property);
-          }
-          for (const a of accepted.filter((a) => a.i === i)) {
-            out.entity_properties.push(...(a.facts.entity_properties ?? []));
-            out.triplets.push(...(a.facts.triplets ?? []));
-            written.add(a.property);
-          }
-          out.retract.push(...names.filter((p) => !written.has(p)).map((p) => source(iri, p)));
+          const planned = plan(i, record);
+          out.entity_properties.push(...planned.entity_properties);
+          out.triplets.push(...planned.triplets);
+          out.retract.push(
+            ...names
+              .filter((p) => !planned.written.has(p) && !held.has(p))
+              .map((p) => source(iri, p)),
+          );
         }
         return {
           subjects: out.subjects,
-          relations: ["HAS_VALUE_SOURCE"],
-          properties: names,
+          // A held property keeps its source link: an instance that holds one
+          // does not replace its links (a source it no longer has is retracted
+          // whole, with its link).
+          relations: held.size ? [] : ["HAS_VALUE_SOURCE"],
+          properties: names.filter((p) => !held.has(p)),
           entity_properties: out.entity_properties,
           triplets: out.triplets,
           retract_entities: out.retract,
         };
-      });
+      };
+
+      const failed = batch.flatMap((iri, i) =>
+        reads[i]!.failed !== undefined ? [{ instance: iri, error: reads[i]!.failed }] : [],
+      );
+      const writable = batch
+        .map((_, i) => i)
+        .filter((i) => !reads[i]!.missing && reads[i]!.failed === undefined);
+      const holding = writable.filter((i) => heldOf(i).size > 0);
+      const writes = [
+        await lbb.writeOwned(ctx, "write", async (s) => {
+          s.progress("writing facts", { done: 0, total: batch.length, unit: "instances" });
+          return ownedWrite(
+            writable.filter((i) => !holding.includes(i)),
+            new Set(),
+          );
+        }),
+      ];
+      // An instance that holds an answered value is written on its own, so
+      // the held property stays out of its replace.
+      for (const i of holding)
+        writes.push(await lbb.writeOwned(ctx, `write-held-${i}`, () => ownedWrite([i], heldOf(i))));
       // Refused instances go back to the watch; the turn completes.
       await lbb.requeue(ctx, "requeue", failed, { graph: message.graph });
 
@@ -619,7 +812,8 @@ export function createWorkflow(lbb: LbbActivities, settings: Settings = defaults
           if (v.outcome) tally[v.outcome] += 1;
         }
       }
-      if (write.commit_seq !== null && !write.replayed) tally.commits += 1;
+      for (const write of writes)
+        if (write.commit_seq !== null && !write.replayed) tally.commits += 1;
       const next = Object.fromEntries(
         Object.entries(ZERO).map(([key]) => [
           key,
@@ -684,6 +878,46 @@ ${BOX.map((b) => `  OPTIONAL { ?s <${P}${b}> ?${b} }`).join("\n")}
     if (page! < 0 || ![x0, y0, x1, y1].every((v) => v! >= 0 && v! <= 1)) return null;
     if (x0! > x1! || y0! > y1!) return null;
     return { page: Math.trunc(page!), x0: x0!, y0: y0!, x1: x1!, y1: y1!, confidence: 0 };
+  }
+
+  /** The value of an answered item that holds in the graph: an accept or a correction the graph took. */
+  function valueInForce(
+    item: Schemas["ReviewItem"],
+  ): { value: string | number | boolean; corrected: boolean } | undefined {
+    const answer = item.answer;
+    if (!answer || item.status !== "answered" || item.effects?.commit_error) return undefined;
+    const value =
+      answer.decision === "correct"
+        ? answer.value
+        : answer.decision === "accept"
+          ? (answer.value ?? item.question?.value)
+          : undefined;
+    return value === undefined || value === null
+      ? undefined
+      : { value: value as string | number | boolean, corrected: answer.decision === "correct" };
+  }
+
+  /** The proposed value a person rejected on an item. */
+  function rejectedValue(item: Schemas["ReviewItem"]): unknown {
+    return item.answer?.decision === "reject" ? item.question?.value : undefined;
+  }
+
+  /** The value of an answer the graph refused to write: the item is open again for the person. */
+  function refusedValue(item: Schemas["ReviewItem"]): unknown {
+    if (!item.effects?.commit_error) return undefined;
+    if (item.answer?.decision === "correct") return item.answer.value;
+    if (item.answer?.decision === "accept") return item.answer.value ?? item.question?.value;
+    return undefined;
+  }
+
+  /** A value as a person answered it: a correction in place of the read value, with support 1. */
+  function answeredAs(
+    v: Checked,
+    answer: { value: string | number | boolean; corrected: boolean },
+  ): Checked {
+    return answer.corrected
+      ? { ...v, typed: answer.value, value: String(answer.value), support: 1 }
+      : { ...v, typed: answer.value, value: String(answer.value) };
   }
 
   /** The source entity of a property's value on an instance. */

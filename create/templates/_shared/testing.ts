@@ -22,7 +22,9 @@ import {
   type OwnedWrite,
   type ReasonRequest,
   type ReasonResult,
+  type ReviewItemRequest,
   type ReviewRequest,
+  type ReviewWaitResult,
   type Schemas,
   type SparqlResults,
   type WorkflowContext,
@@ -147,6 +149,10 @@ export interface MockRules {
   refuses?: (kind: "reason" | "decide" | "embed", request: unknown) => boolean;
   /** The status a review item gets (default `open`). */
   reviewStatus?: (request: ReviewRequest) => Schemas["OntologyChangeSuggestionStatus"];
+  /** The answer a person gave to a review item of another kind than a change (default none: open). */
+  reviewAnswer?: (request: ReviewItemRequest) => Schemas["ReviewAnswer"] | undefined;
+  /** Why the graph refused the answer's value (`effects.commit_error`), if it did. */
+  reviewRefused?: (request: ReviewItemRequest) => string | undefined;
   pages?: FilePages[];
   ontology?: Schemas["OntologyView"];
   /** What a dry-run evolve answers (default: a change that is not a no-op). */
@@ -171,6 +177,10 @@ export class MockActivities implements LbbActivities {
   readonly graph = new MemoryGraph();
   readonly calls: MockCall[] = [];
   readonly reviews = new Map<string, ReviewRequest & { status: string }>();
+  /** The review items of other kinds than a change (`value`, `choice`, …), by key. */
+  readonly questions = new Map<string, ReviewItemRequest>();
+  /** Items asked again on new evidence: the answer in force they hold until a new one. */
+  readonly previous = new Map<string, Schemas["ReviewAnswer"]>();
   readonly evolved: Schemas["OntologyEvolveOp"][][] = [];
   /** The instances each turn sent back to the watch (`lbb.requeue`), by step effect id. */
   readonly requeued: {
@@ -365,7 +375,108 @@ export class MockActivities implements LbbActivities {
     });
   }
 
-  async review(request: ReviewRequest): Promise<Schemas["OntologyChangeSuggestion"]> {
+  review(request: ReviewRequest): Promise<Schemas["OntologyChangeSuggestion"]>;
+  review(request: ReviewItemRequest): Promise<Schemas["ReviewItem"]>;
+  async review(
+    request: ReviewRequest | ReviewItemRequest,
+  ): Promise<Schemas["OntologyChangeSuggestion"] | Schemas["ReviewItem"]> {
+    if ("kind" in request && request.kind !== "change") return this.question(request);
+    return this.suggestion(request as ReviewRequest);
+  }
+
+  /** The items filed under `keys`, of every status and kind. */
+  async reviewItems(keys: string[]): Promise<Schemas["ReviewItem"][]> {
+    return [...new Set(keys)].flatMap((key): Schemas["ReviewItem"][] => {
+      const request = this.questions.get(key);
+      if (request) return [this.itemOf(key, request)];
+      // A suggestion is a `change` item, answered as its status says.
+      const filed = this.reviews.get(key);
+      if (!filed) return [];
+      const decision =
+        filed.status === "accepted"
+          ? "accept"
+          : filed.status === "dismissed"
+            ? "reject"
+            : undefined;
+      return [
+        {
+          id: `rev_${key}`,
+          object: "review_item",
+          key,
+          kind: "change",
+          status: decision ? "answered" : filed.status === "superseded" ? "withdrawn" : "open",
+          title: filed.title,
+          ...(decision ? { answer: { decision } } : {}),
+        } as unknown as Schemas["ReviewItem"],
+      ];
+    });
+  }
+
+  /** A review item of another kind than a change: open, or answered by the rules. A key a
+   * suggestion holds is refused as the server refuses it (`409 review_kind_clash`). */
+  private question(request: ReviewItemRequest): Schemas["ReviewItem"] {
+    const key = request.key ?? `review-${this.questions.size}`;
+    if (this.reviews.has(key))
+      throw new LbbError(409, `key ${key} names a change item, not a ${request.kind} item`, {
+        type: "invalid_request_error",
+        code: "review_kind_clash",
+        message: `key ${key} names a change item, not a ${request.kind} item`,
+      });
+    // As the server does: an answered item stays as answered, unless new
+    // evidence brings another proposal for an answer in force, which asks
+    // again and keeps that answer as `previous_answer`.
+    const before = this.questions.get(key);
+    if (before) {
+      const was = this.itemOf(key, before);
+      const answer = was.status === "answered" ? was.answer : undefined;
+      const inForce = answer?.decision === "accept" || answer?.decision === "correct";
+      const evidenceChanged =
+        Boolean(before.evidence_hash && request.evidence_hash) &&
+        before.evidence_hash !== request.evidence_hash;
+      const held = answer?.value ?? before.question.value;
+      const asked = request.question.value;
+      if (inForce && evidenceChanged && held !== asked && before.question.value !== asked)
+        this.previous.set(key, { ...answer!, value: held });
+      else if (answer) return was;
+    }
+    this.questions.set(key, request);
+    return this.itemOf(key, request);
+  }
+
+  private itemOf(key: string, request: ReviewItemRequest): Schemas["ReviewItem"] {
+    const previous = this.previous.get(key);
+    // An item asked again waits for a new answer.
+    const answer = previous ? undefined : this.rules.reviewAnswer?.(request);
+    const refused = answer ? this.rules.reviewRefused?.(request) : undefined;
+    return {
+      id: `rev_${key}`,
+      object: "review_item",
+      key,
+      kind: request.kind,
+      // A refused answer does not stand: the item is open again, as the server keeps it.
+      status: answer && !refused ? "answered" : "open",
+      title: request.title,
+      question: request.question,
+      ...(request.evidence_hash ? { evidence_hash: request.evidence_hash } : {}),
+      ...(previous ? { previous_answer: previous } : {}),
+      ...(answer ? { answer } : {}),
+      ...(refused ? { effects: { commit_error: refused, delivery: { state: "none" } } } : {}),
+    } as unknown as Schemas["ReviewItem"];
+  }
+
+  /** Files the item; the wait returns the rules' answer, else it times out. */
+  async waitForReview(
+    ctx: WorkflowContext,
+    key: string,
+    request: ReviewItemRequest,
+  ): Promise<ReviewWaitResult> {
+    const item = await ctx.step(`${key}:ask`, async () => this.question(request));
+    return item.answer
+      ? { answered: true, answer: item.answer, item }
+      : { answered: false, answer: null, item };
+  }
+
+  private async suggestion(request: ReviewRequest): Promise<Schemas["OntologyChangeSuggestion"]> {
     const key = request.key ?? `review-${this.reviews.size}`;
     const status = this.reviews.get(key)?.status ?? this.rules.reviewStatus?.(request) ?? "open";
     this.reviews.set(key, { ...request, status });

@@ -1,6 +1,7 @@
 import { WorkflowNamespace } from "./workflows.js";
 import { CdcNamespace } from "./cdc.js";
 import { FilesNamespace } from "./files.js";
+import { ReviewsNamespace } from "./reviews.js";
 import { AccessNamespace, CatalogNamespace } from "./catalog.js";
 import {
   DEFAULT_INTEGRATIONS_URL,
@@ -324,6 +325,11 @@ export class LbbClient {
    * bytes and its parsed pages (lines and words with their boxes), delete.
    */
   readonly files: FilesNamespace;
+  /**
+   * Review: questions for a person. File, list and answer review items
+   * (values, choices, grades, answers, and ontology changes).
+   */
+  readonly reviews: ReviewsNamespace;
   readonly catalog: CatalogNamespace;
   readonly access: AccessNamespace;
   readonly workflows: WorkflowNamespace;
@@ -389,6 +395,7 @@ export class LbbClient {
     this.models = new ModelsNamespace(this);
     this.embeddings = new EmbeddingsNamespace(this);
     this.files = new FilesNamespace(this);
+    this.reviews = new ReviewsNamespace(this);
     this.catalog = new CatalogNamespace(this);
     this.access = new AccessNamespace(this);
     this.workflows = new WorkflowNamespace(this);

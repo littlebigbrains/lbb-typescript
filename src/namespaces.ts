@@ -1,6 +1,7 @@
 import type { WorkflowNamespace } from "./workflows.js";
 import type { LbbClient } from "./client.js";
 import type { FilesNamespace } from "./files.js";
+import type { ReviewsNamespace } from "./reviews.js";
 import {
   parseLbbError,
   sleep,
@@ -72,6 +73,8 @@ export class GraphNamespace {
   readonly embeddings: EmbeddingsNamespace;
   /** Files of this graph and their parsed pages. */
   readonly files: FilesNamespace;
+  /** Review items of this graph: questions for a person. */
+  readonly reviews: ReviewsNamespace;
   readonly workflows: WorkflowNamespace;
 
   constructor(private readonly client: LbbClient) {
@@ -86,6 +89,7 @@ export class GraphNamespace {
     this.models = client.models;
     this.embeddings = client.embeddings;
     this.files = client.files;
+    this.reviews = client.reviews;
     this.workflows = client.workflows;
   }
 

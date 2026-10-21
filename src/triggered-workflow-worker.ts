@@ -25,6 +25,11 @@ export type WorkflowTriggerReason = Schemas["WorkflowTriggerReason"];
 /** The `type` of every trigger message. */
 export const TRIGGER_MESSAGE_TYPE = "instances";
 
+/** The answer to a review item, as a workflow with a review trigger gets it. */
+export type ReviewAnsweredMessage = Schemas["ReviewAnsweredMessage"];
+/** The `type` of a review answer's message. */
+export const REVIEW_ANSWERED_MESSAGE_TYPE = "review.answered";
+
 const isObject = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null && !Array.isArray(value);
 
@@ -112,6 +117,20 @@ export interface TriggeredWorkflowDefinition<S, R = unknown> {
     state: S,
   ): Promise<TriggeredWorkflowTurn<S, R> | void>;
   /**
+   * Handle the answer to a review item the workflow asked, when it has a
+   * review trigger (`{ review: {} }` beside its watch or content trigger):
+   * one `review.answered` message per answer, with the answered item in
+   * brief (`message.review_item`, its answer in `review_item.answer`) and
+   * the id of the request that answered. A value's accept or correction is
+   * in the graph already (`review_item.commit_seq`). Without this handler
+   * such a message fails the turn.
+   */
+  onReviewAnswered?(
+    ctx: WorkflowContext,
+    message: ReviewAnsweredMessage,
+    state: S,
+  ): Promise<TriggeredWorkflowTurn<S, R> | void>;
+  /**
    * Handle one message of the workflow's fan-in identity
    * (`starter.<name>.<fan_in>`, `fan_in` of `PUT /v1/workflows/named`):
    * the shards' turns send it their outputs (`generated`, `decided`) with
@@ -177,11 +196,26 @@ export function triggeredWorkflow<S = Record<string, unknown>, R = unknown>(
           ...(turn?.result !== undefined ? { result: turn.result } : {}),
         };
       }
-      const turn = await definition.onInstances(
-        ctx,
-        parseTriggerMessage(message),
-        state,
-      );
+      const raw: unknown = message;
+      const answered =
+        isObject(raw) && raw.type === REVIEW_ANSWERED_MESSAGE_TYPE;
+      if (answered && !definition.onReviewAnswered) {
+        throw new WorkflowError(
+          `${definition.name} received a review answer (it has a review trigger) but defines no onReviewAnswered`,
+        );
+      }
+      const turn =
+        answered && definition.onReviewAnswered
+          ? await definition.onReviewAnswered(
+              ctx,
+              raw as ReviewAnsweredMessage,
+              state,
+            )
+          : await definition.onInstances(
+              ctx,
+              parseTriggerMessage(message),
+              state,
+            );
       return {
         state: turn?.state !== undefined ? turn.state : state,
         ...(turn?.result !== undefined ? { result: turn.result } : {}),
