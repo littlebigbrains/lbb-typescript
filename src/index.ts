@@ -86,6 +86,25 @@ export type {
 } from "./namespaces.js";
 export { isDerivationUploadChanged } from "./triggered-workflows.js";
 export type {
+  EvalDataset,
+  EvalDatasetCreateRequest,
+  EvalDatasetExport,
+  EvalDatasetItem,
+  EvalDatasetList,
+  EvalDatasetListOptions,
+  EvalDatasetsNamespace,
+} from "./eval-datasets.js";
+export type {
+  WorkflowTest,
+  WorkflowTestAnswerRequest,
+  WorkflowTestCreateRequest,
+  WorkflowTestDataset,
+  WorkflowTestList,
+  WorkflowTestListOptions,
+  WorkflowTestsNamespace,
+  WorkflowTestWaitOptions,
+} from "./workflow-tests.js";
+export type {
   DerivationKey,
   DerivationsNamespace,
   DeriveOptions,
@@ -200,12 +219,17 @@ export type {
   WorkflowTriggerReason,
 } from "./triggered-workflow-worker.js";
 export {
+  captureActivities,
   isActivityRefused,
   lbbActivities,
   splitInHalves,
 } from "./activities.js";
 export { stableHashHex } from "./hash.js";
 export type {
+  ActivityCapture,
+  ActivityCaptureResult,
+  CapturedReview,
+  CapturedWrite,
   ActivityOptions,
   ActivityPagesOptions,
   DecideAnswer,

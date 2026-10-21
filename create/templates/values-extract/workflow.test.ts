@@ -39,6 +39,7 @@ import {
   unitProblem,
   valueItemKey,
 } from "./workflow.js";
+import { report, testExamples } from "./test-examples.js";
 
 const SAMPLES = samplesDir(import.meta.url, "values-extract");
 const RECORDS = readJson<{ name: string; text: string }[]>(join(SAMPLES, "records.json"));
@@ -755,4 +756,29 @@ test("the ontology declares the unit of each number property", () => {
   );
   assert.equal(width!.typed, 60);
   assert.equal(width!.unconfirmed, undefined);
+});
+
+test("test:examples runs the workflow on chosen inputs and writes nothing", async () => {
+  const lbb = new MockActivities(rules(RECORDS));
+  const iris = RECORDS.slice(0, 2).map((r) => iriOf(r.name));
+  const results = await testExamples(lbb, iris);
+  assert.equal(lbb.graph.edgesOf("HAS_VALUE_SOURCE").length, 0, "nothing is written");
+  assert.deepEqual(
+    results.map((r) => r.iri),
+    iris,
+  );
+  const first = results[0]!;
+  assert.deepEqual(first.errors, []);
+  assert.deepEqual(first.review, []);
+  const width = first.written.find((v) => v.property === "width_cm");
+  assert.equal(width?.value, "60");
+  assert.equal(width?.quote, "ca. 60x40 cm");
+  assert.equal(width?.support, 0.92);
+  assert.deepEqual(
+    first.written.map((v) => v.property).sort(),
+    EXPECTED.records[0]!.values.map((v) => v.property).sort(),
+  );
+  const lines = report(results);
+  assert.equal(lines[0], iris[0]);
+  assert.ok(lines.some((line) => line.startsWith("  write   width_cm = 60 (support 0.92)")));
 });

@@ -14,6 +14,7 @@ import type { LbbClient } from "./client.js";
 import type { FilePages } from "./files.js";
 import type { OntologySuggestionListOptions } from "./namespaces.js";
 import {
+  ownedCommitBody,
   requeueFailed,
   writeOwned,
   type FailedInstance,
@@ -414,7 +415,7 @@ async function counted<T extends ActivityUsage>(
  * ```
  */
 export function lbbActivities(client: LbbClient): LbbActivities {
-  return {
+  const activities: LbbActivities = {
     reason<T = unknown>(
       request: ReasonRequest,
       options: ActivityOptions = {},
@@ -577,6 +578,326 @@ export function lbbActivities(client: LbbClient): LbbActivities {
     },
     ontology(options = {}) {
       return client.request("GET", "/v1/ontology", options);
+    },
+  };
+  // `captureActivities` checks writes with this client.
+  Object.defineProperty(activities, ACTIVITIES_CLIENT, { value: client });
+  return activities;
+}
+
+/** The client {@link lbbActivities} made the activities with. */
+const ACTIVITIES_CLIENT = Symbol.for("littlebigbrain.activities.client");
+
+/** One owned write a captured workflow made, as it would commit it. */
+export interface CapturedWrite {
+  /** The step key the workflow wrote under. */
+  stepKey: string;
+  /** The graph it would write: the client's, or `options.graph`. */
+  graph?: string;
+  /** The commit body: the owned triplets and fields and their `replace_owned`. */
+  body: Schemas["TripletCommitFile"];
+  /**
+   * How it was checked: `dry_run` (`POST /v1/graph/commit?dry_run=true`,
+   * the server's own validation), or `shape` (a local check of the body,
+   * for an RDF-native graph, whose commits have no dry run, or a capture
+   * without a client).
+   */
+  check: "dry_run" | "shape";
+  /** Why the check refused it; empty when it passes. */
+  errors: string[];
+  /** What the dry run reports the write would do. */
+  report?: Schemas["GraphCommitDryRunResponse"];
+}
+
+/** One review item a captured workflow filed. */
+export interface CapturedReview {
+  /** A change (`ReviewRequest`), or a question of another kind. */
+  request: ReviewRequest | ReviewItemRequest;
+}
+
+/** What a captured workflow would have written and filed, in call order. */
+export interface ActivityCaptureResult {
+  writes: CapturedWrite[];
+  reviews: CapturedReview[];
+}
+
+/** Activities that write nothing, and what they kept. */
+export interface ActivityCapture {
+  /**
+   * The activities to hand the workflow. The models and the reads run as
+   * they do in `activities`; `writeOwned` checks its write and keeps it
+   * instead of committing it, and `review` keeps its item instead of
+   * filing it (the item it answers is `open`); `evolve` runs as a dry run.
+   */
+  readonly activities: LbbActivities;
+  /** What was kept so far. */
+  result(): ActivityCaptureResult;
+  /** Forget what was kept. */
+  reset(): void;
+}
+
+/**
+ * A local check of an owned commit body: each named entity has a type and
+ * a name (or an id), each edge a source, a relation and a target, each field
+ * a name. The errors, empty when it passes.
+ */
+function shapeErrors(body: Schemas["TripletCommitFile"]): string[] {
+  const errors: string[] = [];
+  const named = (
+    entity: { type?: string | null; name?: string | null } | undefined,
+    where: string,
+  ) => {
+    if (!entity?.type?.trim() || !entity.name?.trim())
+      errors.push(`${where} needs a type and a name`);
+  };
+  body.triplets?.forEach((triplet, i) => {
+    named(triplet.source, `triplets[${i}].source`);
+    named(triplet.target, `triplets[${i}].target`);
+    if (!triplet.relation?.trim())
+      errors.push(`triplets[${i}].relation is empty`);
+  });
+  body.entity_properties?.forEach((entity, i) => {
+    if (!entity.entity_id) named(entity, `entity_properties[${i}]`);
+    const properties = Array.isArray(entity.properties)
+      ? entity.properties
+      : Object.keys(entity.properties ?? {}).map((field) => ({ field }));
+    properties.forEach((property: { field?: string }, j: number) => {
+      if (!property.field?.trim())
+        errors.push(`entity_properties[${i}].properties[${j}] has no field`);
+    });
+  });
+  const owned = body.replace_owned;
+  if (owned) {
+    // The commit's own checks of `replace_owned`.
+    const entities =
+      (owned.subjects?.length ?? 0) + (owned.retract_entities?.length ?? 0);
+    if (entities === 0)
+      errors.push(
+        "replace_owned needs at least one subject or one entity in retract_entities",
+      );
+    if (entities > REPLACE_OWNED_ENTITIES_MAX)
+      errors.push(
+        `replace_owned names ${entities} entities; at most ${REPLACE_OWNED_ENTITIES_MAX}`,
+      );
+    for (const [field, names] of [
+      ["relations", owned.relations],
+      ["properties", owned.properties],
+    ] as const)
+      if ((names?.length ?? 0) > REPLACE_OWNED_NAMES_MAX)
+        errors.push(
+          `replace_owned.${field} holds at most ${REPLACE_OWNED_NAMES_MAX} names`,
+        );
+    owned.subjects?.forEach((subject, i) =>
+      named(subject, `replace_owned.subjects[${i}]`),
+    );
+    owned.retract_entities?.forEach((entity, i) =>
+      named(entity, `replace_owned.retract_entities[${i}]`),
+    );
+  }
+  return errors;
+}
+
+/** The entities and the names one `replace_owned` holds at most. */
+const REPLACE_OWNED_ENTITIES_MAX = 1_000;
+const REPLACE_OWNED_NAMES_MAX = 64;
+
+/** A review item as a capture answers it: kept, not filed, and `open`. */
+/** A question of another kind than a change (`POST /v1/reviews`). */
+function isItemRequest(
+  request: ReviewRequest | ReviewItemRequest,
+): request is ReviewItemRequest {
+  return (
+    "kind" in request && Boolean(request.kind) && request.kind !== "change"
+  );
+}
+
+/** The open review item a captured question stands for; nothing is filed. */
+function capturedItem(
+  request: ReviewItemRequest,
+  n: number,
+): Schemas["ReviewItem"] {
+  const body = reviewItemBody(request);
+  const now = new Date().toISOString();
+  return {
+    ...body,
+    id: `captured_${n}`,
+    object: "review_item",
+    key: body.key ?? `captured_${n}`,
+    scope: body.scope ?? "test",
+    status: "open",
+    revision: 1,
+    created: now,
+    updated: now,
+  };
+}
+
+function capturedSuggestion(
+  request: ReviewRequest,
+  n: number,
+): Schemas["OntologyChangeSuggestion"] {
+  const { workflow, origin, ...item } = request;
+  const now = new Date().toISOString();
+  return {
+    ...item,
+    suggestion_id: `captured_${n}`,
+    key: request.key ?? `captured_${n}`,
+    title: request.title,
+    anchor: request.anchor ?? { kind: "ontology" },
+    change: request.change ?? [],
+    origin: origin ?? {
+      kind: "agent",
+      ...(workflow ? { id: `starter:${workflow}` } : {}),
+    },
+    graph: { tenant_id: "", graph_id: "", branch_id: "main" },
+    revision: 1,
+    status: "open",
+    created_at: now,
+    updated_at: now,
+  } as Schemas["OntologyChangeSuggestion"];
+}
+
+/**
+ * Activities that write nothing: run a workflow on chosen inputs with
+ * them, and read what it would write (`result()`). The models and the reads
+ * run (and spend) as they do live; each `writeOwned` is checked (a local
+ * check of its shape, then the commit's dry run,
+ * `POST /v1/graph/commit?dry_run=true`) and kept, each `review` of every
+ * kind is kept and filed nowhere, `waitForReview` keeps its item and ends
+ * at once without an answer, `requeue` sends nothing back to the watch (it
+ * answers `null`), and `evolve` runs as a dry run. The reads
+ * (`reviewItems`, `listReviews`, `reviewItem`) run. On an RDF-native graph
+ * the dry run refuses the write, as the commit would (`rdf_native_graph`).
+ *
+ * The `reason` and `decide` calls name the test (`test: { workflow }`, the
+ * `workflow` option, default `test`): the call log shows them under
+ * `tests/<workflow>`, and calibration, model checks and trials leave them
+ * out. That needs a server with workflow tests; an older one answers
+ * `400` to the field.
+ *
+ * ```ts
+ * const capture = captureActivities(lbbActivities(client), { workflow: "sinks" });
+ * const workflow = createWorkflow(capture.activities);
+ * // … run the workflow on a trigger message …
+ * const { writes, reviews } = capture.result();
+ * ```
+ *
+ * `client` checks the writes; it defaults to the client the activities
+ * were made with by {@link lbbActivities}. Without one, the writes get the
+ * local check only.
+ */
+export function captureActivities(
+  activities: LbbActivities,
+  options: { client?: LbbClient; workflow?: string } = {},
+): ActivityCapture {
+  // The calls of a capture are a test's: `tests/<workflow>` in the call log.
+  const test = { workflow: options.workflow ?? "test" };
+  const client =
+    options.client ??
+    (activities as unknown as { [ACTIVITIES_CLIENT]?: LbbClient })[
+      ACTIVITIES_CLIENT
+    ];
+  let writes: CapturedWrite[] = [];
+  let reviews: CapturedReview[] = [];
+  let filed = 0;
+  async function check(
+    body: Schemas["TripletCommitFile"],
+    graph: string | undefined,
+  ): Promise<Pick<CapturedWrite, "check" | "errors" | "report">> {
+    const errors = shapeErrors(body);
+    if (!client || errors.length) return { check: "shape", errors };
+    const target = graph ? client.withScope({ graph }) : client;
+    try {
+      return {
+        check: "dry_run",
+        errors: [],
+        report: await target.commitDryRun(body),
+      };
+    } catch (error) {
+      if (
+        !(error instanceof LbbError) ||
+        error.status >= 500 ||
+        error.status === 429
+      )
+        throw error;
+      // The dry run refuses what the commit refuses: on an RDF-native graph
+      // (`rdf_native_graph`) the commit of an owned write is refused too.
+      return { check: "dry_run", errors: [error.message] };
+    }
+  }
+  // The reads and models of `activities`, called on it: a class instance
+  // keeps its methods on its prototype.
+  const captured: LbbActivities = {
+    reason: (request, options) =>
+      activities.reason({ ...request, test }, options),
+    decide: (request, options) =>
+      activities.decide({ ...request, test }, options),
+    embed: (request, options) => activities.embed(request, options),
+    pages: (sha256, options) => activities.pages(sha256, options),
+    sparql: (request, options) => activities.sparql(request, options),
+    ontology: (options) => activities.ontology(options),
+    writeOwned(ctx, stepKey, write, writeOptions = {}) {
+      const { graph, edgeIdempotency, ...stepOptions } = writeOptions;
+      return ctx.step(
+        stepKey,
+        async (step): Promise<OwnedWriteResult> => {
+          const body = ownedCommitBody(
+            typeof write === "function" ? await write(step) : write,
+            edgeIdempotency,
+          );
+          if (body) {
+            writes.push({
+              stepKey,
+              ...(graph ? { graph } : {}),
+              body,
+              ...(await check(body, graph)),
+            });
+          }
+          return {
+            commit_seq: null,
+            idempotency_key: step.effectId,
+            replayed: false,
+            owned: null,
+            entities_written: 0,
+            edges_written: 0,
+          };
+        },
+        stepOptions,
+      );
+    },
+    // A test sends nothing back to the watch.
+    requeue: async () => null,
+    // Every kind of review item is kept, not filed.
+    review: (async (request: ReviewRequest | ReviewItemRequest) => {
+      reviews.push({ request });
+      filed += 1;
+      return isItemRequest(request)
+        ? capturedItem(request, filed)
+        : capturedSuggestion(request, filed);
+    }) as LbbActivities["review"],
+    // An item a test asks is kept and never answered: the wait ends at once.
+    async waitForReview(_ctx, _key, request) {
+      reviews.push({ request });
+      filed += 1;
+      return {
+        answered: false,
+        answer: null,
+        item: capturedItem(request, filed),
+      };
+    },
+    reviewItems: (keys, itemsOptions) =>
+      activities.reviewItems(keys, itemsOptions),
+    listReviews: (listOptions) => activities.listReviews(listOptions),
+    reviewItem: (key, itemOptions) => activities.reviewItem(key, itemOptions),
+    evolve(ops, evolveOptions = {}) {
+      return activities.evolve(ops, { ...evolveOptions, dryRun: true });
+    },
+  };
+  return {
+    activities: captured,
+    result: () => ({ writes: [...writes], reviews: [...reviews] }),
+    reset() {
+      writes = [];
+      reviews = [];
     },
   };
 }

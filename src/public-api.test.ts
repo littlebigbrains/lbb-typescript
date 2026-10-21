@@ -17,6 +17,7 @@ test("the runtime entrypoint exposes only the supported public values", () => {
     "WorkflowTurnReader",
     "WorkflowWait",
     "WorkflowWorker",
+    "captureActivities",
     "entityIdFromIri",
     "entityRef",
     "fanInIdentity",

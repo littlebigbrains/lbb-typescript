@@ -1354,6 +1354,75 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/evals/datasets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The graph's Evals datasets, newest first, without their items */
+        get: operations["get_v1_evals_datasets"];
+        put?: never;
+        /** Create an Evals dataset of kind `values`: a `name` and its first `items` (each a name, the input `text`, the `values` a correct run writes and the ones it must `leave_out`), with the `install` it is graded with. Or create it from a workflow test (`source: {kind: "test", id}`): the test's answers become the items. At most 500 items and 8 MiB of items; a write's body is at most 1 MiB. Takes `Idempotency-Key`: the same key with the same body answers the same dataset, with another body 409 `idempotency_conflict` */
+        post: operations["post_v1_evals_datasets"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/evals/datasets/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** An Evals dataset in the files of a template's samples: `records` (records.json: each input's name and text) and `expected` (expected.json: the answer key). A template's answer key loads back with the same items */
+        get: operations["get_v1_evals_datasets_export"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/evals/datasets/get": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** One Evals dataset with its items, in the order they were added */
+        get: operations["get_v1_evals_datasets_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/evals/datasets/items": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Add items to an Evals dataset. An item with the name of an item the dataset has replaces it in its place. Takes `Idempotency-Key`: a repeat with the same body writes nothing again and answers the dataset as it stands; another body is 409 `idempotency_conflict` */
+        post: operations["post_v1_evals_datasets_items"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/evals/goldens": {
         parameters: {
             query?: never;
@@ -4395,6 +4464,92 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/workflows/triggered/tests": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The graph's workflow tests, newest first, without their inputs' texts and their results */
+        get: operations["get_v1_workflows_triggered_tests"];
+        put?: never;
+        /** Test a `values.extract` workflow on chosen inputs: it reads them as it would live and writes nothing to the graph. Name a workflow of the graph (`workflow`) or a workflow to create (`install`), and `iris` (at most 20) or a `sample` of the watched class (default 6). The test starts `queued`, then `running`, and ends `done`, `failed` or `cancelled`; poll `get`. Its calls count in the call log and the environment's budget, and never in calibration or the checks. Takes `Idempotency-Key`: the same key with the same body answers the same test, with another body 409 `idempotency_conflict`. 429 `workflow_budget_exceeded` when its estimate passes the budget left, 409 `conflict` while a test of the workflow is open, 503 `workflows_disabled` without the workflow engine */
+        post: operations["post_v1_workflows_triggered_tests"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/workflows/triggered/tests/answer": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** A person's answer to one property of one read input, as a `value` review item takes it: `accept`, `reject`, `correct` with the right `value`, or `cant_tell`; `answer: null` removes it. Writes nothing to the graph. Takes `Idempotency-Key` */
+        post: operations["post_v1_workflows_triggered_tests_answer"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/workflows/triggered/tests/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Stop a queued or running test. The inputs it read keep their results; a test that ended stays as it is */
+        post: operations["post_v1_workflows_triggered_tests_cancel"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/workflows/triggered/tests/dataset": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** A test's answers as an Evals dataset of kind `values`, in the shape of a template's samples: `records` (records.json) and `expected` (expected.json). Only answered properties are in it */
+        get: operations["get_v1_workflows_triggered_tests_dataset"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/workflows/triggered/tests/get": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** One workflow test: its frozen settings and fingerprint, its inputs with their texts, and per input the values with their quotes, support and outcome, and the answers */
+        get: operations["get_v1_workflows_triggered_tests_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/workflows/turns/checkpoint": {
         parameters: {
             query?: never;
@@ -4658,6 +4813,17 @@ export interface components {
         };
         /** @enum {string} */
         ActivityState: "queued" | "waiting" | "running" | "succeeded" | "failed" | "cancelled";
+        /**
+         * @description The workflow test a `reason` or `decide` call belongs to: the call log
+         *     names the route `tests/<workflow>` and the scope `test`, it counts as the
+         *     workflow's in the model activity and the budget, and calibration, the
+         *     model checks and model trials leave it out. `captureActivities` of the
+         *     TypeScript SDK sets it.
+         */
+        ActivityTest: {
+            /** @description The workflow under test: 1 to 64 characters of `A-Z a-z 0-9 _ . -`. */
+            workflow: string;
+        };
         /** @enum {string} */
         ActivityUnit: "phases" | "partitions" | "lines" | "bytes" | "entities" | "commits" | "tables" | "documents" | "pages" | "mentions" | "links" | "proposals" | "instances" | "questions" | "messages" | "items";
         /**
@@ -5982,6 +6148,7 @@ export interface components {
             };
             /** @description What the questions are about: any JSON, at most 200,000 characters. */
             state: unknown;
+            test?: null | components["schemas"]["ActivityTest"];
             workflow?: null | components["schemas"]["ActivityWorkflow"];
         };
         /** @description The answers of a decide call. */
@@ -7132,6 +7299,161 @@ export interface components {
              *     question reads the same window on every run.
              */
             today?: string | null;
+        };
+        /**
+         * @description An Evals dataset: a name, a kind, the settings it is graded with, and
+         *     its items. It belongs to a graph and is erased with it.
+         */
+        EvalDataset: {
+            /** @description What the dataset is, in sentences, as an answer key has it. */
+            about?: string[];
+            /** @description RFC 3339, UTC. */
+            created: string;
+            /** @description `ds_` and an opaque suffix. */
+            id: string;
+            install?: components["schemas"]["EvalDatasetInstall"];
+            item_count: number;
+            /** @description The items, in the order they were added. A list leaves them out. */
+            items?: components["schemas"]["EvalDatasetItem"][];
+            kind: components["schemas"]["EvalDatasetKind"];
+            name: string;
+            /** @description `eval_dataset`. */
+            object: string;
+        };
+        /**
+         * @description `POST /v1/evals/datasets`: create a dataset with its first items, or
+         *     from a source: `source: {kind: "test", id}` makes the answers of that
+         *     workflow test the items, and its settings the `install`.
+         */
+        EvalDatasetCreateRequest: {
+            about?: string[];
+            install?: components["schemas"]["EvalDatasetInstall"];
+            items?: components["schemas"]["EvalDatasetItem"][];
+            kind: components["schemas"]["EvalDatasetKind"];
+            name: string;
+            source?: null | components["schemas"]["EvalDatasetSource"];
+        };
+        /**
+         * @description `expected.json` of an export: the answer key. Its `records` are the
+         *     items without their text and instance, which `records.json` holds.
+         */
+        EvalDatasetExpected: {
+            about?: string[];
+            install: components["schemas"]["EvalDatasetInstall"];
+            records: components["schemas"]["EvalDatasetItem"][];
+        };
+        /**
+         * @description A dataset in the files of a template's samples: the inputs
+         *     (`records.json`) and the answer key (`expected.json`).
+         */
+        EvalDatasetExport: {
+            expected: components["schemas"]["EvalDatasetExpected"];
+            records: components["schemas"]["EvalDatasetRecord"][];
+        };
+        /**
+         * @description The settings a `values` dataset is graded with, as a template answer key
+         *     has them: the value type of each property (`text`, `keyword`, `i64`,
+         *     `f64`, `bool`), the units, and the context.
+         */
+        EvalDatasetInstall: {
+            context?: string | null;
+            properties?: {
+                [key: string]: string;
+            };
+            units?: {
+                [key: string]: string;
+            };
+        };
+        /** @description One example of a `values` dataset. */
+        EvalDatasetItem: {
+            /** @description What the example shows, in one sentence. */
+            case?: string | null;
+            /** @description The instance the input was read from, when it came from a graph. */
+            iri?: string | null;
+            /** @description Values a correct run does not write. */
+            leave_out?: components["schemas"]["EvalExpectedValue"][];
+            /** @description The input's name: a record name or label, unique in the dataset. */
+            name: string;
+            source?: null | components["schemas"]["EvalDatasetSource"];
+            /**
+             * @description The input text, at most 40,000 characters. A write needs it; the
+             *     `expected.records` of an export leave it out, because `records`
+             *     holds it, as a template's `records.json` does.
+             */
+            text?: string;
+            /** @description Values a correct run writes. */
+            values?: components["schemas"]["EvalExpectedValue"][];
+        };
+        /**
+         * @description `POST /v1/evals/datasets/items`: add items to the dataset `id`. An item
+         *     with the name of an item the dataset has replaces it in its place.
+         */
+        EvalDatasetItemsRequest: {
+            id: string;
+            items: components["schemas"]["EvalDatasetItem"][];
+        };
+        /**
+         * @description What the items of a dataset hold.
+         * @enum {string}
+         */
+        EvalDatasetKind: "values";
+        /**
+         * @description `GET /v1/evals/datasets`: the graph's datasets, newest first, without
+         *     their items.
+         */
+        EvalDatasetList: {
+            data: components["schemas"]["EvalDataset"][];
+            has_more: boolean;
+            /** @description Pass as `cursor` for the next page; absent on the last page. */
+            next_cursor?: string | null;
+            /** @description `list`. */
+            object: string;
+        };
+        /**
+         * @description One input of an export (`records.json` of a template): its name, its
+         *     text and the instance it was read from.
+         */
+        EvalDatasetRecord: {
+            iri?: string | null;
+            name: string;
+            text: string;
+        };
+        /**
+         * @description The origin of an item: its kind and the id of the test, review item or
+         *     template it came from.
+         */
+        EvalDatasetSource: {
+            id?: string | null;
+            kind: components["schemas"]["EvalDatasetSourceKind"];
+        };
+        /**
+         * @description Where an item came from.
+         * @enum {string}
+         */
+        EvalDatasetSourceKind: "test" | "review" | "answer_key";
+        /**
+         * @description One value of an item: a value a correct run writes, or, in `leave_out`,
+         *     one it must not write.
+         */
+        EvalExpectedValue: {
+            /** @description Other spellings a text value may take, lower case. */
+            accept?: string[];
+            property: string;
+            /** @description Words of the text that state the value. */
+            quote?: string | null;
+            /** @description Why a value is left out. */
+            reason?: string | null;
+            /**
+             * @description The number and unit as the text states them, when the property holds
+             *     another unit: `450 mm` for a `width_cm` of 45.
+             */
+            stated?: string | null;
+            /**
+             * @description The value: numbers compare as numbers, text in lower case and trimmed
+             *     against `accept`. In `leave_out`, null means no value at all for the
+             *     property.
+             */
+            value: unknown;
         };
         /** @description One result of a query: a hit of a search, or a row of a SPARQL query. */
         EvalItem: {
@@ -10518,9 +10840,21 @@ export interface components {
             provider: string;
             /** @description The sampler picked the call for a check. */
             sampled: boolean;
+            scope?: null | components["schemas"]["ModelCallScope"];
+            /**
+             * @description The step of the workflow that made the call (added 2026-10-20):
+             *     `values` or `support` for `values.extract`.
+             */
+            step?: string | null;
             /** @description A text or a list was cut to fit the bounds. */
             truncated?: boolean;
             usage: components["schemas"]["ModelCallUsage"];
+            /**
+             * @description The model use the call served (added 2026-10-20): `extract` for an
+             *     AI step's reasoning call, `decide` for its decision call. Calls of
+             *     `values.extract` carry it.
+             */
+            use?: string | null;
         };
         /**
          * @description `POST /v1/models/calls/check`: the call is queued for a check by the
@@ -10629,14 +10963,19 @@ export interface components {
              */
             run_id?: string | null;
             sampled: boolean;
+            scope?: null | components["schemas"]["ModelCallScope"];
             /** @description `budget`, `refused` or `failed`: sampled but not checked. */
             skipped?: string | null;
+            /** @description The call's workflow step (`ModelCall::step`). */
+            step?: string | null;
             /**
              * @description At most 160 characters: the search text, the question, the stream
              *     name.
              */
             summary: string;
             usage?: null | components["schemas"]["ModelCallRowUsage"];
+            /** @description The call's model use (`ModelCall::model_use`). */
+            use?: string | null;
         };
         /** @description What one call used, in a list row. */
         ModelCallRowUsage: {
@@ -10675,6 +11014,12 @@ export interface components {
              */
             turn?: number | null;
         };
+        /**
+         * @description Whether a logged call did a workflow's live work or ran in a workflow
+         *     test, which writes nothing (`ModelCall::scope`).
+         * @enum {string}
+         */
+        ModelCallScope: "live" | "test";
         /**
          * @description The shape of a job's input and output, and so of its check.
          * @enum {string}
@@ -14034,6 +14379,7 @@ export interface components {
             };
             /** @description The system prompt: who the model is and how it answers. */
             system?: string | null;
+            test?: null | components["schemas"]["ActivityTest"];
             workflow?: null | components["schemas"]["ActivityWorkflow"];
         };
         /** @description The answer of a reason call. */
@@ -19765,6 +20111,15 @@ export interface components {
             /** @description Why it failed, at most 500 characters; `null` otherwise. */
             error?: string | null;
             /**
+             * @description A hash of what an LBB-run workflow ran with (added 2026-10-20): its
+             *     starter and version, settings, gate and watch, the units of its
+             *     properties, its models and its system prompt. A workflow test
+             *     carries the same hash (`WorkflowTest::fingerprint`), so a run and a
+             *     test with one fingerprint ran the same workflow. Absent for engine
+             *     runs.
+             */
+            fingerprint?: string | null;
+            /**
              * @description `<started_at_ms:013>-<identity>-<turn>` for an engine run: sortable
              *     by time. Selected source lifetimes append `~<64-hex-incarnation>`;
              *     use the exact ID returned by the claimed task. A step of the Rust path keeps its own id,
@@ -19978,6 +20333,270 @@ export interface components {
             step_id: string;
             token: string;
             workflow_input: unknown;
+        };
+        /**
+         * @description A test of a workflow on chosen inputs. `get` returns it whole; a list
+         *     leaves out the inputs' texts and the results.
+         */
+        WorkflowTest: {
+            /**
+             * Format: int64
+             * @description What its model calls cost so far.
+             */
+            cost_micro_usd?: number;
+            counts: components["schemas"]["WorkflowTestCounts"];
+            /** @description When it was started, RFC 3339. */
+            created: string;
+            /** @description Who started it, when known. */
+            created_by?: string | null;
+            /** @description Why it failed, at most 500 characters. */
+            error?: string | null;
+            /**
+             * Format: int64
+             * @description What the start estimated the test to cost, in millionths of a US
+             *     dollar.
+             */
+            estimate_micro_usd: number;
+            /**
+             * @description A hash of the settings, the units of the properties, the models and
+             *     the system prompt. A test and a run (`WorkflowRunSummary`) with the
+             *     same fingerprint ran the same workflow.
+             */
+            fingerprint: string;
+            /** @description When it reached `done`, `failed` or `cancelled`, RFC 3339. */
+            finished?: string | null;
+            /** @description `wtest_` and an opaque suffix. */
+            id: string;
+            inputs: components["schemas"]["WorkflowTestInput"][];
+            /**
+             * @description The workflow exists on the graph; `false` for a test of a create
+             *     request.
+             */
+            installed: boolean;
+            /** @description `workflow_test`. */
+            object: string;
+            /** @description One result per read input, in input order. */
+            results?: components["schemas"]["WorkflowTestResult"][];
+            settings: components["schemas"]["WorkflowTestSettings"];
+            status: components["schemas"]["WorkflowTestStatus"];
+            /**
+             * @description The model of each use: `extract` (the reasoning model reads values)
+             *     and `decide` (the decision model scores their support).
+             */
+            uses?: {
+                [key: string]: string;
+            };
+            workflow: components["schemas"]["WorkflowTestWorkflow"];
+        };
+        /**
+         * @description `POST /v1/workflows/triggered/tests/answer`: a person's answer to one
+         *     property of one read input; `answer: null` removes it.
+         */
+        WorkflowTestAnswerRequest: {
+            answer?: null | components["schemas"]["ReviewAnswer"];
+            id: string;
+            iri: string;
+            property: string;
+        };
+        /** @description The values of a test by what the live workflow would do with them. */
+        WorkflowTestCounts: {
+            /**
+             * Format: int64
+             * @description Properties a person answered.
+             */
+            answered: number;
+            /**
+             * Format: int64
+             * @description Values a check dropped, and inputs the model did not answer.
+             */
+            failed: number;
+            /**
+             * Format: int64
+             * @description Inputs with a result.
+             */
+            inputs_done: number;
+            /**
+             * Format: int64
+             * @description Properties of a read input with no value.
+             */
+            no_value: number;
+            /**
+             * Format: int64
+             * @description Values at or above the gate, which the workflow writes: checks
+             *     passed.
+             */
+            passed: number;
+            /**
+             * Format: int64
+             * @description Values a person would review.
+             */
+            review: number;
+        };
+        /**
+         * @description `POST /v1/workflows/triggered/tests`: run a workflow on chosen inputs.
+         *     Name a workflow of the graph (`workflow`), or a workflow to create
+         *     (`install`, the body of `PUT /v1/workflows/triggered`); and the inputs
+         *     (`iris`, at most 20), or a sample of the watched class's first instances
+         *     (`sample`, 1 to 20, default 6).
+         */
+        WorkflowTestCreateRequest: {
+            install?: null | components["schemas"]["TriggeredWorkflowRequest"];
+            iris?: string[];
+            /** Format: int32 */
+            sample?: number | null;
+            workflow?: null | components["schemas"]["WorkflowTestWorkflow"];
+        };
+        /**
+         * @description `GET /v1/workflows/triggered/tests/dataset`: a test's answers as an Evals
+         *     dataset of kind `values`, in the shape of a template's samples: the
+         *     inputs (`records.json`) and the answer key (`expected.json`). An input
+         *     is in it when a person answered at least one of its properties; only
+         *     answered properties are, and `cant_tell` answers are not.
+         *     `POST /v1/evals/datasets` with `source: {kind: "test", id}` stores the
+         *     same items as a dataset.
+         */
+        WorkflowTestDataset: {
+            expected: components["schemas"]["EvalDatasetExpected"];
+            fingerprint: string;
+            kind: components["schemas"]["EvalDatasetKind"];
+            records: components["schemas"]["EvalDatasetRecord"][];
+            /** @description The test's id. */
+            test: string;
+        };
+        /** @description One input of a test: an instance of the watched class. */
+        WorkflowTestInput: {
+            iri: string;
+            /** @description The instance's label; empty until the input is read. */
+            label?: string;
+            /**
+             * @description The text the workflow read, at most 40,000 characters; empty until
+             *     the input is read. A list of tests leaves it out.
+             */
+            text?: string;
+        };
+        /** @description `GET /v1/workflows/triggered/tests`: the graph's tests, newest first. */
+        WorkflowTestList: {
+            data: components["schemas"]["WorkflowTest"][];
+            has_more: boolean;
+            /** @description Pass as `cursor` for the next page; absent on the last page. */
+            next_cursor?: string | null;
+            /** @description `list`. */
+            object: string;
+        };
+        /**
+         * @description One property a `values.extract` test reads: its name, value type and,
+         *     for a number, the unit the property holds.
+         */
+        WorkflowTestProperty: {
+            name: string;
+            unit?: string | null;
+            value_type: string;
+        };
+        /** @description The page box of an instance read from a file: where its values are. */
+        WorkflowTestRegion: {
+            /** Format: int32 */
+            page: number;
+            /** Format: double */
+            x0: number;
+            /** Format: double */
+            x1: number;
+            /** Format: double */
+            y0: number;
+            /** Format: double */
+            y1: number;
+        };
+        /** @description What a test read from one input. */
+        WorkflowTestResult: {
+            /**
+             * @description A person's answer per property (`value` items of Review): to the
+             *     value the workflow read, or, for a property without one, the value
+             *     the text states (`correct`) or that it states none (`accept`).
+             */
+            answers?: {
+                [key: string]: components["schemas"]["ReviewAnswer"];
+            };
+            /**
+             * Format: int64
+             * @description The model cost of this input, in millionths of a US dollar.
+             */
+            cost_micro_usd?: number;
+            /**
+             * @description Why the input has no values: the instance is gone, or its text is
+             *     empty.
+             */
+            error?: string | null;
+            /** @description The model gave no usable answer. */
+            failed?: boolean;
+            iri: string;
+            region?: null | components["schemas"]["WorkflowTestRegion"];
+            values?: components["schemas"]["WorkflowTestValue"][];
+        };
+        /** @description The settings a test runs with, frozen when it starts. */
+        WorkflowTestSettings: {
+            /** @description The watched class IRI. */
+            class: string;
+            context?: string | null;
+            /** @description The watched fields whose text the workflow reads. */
+            fields?: components["schemas"]["EmbeddingField"][];
+            /**
+             * Format: float
+             * @description The gate: a value with this support or more is written.
+             */
+            gate: number;
+            properties: components["schemas"]["WorkflowTestProperty"][];
+        };
+        /**
+         * @description Where a test stands. `queued` → `running` → `done`, `failed` or
+         *     `cancelled`; the last three are final.
+         * @enum {string}
+         */
+        WorkflowTestStatus: "queued" | "running" | "done" | "failed" | "cancelled";
+        /**
+         * @description One value the workflow read from an input, after every check, as the live
+         *     workflow would decide it.
+         */
+        WorkflowTestValue: {
+            detail?: string | null;
+            /**
+             * @description What the live workflow would do: `written` (at or above the gate),
+             *     `review` (a review item), `weak_support` (dropped below 0.5),
+             *     `quote_not_found`, `invalid_value`, `unknown_property` or
+             *     `duplicate`.
+             */
+            outcome: string;
+            property: string;
+            /** @description The words of the text the model quoted. */
+            quote: string;
+            /**
+             * @description The number and unit as the text states them (`600 mm`), when they
+             *     were converted to the property's unit.
+             */
+            stated?: string | null;
+            /**
+             * Format: float
+             * @description How well the quote supports the value, 0 to 1.
+             */
+            support?: number | null;
+            /** @description Why the unit is not confirmed: such a value goes to review at most. */
+            unconfirmed?: string | null;
+            /**
+             * @description The value as the workflow writes it (a number in the property's
+             *     unit).
+             */
+            value: string;
+        };
+        /**
+         * @description The workflow a test runs: a starter workflow's catalog id and the
+         *     workflow's name.
+         */
+        WorkflowTestWorkflow: {
+            /**
+             * @description The triggered workflow's name; for a workflow not created yet, the
+             *     name its create would give.
+             */
+            name: string;
+            /** @description The starter workflow's catalog id (`values.extract`). */
+            starter: string;
         };
         /**
          * @description One trigger of a workflow: a watch or a content trigger, exactly one of
@@ -32864,6 +33483,731 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["EvalSummaryResponse"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Rate limit exceeded */
+            429: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Service unavailable */
+            503: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+        };
+    };
+    get_v1_evals_datasets: {
+        parameters: {
+            query?: {
+                /** @description Graph name (default `main`) */
+                graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
+                /** @description datasets, 1 to 50; default 20 */
+                limit?: string;
+                /** @description the `next_cursor` of the previous page */
+                cursor?: string;
+            };
+            header?: {
+                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                "Lbb-Version"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EvalDatasetList"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Rate limit exceeded */
+            429: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Service unavailable */
+            503: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+        };
+    };
+    post_v1_evals_datasets: {
+        parameters: {
+            query?: {
+                /** @description Graph name (default `main`) */
+                graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
+            };
+            header?: {
+                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                "Lbb-Version"?: string;
+                /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
+                "Idempotency-Key"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EvalDatasetCreateRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EvalDataset"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Rate limit exceeded */
+            429: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Service unavailable */
+            503: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+        };
+    };
+    get_v1_evals_datasets_export: {
+        parameters: {
+            query?: {
+                /** @description Graph name (default `main`) */
+                graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
+                /** @description the dataset's id */
+                id?: string;
+            };
+            header?: {
+                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                "Lbb-Version"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EvalDatasetExport"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Rate limit exceeded */
+            429: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Service unavailable */
+            503: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+        };
+    };
+    get_v1_evals_datasets_get: {
+        parameters: {
+            query?: {
+                /** @description Graph name (default `main`) */
+                graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
+                /** @description the dataset's id */
+                id?: string;
+            };
+            header?: {
+                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                "Lbb-Version"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EvalDataset"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Rate limit exceeded */
+            429: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Service unavailable */
+            503: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+        };
+    };
+    post_v1_evals_datasets_items: {
+        parameters: {
+            query?: {
+                /** @description Graph name (default `main`) */
+                graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
+            };
+            header?: {
+                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                "Lbb-Version"?: string;
+                /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
+                "Idempotency-Key"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EvalDatasetItemsRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EvalDataset"];
                 };
             };
             /** @description Bad request */
@@ -63560,6 +64904,880 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["WorkflowRunStats"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Rate limit exceeded */
+            429: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Service unavailable */
+            503: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+        };
+    };
+    get_v1_workflows_triggered_tests: {
+        parameters: {
+            query?: {
+                /** @description Graph name (default `main`) */
+                graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
+                /** @description the tests of this starter workflow */
+                starter?: string;
+                /** @description the tests of the workflow of this name */
+                name?: string;
+                /** @description tests, 1 to 50; default 10 */
+                limit?: string;
+                /** @description the `next_cursor` of the previous page */
+                cursor?: string;
+            };
+            header?: {
+                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                "Lbb-Version"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkflowTestList"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Rate limit exceeded */
+            429: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Service unavailable */
+            503: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+        };
+    };
+    post_v1_workflows_triggered_tests: {
+        parameters: {
+            query?: {
+                /** @description Graph name (default `main`) */
+                graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
+            };
+            header?: {
+                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                "Lbb-Version"?: string;
+                /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
+                "Idempotency-Key"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WorkflowTestCreateRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkflowTest"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Rate limit exceeded */
+            429: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Service unavailable */
+            503: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+        };
+    };
+    post_v1_workflows_triggered_tests_answer: {
+        parameters: {
+            query?: {
+                /** @description Graph name (default `main`) */
+                graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
+            };
+            header?: {
+                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                "Lbb-Version"?: string;
+                /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
+                "Idempotency-Key"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WorkflowTestAnswerRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkflowTest"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Rate limit exceeded */
+            429: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Service unavailable */
+            503: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+        };
+    };
+    post_v1_workflows_triggered_tests_cancel: {
+        parameters: {
+            query?: {
+                /** @description Graph name (default `main`) */
+                graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
+                /** @description the test's id */
+                id?: string;
+            };
+            header?: {
+                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                "Lbb-Version"?: string;
+                /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
+                "Idempotency-Key"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkflowTest"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Rate limit exceeded */
+            429: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Service unavailable */
+            503: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+        };
+    };
+    get_v1_workflows_triggered_tests_dataset: {
+        parameters: {
+            query?: {
+                /** @description Graph name (default `main`) */
+                graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
+                /** @description the test's id */
+                id?: string;
+            };
+            header?: {
+                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                "Lbb-Version"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkflowTestDataset"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Rate limit exceeded */
+            429: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Service unavailable */
+            503: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+        };
+    };
+    get_v1_workflows_triggered_tests_get: {
+        parameters: {
+            query?: {
+                /** @description Graph name (default `main`) */
+                graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
+                /** @description the test's id */
+                id?: string;
+            };
+            header?: {
+                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                "Lbb-Version"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkflowTest"];
                 };
             };
             /** @description Bad request */
