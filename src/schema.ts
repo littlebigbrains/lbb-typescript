@@ -6783,6 +6783,7 @@ export interface components {
                 [key: string]: unknown;
             };
             current_state: components["schemas"]["StateEntry"][];
+            edge_properties?: null | components["schemas"]["EvidenceCompleteness"];
             entity: components["schemas"]["EntityView"];
             evidence?: null | components["schemas"]["EvidenceCompleteness"];
             history: components["schemas"]["EdgeEventRow"][];
@@ -6804,6 +6805,12 @@ export interface components {
          *     how much. Only the cut collections appear.
          */
         EntityDetailTruncation: {
+            /**
+             * @description True when the per-response cap on edge property reads stopped the
+             *     property read: some relationships show no `properties` although they
+             *     have some.
+             */
+            edge_property_lookups?: boolean;
             edges?: null | components["schemas"]["TruncatedCollection"];
             /**
              * @description True when the per-response cap on evidence statement lookups stopped
@@ -7426,7 +7433,7 @@ export interface components {
          */
         EvalVia: "ask" | "query" | "search" | "app";
         /**
-         * @description Whether the evidence a read returns is complete.
+         * @description Whether the evidence (or the edge properties) a read returns is complete.
          * @enum {string}
          */
         EvidenceCompleteness: "complete" | "partial";
@@ -13807,6 +13814,18 @@ export interface components {
             evidence?: components["schemas"]["RelationEvidence"][];
             /** @description True when this relationship has more evidence than `evidence` holds. */
             evidence_truncated?: boolean;
+            /**
+             * @description The relationship's own properties, typed as the entity's
+             *     `attributes` are, from its newest current assertion
+             *     (`docs/architecture/edge-properties-in-rdf.md`). A relationship holds
+             *     more than one current assertion only in `append` mode; SPARQL returns
+             *     all of them. Empty when the edge has no properties, or when the
+             *     response's `edge_properties` is `partial` and the edge predates edge
+             *     property projection.
+             */
+            properties?: {
+                [key: string]: unknown;
+            };
             relation: components["schemas"]["RelationView"];
         };
         /**
