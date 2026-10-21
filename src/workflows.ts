@@ -12,6 +12,7 @@ import {
   StarterWorkflowsNamespace,
   TriggeredWorkflowsNamespace,
 } from "./triggered-workflows.js";
+import { WorkflowTestsNamespace } from "./workflow-tests.js";
 
 type Turn = Schemas["WorkflowTurn"];
 type Task = Schemas["WorkflowTurnTask"];
@@ -427,6 +428,11 @@ export class WorkflowNamespace {
    * one set of settings, checked before the work and recorded after.
    */
   readonly derivations: DerivationsNamespace;
+  /**
+   * Tests: a workflow runs on chosen inputs and writes nothing; a person
+   * answers each value, and the answers export as a dataset.
+   */
+  readonly tests: WorkflowTestsNamespace;
   /** Blobs: large step outputs and shared reads, keyed by their SHA-256. */
   readonly blobs: WorkflowBlobsNamespace;
 
@@ -435,6 +441,7 @@ export class WorkflowNamespace {
     this.triggered = new TriggeredWorkflowsNamespace(client);
     this.named = new NamedWorkflowsNamespace(client);
     this.derivations = new DerivationsNamespace(client);
+    this.tests = new WorkflowTestsNamespace(client);
     this.blobs = new WorkflowBlobsNamespace(client);
   }
   handle<M = unknown>(id: string): WorkflowHandle<M> {

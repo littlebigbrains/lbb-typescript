@@ -123,6 +123,7 @@ test("a link project keeps the template's folders, its own commands and its grad
     ),
   );
   assert.equal(other.scripts.grade, undefined);
+  assert.equal(other.scripts["test:examples"], undefined);
 });
 
 test("a project needs a known template and an empty directory", async () => {
@@ -141,6 +142,9 @@ test("the client dependency can name another source", async () => {
   await create({ template: "values-extract", dir, client: "file:../lbb/sdk/typescript" });
   const pkg = JSON.parse(await readFile(join(dir, "package.json"), "utf8"));
   assert.equal(pkg.dependencies["@littlebigbrain/client"], "file:../lbb/sdk/typescript");
+  // values-extract tests on examples of your graph before it writes.
+  assert.equal(pkg.scripts["test:examples"], "tsx src/test-examples.ts");
+  assert.ok(existsSync(join(dir, "src", "test-examples.ts")));
 });
 
 const built = existsSync(join(REPO, "sdk", "typescript", "dist", "index.js"));

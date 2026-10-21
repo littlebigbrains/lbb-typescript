@@ -156,6 +156,7 @@ export async function create({ template, dir, client, root = PACKAGE }) {
       test: "tsx --test src/workflow.test.ts",
       typecheck: "tsc --noEmit",
       ...(code.includes("grade-run.ts") ? { grade: "tsx src/grade-run.ts" } : {}),
+      ...(code.includes("test-examples.ts") ? { "test:examples": "tsx src/test-examples.ts" } : {}),
     },
     dependencies: { "@littlebigbrain/client": client ?? `^${clientVersion(templates)}` },
     devDependencies: { "@types/node": "^22", tsx: "^4", typescript: "^5.6" },
@@ -192,7 +193,7 @@ project of its own: a workflow that your \`WorkflowWorker\` runs on a graph.
 npm install
 npm test                    # the workflow on its samples, with mock models: no server
 npm run try                 # the samples on a graph of your stack, and the workflow there
-npm run setup && npm start  # your graph: create the workflow, then serve it
+${code.includes("test-examples.ts") ? "npm run test:examples       # the workflow on instances of your graph; writes nothing\n" : ""}npm run setup && npm start  # your graph: create the workflow, then serve it
 \`\`\`
 
 \`npm run try\`, \`npm run setup\` and \`npm start\` read \`LBB_URL\` (your

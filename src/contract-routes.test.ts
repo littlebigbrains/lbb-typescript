@@ -37,6 +37,7 @@ const CLIENT_SOURCES = [
   "src/reviews.ts",
   "src/triggered-workflows.ts",
   "src/triggered-workflow-worker.ts",
+  "src/workflow-tests.ts",
 ].map((file) => resolve(process.cwd(), file));
 
 const HTTP_METHODS = new Set(["get", "head", "post", "put", "patch", "delete"]);

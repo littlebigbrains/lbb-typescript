@@ -130,3 +130,21 @@ or a conditional variant (`Bei Einsatz`) does not support its value. The run
 writes the values of the answer key and none it leaves out. The test also
 checks the review path, the checks of type and quote, an instance that
 leaves the class, and a message larger than a turn.
+
+## Test on examples
+
+`npm run test:examples` runs the workflow on instances of your graph with
+the real models, and writes nothing (`test-examples.ts`). The activities go
+through `captureActivities`: the server checks each owned write with the
+commit's dry run, and keeps it. Each review item is kept too. The script
+prints, for each input, the values the workflow would write and the values
+it would give a person to review.
+
+```sh
+LBB_URL=... LBB_API_KEY=... LBB_GRAPH=tender npm run test:examples           # the first 6 instances
+LBB_URL=... LBB_API_KEY=... LBB_GRAPH=tender npm run test:examples -- <iri>  # chosen instances
+```
+
+The model calls count in your environment's budget. For the LBB-run
+version, test the workflow in the console (the workflow's Test tab) or with
+`client.workflows.tests`.
