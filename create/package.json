@@ -25,6 +25,7 @@
     "lib",
     "project",
     "templates",
+    "python",
     "README.md",
     "LICENSE"
   ],

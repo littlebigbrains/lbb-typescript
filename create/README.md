@@ -11,6 +11,18 @@ npm install
 npm test
 ```
 
+`--lang python` creates the Python port of a template, for the
+`littlebigbrain` Python SDK:
+
+```sh
+npm create @littlebigbrain -- --template values-extract --lang python my-values
+cd my-values
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -e ".[test]"
+pytest
+```
+
 ## Templates
 
 | Template | Does |
@@ -44,33 +56,57 @@ the samples on it and creates the workflow there. `npm run setup` creates the
 workflow on your own graph, and `npm start` serves it. All three read
 `LBB_URL` and `LBB_API_KEY`.
 
+## The Python project
+
+`--lang python` takes a template with a Python port: `values-extract`. The
+project's package is the template name with underscores (`values_extract`).
+
+| File | Holds |
+| --- | --- |
+| `values_extract/workflow.py` | The workflow, its settings, the triggered workflow that sends it the instances (`trigger()`) and the ontology it writes (`ontology()`) |
+| `values_extract/samples.py`, `values_extract/samples/` | The samples, their answer key, and the loader that puts them on a graph |
+| `values_extract/__main__.py` | The commands `python -m values_extract try`, `setup` and `start` |
+| `tests/test_workflow.py`, `tests/fake_lbb.py` | The workflow on its samples, with mock models and no server (`pytest`) |
+| `pyproject.toml` | The project, its dependency `littlebigbrain>=<the version the port is written for>` and the `test` extra with `pytest` |
+
+`try`, `setup` and `start` do what `npm run try`, `npm run setup` and
+`npm start` do in a TypeScript project. They read `LBB_URL`, `LBB_API_KEY`
+and `LBB_GRAPH`.
+
 ## Options
 
 | Option | Meaning |
 | --- | --- |
 | `--template <name>` | The template (required) |
-| `--client <spec>` | The `@littlebigbrain/client` dependency of the project. Default: the version the templates are written for |
+| `--lang <ts\|python>` | The project's language. Default: `ts`. `python` takes a template with a Python port |
+| `--client <spec>` | The `@littlebigbrain/client` dependency of a TypeScript project. Default: the version the templates are written for |
 | `[dir]` | The new project's directory. Default: the template's name. It must be empty or missing |
 
 ## Development
 
 The package is developed in the little big brain monorepo, and the templates
 live in its `sdk/templates`. There the command reads them from that folder.
-`npm pack` copies them into the package (`prepack`) with the client version,
-and removes the copy afterwards.
+The Python ports live in `sdk/python/examples` (`PYTHON_TEMPLATES` in
+`lib/create.mjs`), and the test of a Python project in
+`project/python/<package>`. `npm pack` copies the templates into the package
+(`prepack`) with the client version, and the Python ports into `python/` with
+the Python SDK version. It removes both copies afterwards.
 
 ```sh
 node sdk/create/bin/create-littlebigbrain.mjs --template documents-link /tmp/my-links
+node sdk/create/bin/create-littlebigbrain.mjs --template values-extract --lang python /tmp/my-values
 npm test -w @littlebigbrain/create
 ```
 
 The test creates each project, compiles it against the workspace's client
-and runs its test.
+and runs its test. The Python SDK's suite
+(`sdk/python/tests/test_create_python_project.py`) creates the Python project
+and runs its `pytest` on the SDK of the repository.
 
 The public repository
 [littlebigbrains/lbb-typescript](https://github.com/littlebigbrains/lbb-typescript)
-holds the package in `create/`, with the templates and
-`templates/versions.json` already copied in. There `prepack` keeps that copy.
+holds the package in `create/`, with the templates, the Python ports and
+their `versions.json` already copied in. There `prepack` keeps those copies.
 A new version in `create/package.json` is published to npm by the
 repository's `release-create.yml` workflow.
 

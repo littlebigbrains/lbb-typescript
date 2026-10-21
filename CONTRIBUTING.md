@@ -43,8 +43,9 @@ approves that deployment; trusted publishing uploads
 Release. No local tag push or registry token is required.
 
 `create/` holds `@littlebigbrain/create`, the `npm create @littlebigbrain`
-generator, with its templates. A new version in `create/package.json`
-releases the same way (`release-create.yml`), with the tag `create-vX.Y.Z`.
+generator, with its templates and their Python ports. A new version in
+`create/package.json` releases the same way (`release-create.yml`), with the
+tag `create-vX.Y.Z`.
 
 ## Conduct & security
 
