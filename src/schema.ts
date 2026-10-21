@@ -3228,6 +3228,126 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/reviews": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List review items of every kind, the latest update first. The canonical list: /v1/ontology/suggestions is the view of kind change. Pass next_cursor as cursor for the next page */
+        get: operations["get_v1_reviews"];
+        put?: never;
+        /** Ask a person: file a review item of kind value, choice, grade or answer, or update the one with the same key (a change is filed with POST /v1/ontology/suggestions). `wait` names the run that waits for the answer */
+        post: operations["post_v1_reviews"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/reviews/answer": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Answer a review item: accept, reject, correct (a value), choose (an option) or can't tell. A value's accept or correction writes the value; every answer is a calibration label and is sent to the workflow that asked as a review.answered event. With an Idempotency-Key, a retry returns the item; the key with another answer is refused with 409 idempotency_conflict */
+        post: operations["post_v1_reviews_answer"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/reviews/answer-batch": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** One answer for up to 500 review items, each checked against its own kind; an item the answer does not fit is skipped with the reason. With an Idempotency-Key, a retry returns the first response */
+        post: operations["post_v1_reviews_answer_batch"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/reviews/comment": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Add a comment to a review item's discussion */
+        post: operations["post_v1_reviews_comment"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/reviews/detail": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read one review item with its question, evidence, answer and effects */
+        get: operations["get_v1_reviews_detail"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/reviews/patterns": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The live review items of every kind grouped by pattern (the items that ask one decision), the largest first, as /v1/ontology/suggestions/patterns groups the suggestions; ids are rev_ ids, counts keep the stored statuses */
+        get: operations["get_v1_reviews_patterns"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/reviews/withdraw": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Withdraw a review item as its producer */
+        post: operations["post_v1_reviews_withdraw"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/schema": {
         parameters: {
             query?: never;
@@ -11625,6 +11745,7 @@ export interface components {
              */
             proposed_identities?: components["schemas"]["SuggestedIdentity"][] | null;
             rationale?: string;
+            review?: null | components["schemas"]["ReviewItemFields"];
             /**
              * Format: int64
              * @description Starts at 1 and grows each time the producer revises the change.
@@ -11767,6 +11888,7 @@ export interface components {
             rationale?: string;
             /** Format: int64 */
             records?: number | null;
+            review?: null | components["schemas"]["ReviewItemFields"];
             /** Format: int64 */
             revision: number;
             source?: null | components["schemas"]["SuggestionSourceSummary"];
@@ -14267,6 +14389,403 @@ export interface components {
          * @enum {string}
          */
         RetrievalProfileId: "baseline" | "scored_atom_v1" | "graph_aware_v1" | "ndcg_v1";
+        /**
+         * @description A person's answer to a review item.
+         *
+         *     `value` goes with `correct` and `option` with `choose`; `note` holds the
+         *     free text of an `answer` item. The server sets `by` and `at`.
+         */
+        ReviewAnswer: {
+            /** @description When, RFC 3339, set by the server. */
+            at?: string | null;
+            /** @description Who answered, set by the server. */
+            by?: string | null;
+            decision: components["schemas"]["ReviewDecision"];
+            /**
+             * @description Why, in a few words; the text of an `answer` item. At most 1,000
+             *     characters.
+             */
+            note?: string | null;
+            /** @description The id of the chosen option or grade, for `choose`. */
+            option?: string | null;
+            /**
+             * @description The corrected value, for `correct`: a number, a string or a boolean
+             *     in the type of the property it corrects.
+             */
+            value?: unknown;
+        };
+        /**
+         * @description `POST /v1/reviews/answer-batch`: one answer for up to 500 items, each
+         *     checked against its own kind.
+         */
+        ReviewAnswerBatchRequest: {
+            answer: components["schemas"]["ReviewAnswer"];
+            /** @description 1 to 500 review item ids. */
+            ids: string[];
+            pattern?: string | null;
+            shown?: string[];
+        };
+        /** @description The answer of `POST /v1/reviews/answer-batch`. */
+        ReviewAnswerBatchResponse: {
+            answered: number;
+            batch_id: string;
+            /** @description One per item id, in the request's order. */
+            results: components["schemas"]["ReviewBatchResult"][];
+            skipped: number;
+        };
+        /**
+         * @description `POST /v1/reviews/answer?id=…`. With an `Idempotency-Key` header, the same
+         *     key again returns the item; with other parameters it is refused
+         *     (`409 idempotency_conflict`).
+         */
+        ReviewAnswerRequest: {
+            answer: components["schemas"]["ReviewAnswer"];
+            /** @description Added to the discussion with the answer. */
+            comment?: string | null;
+            edits?: null | components["schemas"]["OntologyChangeSuggestionAcceptRequest"];
+            /**
+             * Format: int64
+             * @description The revision the person saw; a later revision answers 409.
+             */
+            revision?: number | null;
+        };
+        /**
+         * @description The answered item a `review.answered` event carries: what a workflow
+         *     acts on, each text cut so the message stays within the engine's 32 KiB.
+         *     `GET /v1/reviews/detail?id=` reads the whole item.
+         */
+        ReviewAnsweredItem: {
+            answer: components["schemas"]["ReviewAnswer"];
+            /** @description Why the graph refused the answered value, when it did. */
+            commit_error?: string | null;
+            commit_seq?: null | components["schemas"]["CommitSeq"];
+            /** @description `rev_` and the record's hex. */
+            id: string;
+            key: string;
+            kind: components["schemas"]["ReviewItemKind"];
+            /** @description Always `review_item`. */
+            object: string;
+            origin: components["schemas"]["SuggestionOrigin"];
+            /** @description The property a `value` item asks about. */
+            property?: string | null;
+            /** Format: int64 */
+            revision: number;
+            scope: components["schemas"]["ReviewScope"];
+            subject?: null | components["schemas"]["ReviewSubject"];
+            title: string;
+            workflow?: null | components["schemas"]["ReviewWorkflowOrigin"];
+        };
+        /**
+         * @description The message a workflow's review trigger receives for one answer: the
+         *     event `review.answered`, with the answered item in brief and the
+         *     request that answered.
+         */
+        ReviewAnsweredMessage: {
+            graph: components["schemas"]["GraphKey"];
+            /** @description The request that answered (its `X-Request-Id`). */
+            request_id?: string | null;
+            review_item: components["schemas"]["ReviewAnsweredItem"];
+            /** @description Always `review.answered`. */
+            type: string;
+            /** @description The workflow that receives it. */
+            workflow: string;
+        };
+        /** @description What a batch did with one item. */
+        ReviewBatchResult: {
+            /** @description `true` when this batch answered it. */
+            answered: boolean;
+            id: string;
+            /** @description Why it was skipped. */
+            reason?: string | null;
+            status?: null | components["schemas"]["ReviewStatus"];
+        };
+        /**
+         * @description A person's decision on a review item.
+         * @enum {string}
+         */
+        ReviewDecision: "accept" | "reject" | "correct" | "choose" | "cant_tell";
+        /** @description The "review answered" event of an answer. */
+        ReviewDelivery: {
+            /**
+             * Format: int32
+             * @description Sends tried.
+             */
+            attempts?: number;
+            /** @description The last failure, for a pending or dropped event. */
+            error?: string | null;
+            /** @description Where it went: `signal` and/or `trigger:<workflow>` entries. */
+            sent_to?: string[];
+            state: components["schemas"]["ReviewDeliveryState"];
+        };
+        /**
+         * @description Where the "review answered" event of an answer is.
+         * @enum {string}
+         */
+        ReviewDeliveryState: "none" | "pending" | "sent" | "dropped";
+        /**
+         * @description What an answer did. The answer is recorded first; a `commit_key`
+         *     without a `commit_seq` or a `commit_error` is a commit still to make
+         *     (idempotent by that key).
+         */
+        ReviewEffects: {
+            /**
+             * Format: int32
+             * @description Tries of the commit that failed for a cause that may pass.
+             */
+            commit_attempts?: number;
+            /**
+             * @description Why the graph refused the commit of the answered value (a value the
+             *     property no longer takes, a shape that rejects it). The answer
+             *     stays recorded and its event is sent; the value is not written.
+             */
+            commit_error?: string | null;
+            /**
+             * @description The idempotency key of that commit
+             *     (`review:<suggestion id>:r<revision>:<hash>`).
+             */
+            commit_key?: string | null;
+            commit_seq?: null | components["schemas"]["CommitSeq"];
+            delivery?: components["schemas"]["ReviewDelivery"];
+            /**
+             * @description When the work still to do (the commit, the event) is tried again
+             *     (RFC 3339): after a failed try the starters job waits longer each
+             *     time.
+             */
+            next_attempt_at?: string | null;
+            /** @description The value was in the graph already. */
+            no_op?: boolean;
+            /** @description The request that answered (its `X-Request-Id`). */
+            request_id?: string | null;
+        };
+        /** @description A model check, a calibration session or a test that filed an item. */
+        ReviewEvalOrigin: {
+            id: string;
+            kind: components["schemas"]["ReviewEvalOriginKind"];
+        };
+        /**
+         * @description What in Evals filed an item.
+         * @enum {string}
+         */
+        ReviewEvalOriginKind: "check" | "calibration" | "test";
+        /** @description A quote the producer read, and where it is. */
+        ReviewEvidence: {
+            /** Format: float */
+            confidence?: number | null;
+            quote: string;
+            region?: null | components["schemas"]["RegionAnchorInput"];
+            /**
+             * @description The `Document` IRI with a place (`#page=3`, `#row=5`,
+             *     `#line=39,44`), or a record's name.
+             */
+            source_id?: string | null;
+        };
+        /**
+         * @description A question for a person (`/v1/reviews`). A list holds each item without
+         *     its `facts` and `comments`, with its first quote only, and with
+         *     `rationale` and long question texts cut to 300 characters; `GET
+         *     /v1/reviews/detail` returns it in full.
+         */
+        ReviewItem: {
+            answer?: null | components["schemas"]["ReviewAnswer"];
+            comments?: components["schemas"]["SuggestionComment"][];
+            /** @description RFC 3339 times. */
+            created: string;
+            effects?: null | components["schemas"]["ReviewEffects"];
+            eval?: null | components["schemas"]["ReviewEvalOrigin"];
+            evidence?: components["schemas"]["ReviewEvidence"][];
+            /** @description The producer's mark of the evidence the question is asked on. */
+            evidence_hash?: string | null;
+            facts?: null | components["schemas"]["SuggestedFacts"];
+            /**
+             * @description `rev_` and 24 hex characters. The suggestion id with the same hex
+             *     (`sg_…`) names the same item on these routes.
+             */
+            id: string;
+            /** @description The producer's idempotency key: the same key updates this item. */
+            key: string;
+            kind: components["schemas"]["ReviewItemKind"];
+            /** @description Always `review_item`. */
+            object: string;
+            origin: components["schemas"]["SuggestionOrigin"];
+            previous_answer?: null | components["schemas"]["ReviewAnswer"];
+            question?: null | components["schemas"]["ReviewQuestion"];
+            rationale?: string;
+            /** Format: int64 */
+            revision: number;
+            scope: components["schemas"]["ReviewScope"];
+            status: components["schemas"]["ReviewStatus"];
+            subject?: null | components["schemas"]["ReviewSubject"];
+            /**
+             * @description For a `change` item: its id on `/v1/ontology/suggestions`, which
+             *     serves its change, identities, facts and impact.
+             */
+            suggestion_id?: string | null;
+            title: string;
+            updated: string;
+            wait?: null | components["schemas"]["ReviewWait"];
+            workflow?: null | components["schemas"]["ReviewWorkflowOrigin"];
+        };
+        /**
+         * @description `POST /v1/reviews`: file an item of kind `value`, `choice`, `grade` or
+         *     `answer`, or update the one with the same `key` (a `change` is filed
+         *     with `POST /v1/ontology/suggestions`). The same key with a different
+         *     question revises an open item and reopens a dismissed one; an answered
+         *     item is returned unchanged.
+         */
+        ReviewItemCreateRequest: {
+            eval?: null | components["schemas"]["ReviewEvalOrigin"];
+            evidence?: components["schemas"]["ReviewEvidence"][];
+            /**
+             * @description A mark of the evidence the question is asked on (a document
+             *     version, a hash of the text read), at most 128 characters. An answer
+             *     holds for it: asking again with other evidence and another proposal
+             *     reopens an answered item, and the answer in force stays as
+             *     `previous_answer` until a new one.
+             */
+            evidence_hash?: string | null;
+            facts?: null | components["schemas"]["SuggestedFacts"];
+            /**
+             * @description Idempotency key, as for a suggestion. Absent: derived from the kind,
+             *     subject and question.
+             */
+            key?: string | null;
+            kind: components["schemas"]["ReviewItemKind"];
+            origin: components["schemas"]["SuggestionOrigin"];
+            question: components["schemas"]["ReviewQuestion"];
+            /** @description Why a person sees it. At most 4,000 characters. */
+            rationale?: string;
+            scope?: null | components["schemas"]["ReviewScope"];
+            subject?: null | components["schemas"]["ReviewSubject"];
+            /** @description The question in words. At most 200 characters. */
+            title: string;
+            wait?: null | components["schemas"]["ReviewWait"];
+            workflow?: null | components["schemas"]["ReviewWorkflowOrigin"];
+        };
+        /**
+         * @description The review part of a suggestion record. Absent on a plain suggestion,
+         *     which reads as kind `change`, scope `live`.
+         */
+        ReviewItemFields: {
+            answer?: null | components["schemas"]["ReviewAnswer"];
+            effects?: null | components["schemas"]["ReviewEffects"];
+            eval?: null | components["schemas"]["ReviewEvalOrigin"];
+            evidence?: components["schemas"]["ReviewEvidence"][];
+            /**
+             * @description The producer's mark of the evidence the question is asked on (for
+             *     values.extract: a hash of the text it read). An answer holds for
+             *     that evidence; new evidence with another value asks again.
+             */
+            evidence_hash?: string | null;
+            kind: components["schemas"]["ReviewItemKind"];
+            previous_answer?: null | components["schemas"]["ReviewAnswer"];
+            question?: null | components["schemas"]["ReviewQuestion"];
+            scope?: components["schemas"]["ReviewScope"];
+            subject?: null | components["schemas"]["ReviewSubject"];
+            wait?: null | components["schemas"]["ReviewWait"];
+            workflow?: null | components["schemas"]["ReviewWorkflowOrigin"];
+        };
+        /**
+         * @description What a review item asks a person.
+         * @enum {string}
+         */
+        ReviewItemKind: "change" | "value" | "choice" | "grade" | "answer";
+        /** @description `GET /v1/reviews`: newest update first. */
+        ReviewItemList: {
+            data: components["schemas"]["ReviewItem"][];
+            /** @description More items match: pass `next_cursor` as `cursor`. */
+            has_more: boolean;
+            next_cursor?: string | null;
+            /** @description Always `list`. */
+            object: string;
+        };
+        /** @description One option of a `choice` item, or one grade of a `grade` item. */
+        ReviewOption: {
+            /** @description 1 to 64 characters of `[A-Za-z0-9-_.:]`. */
+            id: string;
+            /** @description At most 200 characters. */
+            label: string;
+        };
+        /**
+         * @description What an item asks, by kind:
+         *     - `value`: `property`, the proposed `value`, its `unit` and `confidence`;
+         *     - `choice`: `options`, and the `proposed` option with its `confidence`;
+         *     - `grade`: the `output` to grade, `options` (the grades) and `proposed`;
+         *     - `answer`: the `prompt`.
+         */
+        ReviewQuestion: {
+            /**
+             * Format: float
+             * @description The producer's confidence in its proposal, from 0 to 1.
+             */
+            confidence?: number | null;
+            options?: components["schemas"]["ReviewOption"][];
+            output?: string | null;
+            prompt?: string | null;
+            property?: string | null;
+            /** @description The option the producer proposes. */
+            proposed?: string | null;
+            unit?: string | null;
+            /** @description The proposed value: a number, a string or a boolean. */
+            value?: unknown;
+        };
+        /**
+         * @description Whether a review item belongs to live work, whose answers take effect,
+         *     or to a test, which writes nothing.
+         * @enum {string}
+         */
+        ReviewScope: "live" | "test";
+        /**
+         * @description Where an item is, as `/v1/reviews` says it.
+         * @enum {string}
+         */
+        ReviewStatus: "open" | "answered" | "withdrawn";
+        /** @description The record a question is about. */
+        ReviewSubject: {
+            /** @description The record's IRI. */
+            iri?: string | null;
+            /** @description Its stable import key. */
+            key?: string | null;
+            /** @description Its display name. */
+            name?: string | null;
+            /** @description Its class. */
+            type?: string | null;
+        };
+        /** @description The run that waits for an item's answer: the signal goes to this turn. */
+        ReviewWait: {
+            /** @description The engine identity (`ctx.workflowId`). */
+            identity: string;
+            /**
+             * @description The signal name the run waits for: `review.<item id>`, set by the
+             *     server (a create request may leave it out).
+             */
+            signal?: string;
+            /** Format: int64 */
+            turn: number;
+        };
+        /**
+         * @description `POST /v1/reviews/withdraw?id=…`: the producer withdraws an open
+         *     item (a suggestion's supersede).
+         */
+        ReviewWithdrawRequest: {
+            /** @description Required, at most 1,000 characters. */
+            reason: string;
+        };
+        /** @description The workflow run and step that filed an item. */
+        ReviewWorkflowOrigin: {
+            /** @description The engine identity and turn of the run, for a signal. */
+            identity?: string | null;
+            /**
+             * @description The workflow's name (its `starter:<name>` origin id without the
+             *     prefix).
+             */
+            name: string;
+            /** @description The run (`WorkflowRunSummary::id`). */
+            run?: string | null;
+            /** @description The step key inside the run. */
+            step?: string | null;
+            /** Format: int64 */
+            turn?: number | null;
+        };
         /** @description The query whose rows hold the answer. */
         RewrittenQuery: {
             /**
@@ -19102,6 +19621,16 @@ export interface components {
             /** @description The items queued again, back on the asking shard. */
             requeued: string[];
         };
+        /**
+         * @description A review trigger: the answers to the review items a workflow asked
+         *     (`POST /v1/reviews` with `workflow.name`, or origin `starter:<name>`)
+         *     arrive as messages of type `review.answered` ([`ReviewAnsweredMessage`]),
+         *     one per answer. It goes beside the workflow's watch or content trigger.
+         */
+        WorkflowReviewTrigger: {
+            /** @description The workflow whose items' answers arrive. Absent: this workflow. */
+            workflow?: string | null;
+        };
         WorkflowRun: {
             /** Format: int64 */
             created_at_ms: number;
@@ -19452,8 +19981,8 @@ export interface components {
         };
         /**
          * @description One trigger of a workflow: a watch or a content trigger, exactly one of
-         *     them. A schedule (design only) is refused with
-         *     `400 workflow_trigger_unsupported`.
+         *     them, and at most one review trigger beside it. A schedule (design only)
+         *     is refused with `400 workflow_trigger_unsupported`.
          */
         WorkflowTrigger: {
             content?: null | components["schemas"]["WorkflowContentTrigger"];
@@ -19462,6 +19991,7 @@ export interface components {
              *     names it.
              */
             id?: string | null;
+            review?: null | components["schemas"]["WorkflowReviewTrigger"];
             /**
              * @description Design only: a timer trigger. Refused in this release
              *     (`workflow_trigger_unsupported`).
@@ -19520,8 +20050,9 @@ export interface components {
         WorkflowTriggerResolved: {
             content?: null | components["schemas"]["WorkflowContentTrigger"];
             id: string;
-            /** @description `watch` or `content`. */
+            /** @description `watch`, `content` or `review`. */
             kind: string;
+            review?: null | components["schemas"]["WorkflowReviewTrigger"];
             watch?: null | components["schemas"]["WorkflowWatchResolved"];
         };
         WorkflowTurn: {
@@ -51511,6 +52042,1196 @@ export interface operations {
                 };
             };
             /** @description Service unavailable. On metered routes, application_usage_unavailable refuses admission before execution and is retryable. On writes, application_usage_handoff_unconfirmed means execution ran but its measurement was not durably confirmed: retryable is false and clients must inspect operation state before retrying. A saved measurement preserves success even if settlement needs recovery. Completed public reads preserve their response and hand reporting to a bounded background task; an unconfirmed handoff remains an explicit reporting gap. An original rejected request keeps its original status if its NoCharge acknowledgement fails. */
+            503: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+        };
+    };
+    get_v1_reviews: {
+        parameters: {
+            query?: {
+                /** @description Graph name (default `main`) */
+                graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
+                /** @description open | answered | withdrawn */
+                status?: string;
+                /** @description change | value | choice | grade | answer; several, comma-separated */
+                kind?: string;
+                /** @description live (default) | test */
+                scope?: string;
+                /** @description Producer id, for example `starter:areas` */
+                origin_id?: string;
+                /** @description The workflow that asked */
+                workflow?: string;
+                /** @description The run that asked */
+                run?: string;
+                /** @description Maximum rows (default 100, maximum 500) */
+                limit?: string;
+                /** @description next_cursor of the page before */
+                cursor?: string;
+                /** @description Producer keys, comma-separated (at most 100): the items filed under them */
+                key?: string;
+            };
+            header?: {
+                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                "Lbb-Version"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReviewItemList"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Rate limit exceeded */
+            429: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Service unavailable */
+            503: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+        };
+    };
+    post_v1_reviews: {
+        parameters: {
+            query?: {
+                /** @description Graph name (default `main`) */
+                graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
+            };
+            header?: {
+                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                "Lbb-Version"?: string;
+                /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
+                "Idempotency-Key"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReviewItemCreateRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReviewItem"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Rate limit exceeded */
+            429: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Service unavailable */
+            503: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+        };
+    };
+    post_v1_reviews_answer: {
+        parameters: {
+            query?: {
+                /** @description Graph name (default `main`) */
+                graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
+                /** @description Review item id (`rev_…`) */
+                id?: string;
+            };
+            header?: {
+                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                "Lbb-Version"?: string;
+                /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
+                "Idempotency-Key"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReviewAnswerRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReviewItem"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Rate limit exceeded */
+            429: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Service unavailable */
+            503: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+        };
+    };
+    post_v1_reviews_answer_batch: {
+        parameters: {
+            query?: {
+                /** @description Graph name (default `main`) */
+                graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
+            };
+            header?: {
+                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                "Lbb-Version"?: string;
+                /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
+                "Idempotency-Key"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReviewAnswerBatchRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReviewAnswerBatchResponse"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Rate limit exceeded */
+            429: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Service unavailable */
+            503: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+        };
+    };
+    post_v1_reviews_comment: {
+        parameters: {
+            query?: {
+                /** @description Graph name (default `main`) */
+                graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
+                /** @description Review item id (`rev_…`) */
+                id?: string;
+            };
+            header?: {
+                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                "Lbb-Version"?: string;
+                /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
+                "Idempotency-Key"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OntologyChangeSuggestionCommentRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReviewItem"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Rate limit exceeded */
+            429: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Service unavailable */
+            503: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+        };
+    };
+    get_v1_reviews_detail: {
+        parameters: {
+            query?: {
+                /** @description Graph name (default `main`) */
+                graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
+                /** @description Review item id (`rev_…`) */
+                id?: string;
+            };
+            header?: {
+                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                "Lbb-Version"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReviewItem"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Rate limit exceeded */
+            429: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Service unavailable */
+            503: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+        };
+    };
+    get_v1_reviews_patterns: {
+        parameters: {
+            query?: {
+                /** @description Graph name (default `main`) */
+                graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
+                /** @description open | answered | withdrawn */
+                status?: string;
+                /** @description Producer id, for example `starter:areas` */
+                origin_id?: string;
+                /** @description facts | links | ontology | other */
+                type?: string;
+            };
+            header?: {
+                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                "Lbb-Version"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OntologySuggestionPatternList"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Rate limit exceeded */
+            429: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Service unavailable */
+            503: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+        };
+    };
+    post_v1_reviews_withdraw: {
+        parameters: {
+            query?: {
+                /** @description Graph name (default `main`) */
+                graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
+                /** @description Review item id (`rev_…`) */
+                id?: string;
+            };
+            header?: {
+                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                "Lbb-Version"?: string;
+                /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
+                "Idempotency-Key"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReviewWithdrawRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReviewItem"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Rate limit exceeded */
+            429: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Service unavailable */
             503: {
                 headers: {
                     /** @description API contract version used for the response */

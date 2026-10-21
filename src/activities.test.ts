@@ -424,6 +424,237 @@ test("review files a suggestion with facts and the workflow's agent origin", asy
   });
 });
 
+test("review files a value item with /v1/reviews and the workflow that asks", async () => {
+  const { lbb, seen } = activities([
+    {
+      body: {
+        id: "rev_1",
+        object: "review_item",
+        kind: "value",
+        status: "open",
+      },
+    },
+  ]);
+  const item = await lbb.review({
+    kind: "value",
+    workflow: { name: "areas", step: "review" },
+    key: "starter:areas:value:r104:area",
+    title: "Is the area of R 1.04 12.5?",
+    subject: { type: "Room", name: "R 1.04" },
+    question: { property: "area", value: 12.5, confidence: 0.62 },
+    evidence: [{ quote: "Fläche 12,5 m²" }],
+  });
+
+  assert.equal(item.id, "rev_1");
+  assert.equal(seen[0]?.path, "/v1/reviews");
+  assert.deepEqual(seen[0]?.body, {
+    kind: "value",
+    key: "starter:areas:value:r104:area",
+    title: "Is the area of R 1.04 12.5?",
+    subject: { type: "Room", name: "R 1.04" },
+    question: { property: "area", value: 12.5, confidence: 0.62 },
+    evidence: [{ quote: "Fläche 12,5 m²" }],
+    origin: { kind: "agent", id: "starter:areas" },
+    workflow: { name: "areas", step: "review" },
+  });
+});
+
+test("reviewItems reads the items of the keys, 100 keys a read", async () => {
+  const keys = Array.from(
+    { length: 150 },
+    (_, n) => `starter:areas:value:e${n}:area`,
+  );
+  const { lbb, seen } = activities([
+    {
+      body: {
+        object: "list",
+        data: [{ id: "rev_1", key: keys[0] }],
+        has_more: false,
+      },
+    },
+    {
+      body: {
+        object: "list",
+        data: [{ id: "rev_2", key: keys[120] }],
+        has_more: false,
+      },
+    },
+  ]);
+  const answered = await lbb.reviewItems([...keys, keys[0]!]);
+  assert.deepEqual(
+    answered.map((item) => item.id),
+    ["rev_1", "rev_2"],
+  );
+  assert.equal(seen.length, 2);
+  assert.equal(seen[0]?.path, "/v1/reviews");
+  const first = new URLSearchParams(seen[0]?.query);
+  assert.equal(first.get("status"), null);
+  assert.equal(first.get("limit"), "100");
+  assert.equal(first.get("key")?.split(",").length, 100);
+  assert.equal(
+    new URLSearchParams(seen[1]?.query).get("key")?.split(",").length,
+    50,
+  );
+});
+
+/** A context that runs each step and answers each wait from `signals`. */
+function waitingContext(
+  workflowId: string,
+  signals: Array<{ received: boolean; value: unknown }>,
+) {
+  const keys: string[] = [];
+  const waits: Array<{ key: string; name: string; timeoutMs: number }> = [];
+  const ctx = {
+    workflowId,
+    turn: 3,
+    step: async <T>(
+      key: string,
+      effect: (s: { effectId: string }) => Promise<T>,
+    ) => {
+      keys.push(key);
+      return effect({ effectId: `turn/${key}` });
+    },
+    waitForSignal: async (
+      key: string,
+      options: { name: string; timeoutMs: number },
+    ) => {
+      waits.push({ key, ...options });
+      return signals.shift() ?? { received: false, value: null };
+    },
+  } as unknown as WorkflowContext;
+  return { ctx, keys, waits };
+}
+
+test("waitForReview files the item with the waiting run and waits for its signal", async () => {
+  const { lbb, seen } = activities([
+    {
+      body: {
+        id: "rev_2",
+        kind: "choice",
+        status: "open",
+        wait: { identity: "asker", turn: 3, signal: "review.rev_2" },
+      },
+    },
+  ]);
+  const { ctx, keys, waits } = waitingContext("asker", [
+    { received: true, value: { decision: "choose", option: "tiles" } },
+  ]);
+  const result = await lbb.waitForReview(
+    ctx,
+    "floor",
+    {
+      kind: "choice",
+      workflow: "rooms",
+      key: "asker:floor",
+      title: "Which floor covering?",
+      question: {
+        options: [
+          { id: "parquet", label: "Parquet" },
+          { id: "tiles", label: "Tiles" },
+        ],
+      },
+    },
+    { timeoutMs: 60_000 },
+  );
+
+  assert.deepEqual(keys, ["floor:ask"]);
+  assert.deepEqual(waits, [
+    { key: "floor:answer", name: "review.rev_2", timeoutMs: 60_000 },
+  ]);
+  assert.equal(result.answered, true);
+  assert.deepEqual(result.answer, { decision: "choose", option: "tiles" });
+  assert.deepEqual(seen[0]?.body?.wait, {
+    identity: "asker",
+    turn: 3,
+    signal: "",
+  });
+  assert.deepEqual(seen[0]?.body?.workflow, {
+    name: "rooms",
+    identity: "asker",
+    turn: 3,
+  });
+});
+
+test("waitForReview reads the item again when its wait times out", async () => {
+  const filed = {
+    id: "rev_4",
+    kind: "choice",
+    status: "open",
+    wait: { identity: "asker", turn: 3, signal: "review.rev_4" },
+  };
+  const { lbb, seen } = activities([
+    { body: filed },
+    {
+      body: {
+        ...filed,
+        status: "answered",
+        answer: { decision: "choose", option: "b" },
+      },
+    },
+  ]);
+  const { ctx, keys } = waitingContext("asker", [
+    { received: false, value: null },
+  ]);
+  const result = await lbb.waitForReview(
+    ctx,
+    "floor",
+    {
+      kind: "choice",
+      key: "asker:floor:2",
+      title: "Which floor covering?",
+      question: {
+        options: [
+          { id: "a", label: "A" },
+          { id: "b", label: "B" },
+        ],
+      },
+    },
+    { timeoutMs: 1_000 },
+  );
+  assert.deepEqual(keys, ["floor:ask", "floor:read"]);
+  assert.equal(seen[1]?.path, "/v1/reviews/detail");
+  assert.equal(result.answered, true);
+  assert.deepEqual(result.answer, { decision: "choose", option: "b" });
+});
+
+test("waitForReview takes an answer that came first, and refuses a trigger shard", async () => {
+  const { lbb } = activities([
+    {
+      body: {
+        id: "rev_3",
+        kind: "choice",
+        status: "answered",
+        answer: { decision: "cant_tell" },
+        wait: { identity: "asker", turn: 3, signal: "review.rev_3" },
+      },
+    },
+  ]);
+  const { ctx, waits } = waitingContext("asker", []);
+  const request = {
+    kind: "choice" as const,
+    key: "asker:floor",
+    title: "Which floor covering?",
+    question: {
+      options: [
+        { id: "a", label: "A" },
+        { id: "b", label: "B" },
+      ],
+    },
+  };
+  const result = await lbb.waitForReview(ctx, "floor", request, {
+    timeoutMs: 1_000,
+  });
+  assert.equal(result.answered, true);
+  assert.deepEqual(result.answer, { decision: "cant_tell" });
+  assert.equal(waits.length, 0, "an answered item needs no wait");
+
+  const shard = waitingContext("starter.rooms", []);
+  await assert.rejects(
+    lbb.waitForReview(shard.ctx, "floor", request, { timeoutMs: 1_000 }),
+    /needs a run with its own identity/,
+  );
+});
+
 test("evolve sends the operations, and a dry run asks for one", async () => {
   const { lbb, seen } = activities([{ body: { no_op: true } }, { body: {} }]);
   const ops = [{ op: "add_entity_type" as const, name: "Mangel" }];

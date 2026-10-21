@@ -696,6 +696,58 @@ test("triggeredWorkflow() fails a turn whose message has another shape, without 
   assert.equal(calls.filter((c) => c.path.endsWith("/complete")).length, 0);
 });
 
+test("triggeredWorkflow() hands a review answer to onReviewAnswered, and refuses it without one", async () => {
+  const answered = {
+    type: "review.answered",
+    workflow: "word-count",
+    graph: { tenant_id: "t", graph_id: "main", branch_id: "main" },
+    review_item: {
+      id: "rev_1",
+      object: "review_item",
+      created: "2026-10-21T10:00:00Z",
+      updated: "2026-10-21T10:05:00Z",
+      key: "starter:word-count:value:n1:words",
+      kind: "value",
+      scope: "live",
+      status: "answered",
+      title: "Is the word count of n1 3?",
+      rationale: "",
+      origin: { kind: "agent", id: "starter:word-count" },
+      answer: { decision: "correct", value: 4 },
+      effects: { commit_seq: 9, delivery: { state: "pending" } },
+      revision: 2,
+    },
+    request_id: "req-1",
+  };
+  const { client, calls } = worker([task(answered), task(answered)]);
+  const got: unknown[] = [];
+  const notes = triggeredWorkflow<{ corrected: number }>({
+    name: "word-count",
+    version: "v1",
+    initialState: { corrected: 0 },
+    async onInstances() {
+      throw new Error("not a trigger message");
+    },
+    async onReviewAnswered(_ctx, message, state) {
+      got.push(message.review_item.answer);
+      return { state: { corrected: state.corrected + 1 } };
+    },
+  });
+  await new WorkflowWorker(client, [notes], { worker: "w" }).runOnce();
+  assert.deepEqual(got, [{ decision: "correct", value: 4 }]);
+  const done = calls.filter((c) => c.path.endsWith("/turns/complete"));
+  assert.deepEqual(done[0]?.body.state, { corrected: 1 });
+
+  const without = triggeredWorkflow({
+    name: "word-count",
+    version: "v1",
+    async onInstances() {},
+  });
+  await new WorkflowWorker(client, [without], { worker: "w" }).runOnce();
+  const failed = calls.find((c) => c.path.endsWith("/turns/fail"));
+  assert.match(String(failed?.body.error), /defines no onReviewAnswered/);
+});
+
 test("writeOwned commits in a step with the step's effect id as idempotency key", async () => {
   const { client, calls } = worker([task(MESSAGE)]);
   const results: unknown[] = [];

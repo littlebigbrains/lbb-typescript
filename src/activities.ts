@@ -30,6 +30,7 @@ import type {
 import {
   activityTurn,
   addTurnUsage,
+  WorkflowError,
   type ActivityTurn,
   type WorkflowContext,
   type WorkflowStepContext,
@@ -102,6 +103,59 @@ export type ReviewRequest = Omit<
   workflow?: string;
   origin?: Schemas["SuggestionOrigin"];
 };
+
+/**
+ * A question for a person of another kind than a change
+ * (`POST /v1/reviews`): a `value` to confirm or correct, a `choice`, a
+ * `grade` or a free-text `answer`. `workflow` names the workflow that asks,
+ * by its name or with its run and step: the item's origin is then
+ * `{ kind: "agent", id: "starter:<name>" }`, and a workflow with a review
+ * trigger receives the answer. An answer of a `value` writes the value.
+ */
+export type ReviewItemRequest = Omit<
+  Schemas["ReviewItemCreateRequest"],
+  "origin" | "workflow" | "wait"
+> & {
+  workflow?: string | Schemas["ReviewWorkflowOrigin"];
+  origin?: Schemas["SuggestionOrigin"];
+};
+
+/** What `waitForReview` returns: the answer, or none when the wait timed out. */
+export type ReviewWaitResult =
+  | {
+      answered: true;
+      answer: Schemas["ReviewAnswer"];
+      item: Schemas["ReviewItem"];
+    }
+  | { answered: false; answer: null; item: Schemas["ReviewItem"] };
+
+/** Keys one read of `reviewItems` names, at most (the list route's bound). */
+const REVIEW_KEYS_PER_READ = 100;
+
+/** The body of `POST /v1/reviews` for a request. */
+function reviewItemBody(
+  request: ReviewItemRequest,
+  run?: { identity: string; turn: number },
+): Schemas["ReviewItemCreateRequest"] {
+  const { workflow, origin, ...item } = request;
+  const named = typeof workflow === "string" ? { name: workflow } : workflow;
+  const asking = named && run ? { ...named, ...run } : named;
+  return {
+    ...item,
+    // An item that names no workflow is filed by the run itself: its
+    // origin id is the run's identity.
+    origin: origin ?? {
+      kind: "agent",
+      ...(named
+        ? { id: `starter:${named.name}` }
+        : run
+          ? { id: run.identity }
+          : {}),
+    },
+    ...(asking ? { workflow: asking } : {}),
+    ...(run ? { wait: { ...run, signal: "" } } : {}),
+  };
+}
 
 /** The page range of `pages`: 0-based, `to` is the first page not read. */
 export interface ActivityPagesOptions extends CallOptions {
@@ -192,8 +246,45 @@ export interface LbbActivities {
     options?: CallOptions,
   ): Promise<Schemas["OntologyChangeSuggestion"]>;
   /**
-   * The review items, newest update first, with counts per status
-   * (`GET /v1/ontology/suggestions`): `client.ontology.suggestions.list`.
+   * Ask a person (`POST /v1/reviews`): a value to confirm or correct, a
+   * choice, a grade or a free-text answer. Returns at once; the answer
+   * reaches a workflow with a review trigger as a `review.answered`
+   * message. The same `key` again updates the item.
+   */
+  review(
+    request: ReviewItemRequest,
+    options?: CallOptions,
+  ): Promise<Schemas["ReviewItem"]>;
+  /**
+   * The review items filed under `keys`, of every status
+   * (`GET /v1/reviews?key=…`, 100 keys a read): a workflow reads them
+   * before it writes, so a person's answer wins over what it would write
+   * itself, and an item asked again on new evidence keeps the answer in
+   * force (`previous_answer`) until a new one.
+   */
+  reviewItems(
+    keys: string[],
+    options?: CallOptions,
+  ): Promise<Schemas["ReviewItem"][]>;
+  /**
+   * Ask a person and wait for the answer without holding a worker: files
+   * the item in the step `key` with this run as the one that waits, then
+   * waits for the answer's signal. An answer that came before the wait is
+   * taken at once. Only for a run with its own identity: a trigger shard
+   * (`starter.<name>`) serves many inputs, and a wait would hold them all,
+   * so it is refused there; file with `review` and take the answer with a
+   * review trigger instead.
+   */
+  waitForReview(
+    ctx: WorkflowContext,
+    key: string,
+    request: ReviewItemRequest,
+    options: { timeoutMs: number },
+  ): Promise<ReviewWaitResult>;
+  /**
+   * The suggestions (`change` review items), newest update first, with
+   * counts per status (`GET /v1/ontology/suggestions`):
+   * `client.ontology.suggestions.list`.
    * Filter by `originId` (`starter:<workflow>`, `fit:<source>`), `status`,
    * `key` or `anchor`.
    */
@@ -201,8 +292,9 @@ export interface LbbActivities {
     options?: OntologySuggestionListOptions,
   ): Promise<Schemas["OntologyChangeSuggestionList"]>;
   /**
-   * The review item filed under `key`, with its evidence, or null when none
-   * is: a merge of new evidence into an item reads it first.
+   * The suggestion (a `change` review item) filed under `key`, with its
+   * evidence and facts, or null when none is: a merge of new evidence into
+   * an item reads it first. `reviewItems` reads the items of every kind.
    */
   reviewItem(
     key: string,
@@ -396,8 +488,14 @@ export function lbbActivities(client: LbbClient): LbbActivities {
     requeue(ctx, stepKey, failed, options) {
       return requeueFailed(client, ctx, stepKey, failed, options);
     },
-    review(request, options = {}) {
-      const { workflow, origin, ...suggestion } = request;
+    review: ((
+      request: ReviewRequest | ReviewItemRequest,
+      options: CallOptions = {},
+    ) => {
+      if ("kind" in request && request.kind && request.kind !== "change") {
+        return client.reviews.create(reviewItemBody(request), options);
+      }
+      const { workflow, origin, ...suggestion } = request as ReviewRequest;
       return client.ontology.suggestions.create(
         {
           ...suggestion,
@@ -408,6 +506,57 @@ export function lbbActivities(client: LbbClient): LbbActivities {
         },
         options,
       );
+    }) as LbbActivities["review"],
+    async reviewItems(keys, options = {}) {
+      const unique = [...new Set(keys)];
+      const out: Schemas["ReviewItem"][] = [];
+      for (let at = 0; at < unique.length; at += REVIEW_KEYS_PER_READ) {
+        const chunk = unique.slice(at, at + REVIEW_KEYS_PER_READ);
+        const page = await client.reviews.list({
+          ...options,
+          key: chunk,
+          limit: chunk.length,
+        });
+        out.push(...page.data);
+      }
+      return out;
+    },
+    async waitForReview(ctx, key, request, { timeoutMs }) {
+      if (ctx.workflowId.startsWith("starter.")) {
+        throw new WorkflowError(
+          `waitForReview needs a run with its own identity: ${ctx.workflowId} serves many inputs, and a wait would hold them all. File the item with review() and take the answer with a review trigger.`,
+        );
+      }
+      const item = await ctx.step(`${key}:ask`, () =>
+        client.reviews.create(
+          reviewItemBody(request, {
+            identity: ctx.workflowId,
+            turn: ctx.turn,
+          }),
+        ),
+      );
+      if (item.status !== "open" && item.answer) {
+        return { answered: true, answer: item.answer, item };
+      }
+      const signal = item.wait?.signal;
+      if (!signal) {
+        throw new WorkflowError(
+          `review item ${item.id} names no signal to wait for`,
+        );
+      }
+      const got = await ctx.waitForSignal<Schemas["ReviewAnswer"]>(
+        `${key}:answer`,
+        { name: signal, timeoutMs },
+      );
+      if (got.received) return { answered: true, answer: got.value, item };
+      // The wait timed out: the answer may have come and its signal not
+      // (a dropped event). Read the item again.
+      const now = await ctx.step(`${key}:read`, () =>
+        client.reviews.get(item.id),
+      );
+      return now.status === "answered" && now.answer
+        ? { answered: true, answer: now.answer, item: now }
+        : { answered: false, answer: null, item: now };
     },
     listReviews(options = {}) {
       return client.ontology.suggestions.list(options);

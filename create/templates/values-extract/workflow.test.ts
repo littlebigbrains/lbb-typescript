@@ -10,8 +10,10 @@ import { join } from "node:path";
 import {
   ENTITY_IRI_NAMESPACE,
   entityIdFromIri,
+  entityRef,
   stableHashHex,
   type DecideAnswer,
+  type Schemas,
 } from "@littlebigbrain/client";
 import {
   MockActivities,
@@ -28,11 +30,14 @@ import {
   check,
   createWorkflow,
   defaults,
+  evidenceOf,
+  legacyValueKey,
   ontology,
   quoteHolds,
   typed,
   unitOf,
   unitProblem,
+  valueItemKey,
 } from "./workflow.js";
 
 const SAMPLES = samplesDir(import.meta.url, "values-extract");
@@ -193,6 +198,7 @@ test("the samples give the values of the answer key and none it leaves out", asy
     commits: 1,
     removed: 0,
   });
+  assert.equal(lbb.questions.size, 0);
   assert.equal(lbb.reviews.size, 0);
   assert.equal(turns.length, 1);
 });
@@ -269,35 +275,273 @@ test("a value below the gate goes to review, and the checks run in LBB's order",
   assert.equal(state.invalid_value, 1);
   assert.equal(state.duplicate, 1);
   assert.equal(state.unknown_property, 1);
-  const [key, item] = [...lbb.reviews.entries()][0]!;
-  // The key of LBB's values.extract: its instance, property and value.
+  const [item] = [...lbb.questions.values()];
+  assert.equal(item!.kind, "value");
+  // The key of LBB's values.extract: its instance and property.
+  assert.equal(item!.key, valueItemKey("values-extract", iriOf(record.name), "width_cm"));
   assert.equal(
-    key,
-    `starter:values-extract:value:${stableHashHex([entityIdFromIri(iriOf(record.name)), "width_cm", "70"]).slice(0, 24)}`,
+    item!.key,
+    `starter:values-extract:value:${stableHashHex(["value_item_v2", entityIdFromIri(iriOf(record.name)), "width_cm"]).slice(0, 24)}`,
   );
   assert.equal(item!.title, "Set width_cm of S 9.1 to 70");
-  assert.equal(
-    item!.rationale,
-    'The text supports the value with 0.60, below the gate 0.8: "Breite etwa 70 cm"',
-  );
-  assert.deepEqual(item!.origin, {
-    kind: "agent",
-    id: "starter:values-extract",
-    label: "values.extract",
+  assert.equal(item!.rationale, "The text supports the value with 0.60, below the gate 0.8.");
+  assert.deepEqual(item!.workflow, { name: "values-extract" });
+  assert.deepEqual(item!.subject, {
+    iri: iriOf(record.name),
+    type: "EquipmentItem",
+    name: record.name,
   });
-  assert.equal(item!.workflow, "values-extract");
+  assert.deepEqual(item!.question, {
+    property: "width_cm",
+    value: 70,
+    unit: "cm",
+    confidence: item!.question.confidence,
+  });
+  assert.equal(item!.evidence![0]!.quote, "Breite etwa 70 cm");
   assert.deepEqual(item!.facts!.entity_properties![0]!.properties, { width_cm: 70 });
 
   // Accepted, the value is written with the others the next time the instance is read.
   const accepting = new MockActivities(
-    rules([record], { reason: () => ({ values: proposals }), reviewStatus: () => "accepted" }),
+    rules([record], {
+      reason: () => ({ values: proposals }),
+      reviewAnswer: () => ({ decision: "accept" }),
+    }),
   );
   await runMessage(
     createWorkflow(accepting),
     triggerMessage("values-extract", [iriOf(record.name)]),
   );
   assert.deepEqual(written(accepting, record.name), { width_cm: 70, material: "Kunststoff" });
+
+  // Corrected, the person's number is written as given, in the property's unit.
+  const correcting = new MockActivities(
+    rules([record], {
+      reason: () => ({ values: proposals }),
+      reviewAnswer: () => ({ decision: "correct", value: 72 }),
+    }),
+  );
+  await runMessage(
+    createWorkflow(correcting),
+    triggerMessage("values-extract", [iriOf(record.name)]),
+  );
+  assert.deepEqual(written(correcting, record.name), { width_cm: 72, material: "Kunststoff" });
 });
+
+/** A second message to the same workflow, at a later commit (its own step effect ids). */
+const later = (iri: string) => ({
+  ...triggerMessage("values-extract", [iri]),
+  as_of_commit_seq: 8,
+});
+
+test("a person's correction stays when new evidence reads another value, which asks again", async () => {
+  const records = [
+    { name: "S 9.3", text: "S 9.3 Becken aus Kunststoff. Breite etwa 70 cm, Tiefe 40 cm." },
+  ];
+  let proposals = [{ property: "width_cm", value: "70", unit: "cm", quote: "Breite etwa 70 cm" }];
+  const lbb = new MockActivities(
+    rules(records, {
+      reason: () => ({ values: proposals }),
+      reviewAnswer: (request) =>
+        request.question.property === "width_cm" ? { decision: "correct", value: 72 } : undefined,
+    }),
+  );
+  const workflow = createWorkflow(lbb);
+  await runMessage(workflow, triggerMessage("values-extract", [iriOf("S 9.3")]));
+  assert.deepEqual(written(lbb, "S 9.3"), { width_cm: 72 });
+
+  // A new version of the text, and the model reads 80 above the gate: the
+  // person is asked again, and the corrected 72 stays until they answer.
+  records[0]!.text = "S 9.3 Becken aus Kunststoff. Breite 80 cm.";
+  proposals = [{ property: "width_cm", value: "80", unit: "cm", quote: "Breite 80 cm" }];
+  await runMessage(workflow, later(iriOf("S 9.3")));
+  assert.deepEqual(written(lbb, "S 9.3"), { width_cm: 72 });
+  const [item] = await lbb.reviewItems([
+    valueItemKey("values-extract", iriOf("S 9.3"), "width_cm"),
+  ]);
+  assert.equal(item!.status, "open");
+  assert.deepEqual(item!.question?.value, 80);
+  assert.deepEqual(item!.previous_answer, { decision: "correct", value: 72 });
+});
+
+test("an accepted value stays when new evidence reads the same value, and asks nothing", async () => {
+  const records = [{ name: "S 9.5", text: "S 9.5 Becken. Breite etwa 70 cm." }];
+  let proposals = [{ property: "width_cm", value: "70", unit: "cm", quote: "Breite etwa 70 cm" }];
+  const lbb = new MockActivities(
+    rules(records, {
+      reason: () => ({ values: proposals }),
+      reviewAnswer: () => ({ decision: "accept" }),
+    }),
+  );
+  const workflow = createWorkflow(lbb);
+  await runMessage(workflow, triggerMessage("values-extract", [iriOf("S 9.5")]));
+  assert.deepEqual(written(lbb, "S 9.5"), { width_cm: 70 });
+  records[0]!.text = "S 9.5 Becken. Breite 70 cm.";
+  proposals = [{ property: "width_cm", value: "70", unit: "cm", quote: "Breite 70 cm" }];
+  await runMessage(workflow, later(iriOf("S 9.5")));
+  assert.deepEqual(written(lbb, "S 9.5"), { width_cm: 70 });
+  assert.equal(lbb.previous.size, 0, "nothing is asked again");
+});
+
+test("a rejected value is not written again, even above the gate", async () => {
+  const records = [{ name: "S 9.6", text: "S 9.6 Becken. Breite etwa 70 cm." }];
+  let proposals = [{ property: "width_cm", value: "70", unit: "cm", quote: "Breite etwa 70 cm" }];
+  const lbb = new MockActivities(
+    rules(records, {
+      reason: () => ({ values: proposals }),
+      reviewAnswer: () => ({ decision: "reject" }),
+    }),
+  );
+  const workflow = createWorkflow(lbb);
+  await runMessage(workflow, triggerMessage("values-extract", [iriOf("S 9.6")]));
+  assert.deepEqual(written(lbb, "S 9.6"), {});
+  records[0]!.text = "S 9.6 Becken. Breite 70 cm.";
+  proposals = [{ property: "width_cm", value: "70", unit: "cm", quote: "Breite 70 cm" }];
+  await runMessage(workflow, later(iriOf("S 9.6")));
+  assert.deepEqual(written(lbb, "S 9.6"), {});
+});
+
+test("an answer the graph refused is not written, and the batch's other values are", async () => {
+  const records = [
+    { name: "S 9.7", text: "S 9.7 Becken. Breite etwa 70 cm." },
+    { name: "S 9.8", text: "S 9.8 Becken. Breite 60 cm." },
+  ];
+  const lbb = new MockActivities(
+    rules(records, {
+      reason: (request) =>
+        (JSON.parse(request.prompt) as { text: string }).text.includes("S 9.7")
+          ? {
+              values: [
+                { property: "width_cm", value: "70", unit: "cm", quote: "Breite etwa 70 cm" },
+              ],
+            }
+          : { values: [{ property: "width_cm", value: "60", unit: "cm", quote: "Breite 60 cm" }] },
+      reviewAnswer: () => ({ decision: "correct", value: 72 }),
+      reviewRefused: () => "the shape MaxWidth rejects 72",
+    }),
+  );
+  await runMessage(
+    createWorkflow(lbb),
+    triggerMessage(
+      "values-extract",
+      records.map((r) => iriOf(r.name)),
+    ),
+  );
+  assert.deepEqual(written(lbb, "S 9.7"), {});
+  assert.deepEqual(written(lbb, "S 9.8"), { width_cm: 60 });
+});
+
+test("a value the graph refused is not written when a later text states it", async () => {
+  const records = [{ name: "S 9.6", text: "S 9.6 Becken. Breite etwa 70 cm." }];
+  let proposals = [{ property: "width_cm", value: "70", unit: "cm", quote: "Breite etwa 70 cm" }];
+  const lbb = new MockActivities(
+    rules(records, {
+      reason: () => ({ values: proposals }),
+      reviewAnswer: () => ({ decision: "correct", value: 72 }),
+      reviewRefused: () => "the shape MaxWidth rejects 72",
+    }),
+  );
+  const workflow = createWorkflow(lbb);
+  await runMessage(workflow, triggerMessage("values-extract", [iriOf("S 9.6")]));
+  assert.deepEqual(written(lbb, "S 9.6"), {});
+  // The text now states 72 above the gate: the graph refused it, so it is
+  // not written; the item stays open for the person.
+  records[0]!.text = "S 9.6 Becken. Breite 72 cm.";
+  proposals = [{ property: "width_cm", value: "72", unit: "cm", quote: "Breite 72 cm" }];
+  await runMessage(workflow, later(iriOf("S 9.6")));
+  assert.deepEqual(written(lbb, "S 9.6"), {});
+});
+
+test("the value a person decided on, quoted from another span, asks nothing", async () => {
+  const records = [{ name: "S 9.2", text: "S 9.2 Becken. Breite etwa 70 cm." }];
+  let proposals = [{ property: "width_cm", value: "70", unit: "cm", quote: "Breite etwa 70 cm" }];
+  const lbb = new MockActivities(
+    rules(records, {
+      reason: () => ({ values: proposals }),
+      reviewAnswer: () => ({ decision: "correct", value: 72 }),
+    }),
+  );
+  const workflow = createWorkflow(lbb);
+  await runMessage(workflow, triggerMessage("values-extract", [iriOf("S 9.2")]));
+  assert.deepEqual(written(lbb, "S 9.2"), { width_cm: 72 });
+  // The same text; the model quotes another span of it, and spells the unit
+  // otherwise. The person decided on 70 already.
+  proposals = [{ property: "width_cm", value: "70", unit: "CM", quote: "etwa 70 cm" }];
+  await runMessage(workflow, later(iriOf("S 9.2")));
+  assert.deepEqual(written(lbb, "S 9.2"), { width_cm: 72 });
+  assert.equal(lbb.previous.size, 0, "nothing is asked again");
+});
+
+test("the evidence of a value is its quote and the unit the text states, as LBB marks it", () => {
+  const [checked] = check(
+    [{ property: "width_cm", value: "60", unit: "CM", quote: "Breite  60 cm" }],
+    defaults.properties,
+    "Waschtisch, Breite 60 cm",
+    { width_cm: "cm" },
+  );
+  // LBB's golden: values_evidence_hash("Breite 60 cm", "cm").
+  assert.equal(evidenceOf(checked!), "952222f8bb95037753aab03b96bab676");
+});
+
+test("a held value keeps its source link", async () => {
+  const records = [{ name: "S 9.9", text: "S 9.9 Becken. Breite etwa 70 cm." }];
+  let proposals = [{ property: "width_cm", value: "70", unit: "cm", quote: "Breite etwa 70 cm" }];
+  const lbb = new MockActivities(
+    rules(records, {
+      reason: () => ({ values: proposals }),
+      reviewAnswer: () => ({ decision: "accept" }),
+    }),
+  );
+  const workflow = createWorkflow(lbb);
+  await runMessage(workflow, triggerMessage("values-extract", [iriOf("S 9.9")]));
+  const links = () =>
+    lbb.graph.edgesOf("HAS_VALUE_SOURCE").filter((edge) => edge.source === iriOf("S 9.9")).length;
+  assert.equal(links(), 1);
+  // New evidence with another value: asked again, the accepted 70 and its
+  // source link stay.
+  records[0]!.text = "S 9.9 Becken. Breite 85 cm.";
+  proposals = [{ property: "width_cm", value: "85", unit: "cm", quote: "Breite 85 cm" }];
+  await runMessage(workflow, later(iriOf("S 9.9")));
+  assert.deepEqual(written(lbb, "S 9.9"), { width_cm: 70 });
+  assert.equal(links(), 1);
+  assert.equal(lbb.previous.size, 1);
+});
+
+for (const [status, writes] of [
+  ["accepted", { width_cm: 70 }],
+  ["open", {}],
+  ["dismissed", {}],
+] as const) {
+  test(`a value an earlier version filed as a suggestion keeps working (${status})`, async () => {
+    const record = { name: "S 9.4", text: "S 9.4 Becken. Breite etwa 70 cm." };
+    const proposals = [
+      { property: "width_cm", value: "70", unit: "cm", quote: "Breite etwa 70 cm" },
+    ];
+    const lbb = new MockActivities(rules([record], { reason: () => ({ values: proposals }) }));
+    // The key of the suggestion: one per value.
+    const key = legacyValueKey("values-extract", iriOf(record.name), {
+      property: "width_cm",
+      value: "70",
+      quote: "",
+      outcome: "",
+    });
+    const facts: Schemas["SuggestedFacts"] = {
+      entity_properties: [
+        {
+          ...entityRef(iriOf(record.name), "EquipmentItem", record.name),
+          properties: { width_cm: 70 },
+        },
+      ],
+      triplets: [],
+    };
+    lbb.reviews.set(key, { key, title: "Set width_cm of S 9.4 to 70", status, facts });
+    await runMessage(createWorkflow(lbb), triggerMessage("values-extract", [iriOf(record.name)]));
+    // An accepted one is written again, an open one stays the question (no
+    // value item), and a dismissed one is a reject of its value.
+    assert.equal(lbb.questions.size, 0);
+    assert.equal(lbb.reviews.get(key)?.status, status);
+    assert.deepEqual(written(lbb, record.name), writes);
+  });
+}
 
 test("an instance that leaves the class keeps its values, as in LBB's values.extract", async () => {
   const lbb = new MockActivities(rules(RECORDS));
@@ -475,7 +719,7 @@ test("a number in another unit, or with none, goes to review and is not written"
   assert.equal(state.values_proposed, 3);
   assert.equal(state.written, 1);
   assert.equal(state.review, 2);
-  const rationales = [...lbb.reviews.values()].map((item) => item.rationale).sort();
+  const rationales = [...lbb.questions.values()].map((item) => item.rationale ?? "").sort();
   assert.match(
     rationales[0]!,
     /^The unit is not confirmed: the text states mm; the property holds cm\./,

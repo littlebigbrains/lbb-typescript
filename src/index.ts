@@ -193,6 +193,7 @@ export type {
   OwnedWrite,
   OwnedWriteOptions,
   OwnedWriteResult,
+  ReviewAnsweredMessage,
   TriggeredWorkflowDefinition,
   TriggeredWorkflowTurn,
   WorkflowTriggerMessage,
@@ -216,8 +217,11 @@ export type {
   LbbActivities,
   ReasonRequest,
   ReasonResult,
+  ReviewItemRequest,
   ReviewRequest,
+  ReviewWaitResult,
 } from "./activities.js";
+export type { ReviewListOptions, ReviewsNamespace } from "./reviews.js";
 
 export {
   WorkflowExecutionError,
