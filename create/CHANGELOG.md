@@ -2,7 +2,7 @@
 
 All notable changes to the `@littlebigbrain/create` package are documented here.
 
-## Unreleased
+## 0.6.0 (2026-10-21)
 
 - `--lang <ts|python>` (default `ts`). `--lang python` creates the Python
   port of a template, for the `littlebigbrain` Python SDK:
