@@ -6665,9 +6665,13 @@ export interface components {
             building?: null | components["schemas"]["EmbeddingVersionStatus"];
             class: string;
             created_at: string;
+            head_seq?: null | components["schemas"]["CommitSeq"];
             /**
              * Format: int64
-             * @description Commits the serving version is behind the published generation.
+             * @description Commits the serving version is behind the newest commit
+             *     (`head_seq` − its `embedded_through_seq`). 0: a search finds every
+             *     commit. The commits wait for the publication
+             *     (`head_seq` − `published_seq`), then for the embed job.
              */
             lag_commits?: number | null;
             name: string;
@@ -15165,6 +15169,7 @@ export interface components {
             filter?: components["schemas"]["SearchFilter"][];
             /** @description Extra hit fields: `text` (the embedded text). */
             include?: string[];
+            min_commit_seq?: null | components["schemas"]["CommitSeq"];
             /**
              * @description Clusters to read across the big runs (default 4·√clusters, at least
              *     8). Runs of up to 4,096 entries are always read whole.
@@ -15234,6 +15239,7 @@ export interface components {
             /** @description Only planned (`explain`): no hits and no model call. */
             explain?: boolean;
             filter?: null | components["schemas"]["SearchFilterReport"];
+            head_seq?: null | components["schemas"]["CommitSeq"];
             /**
              * @description The best hits over every searched embedding, by score; an entity two
              *     embeddings hold comes back once, with its best score.
@@ -15241,8 +15247,10 @@ export interface components {
             hits: components["schemas"]["SearchHit"][];
             /**
              * Format: int64
-             * @description The most published commits one searched embedding does not cover yet
-             *     (`served_at_seq` − its watermark); the embed job catches up by itself.
+             * @description The most commits one searched embedding is behind the newest commit
+             *     (`head_seq` − its watermark). 0: the search found every commit. The
+             *     publication and then the embed job catch up by themselves; to wait
+             *     for one write, pass its `commit_seq` as `min_commit_seq`.
              */
             lag_commits?: number;
             /**
@@ -15622,7 +15630,11 @@ export interface components {
             embedded_through_seq?: null | components["schemas"]["CommitSeq"];
             /** @description The hits of this response it found. */
             hits: number;
-            /** Format: int64 */
+            /**
+             * Format: int64
+             * @description Commits it is behind the newest commit (`head_seq` −
+             *     `embedded_through_seq`).
+             */
             lag_commits?: number;
             model_id: string;
             name: string;
