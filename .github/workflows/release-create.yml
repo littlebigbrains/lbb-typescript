@@ -4,15 +4,19 @@ name: release-create
 # A canonical sync that lands a new version in create/package.json on public
 # main is the release trigger.
 # Already-published versions are a no-op. A new version is checked (package
-# contents, and a project made from each template passes its test against the
-# published client), pauses at the protected `npm` environment, publishes
-# through trusted publishing, then receives its create-vX.Y.Z tag and GitHub
-# Release.
+# contents, a project made from each template passes its test against the
+# published client, and a Python project made from each Python port passes
+# its test against the published Python SDK), pauses at the protected `npm`
+# environment, publishes through trusted publishing, then receives its
+# create-vX.Y.Z tag and GitHub Release.
 #
 # The sync stages the templates in create/templates, with the client version
-# they are written for (templates/versions.json); the package's prepack keeps
-# that copy. The client publishes first: when one sync lands both, the
-# check waits for the client version the templates name to reach npm.
+# they are written for (templates/versions.json), and their Python ports in
+# create/python, with the Python SDK version they are written for
+# (python/versions.json); the package's prepack keeps those copies. The client
+# and the Python SDK publish first: when one sync lands them with the
+# generator, the check waits for the client version on npm and the Python SDK
+# version on PyPI.
 
 on:
   push:
@@ -47,6 +51,8 @@ jobs:
             || { echo "::error::invalid package version: $version"; exit 1; }
           [ -f templates/versions.json ] \
             || { echo "::error::create/templates/versions.json is missing: the sync stages the templates"; exit 1; }
+          [ -f python/versions.json ] \
+            || { echo "::error::create/python/versions.json is missing: the sync stages the Python ports"; exit 1; }
           echo "version=$version" >> "$GITHUB_OUTPUT"
           echo "tag=create-v$version" >> "$GITHUB_OUTPUT"
           if npm view "@littlebigbrain/create@${version}" version >/dev/null 2>&1; then
@@ -61,7 +67,8 @@ jobs:
     needs: [preflight]
     if: ${{ needs.preflight.outputs.publish == 'true' }}
     runs-on: ubuntu-24.04
-    timeout-minutes: 45
+    # Two waits of up to 30 minutes each (the client, the Python SDK), then the projects.
+    timeout-minutes: 90
     defaults:
       run:
         working-directory: create
@@ -80,16 +87,22 @@ jobs:
           tar tzf "$tarball" > "$RUNNER_TEMP/files.txt"
           FILES="$RUNNER_TEMP/files.txt" node --input-type=module -e '
             import { readFileSync } from "node:fs";
-            import { TEMPLATES } from "./lib/create.mjs";
+            import { PYTHON_TEMPLATES, TEMPLATES, pythonModule } from "./lib/create.mjs";
             const files = readFileSync(process.env.FILES, "utf8").split("\n").filter(Boolean)
               .map((p) => p.replace(/^package\//, ""));
             const top = ["package.json", "README.md", "LICENSE"];
-            const bad = files.filter((p) => !top.includes(p) && !/^(bin|lib|project|templates)\//.test(p));
+            const bad = files.filter((p) => !top.includes(p) && !/^(bin|lib|project|templates|python)\//.test(p));
             if (bad.length) { console.error("unexpected files in tarball:", bad); process.exit(1); }
-            const folders = [...new Set(files.filter((p) => p.startsWith("templates/")).map((p) => p.split("/")[1]))].sort();
+            const cached = files.filter((p) => /__pycache__|\.pyc$/.test(p));
+            if (cached.length) { console.error("Python caches in tarball:", cached); process.exit(1); }
+            const folders = (dir) => [...new Set(files.filter((p) => p.startsWith(dir + "/")).map((p) => p.split("/")[1]))].sort();
             const want = ["_shared", "versions.json", ...TEMPLATES].sort();
-            if (JSON.stringify(folders) !== JSON.stringify(want)) {
-              console.error("templates/ holds", folders, "not", want); process.exit(1);
+            if (JSON.stringify(folders("templates")) !== JSON.stringify(want)) {
+              console.error("templates/ holds", folders("templates"), "not", want); process.exit(1);
+            }
+            const ports = ["versions.json", ...PYTHON_TEMPLATES.map(pythonModule)].sort();
+            if (JSON.stringify(folders("python")) !== JSON.stringify(ports)) {
+              console.error("python/ holds", folders("python"), "not", ports); process.exit(1);
             }
             for (const path of ["bin/create-littlebigbrain.mjs", "lib/create.mjs", "templates/_shared/testing.ts"])
               if (!files.includes(path)) { console.error("missing from tarball:", path); process.exit(1); }
@@ -124,6 +137,37 @@ jobs:
             [ "$dependency" = "^$client" ] \
               || { echo "::error::$template depends on @littlebigbrain/client $dependency, not ^$client"; exit 1; }
             (cd "$dir" && npm install --no-audit --no-fund && npm test)
+          done
+      - name: Wait for the Python SDK the Python ports name
+        run: |
+          set -euo pipefail
+          sdk=$(node -p "require('./python/versions.json').littlebigbrain")
+          for attempt in $(seq 1 60); do
+            if curl -sf "https://pypi.org/pypi/littlebigbrain/${sdk}/json" >/dev/null; then
+              echo "littlebigbrain ${sdk} is on PyPI"
+              exit 0
+            fi
+            echo "littlebigbrain ${sdk} is not on PyPI yet (attempt ${attempt}/60); its release may be waiting for approval"
+            sleep 30
+          done
+          echo "::error::littlebigbrain ${sdk} is not on PyPI; release the Python SDK, then run this workflow again"
+          exit 1
+      - name: Create a Python project from each Python port and run its test
+        env:
+          VERSION: ${{ needs.preflight.outputs.version }}
+        run: |
+          set -euo pipefail
+          tarball="$RUNNER_TEMP/littlebigbrain-create-${VERSION}.tgz"
+          sdk=$(node -p "require('./python/versions.json').littlebigbrain")
+          templates=$(node --input-type=module -e 'import { PYTHON_TEMPLATES } from "./lib/create.mjs"; console.log(PYTHON_TEMPLATES.join(" "))')
+          for template in $templates; do
+            dir="$RUNNER_TEMP/python-projects/$template"
+            (cd "$RUNNER_TEMP" && npm exec --yes --package="$tarball" -- create-littlebigbrain --template "$template" --lang python "$dir")
+            grep -qxF "dependencies = [\"littlebigbrain>=${sdk}\"]" "$dir/pyproject.toml" \
+              || { echo "::error::the Python $template project does not depend on littlebigbrain>=${sdk}"; exit 1; }
+            (cd "$dir" && python3 -m venv .venv \
+              && .venv/bin/pip install --quiet -e ".[test]" "littlebigbrain==${sdk}" \
+              && .venv/bin/python -m pytest -q)
           done
 
   publish-npm:

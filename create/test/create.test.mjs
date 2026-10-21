@@ -3,16 +3,20 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { existsSync } from "node:fs";
-import { mkdir, mkdtemp, readFile, rm, symlink, writeFile } from "node:fs/promises";
+import { cp, mkdir, mkdtemp, readFile, readdir, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
+  PYTHON_TEMPLATES,
   TEMPLATES,
   clientVersion,
   create,
   main,
   parseArgs,
+  pythonModule,
+  pythonRoot,
+  pythonSdkVersion,
   templatesRoot,
 } from "../lib/create.mjs";
 
@@ -21,6 +25,18 @@ const REPO = resolve(PACKAGE, "..", "..");
 
 /** A new empty directory under the system's temporary folder. */
 const scratch = () => mkdtemp(join(tmpdir(), "create-littlebigbrain-"));
+
+/** Every file under `dir`, relative and sorted. @param {string} dir @returns {Promise<string[]>} */
+async function filesOf(dir, prefix = "") {
+  /** @type {string[]} */
+  const out = [];
+  for (const entry of await readdir(join(dir, prefix), { withFileTypes: true })) {
+    const path = prefix ? `${prefix}/${entry.name}` : entry.name;
+    if (entry.isDirectory()) out.push(...(await filesOf(dir, path)));
+    else out.push(path);
+  }
+  return out.sort();
+}
 
 test("the command line takes a template, a directory and a client", () => {
   assert.deepEqual(parseArgs(["--template", "documents-link", "my-links"]), {
@@ -37,6 +53,163 @@ test("the command line takes a template, a directory and a client", () => {
   assert.throws(() => parseArgs(["--template"]), /needs a value/);
   assert.throws(() => parseArgs(["--force"]), /unknown option/);
   assert.throws(() => parseArgs(["a", "b"]), /one directory/);
+});
+
+test("the command line takes a language, ts or python", () => {
+  assert.deepEqual(parseArgs(["--template=values-extract", "--lang=python", "my-values"]), {
+    help: false,
+    template: "values-extract",
+    lang: "python",
+    dir: "my-values",
+  });
+  assert.equal(parseArgs(["-t", "review", "--lang", "ts"]).lang, "ts");
+  assert.equal(parseArgs(["-t", "review"]).lang, undefined);
+  assert.throws(() => parseArgs(["--lang", "go"]), /--lang is ts or python, not go/);
+  assert.throws(() => parseArgs(["--lang"]), /needs a value/);
+});
+
+test("in the repository the Python ports come from sdk/python/examples, for the SDK's version", async () => {
+  const root = pythonRoot();
+  assert.equal(root, join(REPO, "sdk", "python", "examples"));
+  // The ports are the folders of sdk/python/examples, by template name.
+  const folders = (await readdir(root, { withFileTypes: true }))
+    .filter((entry) => entry.isDirectory() && !entry.name.startsWith("__"))
+    .map((entry) => entry.name)
+    .sort();
+  assert.deepEqual(folders, PYTHON_TEMPLATES.map(pythonModule).sort());
+  for (const template of PYTHON_TEMPLATES) {
+    assert.ok(TEMPLATES.includes(template), `${template} is a template`);
+    assert.ok(existsSync(join(PACKAGE, "project", "python", pythonModule(template))), template);
+  }
+  const version = await readFile(join(REPO, "sdk", "python", "lbb", "_version.py"), "utf8");
+  assert.ok(version.includes(`__version__ = "${pythonSdkVersion(root)}"`), version);
+});
+
+test("a Python values-extract project has the port, its samples, a test and its pyproject", async () => {
+  const dir = join(await scratch(), "My Values");
+  /** @type {string[]} */
+  const lines = [];
+  await main(["--template", "values-extract", "--lang", "python", dir], {
+    log: (line) => lines.push(line),
+  });
+  assert.deepEqual(await filesOf(dir), [
+    ".gitignore",
+    "README.md",
+    "pyproject.toml",
+    "tests/fake_lbb.py",
+    "tests/test_workflow.py",
+    "values_extract/__init__.py",
+    "values_extract/__main__.py",
+    "values_extract/samples.py",
+    "values_extract/samples/expected.json",
+    "values_extract/samples/records.json",
+    "values_extract/workflow.py",
+  ]);
+  const pyproject = await readFile(join(dir, "pyproject.toml"), "utf8");
+  const version = pythonSdkVersion(pythonRoot());
+  assert.match(pyproject, /^name = "my-values"$/m);
+  assert.match(pyproject, /^requires-python = ">=3\.10"$/m);
+  assert.ok(pyproject.includes(`dependencies = ["littlebigbrain>=${version}"]`), pyproject);
+  assert.match(pyproject, /^test = \["pytest>=8"\]$/m);
+  assert.match(pyproject, /^include = \["values_extract\*"\]$/m);
+  for (const file of ["workflow.py", "samples/expected.json"])
+    assert.equal(
+      await readFile(join(dir, "values_extract", file), "utf8"),
+      await readFile(join(REPO, "sdk", "python", "examples", "values_extract", file), "utf8"),
+      file,
+    );
+  const test = await readFile(join(dir, "tests", "test_workflow.py"), "utf8");
+  assert.match(test, /expected\.json/);
+  assert.match(test, /^from fake_lbb import /m);
+  const gitignore = await readFile(join(dir, ".gitignore"), "utf8");
+  for (const entry of [".venv/", "__pycache__/", "*.egg-info/"])
+    assert.ok(gitignore.split("\n").includes(entry), entry);
+  const readme = await readFile(join(dir, "README.md"), "utf8");
+  for (const text of [
+    "# my-values",
+    "python3 -m venv .venv",
+    'pip install -e ".[test]"',
+    "\npytest\n",
+    "python -m values_extract try",
+    "python -m values_extract setup",
+    "python -m values_extract start",
+    "LBB_URL",
+    "LBB_API_KEY",
+    "LBB_GRAPH",
+    "## The template",
+    "It fills properties of\na class",
+  ])
+    assert.ok(readme.includes(text), text);
+  assert.doesNotMatch(readme, /sdk\/python\/examples/, "no path of the repository");
+  assert.doesNotMatch(readme, /—|–/, "no dashes in the prose");
+  assert.match(lines[0] ?? "", /in Python \(11 files\)/);
+  assert.ok(lines.includes("  pytest"), lines.join("\n"));
+  assert.ok(lines.includes("  LBB_URL=... LBB_API_KEY=... python -m values_extract try"));
+});
+
+test("--lang python needs a template with a Python port, and no --client", async () => {
+  const dir = await scratch();
+  await assert.rejects(
+    create({ template: "review", dir: join(dir, "review"), lang: "python" }),
+    /the template review has no Python port; the templates with one are values-extract/,
+  );
+  await assert.rejects(
+    main(["--template", "documents-link", "--lang", "python", join(dir, "links")], {
+      log: () => {},
+    }),
+    /has no Python port; the templates with one are values-extract/,
+  );
+  assert.equal(existsSync(join(dir, "links")), false, "nothing is written");
+  await assert.rejects(
+    create({ template: "embeddings", dir: join(dir, "x"), lang: "python" }),
+    /unknown template/,
+  );
+  await assert.rejects(
+    create({ template: "values-extract", dir: join(dir, "v"), lang: "python", client: "^1" }),
+    /--client names the dependency of a TypeScript project/,
+  );
+  await assert.rejects(
+    create({ template: "values-extract", dir: join(dir, "v"), lang: "go" }),
+    /ts or python, not go/,
+  );
+});
+
+test("a packed package reads its own copy of the ports and leaves Python's caches out", async () => {
+  const dir = await scratch();
+  const root = join(dir, "create");
+  await cp(join(PACKAGE, "project"), join(root, "project"), { recursive: true });
+  const port = join(root, "python", "values_extract");
+  await cp(join(REPO, "sdk", "python", "examples", "values_extract"), port, { recursive: true });
+  await mkdir(join(port, "__pycache__"), { recursive: true });
+  await writeFile(join(port, "__pycache__", "workflow.cpython-312.pyc"), "");
+  await writeFile(join(root, "python", "versions.json"), '{ "littlebigbrain": "9.8.7" }\n');
+  assert.equal(pythonRoot(root), join(root, "python"));
+
+  const project = join(dir, "values");
+  const files = await create({ template: "values-extract", dir: project, lang: "python", root });
+  assert.ok(files.includes("values_extract/workflow.py"));
+  assert.ok(!files.some((file) => file.includes("__pycache__")), files.join("\n"));
+  assert.ok(!files.includes("values_extract/README.md"), "the project's README holds it");
+  const pyproject = await readFile(join(project, "pyproject.toml"), "utf8");
+  assert.ok(pyproject.includes('dependencies = ["littlebigbrain>=9.8.7"]'), pyproject);
+  await rm(dir, { recursive: true, force: true });
+});
+
+test("--lang ts is the TypeScript project, as without --lang", async () => {
+  const dir = await scratch();
+  const plain = await create({ template: "values-extract", dir: join(dir, "plain") });
+  const ts = await create({ template: "values-extract", dir: join(dir, "ts"), lang: "ts" });
+  assert.deepEqual(ts, plain);
+  assert.ok(ts.includes("package.json") && ts.includes("src/workflow.ts"));
+  assert.ok(!ts.includes("pyproject.toml"));
+  /** @type {string[]} */
+  const lines = [];
+  await main(["--template", "review", "--lang", "ts", join(dir, "review")], {
+    log: (line) => lines.push(line),
+  });
+  assert.match(lines[0] ?? "", /from the review template \(\d+ files\)/);
+  assert.ok(lines.includes("  npm install") && lines.includes("  npm test"), lines.join("\n"));
+  await rm(dir, { recursive: true, force: true });
 });
 
 test("in the repository the templates come from sdk/templates, for the client's version", async () => {
