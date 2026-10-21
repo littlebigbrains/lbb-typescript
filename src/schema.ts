@@ -1590,7 +1590,8 @@ export interface paths {
         };
         /** A parsed file's pages `from` (inclusive) to `to` (exclusive), 0-based, at most 50 (default 10): lines and words with boxes normalized to the page, origin top left. 404 `file_not_parsed` before the parse */
         get: operations["get_v1_files_pages"];
-        put?: never;
+        /** Store what a parser outside the server made of a file (LBB's hosted `documents.parse`): `status` `parsed` with every page (at most 2,000, the shape `GET /v1/files/pages` serves), or `failed` or `unsupported` with its `error`. The pages are stored once under the parser id; the same pages again store nothing (`stored: false`), other pages under the same id are 409 `file_pages_conflict`. The file's record gets the parse, so `GET /v1/files/pages` serves the pages. 400 `file_pages_invalid`, 404 `file_not_found` */
+        put: operations["put_v1_files_pages"];
         post?: never;
         delete?: never;
         options?: never;
@@ -1641,7 +1642,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Commit triplets and optional entity embeddings; `replace_owned` replaces a writer's owned edges and fields on its subjects in the same commit */
+        /** Commit triplets and optional entity embeddings; `replace_owned` replaces a writer's owned edges and fields on its subjects in the same commit. A commit of a workflow turn names `workflow_fence`: a repeat of its `Idempotency-Key` replays, and a new commit whose token no longer holds the turn answers `409 workflow_fence_lost` and writes nothing */
         post: operations["post_v1_graph_commit"];
         delete?: never;
         options?: never;
@@ -3537,6 +3538,24 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/workflows/blobs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** A blob's bytes (`application/octet-stream`). 404 when no kept generation holds it */
+        get: operations["get_v1_workflows_blobs"];
+        put?: never;
+        /** Store a blob of a workflow: the raw request body (at most 8 MiB), keyed by its SHA-256 under the workflow of the writing identity (`<workflow>/<sha256>`). A step names the key in its output, its state or a message instead of large bytes. A blob stays while a live identity of the graph names it and at least a day after its last write; it goes with its workflow and with the graph. The same bytes again answer the same key (`created: false`) */
+        post: operations["post_v1_workflows_blobs"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/workflows/cancel": {
         parameters: {
             query?: never;
@@ -3891,6 +3910,23 @@ export interface paths {
         get: operations["get_v1_workflows_named_queue"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/workflows/named/requeue": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Send the instances a turn of a shard could not do again later: they go back into the watch's queue on the same shard, with origin `requeue` (the attempt, the asking turn and message, the first error) and a backoff of one minute, then four, then sixteen. The attempt is one more than the asking message's (`origin.attempt` of a requeue); past 3 the instances are exhausted, not sent again, and counted in the workflow's `exhausted`. Record the failure in the turn's result, ask for the requeue, and complete the turn */
+        post: operations["post_v1_workflows_named_requeue"];
         delete?: never;
         options?: never;
         head?: never;
@@ -4299,7 +4335,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Issue or refresh a SELECT/ASK credential for the exact live turn attempt. Requires the original control credential and lease token; execution bearers cannot refresh or control workflows. */
+        /** Issue or refresh one operation credential for the exact live turn attempt: SELECT/ASK (`sparql_read`, the default), or the grants of LBB's hosted workers (`file_read`, `owned_write`), which only LBB's work token is issued and only with LBB_WORKFLOW_EXECUTION_GRANTS (403 workflow_execution_scope or workflow_execution_disabled). Requires the original control credential and lease token; execution bearers cannot refresh or control workflows. */
         post: operations["post_v1_workflows_turns_execution_credential"];
         delete?: never;
         options?: never;
@@ -7641,6 +7677,43 @@ export interface components {
             sha256: string;
             /** Format: int32 */
             to: number;
+        };
+        /**
+         * @description `PUT /v1/files/pages?sha256=&parser=`: what a parser made of one upload
+         *     of a file, sent by a worker that parses outside the server (LBB's hosted
+         *     `documents.parse`). `parsed` stores every page once under the parser id;
+         *     `failed` and `unsupported` store no page and record why.
+         */
+        FilePagesPutRequest: {
+            /** @description Why the parse failed, at most 500 characters. Only without pages. */
+            error?: string | null;
+            /**
+             * @description Every page of the file, in order, `page` 0 to `n - 1`, at most 2,000.
+             *     Only with `parsed`.
+             */
+            pages?: components["schemas"]["FilePage"][];
+            /** @description `parsed` (the default), `failed` or `unsupported`. */
+            status?: string;
+            /**
+             * @description The upload the parser read: the file record's `uploaded_at`
+             *     (`GET /v1/files/record`). When the file was deleted and uploaded
+             *     again since, the server stores nothing and answers `409
+             *     file_upload_changed`; a deleted file answers `404 file_not_found`.
+             */
+            uploaded_at: string;
+        };
+        /** @description The answer of `PUT /v1/files/pages`. */
+        FilePagesPutResponse: {
+            /** Format: int32 */
+            page_count?: number | null;
+            parser: string;
+            sha256: string;
+            status: string;
+            /**
+             * @description False when the same pages were stored before under this parser id:
+             *     nothing was written.
+             */
+            stored: boolean;
         };
         /** @description What the parse starter made of a file. */
         FileParse: {
@@ -11226,8 +11299,14 @@ export interface components {
             /** Format: double */
             budget_usd_per_month?: number | null;
             created_at?: string | null;
+            fan_in?: null | components["schemas"]["NamedWorkflowFanIn"];
             gate?: null | components["schemas"]["WorkflowGate"];
             name: string;
+            /**
+             * @description What a turn of a shard that failed for good does: absent while
+             *     `block`.
+             */
+            on_exhausted?: components["schemas"]["WorkflowOnExhausted"];
             owns?: components["schemas"]["WorkflowOwns"];
             params?: unknown;
             paused: boolean;
@@ -11267,6 +11346,17 @@ export interface components {
         /** @description `DELETE /v1/workflows/named`. */
         NamedWorkflowDeleteResponse: {
             deleted: boolean;
+        };
+        /** @description The fan-in identity of a workflow and what the engine holds for it. */
+        NamedWorkflowFanIn: {
+            /** @description The id word (`fan_in` of the request). */
+            id: string;
+            /** Format: int64 */
+            pending_messages?: number | null;
+            running?: null | components["schemas"]["WorkflowProgress"];
+            status?: null | components["schemas"]["WorkflowInstanceStatus"];
+            /** @description `starter.<name>.<id>`. */
+            workflow_id: string;
         };
         /** @description `GET /v1/workflows/named`: the graph's workflows with triggers, by name. */
         NamedWorkflowList: {
@@ -11324,8 +11414,29 @@ export interface components {
              *     one content per message (`batch` 1 or absent).
              */
             batch?: number | null;
+            /**
+             * Format: double
+             * @description The workflow's own monthly budget of model calls, in US dollars: the
+             *     activities its turns call (`reason`, `decide`, `embed`) answer `429
+             *     workflow_budget_exceeded` with `retry_at` once the month's spend
+             *     reaches it. The stack's budget of the workflow's kind applies too.
+             *     Absent: no budget of its own.
+             */
+            budget_usd_per_month?: number | null;
+            /**
+             * @description The workflow's fan-in identity (dogfooding design §3.3 G9): one more
+             *     engine identity of the workflow's type, `starter.<name>.<fan_in>`,
+             *     that the shards' turns send to (a catalogue, the things of a
+             *     linking). `[a-z][a-z0-9-]{0,30}`. Send with deterministic message
+             *     ids (`generated-<sha256>-<version>`, `decided-<shard>-<turn>`): a
+             *     repeat is admitted once. It is paused, resumed and woken with the
+             *     shards, its runs and blobs file under the workflow, and its model
+             *     calls count against the workflow's budget. Absent: none.
+             */
+            fan_in?: string | null;
             /** @description `[a-z0-9][a-z0-9-]{0,62}`. */
             name: string;
+            on_exhausted?: null | components["schemas"]["WorkflowOnExhausted"];
             owns?: null | components["schemas"]["WorkflowOwns"];
             /**
              * @description A field of the watched class (one step of the path syntax) whose
@@ -13092,6 +13203,14 @@ export interface components {
              * @description Candidates per name: 1 to 10, default 5.
              */
             limit?: number | null;
+            /**
+             * Format: int64
+             * @description The commit the index must hold: the `commit_seq` of your write. The
+             *     call waits for the index to hold it (a few seconds at most), then
+             *     fails with the retryable `429 read_your_writes_pending`. Without it,
+             *     an index behind the graph's head answers while a new one builds.
+             */
+            min_commit_seq?: number | null;
             /** @description A question, or names: 1 to 4,000 characters. */
             text: string;
         };
@@ -13105,7 +13224,9 @@ export interface components {
             candidates: components["schemas"]["QueryRewriteLink"][];
             /**
              * Format: int64
-             * @description The commit of the graph description the index was built from.
+             * @description Every commit up to this one is in the index. Below the graph's head
+             *     while a newer index builds; pass `min_commit_seq` to wait for a
+             *     commit. The graph's head when the index was not ready.
              */
             commit_seq: number;
             /**
@@ -13115,7 +13236,8 @@ export interface components {
              */
             index_classes_read?: number | null;
             /**
-             * @description Every class of the graph description was read in full. Absent when
+             * @description Every class of the graph description was read in full. It says
+             *     nothing of how recent the names are: that is `commit_seq`. Absent when
              *     the index was not ready.
              */
             index_complete?: boolean | null;
@@ -17913,6 +18035,7 @@ export interface components {
              *     still requires at least one triplet, embedding, or entity-property overall.
              */
             triplets?: components["schemas"]["TripletInput"][];
+            workflow_fence?: null | components["schemas"]["WorkflowFence"];
         };
         TripletInput: {
             /** Format: float */
@@ -18144,6 +18267,29 @@ export interface components {
         };
         /** @enum {string} */
         WorkerRole: "capture" | "apply";
+        /**
+         * @description A blob of a workflow (`POST /v1/workflows/blobs?workflow_id=`): bytes a
+         *     step stores beside the engine for a large output or a large shared read
+         *     (a catalogue), keyed by their SHA-256. A step names `key` in its output,
+         *     its state or a message; `GET /v1/workflows/blobs?key=` reads the bytes.
+         *     A blob stays while a live identity of the graph names it (its state, an
+         *     unfinished turn's message, steps or operation), and at least a day after
+         *     its last write; it goes with its workflow and with the graph.
+         */
+        WorkflowBlob: {
+            /** Format: int64 */
+            bytes: number;
+            /** @description This write stored the bytes; false when they were stored already. */
+            created: boolean;
+            /**
+             * @description `<workflow>/<sha256>`: the workflow is the named workflow of the
+             *     writing identity (`starter.<name>[.<k>]` writes under `<name>`), or
+             *     `instance:<id>` for an identity of no named workflow.
+             */
+            key: string;
+            /** @description The SHA-256 of the bytes, lowercase hex. */
+            sha256: string;
+        };
         /** @enum {string} */
         WorkflowCheckpointKind: "step" | "sleep" | "signal";
         WorkflowClaimRequest: {
@@ -18230,10 +18376,26 @@ export interface components {
             workflow_id: string;
         };
         /**
-         * @description One explicit operation of a workflow execution credential.
+         * @description One explicit operation of a workflow execution credential. `file_read`
+         *     and `owned_write` are the grants of LBB's hosted workers: only LBB's work
+         *     token is issued them.
          * @enum {string}
          */
-        WorkflowExecutionOperation: "sparql_read";
+        WorkflowExecutionOperation: "sparql_read" | "file_read" | "owned_write";
+        /**
+         * @description A commit made from a workflow turn (`POST /v1/graph/commit`,
+         *     `workflow_fence`): the server answers a repeat of the commit's request id
+         *     as a replay, and refuses a new commit unless `token` still holds turn
+         *     `turn` of instance `workflow_id` (`409 workflow_fence_lost`). The check
+         *     runs before the commit, so a lease that ends while the commit runs is the
+         *     only window left.
+         */
+        WorkflowFence: {
+            token: string;
+            /** Format: int64 */
+            turn: number;
+            workflow_id: string;
+        };
         /**
          * @description Outputs whose confidence is below `below` go to the review inbox instead
          *     of the graph.
@@ -18544,6 +18706,7 @@ export interface components {
              * @description The turn number; turns run in this order.
              */
             turn: number;
+            wait?: null | components["schemas"]["WorkflowTurnWait"];
         };
         /**
          * @description `GET /v1/workflows/instances/inbox?id=&after=&limit=&payloads=`: the
@@ -18596,6 +18759,8 @@ export interface components {
              */
             history_through: number;
             id: string;
+            /** @description What a turn that failed for good does: absent while `block`. */
+            on_exhausted?: components["schemas"]["WorkflowOnExhausted"];
             /** Format: int64 */
             pending_messages: number;
             progress?: null | components["schemas"]["WorkflowProgress"];
@@ -18609,7 +18774,7 @@ export interface components {
             workflow_type: string;
         };
         /** @enum {string} */
-        WorkflowInstanceAction: "pause" | "resume" | "retry" | "skip" | "cancel_turn";
+        WorkflowInstanceAction: "pause" | "resume" | "retry" | "skip" | "cancel_turn" | "wake";
         WorkflowInstanceControlRequest: {
             action: components["schemas"]["WorkflowInstanceAction"];
             /**
@@ -18626,6 +18791,13 @@ export interface components {
             lease_ms?: number;
             /** Format: int32 */
             max_attempts?: number;
+            /**
+             * @description What a turn that failed for good does to the inbox: `block` (the
+             *     default) keeps it at the inbox head until a person retries or skips
+             *     it; `skip` keeps the failed turn in the history and goes on with the
+             *     next message. Absent on the wire while `block`.
+             */
+            on_exhausted?: components["schemas"]["WorkflowOnExhausted"];
             state?: unknown;
             version: string;
             workflow_type: string;
@@ -18736,6 +18908,12 @@ export interface components {
             origin?: null | components["schemas"]["WorkflowMessageOrigin"];
             workflow_id: string;
         };
+        /**
+         * @description What a turn does after its last attempt failed
+         *     (`WorkflowInstanceCreateRequest::on_exhausted`).
+         * @enum {string}
+         */
+        WorkflowOnExhausted: "block" | "skip";
         /** @enum {string} */
         WorkflowOperationKind: "step" | "model" | "tool";
         /**
@@ -18843,6 +19021,55 @@ export interface components {
              */
             waiting: number;
             workflow_id: string;
+        };
+        /** @description One item a turn could not do (`POST /v1/workflows/named/requeue`). */
+        WorkflowRequeueItem: {
+            /**
+             * @description Why it failed, at most 1,000 characters. The first error is the
+             *     requeue origin's note.
+             */
+            error?: string | null;
+            /** @description The instance IRI, as the message named it. */
+            instance: string;
+        };
+        /**
+         * @description `POST /v1/workflows/named/requeue?name=`: the instances a turn of a
+         *     shard could not do go back into the watch's queue, to be sent again
+         *     later with origin `requeue` (dogfooding design §3.3 G7). Record the
+         *     failure in the turn's result and counters, ask for the requeue, and
+         *     complete the turn: the shard goes on with its next message.
+         */
+        WorkflowRequeueRequest: {
+            /** @description 1 to 64 items. */
+            items: components["schemas"]["WorkflowRequeueItem"][];
+            /**
+             * Format: int64
+             * @description The turn that asks. Its message's origin gives the attempt: one more
+             *     than a requeue message's `attempt`, else 1.
+             */
+            turn: number;
+            /** @description The shard whose turn asks: `starter.<name>` or `starter.<name>.<k>`. */
+            workflow_id: string;
+        };
+        /** @description What a requeue did. */
+        WorkflowRequeueResponse: {
+            /**
+             * Format: int32
+             * @description The attempt the items are sent with: 1 to 3.
+             */
+            attempt: number;
+            /**
+             * @description The items that failed after 3 requeues: not sent again, counted in
+             *     the workflow's `exhausted` counter and named in its `last_error`.
+             */
+            exhausted: string[];
+            /**
+             * @description When they are sent at the earliest (RFC 3339): one minute after the
+             *     first failure, four after the second, sixteen after the third.
+             */
+            not_before: string;
+            /** @description The items queued again, back on the asking shard. */
+            requeued: string[];
         };
         WorkflowRun: {
             /** Format: int64 */
@@ -19298,6 +19525,7 @@ export interface components {
             /** Format: int64 */
             updated_at_ms: number;
             version: string;
+            wait?: null | components["schemas"]["WorkflowTurnWait"];
             worker?: string | null;
             workflow_id: string;
         };
@@ -19347,6 +19575,16 @@ export interface components {
         WorkflowTurnFailRequest: {
             error: string;
             non_retryable?: boolean;
+            /**
+             * Format: int64
+             * @description Wait until this time (Unix milliseconds, at most 366 days ahead) and
+             *     count no attempt: for a cause outside the turn, such as a spent budget
+             *     (`retry_at` of `429 workflow_budget_exceeded`) or a dependency that is
+             *     not there yet. A time less than a second ahead waits one second
+             *     (`WORKFLOW_MIN_WAIT_MS`). A resume or a wake of the instance moves the
+             *     time to now. Not with `non_retryable`.
+             */
+            retry_at_ms?: number | null;
             token: string;
             /** Format: int64 */
             turn: number;
@@ -19477,6 +19715,36 @@ export interface components {
             turn: components["schemas"]["WorkflowTurn"];
             workflow_type: string;
         };
+        /**
+         * @description A wait of a turn that counts no attempt (`WorkflowTurn::wait`). Two
+         *     causes make one: a worker's failure with `retry_at_ms` (a spent budget, a
+         *     missing dependency), and the server's deferral of a turn for capacity.
+         *     The turn is ready again at `until_ms`. A resume or a wake of the
+         *     instance moves the time to now, and the next claim clears the wait. A
+         *     step's own sleep or signal wait is not one.
+         */
+        WorkflowTurnWait: {
+            /**
+             * @description Why the turn waits: `retry` (the default, absent on the wire) or
+             *     `capacity`.
+             */
+            reason?: components["schemas"]["WorkflowTurnWaitReason"];
+            /**
+             * Format: int64
+             * @description When the wait began.
+             */
+            since_ms: number;
+            /**
+             * Format: int64
+             * @description When the turn is ready again.
+             */
+            until_ms: number;
+        };
+        /**
+         * @description Why a turn waits without counting an attempt (`WorkflowTurnWait`).
+         * @enum {string}
+         */
+        WorkflowTurnWaitReason: "retry" | "capacity";
         WorkflowTurnWaitSignalRequest: {
             key: string;
             name: string;
@@ -34989,6 +35257,155 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["FilePages"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Rate limit exceeded */
+            429: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Service unavailable */
+            503: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+        };
+    };
+    put_v1_files_pages: {
+        parameters: {
+            query?: {
+                /** @description Graph name (default `main`) */
+                graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
+                /** @description the file's SHA-256, hex */
+                sha256?: string;
+                /** @description the parser id (`poppler-26.03.0`): 1 to 64 letters, digits, '.', '_' or '-' */
+                parser?: string;
+            };
+            header?: {
+                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                "Lbb-Version"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FilePagesPutRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FilePagesPutResponse"];
                 };
             };
             /** @description Bad request */
@@ -54275,6 +54692,303 @@ export interface operations {
             };
         };
     };
+    get_v1_workflows_blobs: {
+        parameters: {
+            query?: {
+                /** @description Graph name (default `main`) */
+                graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
+                /** @description Optional decimal u64 graph incarnation from /v1/workflows/scope. A changed incarnation returns 409 graph_epoch_changed; a graph missing at admission returns 404. Synchronous writes and CAS retries cannot mutate a replacement incarnation; detached jobs are outside this precondition. */
+                expected_graph_epoch?: string;
+                /** @description the blob's key, `<workflow>/<sha256>` */
+                key?: string;
+            };
+            header?: {
+                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                "Lbb-Version"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Rate limit exceeded */
+            429: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Service unavailable */
+            503: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+        };
+    };
+    post_v1_workflows_blobs: {
+        parameters: {
+            query?: {
+                /** @description Graph name (default `main`) */
+                graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
+                /** @description Optional decimal u64 graph incarnation from /v1/workflows/scope. A changed incarnation returns 409 graph_epoch_changed; a graph missing at admission returns 404. Synchronous writes and CAS retries cannot mutate a replacement incarnation; detached jobs are outside this precondition. */
+                expected_graph_epoch?: string;
+                /** @description the writing identity */
+                workflow_id?: string;
+            };
+            header?: {
+                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                "Lbb-Version"?: string;
+                /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
+                "Idempotency-Key"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        /** @description The blob's bytes, at most 8 MiB. */
+        requestBody: {
+            content: {
+                "application/octet-stream": string;
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkflowBlob"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Rate limit exceeded */
+            429: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Service unavailable */
+            503: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+        };
+    };
     post_v1_workflows_cancel: {
         parameters: {
             query?: {
@@ -57717,6 +58431,155 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["NamedWorkflowQueue"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Rate limit exceeded */
+            429: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Service unavailable */
+            503: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+        };
+    };
+    post_v1_workflows_named_requeue: {
+        parameters: {
+            query?: {
+                /** @description Graph name (default `main`) */
+                graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
+                /** @description the workflow's name */
+                name?: string;
+            };
+            header?: {
+                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                "Lbb-Version"?: string;
+                /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
+                "Idempotency-Key"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WorkflowRequeueRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkflowRequeueResponse"];
                 };
             };
             /** @description Bad request */

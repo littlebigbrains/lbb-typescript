@@ -46,6 +46,12 @@ export class LbbError extends Error {
   readonly docUrl?: string | null;
   readonly retryable?: boolean;
   readonly retryAfterSeconds?: number;
+  /**
+   * When a spent monthly budget is whole again, in milliseconds since the
+   * Unix epoch (`429 workflow_budget_exceeded`). A workflow step that meets
+   * it waits until then and counts no attempt.
+   */
+  readonly retryAtMs?: number;
   /** Actionable guidance for composite environment-endpoint routing errors. */
   readonly endpointHint?: string;
   /** Per-item reasons for a refusal, for example `conflicts` of `starter_conflict`. */
@@ -65,6 +71,7 @@ export class LbbError extends Error {
     this.docUrl = error?.doc_url;
     this.retryable = error?.retryable;
     this.retryAfterSeconds = error?.retry_after_seconds;
+    this.retryAtMs = error?.retry_at_ms;
     this.endpointHint = endpointMigrationHint(this.code);
     this.details = error?.details;
   }

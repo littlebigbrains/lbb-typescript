@@ -383,6 +383,28 @@ export class NamedWorkflowsNamespace {
   }
 
   /**
+   * Send instances a turn of a shard could not do again later (`POST
+   * /v1/workflows/named/requeue`): they go back into the watch's queue on
+   * the asking shard, with origin `requeue` and a backoff of 1, 4, then 16
+   * minutes. The server takes the attempt from the asking turn's message;
+   * past 3 the instances are exhausted and not sent again. The same
+   * request again changes nothing more, so a failed call is retried.
+   * `requeueFailed` of a turn calls it inside a step.
+   */
+  requeue(
+    name: string,
+    request: Schemas["WorkflowRequeueRequest"],
+    opts: CallOptions = {},
+  ): Promise<Schemas["WorkflowRequeueResponse"]> {
+    return this.client.request("POST", "/v1/workflows/named/requeue", {
+      ...opts,
+      retry: opts.retry ?? true,
+      query: { name },
+      body: request,
+    });
+  }
+
+  /**
    * What the watch has not sent yet: each waiting instance with its
    * reason, shard and origin (a backfill, a commit range with the watched
    * fields and the requests that changed it, a run now, a schema change),

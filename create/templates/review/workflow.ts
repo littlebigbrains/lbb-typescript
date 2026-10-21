@@ -18,9 +18,9 @@
 // `fact_status: accepted`; a person can leave facts out of the accept, except the type of a new
 // instance. The proposal gets its `fact_status` (`written`, `in_review`, `refused`) and
 // `review_note`, owned by this workflow.
-import { createHash } from "node:crypto";
 import {
   entityRef,
+  LbbError,
   triggeredWorkflow,
   type LbbActivities,
   type Schemas,
@@ -69,14 +69,29 @@ export function ontology(settings: Settings = defaults): Schemas["OntologyEvolve
   ];
 }
 
-/** What the workflow decided, over all its turns. */
+/** What the workflow decided, over all its turns: the counters of LBB's review. */
 export interface ReviewState {
   proposals: number;
+  /** Written, or held by the graph already (`held_already`). */
   written: number;
-  held: number;
+  held_already: number;
   in_review: number;
   refused: number;
+  /** Proposals for a person that name an instance the graph does not have. */
+  new_instance: number;
+  /** Review items filed. */
+  items: number;
 }
+
+const ZERO: ReviewState = {
+  proposals: 0,
+  written: 0,
+  held_already: 0,
+  in_review: 0,
+  refused: 0,
+  new_instance: 0,
+  items: 0,
+};
 
 /** Proposals one turn decides: two steps each, and at most one review item each, in a turn of 64 steps. */
 const TURN_PROPOSALS = 20;
@@ -106,6 +121,10 @@ interface Outcome {
   note?: string;
   facts?: review.Facts;
   holds?: boolean;
+  /** The confidence the decision gated on (`gateValue`). */
+  gate?: number;
+  /** For a person, and it names an instance the graph does not have. */
+  newInstance?: boolean;
   /** For a person: the item's instance, its view, and what the item shows of the fact. */
   item?: {
     instance: string;
@@ -121,27 +140,46 @@ export function createWorkflow(lbb: LbbActivities, settings: Settings = defaults
   return triggeredWorkflow<ReviewState>({
     name: workflowType.workflow_type,
     version: workflowType.version,
-    initialState: { proposals: 0, written: 0, held: 0, in_review: 0, refused: 0 },
+    initialState: ZERO,
     async onInstances(ctx, message, state) {
       const batch = message.instances.slice(0, TURN_PROPOSALS);
       let cache: Promise<Read> | undefined;
       const read = () => (cache ??= reader(lbb, batch, settings));
-      const next = { ...state };
+      const next = { ...ZERO, ...state };
       const forPeople: { iri: string; outcome: Outcome }[] = [];
       for (const [i, iri] of batch.entries()) {
-        const outcome = await ctx.step(`decide-${i}`, async (s) => {
+        let outcome = await ctx.step(`decide-${i}`, async (s) => {
           s.progress("deciding proposals", { done: i, total: batch.length, unit: "proposals" });
           return decideOne(lbb, await read(), iri, settings);
         });
-        await lbb.writeOwned(ctx, `write-${i}`, async (s) => {
-          s.progress("writing facts", { done: i, total: batch.length, unit: "proposals" });
-          return statusWrite(await read(), iri, outcome, settings);
-        });
+        try {
+          await lbb.writeOwned(ctx, `write-${i}`, async (s) => {
+            s.progress("writing facts", { done: i, total: batch.length, unit: "proposals" });
+            return statusWrite(await read(), iri, outcome, settings);
+          });
+        } catch (error) {
+          // The graph refused the statement (a value it cannot hold): the proposal says why.
+          if (!(error instanceof LbbError && error.status === 400) || outcome.status !== "written")
+            throw error;
+          outcome = {
+            status: "refused",
+            note: `The graph refused the statement: ${error.message}`,
+          };
+          const refused = outcome;
+          await lbb.writeOwned(ctx, `refuse-${i}`, async () =>
+            statusWrite(await read(), iri, refused, settings),
+          );
+        }
         if (outcome.status === "decided") continue;
         next.proposals += 1;
-        if (outcome.status === "written") next[outcome.holds ? "held" : "written"] += 1;
-        else next[outcome.status] += 1;
-        if (outcome.status === "in_review") forPeople.push({ iri, outcome });
+        if (outcome.status === "written") {
+          next.written += 1;
+          if (outcome.holds) next.held_already += 1;
+        } else next[outcome.status] += 1;
+        if (outcome.status === "in_review") {
+          if (outcome.newInstance) next.new_instance += 1;
+          forPeople.push({ iri, outcome });
+        }
       }
       // One review item per instance of this turn.
       const groups = new Map<string, { iri: string; outcome: Outcome }[]>();
@@ -149,12 +187,14 @@ export function createWorkflow(lbb: LbbActivities, settings: Settings = defaults
         const instance = one.outcome.item!.instance;
         groups.set(instance, [...(groups.get(instance) ?? []), one]);
       }
-      for (const [n, members] of [...groups.values()].entries())
+      for (const [n, members] of [...groups.values()].entries()) {
         await ctx.step(`review-${n}`, async (s) => {
           s.progress("filing review items", { done: n, total: groups.size, unit: "instances" });
           await fileItem(lbb, await read(), members, message, settings);
           return true;
         });
+        next.items += 1;
+      }
       // A proposal its proposer withdrew (message.removed) keeps the fact written for it: see the README.
       const rest = message.instances.slice(TURN_PROPOSALS);
       return rest.length
@@ -295,10 +335,11 @@ async function decideOne(
     );
     edgeHolds = rows.length > 0;
   }
-  const decision = review.decide(terms, s.predicate, proposal.confidence, settings, edgeHolds);
+  const gate = review.gateValue(proposal.confidence, proposal.evidence);
+  const decision = review.decide(terms, s.predicate, gate, settings, edgeHolds);
   if (decision.status === "refused" || terms.kind === "refused")
     return { status: "refused", note: decision.status === "refused" ? decision.why : "" };
-  const facts = review.factsOf(terms, iri, proposal.confidence, proposal.evidence);
+  const facts = review.factsOf(terms, iri, gate, proposal.evidence);
   if (decision.status === "written")
     return decision.holds
       ? { status: "written", holds: true }
@@ -313,6 +354,8 @@ async function decideOne(
     status: "in_review",
     note: decision.why,
     facts,
+    gate,
+    newInstance: review.namesNewInstance(terms),
     item: {
       instance,
       ...(known.class || terms.kind === "type"
@@ -329,10 +372,13 @@ const proposalRef = (proposal: Proposal, settings: Settings) =>
   entityRef(proposal.iri, settings.className, proposal.label);
 
 /**
- * File the review item of one instance: each fact's statement and its proposal's
- * `fact_status: accepted`, in the item's order (the type, the label, values, links, the trace),
- * with one evidence sample per fact. The key carries the proposals, so other proposals file
- * another item.
+ * File the review item of one instance, as LBB's review files it: one status row per proposal
+ * (`fact_status: accepted`) in the order a person reads them (the type, the label, values,
+ * links, the trace), the type of a new instance and the trace required, one evidence sample per
+ * fact, and LBB's key, title, rationale and summary. As the design of the workflows on the
+ * fleet asks (G8), the item also holds each statement after the status rows, so its accept
+ * commits the facts: each sample names the rows and triplets of its fact (`rows`, `triplets`),
+ * and a person can leave facts out of the accept.
  */
 async function fileItem(
   lbb: LbbActivities,
@@ -341,97 +387,98 @@ async function fileItem(
   message: WorkflowTriggerMessage,
   settings: Settings,
 ) {
-  const first = members[0]!.outcome.item!;
-  const instance = first.instance;
+  const instance = members[0]!.outcome.item!.instance;
   const kind = (m: { outcome: Outcome }) => m.outcome.item!.shown.kind;
+  const text = (m: { outcome: Outcome }) => m.outcome.item!.shown.text;
   const ordered = [...members].sort(
     (a, b) =>
       review.KIND_ORDER.indexOf(kind(a)) - review.KIND_ORDER.indexOf(kind(b)) ||
-      a.outcome.item!.shown.text.localeCompare(b.outcome.item!.shown.text),
+      (text(a) < text(b) ? -1 : text(a) > text(b) ? 1 : 0) ||
+      (a.iri < b.iri ? -1 : a.iri > b.iri ? 1 : 0),
   );
-  const creates = first.isNew && ordered.some((m) => kind(m) === "type");
-  const className = ordered.map((m) => m.outcome.item!.class).find(Boolean) ?? "Instance";
-  const label =
-    ordered.map((m) => m.outcome.item!.label).find(Boolean) ??
-    instance.slice(instance.lastIndexOf("/") + 1);
+  const isNew = members.some((m) => m.outcome.item!.isNew);
+  const creates = isNew && ordered.some((m) => kind(m) === "type");
+  const className = ordered.map((m) => m.outcome.item!.class).find(Boolean);
+  const label = ordered.map((m) => m.outcome.item!.label).find(Boolean);
+  // The status rows first, one per fact, as LBB's item holds them; the statements after them.
+  const rows: Schemas["EntityPropertiesInput"][] = ordered.map(({ iri }) => ({
+    ...proposalRef(read.proposals.get(iri)!, settings),
+    properties: { fact_status: "accepted" },
+  }));
   const triplets: Schemas["TripletInput"][] = [];
-  const rows: Schemas["EntityPropertiesInput"][] = [];
-  // The rows an accept must keep (`required`, from client 0.24; an older client sends it as is).
   const required: { row: number; reason: string }[] = [];
+  const statementRequired: { row: number; reason: string }[] = [];
   const samples: Record<string, unknown>[] = [];
-  const whys = new Set<string>();
-  for (const { iri, outcome } of ordered) {
+  const whys: string[] = [];
+  const proposers = new Set<string>();
+  const parts: string[] = [];
+  let links = 0;
+  for (const [row, { iri, outcome }] of ordered.entries()) {
     const proposal = read.proposals.get(iri)!;
     const shown = outcome.item!.shown;
     const needed = shown.kind === "source" || (creates && shown.kind === "type");
-    const writeTriplets = (outcome.facts?.triplets ?? []).map((t) => triplets.push(t) - 1);
-    const writeRows = (outcome.facts?.entity_properties ?? []).map((r) => rows.push(r) - 1);
-    const row =
-      rows.push({ ...proposalRef(proposal, settings), properties: { fact_status: "accepted" } }) -
-      1;
-    if (needed)
-      for (const at of [...writeRows, row])
-        required.push({
-          row: at,
-          reason:
-            shown.kind === "type"
-              ? "a new instance needs its type"
-              : "the source of an instance goes with it",
-        });
-    if (outcome.note) whys.add(outcome.note);
+    const reason =
+      shown.kind === "type"
+        ? "a new instance needs its type"
+        : "the source of an instance goes with it";
+    const factRows = (outcome.facts?.entity_properties ?? []).map((r) => rows.push(r) - 1);
+    const factTriplets = (outcome.facts?.triplets ?? []).map((t) => triplets.push(t) - 1);
+    if (needed) {
+      required.push({ row, reason });
+      for (const at of factRows) statementRequired.push({ row: at, reason });
+    }
+    if (outcome.note && !whys.includes(outcome.note)) whys.push(outcome.note);
+    if (proposal.proposedBy) proposers.add(proposal.proposedBy);
+    if (shown.kind === "link") links += 1;
+    else if (shown.kind !== "source") parts.push(shown.text);
     samples.push({
       proposal: iri,
       row,
-      ...(writeRows.length ? { rows: writeRows } : {}),
-      ...(writeTriplets.length ? { triplets: writeTriplets } : {}),
       kind: shown.kind,
       fact: shown.text,
-      confidence: Math.round(proposal.confidence * 1000) / 1000,
+      confidence: Math.round((outcome.gate ?? proposal.confidence) * 1000) / 1000,
       ...(review.place(proposal.evidence) ?? {}),
       ...(needed ? { required: true } : {}),
+      ...(shown.waitsFor !== undefined ? { waits_for: shown.waitsFor } : {}),
+      ...(factRows.length ? { rows: factRows } : {}),
+      ...(factTriplets.length ? { triplets: factTriplets } : {}),
     });
   }
-  const proposalsHash = createHash("sha256")
-    .update(
-      ordered
-        .map((m) => m.iri)
-        .sort()
-        .join("\n"),
-    )
-    .digest("hex")
-    .slice(0, 12);
+  if (links) parts.push(links === 1 ? "1 link" : `${links} links`);
+  const tail = instance.slice(instance.lastIndexOf("/") + 1);
   const title = creates
-    ? `New ${className} ${label}`
-    : `${className} ${label}: ${members.length === 1 ? "1 fact" : `${members.length} facts`} to check`;
-  const proposers = [...new Set(ordered.map((m) => read.proposals.get(m.iri)!.proposedBy))].filter(
-    Boolean,
-  );
+    ? `New ${className ?? "Instance"} ${label ?? tail}`
+    : `${className ?? "Instance"} ${label ?? tail}: ${ordered.length === 1 ? "1 fact" : `${ordered.length} facts`} to check`;
+  const by = [...proposers].sort();
+  const rationale = `${whys.slice(0, 3).join(" ")}${by.length ? ` Proposed by ${by.join(", ")}.` : ""}`;
   await lbb.review({
     workflow: message.workflow,
-    key: `starter:${message.workflow}:instance:${instance.slice(instance.lastIndexOf("/") + 1)}:${proposalsHash}`,
-    title: review.clip(title, 200),
-    rationale: review.clip(
-      `${[...whys].slice(0, 3).join(" ")}${proposers.length ? ` Proposed by ${proposers.join(", ")}.` : ""}`,
-      500,
+    key: review.itemKey(
+      message.workflow,
+      instance,
+      ordered.map((m) => m.iri),
     ),
+    title: review.clip(title, 200),
+    rationale: review.clip(rationale.trim(), 500),
+    origin: { kind: "agent", id: `starter:${message.workflow}`, label: "review" },
     facts: {
       triplets,
       entity_properties: rows,
-      required,
-      summary: review.clip(ordered.map((m) => m.outcome.item!.shown.text).join(" · "), 500),
+      required: [...required, ...statementRequired],
+      summary: review.clip(parts.join(" · "), 500),
     } as Schemas["SuggestedFacts"],
     mapping: {
       review: {
         instance,
-        class: className,
-        label,
+        class: className ?? null,
+        label: label ?? null,
         new: creates,
-        facts: members.length,
-        shown: members.length,
+        facts: ordered.length,
+        shown: ordered.length,
         truncated: false,
       },
     },
-    evidence: { records: members.length, samples },
+    evidence: { records: ordered.length, samples },
   });
 }
 

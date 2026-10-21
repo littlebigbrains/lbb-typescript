@@ -11,34 +11,59 @@ The LBB-run version is the starter workflow `values.extract@v1`
 
 ## How it runs
 
+The template follows the rules of LBB's version
+(`lbb-graph-query/src/infer_llm.rs`). Its eval runs both on the same
+recorded model answers and finds the same calls and outputs
+([`../_evals/README.md`](../_evals/README.md)).
+
 The triggered workflow watches the class and its text field. For each
 instance of a trigger message, two steps:
 
-1. **Values.** The reasoning model reads the text and returns
-   `{values: [{property, value, unit, quote}]}`; the schema allows only the
-   settings' property names. A number comes as the text states it, with
-   its unit, and the model never converts it. The prompt is the LBB version's: the values of
-   the instance's own item in its base version, not those of a part, an
-   accessory, an alternative or a variant under a condition; an approximate
-   value is stated. Then the checks without a model: a value takes its
-   property's type (`typed`), its quote is in the text with at least three
-   words or the value in it (`quoteHolds`), and one value per property. A
-   number of a property with a unit must come in that unit, with the unit
-   in its quote (`unitProblem`); otherwise it goes to review at most.
+1. **Values.** The text is the field's values as LBB composes it
+   (`text: <values>`, each value's whitespace as single spaces). The
+   reasoning model reads it and returns `{values: [{property, value, unit,
+   quote}]}`; the schema allows only the settings' property names, in name
+   order, and a number property names its unit. A number comes as the text
+   states it, with its unit, and the model never converts it. The prompt is
+   the LBB version's: the values of the instance's own item in its base
+   version, not those of a part, an accessory, an alternative or a variant
+   under a condition; an approximate value is stated. Then the checks
+   without a model, in LBB's order (`check`): the property is one the
+   workflow fills (else `unknown_property`), the value is the first of its
+   property (else `duplicate`), it takes its property's type (else
+   `invalid_value`), and its quote is in the text with at least three words
+   or the value in it (else `quote_not_found`). A number of a property with
+   a unit must come in that unit, with the unit in its quote
+   (`unitProblem`); otherwise it goes to review at most, with LBB's reason.
 2. **Support.** The decision model scores how well each quote supports its
    value: `supported`, `weak` or `not_supported`. The support is the
    probability of `supported`.
 
-Then the gate: a value at or above `gate` is written, one from 0.5 to the
-gate becomes a review item with the value as its facts, one below 0.5 is
-dropped. One owned write per turn replaces the values of the turn's
-instances: a property the workflow does not write again loses its value and
-its source. An accepted review item's value is written with the others the
-next time its instance is read. An instance that leaves the class loses the
-values this workflow wrote.
+Then the gate: a value at or above `gate` is `written`, one from 0.5 to the
+gate goes to `review`, one below 0.5 or without an answer is
+`weak_support` and is dropped. A review item's key is LBB's,
+`starter:<workflow>:value:<hash of instance, property and value>`
+(`stableHashHex`), so a new value files a new item and the same value
+updates its item. One owned write per turn replaces the values of the
+turn's instances: a property the workflow does not write again loses its
+value and its source. Each value's evidence is its quote, with the
+instance's page box as its region when the instance has one (`page`, `x0`,
+`y0`, `x1`, `y1`, as a `DocEntry` has). An accepted review item's value is
+written with the others the next time its instance is read. An instance
+that leaves the class keeps its values: they go with its fields when it is
+retracted.
 
-A turn reads at most 24 instances; the rest of a message goes to a new turn
-(`ctx.continue`).
+The write's request id is its step's effect id, which no other turn
+repeats, so a value that changes back (A, then B, then A) is written again.
+When a model call is refused, the instance goes back to the watch
+(`lbb.requeue`, after 1, 4 and 16 minutes, at most 3 times) and keeps its
+values; the turn completes and the shard goes on. A spent budget fails the
+turn with the time to retry, and the worker waits without an attempt.
+
+The state counts what LBB's version counts: `instances`,
+`values_proposed`, one counter per outcome, `failed`, `commits` and
+`removed`. A turn reads at most 24 instances; the rest of a message goes to
+a new turn (`ctx.continue`).
 
 ## Settings
 
@@ -61,17 +86,22 @@ relation.
 ## What the LBB-run version adds
 
 - `params.where`: a SPARQL pattern that limits the instances it reads.
-- Texts built from several watched fields, as fit sources build them, and
-  the fields chosen for you when the watch names none.
-- The instance's page box as the region of each value's evidence, for an
-  instance that has one (a `DocEntry`).
+- Texts built from several watched fields, and the fields chosen for you
+  when the watch names none.
 - A check at creation that each property is in the property registry with
   a type it can write.
 - Its own monthly budget, a preview with the values of up to 3 instances,
-  and counters per outcome in the workflow's status.
-- Unit conversion: a number the text states in another unit of the same
-  kind (`600 mm` for a property in `cm`) is converted to the unit the
-  property declares, where this template sends it to review.
+  and its counters in the workflow's status.
+
+It differs in three places. It commits once per instance, the template once
+per turn, so its `commits` counter is larger. When the reasoning model gives
+no usable answer, it counts the instance `failed` and clears its values; the
+template sends the instance back to the watch and keeps them. And it
+converts a number the text states in another unit of the same kind (`600 mm`
+for a property in `cm`) to the unit the property declares, and refuses a
+unit it does not know or of another kind; the template sends such a number
+to review. So the review key and title of such a number differ: LBB keys
+its item by the converted value, the template by the value as stated.
 
 ## Samples and test
 

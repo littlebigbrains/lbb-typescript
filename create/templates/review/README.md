@@ -10,9 +10,12 @@ others to a person: one review item per instance.
 
 The LBB-run version is the starter workflow `review@v1`
 (`docs/reference/starter-workflows.md`, "Review"; design
-`docs/architecture/document-output-mapping.md`). This template is the same
-decision in TypeScript: the workflow in `workflow.ts`, the rules and the
-facts in `decision.ts`. It calls no model.
+`docs/architecture/document-output-mapping.md`). This template takes its
+rules, notes, counters and review items: the workflow in `workflow.ts`, the
+rules and the facts in `decision.ts`. It calls no model. Its eval runs both
+on the samples and on a fixture of every rule, and finds the same
+decisions, notes, facts and items
+([`../_evals/README.md`](../_evals/README.md)).
 
 ## How it runs
 
@@ -32,29 +35,36 @@ proposal is decided once: one that has a `fact_status` already is skipped.
    `rdfs:label`, a relation between two instances (the entry's `DENOTES`
    included), or a property value in its type. The ends of a relation must fit
    its domain and range, superclasses included.
-3. **The decision** (`decide`), in this order:
+3. **The decision** (`decide`), in this order, with LBB's notes:
    - **refused** when the graph cannot hold the statement: a predicate that
      is no relation or property of the records ontology (nor `rdf:type` or
-     `rdfs:label`), a value of another type, an object that is no instance,
-     an instance without a class, an end its relation does not take, a second
-     class, or a statement about a proposal;
+     `rdfs:label`), a value that does not take its property's type (LBB's
+     words: `` `vierzehn` is not a number``), an object that is no
+     instance, an instance without a class, an end its relation does not
+     take, a second class, or a statement about a proposal;
    - **to a person** when a rule of `alwaysReview` names it (`new_instance`:
      a statement whose subject or object the graph does not have yet; or a
-     predicate IRI), when it would replace another writer's value (a records
-     graph holds one value per property) or name, or when its confidence is
-     below the gate. The proposal goes into the **review item of its
-     instance** (`groupOf`): its subject; the object of a link whose subject
-     the graph has and whose object is new; and always the object of the
-     trace (`DENOTES`). One item holds every proposal of its instance that
-     the turn sends to a person, in order: the type, the label, values,
-     links, the trace (`fileItem`). Its title names the instance (`New
+     predicate IRI), when it would replace another writer's value or name, or
+     when its gate value is below the gate. The gate value is the
+     proposal's confidence, or the typing answer's probability `p` of a
+     source whose link is in the graph already (`gateValue`). The proposal
+     goes into the **review item of its instance** (`groupOf`): its subject;
+     the object of a link whose subject the graph has and whose object is
+     new; and always the object of the trace (`DENOTES`). One item holds every
+     proposal of its instance that the turn sends to a person, in order: the
+     type, the label, values, links, the trace (`fileItem`). The item is
+     LBB's: its key (`starter:<workflow>:instance:<hash of the
+     instance>:<hash of its proposals>`, `itemKey`), its title (`New
      Equipment M 7 Medienwagen`, or `Room Raum 0.12 Klassenraum: 1 fact to
-     check`), its rationale says why, and it has one evidence sample per
-     fact (what it states, its confidence, its line). Its facts are each
-     statement and its proposal's `fact_status: accepted`, and each sample
-     names the rows and triplets of its fact (`row`, `rows`, `triplets`), so
-     a person can leave facts out of the accept. The type of a new instance
-     is a required row: a person keeps it or dismisses the item;
+     check`), its rationale, its summary (`is a Equipment · label · M 7
+     Medienwagen · 1 link`), one status row per fact (the proposal's
+     `fact_status: accepted`) and one evidence sample per fact (what it
+     states, its gate value, its line, the other new instance a link waits
+     for). The type of a new instance is a required row: a person keeps it or
+     dismisses the item. After the status rows the item holds each
+     statement, so its accept commits the facts (design G8); each sample names
+     the rows and triplets of its fact (`rows`, `triplets`), so a person can
+     leave facts out of the accept;
    - **written** otherwise: a relation as an edge whose evidence names the
      proposal (`source_id` is the proposal's IRI, the text its evidence); a
      property as its value; a new instance's `rdf:type` as the instance of
@@ -64,10 +74,16 @@ proposal is decided once: one that has a `fact_status` already is skipped.
      name does not depend on which statement is written first. A label is a
      text: an IRI or an empty label is refused. A statement the graph holds
      already is not written again. Nothing is taken back, a name included: a
-     records instance keeps one.
+     records instance keeps one. When the graph refuses the commit, the
+     proposal is `refused` with `The graph refused the statement: …`.
 4. **Write** (`writeOwned`): the proposal's `fact_status` (`written`,
    `in_review` or `refused`) and `review_note`, owned by this workflow, and in
    the same commit the facts of a written statement.
+
+The state counts what LBB's version counts: `proposals`, `written` (a
+statement the graph held already included), `held_already`, `in_review`,
+`refused`, `new_instance` (proposals for a person that name a new instance)
+and `items`.
 
 ## Settings
 
@@ -94,7 +110,8 @@ beside an LBB-run `review` on the same graph: they own the same properties.
   only; its sweep writes each kept fact, the type first, and dismisses the
   facts a person left out. A link to another new instance waits until that
   instance's item is accepted, and is dismissed with it. The template's item
-  commits its facts on accept, so such a link makes the other instance too.
+  commits its facts on accept (design G8), so such a link makes the other
+  instance too.
 - **One item per instance over time.** Its items follow the open proposals
   of an instance across messages: when they change, it supersedes the open
   item with a new one, and an accept of the old item fails (409). The
@@ -122,16 +139,26 @@ beside an LBB-run `review` on the same graph: they own the same properties.
   graph kinds: the records ontology's relations (the records `DENOTES`
   included), properties and classes, and `rdfs:label`. An instance is new
   when it has no class of the records ontology. It refuses any other
-  predicate with a note that says so (`owl:sameAs`, `lbb:denotes`).
+  predicate with LBB's note (`owl:sameAs`, `lbb:denotes`).
 - **Ownership by statement.** Its facts count as owned by statement, so it
   conflicts with no other workflow on the predicates it writes. The template
   owns `fact_status` and `review_note` only and writes the facts without
   owning them.
-- **The graph refuses.** It lets the commit refuse a statement (a domain, a
-  range) and marks the proposal `refused`. The template checks domain and
-  range before it writes; another refusal stops the turn.
-- **Status and preview.** Counters per outcome, the open items it follows,
-  and a preview of what it would decide.
+- **Status and preview.** The open items it follows in its status, and a
+  preview of what it would decide.
+
+The template differs from it in two places, and its eval names both:
+
+- **Domain and range.** LBB's review leaves them to the commit, and a
+  records graph commits such an edge, so it writes p11 of the samples (a
+  room as the equipment of a room). The template checks a relation's ends
+  against its domain and range, superclasses included, and refuses it, as
+  the answer key says.
+- **What it reads.** The template reads the graph with the commits of its
+  own turn; LBB's review reads the published generation. A statement written
+  earlier in the same turn (the label of a new instance written with its
+  type) counts as `held_already` in the template, and LBB's review writes it
+  again. The facts are the same.
 
 ## Samples and test
 

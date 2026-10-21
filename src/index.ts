@@ -160,10 +160,16 @@ export {
   WorkflowWorker,
   WorkflowHandle,
   WorkflowNamespace,
+  WorkflowBlobsNamespace,
   WorkflowError,
+  WorkflowWait,
+  fanInIdentity,
+  isFanInIdentity,
+  workflowOfIdentity,
 } from "./workflows.js";
 export type {
   WorkflowContext,
+  WorkflowStartOptions,
   WorkflowStepOptions,
   WorkflowStepContext,
   WorkflowProgressCounts,
@@ -178,10 +184,12 @@ export {
   entityIdFromIri,
   entityRef,
   parseTriggerMessage,
+  requeueFailed,
   triggeredWorkflow,
   writeOwned,
 } from "./triggered-workflow-worker.js";
 export type {
+  FailedInstance,
   OwnedWrite,
   OwnedWriteOptions,
   OwnedWriteResult,
@@ -195,6 +203,7 @@ export {
   lbbActivities,
   splitInHalves,
 } from "./activities.js";
+export { stableHashHex } from "./hash.js";
 export type {
   ActivityOptions,
   ActivityPagesOptions,

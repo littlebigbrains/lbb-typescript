@@ -1,5 +1,5 @@
 import type { LbbClient, Schemas } from "./client.js";
-import type { CallOptions } from "./transport.js";
+import { LbbError, type CallOptions } from "./transport.js";
 import {
   WorkflowExecutionError,
   WorkflowTurnReader,
@@ -76,6 +76,75 @@ const copy = <T>(value: T, where = "value"): T => {
 
 /** A permanent handler/replay error; ordinary thrown errors retry up to max_attempts. */
 export class WorkflowError extends Error {}
+
+/**
+ * Throw from a turn to wait for a cause outside it (a dependency that is
+ * not there yet, a spent budget) and count no attempt: the worker fails
+ * the turn with `retry_at_ms`, and the turn runs again at `retryAtMs`, or
+ * at once on a resume or a run now. Its steps are kept. A step that meets
+ * `429 workflow_budget_exceeded` waits this way by itself.
+ */
+export class WorkflowWait extends Error {
+  constructor(
+    readonly retryAtMs: number,
+    message = "the turn waits",
+  ) {
+    super(message);
+    this.name = "WorkflowWait";
+  }
+}
+
+/**
+ * The shortest wait a failure asks for: a wait of now (or of a clock behind
+ * the server's) waits a second, so a turn that keeps waiting cannot spin.
+ */
+const MIN_WAIT_MS = 1_000;
+
+/** The wait of a thrown error: a {@link WorkflowWait}, or a spent budget. */
+function waitOf(error: unknown): number | undefined {
+  if (error instanceof WorkflowWait) return error.retryAtMs;
+  if (
+    error instanceof LbbError &&
+    error.code === "workflow_budget_exceeded" &&
+    typeof error.retryAtMs === "number"
+  )
+    return error.retryAtMs;
+  return undefined;
+}
+
+/** A turn route's answer that the lease is stale (409) or the instance is gone (404). */
+const gone = (error: unknown): boolean =>
+  error instanceof LbbError && (error.status === 409 || error.status === 404);
+
+/** The engine identity of a shard: `starter.<name>` or `starter.<name>.<k>`. */
+const SHARD = /^starter\.([^.]+)(?:\.([1-9][0-9]*))?$/;
+/** The engine identity of a fan-in identity: `starter.<name>.<word>`. */
+const FAN_IN = /^starter\.([^.]+)\.([a-z][a-z0-9-]{0,30})$/;
+
+/**
+ * The named workflow of an engine identity: a shard's (`starter.<name>`,
+ * `starter.<name>.<k>`) or a fan-in identity's (`starter.<name>.<word>`);
+ * `undefined` for an identity of no named workflow.
+ */
+export function workflowOfIdentity(id: string): string | undefined {
+  return SHARD.exec(id)?.[1] ?? FAN_IN.exec(id)?.[1];
+}
+
+/**
+ * The engine identity of the fan-in identity `fanIn` of the workflow
+ * `name` (`fan_in` of `PUT /v1/workflows/named`): `starter.<name>.<fanIn>`.
+ * Send to it with a deterministic message id, so a repeat is admitted once.
+ */
+export function fanInIdentity(name: string, fanIn: string): string {
+  if (!/^[a-z][a-z0-9-]{0,30}$/.test(fanIn))
+    throw new RangeError("a fan-in id matches [a-z][a-z0-9-]{0,30}");
+  return `starter.${name}.${fanIn}`;
+}
+
+/** Whether `id` is a fan-in identity (`starter.<name>.<word>`). */
+export function isFanInIdentity(id: string): boolean {
+  return FAN_IN.test(id);
+}
 export interface WorkflowResult<S, R = unknown, M = unknown> {
   state: S;
   result?: R;
@@ -103,6 +172,20 @@ export interface WorkflowProgressCounts {
 }
 export interface WorkflowStepContext {
   effectId: string;
+  /**
+   * The turn this step runs in, as `workflow_fence` of a commit names it:
+   * the server refuses a new commit once the token no longer holds the
+   * turn (`409 workflow_fence_lost`). `writeOwned` sends it with a write to
+   * the turn's graph (`graph`). A `WorkflowWorker` always sets it; a test's
+   * own context may leave it out.
+   */
+  fence?: Schemas["WorkflowFence"];
+  /**
+   * The graph of the turn: the graph the worker's client names. Undefined
+   * when that client names none (the server's default graph); `writeOwned`
+   * then takes the graph a write names for the turn's graph.
+   */
+  graph?: string;
   signal: AbortSignal;
   /** Last progress checkpoint from a previous attempt, or null. */
   checkpoint: unknown;
@@ -136,8 +219,16 @@ export interface WorkflowContext {
     request: WorkflowReadRequest | string,
     options?: WorkflowReadOptions,
   ): Promise<Schemas["SparqlTextResponse"]>;
+  /**
+   * The attempt's execution reader: SELECT/ASK, and for LBB's hosted workers
+   * the file reads and owned writes of their grants. Requires the worker's
+   * executionReads opt-in. Optional for compatibility with custom contexts.
+   */
+  execution?(): WorkflowTurnReader;
   /** Where the message came from, when its sender named it. */
   readonly origin?: Schemas["WorkflowMessageOrigin"] | null;
+  /** The named workflow of this identity (a shard's or a fan-in identity's), if any. */
+  readonly workflowName?: string;
   /** Sequential named effects only. Pass effectId to the external service as its idempotency key. */
   step<T>(
     key: string,
@@ -169,7 +260,7 @@ export interface WorkflowDefinition<S, M> extends RegisteredWorkflow {
   start(
     client: LbbClient,
     id: string,
-    options?: { leaseMs?: number; maxAttempts?: number },
+    options?: WorkflowStartOptions,
   ): Promise<WorkflowHandle<M>>;
 }
 /** Define a version-pinned message handler. Put I/O, clock reads and randomness inside ctx.step. */
@@ -193,6 +284,18 @@ export function workflow<S, M, R = unknown>(definition: {
       client.workflows.start(registered, id, options),
   };
   return registered;
+}
+
+/** How `start` creates an instance. */
+export interface WorkflowStartOptions {
+  leaseMs?: number;
+  maxAttempts?: number;
+  /**
+   * What a turn that failed for good does: `block` (the default) holds the
+   * inbox until a person retries or skips it; `skip` keeps the failed turn
+   * in the history and goes on with the next message.
+   */
+  onExhausted?: Schemas["WorkflowOnExhausted"];
 }
 
 export class WorkflowHandle<M = unknown> {
@@ -241,6 +344,66 @@ export class WorkflowHandle<M = unknown> {
   cancelTurn(turn: number, options?: CallOptions) {
     return this.api.control(this.id, "cancel_turn", turn, options);
   }
+  /** End a wait of the current turn that counts no attempt (`retry_at_ms`): a run now. */
+  wake(options?: CallOptions) {
+    return this.api.control(this.id, "wake", undefined, options);
+  }
+}
+
+/** Blobs of the workflow engine: large step outputs and shared reads. */
+export class WorkflowBlobsNamespace {
+  constructor(private readonly client: LbbClient) {}
+  /**
+   * Store `data` (at most 8 MiB) as a blob of the identity `workflowId`'s
+   * workflow (`POST /v1/workflows/blobs`) and answer its key,
+   * `<workflow>/<sha256>`. Name the key in a step's output, the state or a
+   * message: a blob stays while a live identity names it, and at least a
+   * day after its last write. The same bytes again answer the same key,
+   * so a failed call is retried.
+   */
+  async put(
+    data: ArrayBuffer | Uint8Array | string,
+    options: { workflowId: string } & CallOptions,
+  ): Promise<Schemas["WorkflowBlob"]> {
+    const { workflowId, ...call } = options;
+    const bytes =
+      typeof data === "string" ? new TextEncoder().encode(data) : data;
+    if (bytes.byteLength > 8 * 1024 * 1024)
+      throw new RangeError("a blob holds at most 8 MiB");
+    return this.client.request("POST", `${base}/blobs`, {
+      ...call,
+      retry: call.retry ?? true,
+      query: { workflow_id: workflowId },
+      rawBody: bytes,
+      contentType: "application/octet-stream",
+    });
+  }
+  /** The bytes of blob `key` (`GET /v1/workflows/blobs`). */
+  get(key: string, options: CallOptions = {}): Promise<Uint8Array> {
+    return this.client.request("GET", `${base}/blobs`, {
+      ...options,
+      query: { key },
+      responseType: "bytes",
+    });
+  }
+  /** The text of blob `key`, decoded as UTF-8. */
+  async getText(key: string, options: CallOptions = {}): Promise<string> {
+    return new TextDecoder().decode(await this.get(key, options));
+  }
+  /** Store a JSON value as a blob: {@link put} of its text. */
+  putJson(
+    value: unknown,
+    options: { workflowId: string } & CallOptions,
+  ): Promise<Schemas["WorkflowBlob"]> {
+    return this.put(JSON.stringify(value), options);
+  }
+  /** The JSON value of blob `key`. */
+  async getJson<T = unknown>(
+    key: string,
+    options: CallOptions = {},
+  ): Promise<T> {
+    return JSON.parse(await this.getText(key, options)) as T;
+  }
 }
 export class WorkflowNamespace {
   /**
@@ -264,12 +427,15 @@ export class WorkflowNamespace {
    * one set of settings, checked before the work and recorded after.
    */
   readonly derivations: DerivationsNamespace;
+  /** Blobs: large step outputs and shared reads, keyed by their SHA-256. */
+  readonly blobs: WorkflowBlobsNamespace;
 
   constructor(private readonly client: LbbClient) {
     this.starters = new StarterWorkflowsNamespace(client);
     this.triggered = new TriggeredWorkflowsNamespace(client);
     this.named = new NamedWorkflowsNamespace(client);
     this.derivations = new DerivationsNamespace(client);
+    this.blobs = new WorkflowBlobsNamespace(client);
   }
   handle<M = unknown>(id: string): WorkflowHandle<M> {
     return new WorkflowHandle<M>(this, id);
@@ -277,7 +443,7 @@ export class WorkflowNamespace {
   async start<S, M>(
     definition: WorkflowDefinition<S, M>,
     id: string,
-    options: { leaseMs?: number; maxAttempts?: number } = {},
+    options: WorkflowStartOptions = {},
   ): Promise<WorkflowHandle<M>> {
     await this.create({
       id,
@@ -286,6 +452,7 @@ export class WorkflowNamespace {
       state: definition.initialState,
       lease_ms: options.leaseMs ?? 60_000,
       max_attempts: options.maxAttempts ?? 3,
+      ...(options.onExhausted ? { on_exhausted: options.onExhausted } : {}),
     });
     return this.handle<M>(id);
   }
@@ -580,6 +747,7 @@ export class WorkflowWorker {
       turn: task.turn.number,
       token: task.token,
     };
+    const turnGraph = this.client.graphName;
     // The run of this attempt: the activity calls of its steps name it,
     // and their usage goes with the completion.
     const turnRun: ActivityTurn = {
@@ -641,6 +809,23 @@ export class WorkflowWorker {
       stopped = true;
       clearTimeout(heartbeat);
     };
+    // A request of a turn route. A 409 (the lease is stale) or a 404 (the
+    // instance is gone) ends the attempt here: nothing more is sent for it.
+    const turnRequest = async <T>(
+      route: string,
+      body: Record<string, unknown>,
+    ): Promise<T> => {
+      try {
+        return await this.client.request<T>("POST", `${base}/turns/${route}`, {
+          signal: controller.signal,
+          retry: true,
+          body,
+        });
+      } catch (error) {
+        if (gone(error)) controller.abort(error);
+        throw error;
+      }
+    };
     const checkpoint = async (
       key: string,
       kind: "step" | "sleep" | "signal",
@@ -692,22 +877,14 @@ export class WorkflowWorker {
                 progressTimeout > timeout))
           )
             throw new WorkflowError("Invalid operation/progress timeout");
-          const begun = await this.client.request<Turn>(
-            "POST",
-            `${base}/turns/operation`,
-            {
-              signal: controller.signal,
-              retry: true,
-              body: {
-                ...lease,
-                key,
-                position: index,
-                kind: stepOptions.kind ?? "step",
-                timeout_ms: timeout,
-                heartbeat_timeout_ms: progressTimeout,
-              },
-            },
-          );
+          const begun = await turnRequest<Turn>("operation", {
+            ...lease,
+            key,
+            position: index,
+            kind: stepOptions.kind ?? "step",
+            timeout_ms: timeout,
+            heartbeat_timeout_ms: progressTimeout,
+          });
           check(); // A late begin response cannot authorize I/O after lease loss.
           let sequence = 0,
             active = true;
@@ -718,16 +895,12 @@ export class WorkflowWorker {
             pending = pending.then(async () => {
               check();
               if (savedCursor !== undefined) cursor = savedCursor;
-              await this.client.request("POST", `${base}/turns/progress`, {
-                signal: controller.signal,
-                retry: true,
-                body: {
-                  ...lease,
-                  key,
-                  sequence: ++sequence,
-                  details,
-                  checkpoint: cursor,
-                },
+              await turnRequest("progress", {
+                ...lease,
+                key,
+                sequence: ++sequence,
+                details,
+                checkpoint: cursor,
               });
               check();
               watchProgress();
@@ -787,6 +960,8 @@ export class WorkflowWorker {
             output = copy(
               await effect!({
                 effectId: `${task.effect_prefix}/${key}`,
+                fence: { ...lease },
+                graph: turnGraph,
                 signal: controller.signal,
                 checkpoint: copy(cursor),
                 heartbeat: (details, options) => {
@@ -831,30 +1006,24 @@ export class WorkflowWorker {
         }
         check();
         if (kind !== "step") stopHeartbeat();
-        const saved = await this.client.request<Turn>(
-          "POST",
-          `${base}/turns/${kind === "signal" ? "wait-signal" : "checkpoint"}`,
-          {
-            signal: controller.signal,
-            retry: true,
-            body:
-              kind === "signal"
-                ? {
-                    ...lease,
-                    position: index,
-                    key,
-                    name: signalName,
-                    timeout_ms: delay,
-                  }
-                : {
-                    ...lease,
-                    position: index,
-                    key,
-                    kind,
-                    output,
-                    delay_ms: delay,
-                  },
-          },
+        const saved = await turnRequest<Turn>(
+          kind === "signal" ? "wait-signal" : "checkpoint",
+          kind === "signal"
+            ? {
+                ...lease,
+                position: index,
+                key,
+                name: signalName,
+                timeout_ms: delay,
+              }
+            : {
+                ...lease,
+                position: index,
+                key,
+                kind,
+                output,
+                delay_ms: delay,
+              },
         );
         if (kind === "signal") {
           const entry = saved.steps[index];
@@ -898,7 +1067,16 @@ export class WorkflowWorker {
           );
         return executionReader.sparql(request, options);
       },
+      execution: () => {
+        check();
+        if (!executionReader)
+          throw new WorkflowExecutionError(
+            "Enable executionReads on this worker; nothing was sent",
+          );
+        return executionReader;
+      },
       origin: task.turn.origin ?? null,
+      workflowName: workflowOfIdentity(lease.workflow_id),
       step: async <T>(
         key: string,
         fn: (context: WorkflowStepContext) => Promise<T>,
@@ -972,30 +1150,40 @@ export class WorkflowWorker {
       };
       // Serialize completion retries exactly; a lost response must not rerun effects.
       stopHeartbeat();
-      await this.client.request("POST", `${base}/turns/complete`, {
-        body,
-        retry: true,
-        signal: controller.signal,
-      });
+      await turnRequest("complete", body);
     } catch (error) {
       if (error === suspended) return;
       if (controller.signal.aborted) {
         if (signal?.aborted) throw signal.reason ?? error;
         return; // The coordinator expires/fences this attempt and schedules its retry.
       }
+      // A fenced write found the lease gone: the turn's next holder writes.
+      if (error instanceof LbbError && error.code === "workflow_fence_lost")
+        return;
       stopHeartbeat();
-      await this.client.request("POST", `${base}/turns/fail`, {
-        body: {
-          ...lease,
-          error: String(error).slice(0, 1000),
-          non_retryable:
-            error instanceof WorkflowError ||
-            error instanceof WorkflowExecutionError,
-          ...reportedUsage(turnRun),
-        },
-        retry: false,
-        signal: controller.signal,
-      });
+      // A wait for a cause outside the turn counts no attempt.
+      const retryAt = waitOf(error);
+      try {
+        await this.client.request("POST", `${base}/turns/fail`, {
+          body: {
+            ...lease,
+            error: String(error).slice(0, 1000),
+            non_retryable:
+              retryAt === undefined &&
+              (error instanceof WorkflowError ||
+                error instanceof WorkflowExecutionError),
+            ...(retryAt !== undefined
+              ? { retry_at_ms: Math.max(retryAt, Date.now() + MIN_WAIT_MS) }
+              : {}),
+            ...reportedUsage(turnRun),
+          },
+          retry: false,
+          signal: controller.signal,
+        });
+      } catch (refused) {
+        // The turn is no longer this worker's: nothing to fail.
+        if (!gone(refused)) throw refused;
+      }
     } finally {
       if (runningTurns.get(task.effect_prefix) === turnRun)
         runningTurns.delete(task.effect_prefix);

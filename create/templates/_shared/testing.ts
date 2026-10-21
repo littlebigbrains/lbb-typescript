@@ -16,6 +16,7 @@ import {
   type DecideResult,
   type EmbedRequest,
   type EmbedResult,
+  type FailedInstance,
   type FilePages,
   type LbbActivities,
   type OwnedWrite,
@@ -171,6 +172,13 @@ export class MockActivities implements LbbActivities {
   readonly calls: MockCall[] = [];
   readonly reviews = new Map<string, ReviewRequest & { status: string }>();
   readonly evolved: Schemas["OntologyEvolveOp"][][] = [];
+  /** The instances each turn sent back to the watch (`lbb.requeue`), by step effect id. */
+  readonly requeued: {
+    effectId: string;
+    workflowId: string;
+    turn: number;
+    failed: FailedInstance[];
+  }[] = [];
   private readonly kept = new Map<string, { request: string; answer: unknown }>();
   private readonly written = new Set<string>();
 
@@ -299,7 +307,23 @@ export class MockActivities implements LbbActivities {
       const { effectId } = step;
       const replayed = this.written.has(effectId);
       if (!replayed) {
-        this.graph.apply(typeof write === "function" ? await write(step) : write);
+        const body = typeof write === "function" ? await write(step) : write;
+        // As the SDK does: a write of nothing sends no commit.
+        const empty =
+          !body.subjects.length &&
+          !body.retract_entities?.length &&
+          !body.triplets?.length &&
+          !body.entity_properties?.length;
+        if (empty)
+          return {
+            commit_seq: null,
+            idempotency_key: effectId,
+            replayed: false,
+            owned: null,
+            entities_written: 0,
+            edges_written: 0,
+          };
+        this.graph.apply(body);
         this.written.add(effectId);
       }
       return {
@@ -313,6 +337,34 @@ export class MockActivities implements LbbActivities {
     });
   }
 
+  /**
+   * `lbb.requeue` inside the step `stepKey`, as the SDK runs it: nothing
+   * without failed instances, and a repeat of the step reads its saved
+   * answer. The answer counts the attempt from 1 (the server takes it from
+   * the turn's message).
+   */
+  async requeue(
+    ctx: WorkflowContext,
+    stepKey: string,
+    failed: readonly FailedInstance[],
+  ): Promise<Schemas["WorkflowRequeueResponse"] | null> {
+    if (!failed.length) return null;
+    return ctx.step(stepKey, async (step) => {
+      this.requeued.push({
+        effectId: step.effectId,
+        workflowId: ctx.workflowId,
+        turn: ctx.turn,
+        failed: failed.map((f) => ({ ...f })),
+      });
+      return {
+        attempt: 1,
+        not_before: "2026-01-01T00:01:00Z",
+        requeued: failed.map((f) => f.instance),
+        exhausted: [],
+      };
+    });
+  }
+
   async review(request: ReviewRequest): Promise<Schemas["OntologyChangeSuggestion"]> {
     const key = request.key ?? `review-${this.reviews.size}`;
     const status = this.reviews.get(key)?.status ?? this.rules.reviewStatus?.(request) ?? "open";
@@ -322,6 +374,38 @@ export class MockActivities implements LbbActivities {
       status,
       facts: request.facts ?? null,
     } as unknown as Schemas["OntologyChangeSuggestion"];
+  }
+
+  /** The review items of `reviews`, newest first, filtered as the route filters them. */
+  async listReviews(
+    options: { originId?: string; status?: string; key?: string; limit?: number } = {},
+  ): Promise<Schemas["OntologyChangeSuggestionList"]> {
+    const items = [...this.reviews.entries()]
+      .reverse()
+      .filter(
+        ([key, item]) =>
+          (options.key === undefined || key === options.key) &&
+          (options.status === undefined || item.status === options.status) &&
+          (options.originId === undefined || item.origin?.id === options.originId),
+      )
+      .slice(0, options.limit ?? 100);
+    return {
+      suggestions: items.map(([key, item]) => ({
+        suggestion_id: key,
+        key,
+        status: item.status,
+        title: item.title,
+        anchor: item.anchor ?? { kind: "ontology" },
+      })),
+    } as unknown as Schemas["OntologyChangeSuggestionList"];
+  }
+
+  /** The review item filed under `key`, or null. */
+  async reviewItem(key: string): Promise<Schemas["OntologyChangeSuggestion"] | null> {
+    const item = this.reviews.get(key);
+    return item
+      ? ({ ...item, suggestion_id: key, key } as unknown as Schemas["OntologyChangeSuggestion"])
+      : null;
   }
 
   async evolve(ops: Schemas["OntologyEvolveOp"][], options: { dryRun?: boolean } = {}) {

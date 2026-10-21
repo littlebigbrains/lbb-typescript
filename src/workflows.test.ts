@@ -1,7 +1,13 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { LbbClient, type Schemas } from "./client.js";
-import { workflow, WorkflowWorker } from "./workflows.js";
+import { LbbClient, type FetchLike, type Schemas } from "./client.js";
+import {
+  fanInIdentity,
+  isFanInIdentity,
+  workflow,
+  workflowOfIdentity,
+  WorkflowWorker,
+} from "./workflows.js";
 
 type Task = Schemas["WorkflowTurnTask"];
 function task(steps: Task["turn"]["steps"] = []): Task {
@@ -757,4 +763,73 @@ test("a turn without activity calls completes without usage, and a refused call 
     tokens_out: 0,
     cost_micro_usd: 0,
   });
+});
+
+test("blobs: put sends the raw bytes under the writing identity, get reads them back", async () => {
+  const requests: Array<{
+    url: string;
+    method?: string;
+    body?: unknown;
+    headers?: Record<string, string>;
+  }> = [];
+  const fetch: FetchLike = async (url, init) => {
+    requests.push({
+      url,
+      method: init?.method,
+      body: init?.body,
+      headers: init?.headers,
+    });
+    if (init?.method === "POST")
+      return {
+        ok: true,
+        status: 200,
+        headers: { get: () => null },
+        text: async () =>
+          JSON.stringify({
+            key: "rooms/ab",
+            sha256: "ab",
+            bytes: 9,
+            created: true,
+          }),
+      };
+    return {
+      ok: true,
+      status: 200,
+      headers: { get: () => null },
+      text: async () => "catalogue",
+      arrayBuffer: async () => new TextEncoder().encode("catalogue").buffer,
+    };
+  };
+  const client = new LbbClient({ baseUrl: "http://h", graph: "main", fetch });
+  const blob = await client.workflows.blobs.put("catalogue", {
+    workflowId: "starter.rooms",
+  });
+  assert.equal(blob.key, "rooms/ab");
+  assert.equal(
+    requests[0]?.url,
+    "http://h/v1/workflows/blobs?graph=main&workflow_id=starter.rooms",
+  );
+  assert.equal(
+    requests[0]?.headers?.["content-type"],
+    "application/octet-stream",
+  );
+  assert.equal(await client.workflows.blobs.getText("rooms/ab"), "catalogue");
+  assert.ok(requests[1]?.url.includes("key=rooms%2Fab"), requests[1]?.url);
+  await assert.rejects(
+    client.workflows.blobs.put(new Uint8Array(8 * 1024 * 1024 + 1), {
+      workflowId: "w",
+    }),
+    RangeError,
+  );
+});
+
+test("the identities of a named workflow: shards and the fan-in identity", () => {
+  assert.equal(workflowOfIdentity("starter.rooms"), "rooms");
+  assert.equal(workflowOfIdentity("starter.rooms.3"), "rooms");
+  assert.equal(workflowOfIdentity("starter.rooms.things"), "rooms");
+  assert.equal(workflowOfIdentity("model-checks"), undefined);
+  assert.equal(fanInIdentity("rooms", "things"), "starter.rooms.things");
+  assert.ok(isFanInIdentity("starter.rooms.things"));
+  assert.ok(!isFanInIdentity("starter.rooms.3"));
+  assert.throws(() => fanInIdentity("rooms", "3things"), RangeError);
 });
