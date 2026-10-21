@@ -113,9 +113,22 @@ function waitOf(error: unknown): number | undefined {
   return undefined;
 }
 
-/** A turn route's answer that the lease is stale (409) or the instance is gone (404). */
+/**
+ * The code of a turn route's answer that this attempt's token no longer
+ * holds its turn: another attempt holds it, its lease ended, or it finished.
+ */
+const TURN_LEASE_LOST_CODE = "turn_lease_lost";
+
+/**
+ * A turn route's answer that the turn is not this attempt's any more:
+ * `409 turn_lease_lost`, another 409 (a server older than the code answers
+ * a lost lease `409 conflict`) or a 404 (the instance is gone).
+ */
 const gone = (error: unknown): boolean =>
-  error instanceof LbbError && (error.status === 409 || error.status === 404);
+  error instanceof LbbError &&
+  (error.code === TURN_LEASE_LOST_CODE ||
+    error.status === 409 ||
+    error.status === 404);
 
 /** The engine identity of a shard: `starter.<name>` or `starter.<name>.<k>`. */
 const SHARD = /^starter\.([^.]+)(?:\.([1-9][0-9]*))?$/;
@@ -816,8 +829,9 @@ export class WorkflowWorker {
       stopped = true;
       clearTimeout(heartbeat);
     };
-    // A request of a turn route. A 409 (the lease is stale) or a 404 (the
-    // instance is gone) ends the attempt here: nothing more is sent for it.
+    // A request of a turn route. A 409 (`turn_lease_lost`, or another
+    // conflict) or a 404 (the instance is gone) ends the attempt here:
+    // nothing more is sent for it.
     const turnRequest = async <T>(
       route: string,
       body: Record<string, unknown>,
