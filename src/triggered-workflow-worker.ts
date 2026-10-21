@@ -8,6 +8,7 @@
 // commit's idempotency key.
 import type { LbbClient, Schemas } from "./client.js";
 import {
+  isFanInIdentity,
   workflow,
   WorkflowError,
   type WorkflowContext,
@@ -110,6 +111,19 @@ export interface TriggeredWorkflowDefinition<S, R = unknown> {
     message: WorkflowTriggerMessage,
     state: S,
   ): Promise<TriggeredWorkflowTurn<S, R> | void>;
+  /**
+   * Handle one message of the workflow's fan-in identity
+   * (`starter.<name>.<fan_in>`, `fan_in` of `PUT /v1/workflows/named`):
+   * the shards' turns send it their outputs (`generated`, `decided`) with
+   * deterministic ids. Read what the message names from where the outputs
+   * are kept (the graph, a blob), so the turns after a build find nothing
+   * new. A fan-in message without this handler fails the turn.
+   */
+  onFanIn?(
+    ctx: WorkflowContext,
+    message: unknown,
+    state: S,
+  ): Promise<TriggeredWorkflowTurn<S, R> | void>;
 }
 
 /** A JSON copy, so a handler that changes its state never changes the definition. */
@@ -152,6 +166,17 @@ export function triggeredWorkflow<S = Record<string, unknown>, R = unknown>(
     initialState,
     async onMessage(ctx, saved, message) {
       const state = triggeredWorkflowState(initialState, saved);
+      if (isFanInIdentity(ctx.workflowId)) {
+        if (!definition.onFanIn)
+          throw new WorkflowError(
+            `${ctx.workflowId} is a fan-in identity, and the workflow has no onFanIn`,
+          );
+        const turn = await definition.onFanIn(ctx, message, state);
+        return {
+          state: turn?.state !== undefined ? turn.state : state,
+          ...(turn?.result !== undefined ? { result: turn.result } : {}),
+        };
+      }
       const turn = await definition.onInstances(
         ctx,
         parseTriggerMessage(message),
@@ -378,10 +403,25 @@ export function writeOwned(
           edges_written: 0,
         };
       const target = graph ? client.withScope({ graph }) : client;
+      // The fence: a worker whose lease ended commits nothing new. It names
+      // a turn of the turn's graph, so a write to another graph carries
+      // none: that graph's engine holds no such turn. A worker whose client
+      // names no graph takes the write's graph (`message.graph`) for the
+      // turn's.
+      const fenced =
+        step.fence &&
+        (graph === undefined ||
+          step.graph === undefined ||
+          graph === step.graph);
       const response: Schemas["GraphCommitResponse"] = await target.request(
         "POST",
         "/v1/graph/commit",
-        { body, idempotencyKey: effectId, signal, retry: true },
+        {
+          body: fenced ? { ...body, workflow_fence: step.fence } : body,
+          idempotencyKey: effectId,
+          signal,
+          retry: true,
+        },
       );
       return {
         commit_seq: response.commit_seq,
@@ -393,5 +433,57 @@ export function writeOwned(
       };
     },
     stepOptions,
+  );
+}
+
+/** One instance a turn could not do, and why. */
+export interface FailedInstance {
+  /** The instance IRI, as the message named it. */
+  instance: string;
+  /** Why it failed, at most 1,000 characters. */
+  error?: string;
+}
+
+/**
+ * Ask the watch to send instances again later (`POST
+ * /v1/workflows/named/requeue`), inside the step `stepKey`: the instances
+ * this turn could not do go back into the queue on this shard, with origin
+ * `requeue`, after a backoff (1, 4, then 16 minutes). The server takes the
+ * attempt from this turn's message; past 3 the instances are exhausted and
+ * not sent again (the answer's `exhausted`). Record the failure in the
+ * turn's result and counters and complete the turn: the shard goes on.
+ * Without failed instances it calls nothing.
+ *
+ * ```ts
+ * const failed = [{ instance: iri, error: String(error) }];
+ * await requeueFailed(client, ctx, "requeue", failed, { graph: message.graph });
+ * return { state, result: { counters: { failed: failed.length } } };
+ * ```
+ */
+export async function requeueFailed(
+  client: LbbClient,
+  ctx: WorkflowContext,
+  stepKey: string,
+  failed: readonly FailedInstance[],
+  options: { graph?: string } = {},
+): Promise<Schemas["WorkflowRequeueResponse"] | null> {
+  if (!failed.length) return null;
+  const name = ctx.workflowName;
+  if (!name)
+    throw new WorkflowError(
+      `${ctx.workflowId} is no shard of a named workflow: only a watch sends instances again`,
+    );
+  const target = options.graph
+    ? client.withScope({ graph: options.graph })
+    : client;
+  return ctx.step(stepKey, () =>
+    target.workflows.named.requeue(name, {
+      workflow_id: ctx.workflowId,
+      turn: ctx.turn,
+      items: failed.map(({ instance, error }) => ({
+        instance,
+        ...(error !== undefined ? { error: error.slice(0, 1_000) } : {}),
+      })),
+    }),
   );
 }

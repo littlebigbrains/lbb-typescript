@@ -578,3 +578,125 @@ test("query timeout uses the short server lifetime minus the whole refresh round
   assert.deepEqual(timers, [30_000, 9_500]);
   assert.equal(seen.length, 2);
 });
+
+test("hosted grants: one credential per operation, file reads and owned writes on their bearers", async () => {
+  const granted = (operation: string): Credential => ({
+    ...credential(),
+    token: `lbb_wke_${operation}.signature`,
+    operations: [operation] as Credential["operations"],
+  });
+  const { client, seen } = setup((call) => {
+    if (call.url.pathname.endsWith("/execution-credential"))
+      return granted(String(call.body.operation ?? "sparql_read"));
+    if (call.url.pathname.endsWith("/files/record"))
+      return { sha256: "ab", uploaded_at: "2026-10-21T08:00:00.000000Z" };
+    if (call.url.pathname.endsWith("/files/pages"))
+      return { sha256: "ab", parser: "p", status: "failed", stored: false };
+    if (call.url.pathname.endsWith("/graph/commit"))
+      return { commit_seq: 7, replayed: false };
+    return {};
+  });
+  const reader = new WorkflowTurnReader(client, task());
+  const record = await reader.fileRecord("ab");
+  assert.equal(record.uploaded_at, "2026-10-21T08:00:00.000000Z");
+  await reader.putPages("ab", "p", {
+    status: "failed",
+    error: "damaged",
+    uploaded_at: record.uploaded_at,
+  });
+  const committed = await reader.commitOwned(
+    { entity_properties: [] },
+    { idempotencyKey: "effect-1" },
+  );
+  assert.equal(committed.commit_seq, 7);
+  // A second write reuses its live credential: one refresh per operation.
+  await reader.commitOwned(
+    { entity_properties: [] },
+    { idempotencyKey: "effect-2" },
+  );
+  const refreshes = seen
+    .filter((call) => call.url.pathname.endsWith("/execution-credential"))
+    .map((call) => call.body.operation);
+  assert.deepEqual(refreshes, ["file_read", "owned_write"]);
+  const recordCall = seen.find((call) =>
+    call.url.pathname.endsWith("/files/record"),
+  );
+  assert.equal(
+    recordCall?.headers.authorization,
+    "Bearer lbb_wke_file_read.signature",
+  );
+  assert.equal(recordCall?.url.searchParams.get("sha256"), "ab");
+  assert.equal(recordCall?.url.searchParams.get("expected_graph_epoch"), epoch);
+  const pages = seen.find((call) => call.url.pathname.endsWith("/files/pages"));
+  assert.equal(
+    pages?.headers.authorization,
+    "Bearer lbb_wke_owned_write.signature",
+  );
+  assert.equal(pages?.url.searchParams.get("parser"), "p");
+  const commits = seen.filter((call) =>
+    call.url.pathname.endsWith("/graph/commit"),
+  );
+  assert.deepEqual(
+    commits.map(
+      (call) =>
+        call.headers["idempotency-key"] ?? call.headers["Idempotency-Key"],
+    ),
+    ["effect-1", "effect-2"],
+  );
+  for (const call of commits)
+    assert.equal(
+      call.headers.authorization,
+      "Bearer lbb_wke_owned_write.signature",
+    );
+});
+
+test("hosted grants: a credential of another operation and a commit without a key send nothing", async () => {
+  const { client, seen } = setup((call) => {
+    if (call.url.pathname.endsWith("/execution-credential"))
+      return credential();
+    return {};
+  });
+  const reader = new WorkflowTurnReader(client, task());
+  await assert.rejects(reader.fileRecord("ab"), WorkflowExecutionError);
+  assert.equal(
+    seen.filter((call) => call.url.pathname.endsWith("/files/record")).length,
+    0,
+  );
+  await assert.rejects(
+    reader.commitOwned({ entity_properties: [] }, { idempotencyKey: "" }),
+    WorkflowExecutionError,
+  );
+  assert.equal(
+    seen.filter((call) => call.url.pathname.endsWith("/graph/commit")).length,
+    0,
+  );
+});
+
+test("hosted grants: a file streams on its file_read bearer", async () => {
+  const { client, seen } = setup((call) => {
+    if (call.url.pathname.endsWith("/execution-credential"))
+      return {
+        ...credential(),
+        token: "lbb_wke_file_read.signature",
+        operations: ["file_read"],
+      };
+    if (call.url.pathname.endsWith("/files/content"))
+      return new Response(new Uint8Array([37, 80, 68, 70, 45]), {
+        status: 200,
+      });
+    return {};
+  });
+  const reader = new WorkflowTurnReader(client, task());
+  const chunks: number[] = [];
+  for await (const chunk of await reader.fileContentStream("ab"))
+    chunks.push(...chunk);
+  assert.deepEqual(chunks, [37, 80, 68, 70, 45]);
+  const content = seen.find((call) =>
+    call.url.pathname.endsWith("/files/content"),
+  );
+  assert.equal(
+    content?.headers.authorization,
+    "Bearer lbb_wke_file_read.signature",
+  );
+  assert.equal(content?.url.searchParams.get("sha256"), "ab");
+});

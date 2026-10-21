@@ -3,8 +3,9 @@
 // `Frist`, `Status` and `Zuständig` propose its facts, a room in the same
 // text widens `betrifft_raum`, a list of who was present proposes the
 // relation `anwesend` the ontology has, and a text about the acceptance
-// (`Abnahme`) gets a quote that is not in the text. The expected keys come
-// from samples/expected.md.
+// (`Abnahme`) gets a quote that is not in the text. The mock decision model
+// finds every quote supports its change. The expected keys come from
+// samples/expected.md.
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
@@ -20,7 +21,7 @@ import {
   triggerMessage,
   type MockRules,
 } from "../_shared/testing.js";
-import { createWorkflow, keyPart, quoteInText } from "./workflow.js";
+import { chunkText, createWorkflow, displayName, keyPart, quoteInText } from "./workflow.js";
 import { sampleOntology } from "./samples.js";
 
 const SAMPLES = samplesDir(import.meta.url, "ontology-fit");
@@ -183,10 +184,18 @@ function rules(more: MockRules = {}): MockRules {
     reason: (request) => ({
       proposals: propose((JSON.parse(request.prompt) as { text: string }).text),
     }),
+    decide: (request) =>
+      Object.fromEntries(
+        Object.keys(request.questions).map((id) => [
+          id,
+          { choice: "supported", confidence: 0.9, probabilities: { supported: 0.9 } },
+        ]),
+      ),
     evolve: (ops) => ({ no_op: ops.every((op) => covered(op, v)) }),
     sparql: (query) =>
       TEXTS.filter((t) => query.includes(iriOf(t.name))).map((t) => ({
         s: iriOf(t.name),
+        class: "Baustellenbericht",
         label: t.name,
         text: t.text,
       })),
@@ -211,7 +220,23 @@ test("the samples give the changes of expected.md, one review item per key", asy
   );
   assert.equal(EXPECTED_KEYS.length, 5);
   assert.deepEqual([...lbb.reviews.keys()].sort(), [...EXPECTED_KEYS].sort());
-  assert.deepEqual(state, { texts: 5, proposals: 3 + 4 + 5 + 5 + 2, filed: 5 });
+  // The counters of LBB's fit: the quote of Abnahme is not in its text, anwesend is covered
+  // (texts 1 and 2 list who was present).
+  assert.deepEqual(state, {
+    instances: 5,
+    chunks: 5,
+    failed_chunks: 0,
+    proposals: 22,
+    kept: 19,
+    filed: 5,
+    updated: 14,
+    reopened: 0,
+    quote_not_found: 1,
+    invalid: 0,
+    already_covered: 2,
+    weak_support: 0,
+    skipped: 0,
+  });
   const mangel = lbb.reviews.get("fit:berichte/add_class/mangel")!;
   assert.equal(mangel.workflow, "berichte");
   assert.deepEqual(mangel.change, [{ op: "add_entity_type", name: "Mangel" }]);
@@ -230,7 +255,18 @@ test("a change names the classes it needs, and a widening keeps the relation's n
 
   assert.deepEqual(lbb.reviews.get("fit:berichte/add_relation/mangel/zustaendig/firma")!.change, [
     { op: "add_entity_type", name: "Mangel" },
-    { op: "add_relation", name: "zustaendig", domain: ["Mangel"], range: ["Firma"] },
+    {
+      op: "add_relation",
+      name: "zustaendig",
+      domain: ["Mangel"],
+      range: ["Firma"],
+      cardinality: null,
+      temporal_semantics: null,
+      reducer: null,
+      inverse_name: null,
+      transitive: false,
+      symmetric: false,
+    },
   ]);
   assert.deepEqual(lbb.reviews.get("fit:berichte/widen_relation/betrifft-raum/mangel/x")!.change, [
     { op: "add_entity_type", name: "Mangel" },
@@ -267,4 +303,19 @@ test("keys keep lowercase ASCII letters and digits, other runs as one dash", () 
   assert.equal(keyPart("betrifft_raum"), "betrifft-raum");
   assert.equal(keyPart("-"), "x");
   assert.equal(keyPart("zuständig"), "zust-ndig");
+});
+
+test("a long text is read in chunks as LBB reads it, and a class name in its words", () => {
+  const sentence = "Der Mangel in Raum 0.12 ist behoben. ";
+  const long = sentence.repeat(3_000);
+  const chunks = chunkText(long);
+  assert.equal(chunks.length, 3);
+  assert.ok(chunks.every((c) => [...c].length <= 40_000));
+  // Each chunk ends after a sentence and shares 1,000 characters with the next.
+  assert.ok(chunks[0]!.endsWith("behoben."));
+  assert.equal(chunks[1]!.slice(0, 1_000), chunks[0]!.slice(-1_000));
+  assert.deepEqual(chunkText("kurz"), ["kurz"]);
+  assert.equal(displayName("customerIdentityData"), "customer identity data");
+  assert.equal(displayName("depends_on"), "depends on");
+  assert.equal(displayName("baustellenbericht"), "baustellenbericht");
 });

@@ -1,7 +1,14 @@
 // The parts of review that need no I/O: what a proposal's statement is in the graph's records
-// ontology, the decision (write, a person, or refused), and the facts that write it. Adapted
-// from the LBB-run `review@v1` (database/crates/lbb-graph-query/src/review.rs).
-import { ENTITY_ID_KEY_SENTINEL, ENTITY_IRI_NAMESPACE, type Schemas } from "@littlebigbrain/client";
+// ontology, the decision (write, a person, or refused), and the facts that write it. The rules,
+// notes and item shapes are those of the LBB-run `review@v1`
+// (database/crates/lbb-graph-query/src/review.rs); its eval (sdk/templates/_evals) runs both on
+// the samples.
+import {
+  ENTITY_ID_KEY_SENTINEL,
+  ENTITY_IRI_NAMESPACE,
+  stableHashHex,
+  type Schemas,
+} from "@littlebigbrain/client";
 
 export const RDF_TYPE = "http://www.w3.org/1999/02/22-rdf-syntax-ns#type";
 export const RDFS_LABEL = "http://www.w3.org/2000/01/rdf-schema#label";
@@ -125,23 +132,74 @@ const ENTITY = /^https:\/\/littlebigbrain\.com\/e\/[0-9a-f]{32}$/;
 /** Whether an IRI names an instance of a records graph. */
 export const isEntity = (iri: string) => ENTITY.test(iri.trim());
 
-/** A value in its property's type, or null when it does not take the type. */
-export function coerce(raw: string, type: string): string | number | boolean | null {
+const NUMBER = /^[+-]?(\d+(\.\d*)?|\.\d+)([eE][+-]?\d+)?$/;
+const RFC3339 = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:\d{2})$/;
+
+/** A value in its property's type, or why it does not take the type (LBB's `coerce_value`). */
+export function coerceValue(
+  raw: string,
+  type: string,
+): { value: string | number | boolean } | { error: string } {
   const text = raw.trim();
-  if (!text) return null;
-  const number = Number(text);
+  if (!text) return { error: "the value is empty" };
+  const cleaned = text.replaceAll(",", ".").replace(/\s+/g, "");
+  const number = NUMBER.test(cleaned) ? Number(cleaned) : NaN;
   switch (type) {
     case "i64":
-      return Number.isInteger(number) ? number : null;
+      if (!Number.isFinite(number)) return { error: `\`${text}\` is not a number` };
+      return Number.isInteger(number)
+        ? { value: number }
+        : { error: `\`${text}\` is not a whole number` };
     case "f64":
-      return Number.isFinite(number) ? number : null;
-    case "bool":
-      return text === "true" ? true : text === "false" ? false : null;
-    case "date_time":
-      return Number.isNaN(Date.parse(text)) ? null : text;
+      return Number.isFinite(number) ? { value: number } : { error: `\`${text}\` is not a number` };
+    case "bool": {
+      const lower = text.toLowerCase();
+      if (["true", "yes", "ja"].includes(lower)) return { value: true };
+      if (["false", "no", "nein"].includes(lower)) return { value: false };
+      return { error: `\`${text}\` is not true or false` };
+    }
+    case "datetime":
+    case "date_time": {
+      const value = new TextEncoder().encode(text).length === 10 ? `${text}T00:00:00Z` : text;
+      return RFC3339.test(value) && !Number.isNaN(Date.parse(value))
+        ? { value }
+        : { error: `\`${text}\` is not a date` };
+    }
+    case "keyword":
     default:
-      return text;
+      return { value: text };
   }
+}
+
+/** A value in its property's type, or null when it does not take the type. */
+export function coerce(raw: string, type: string): string | number | boolean | null {
+  const coerced = coerceValue(raw, type);
+  return "value" in coerced ? coerced.value : null;
+}
+
+/**
+ * The confidence the review gates a proposal on (LBB's `gate_value`): its `fact_confidence`,
+ * unless a source of its evidence is a link the graph holds already (`documents.map` writes
+ * `"link": {"written": true}` beside the typing answer's probability `p`); then that `p` when it
+ * is higher. A value that is not a finite number reads as 0.
+ */
+export function gateValue(confidence: number, evidence: string | undefined): number {
+  let value = Number.isFinite(confidence) ? Math.min(1, Math.max(0, confidence)) : 0;
+  const text = evidence?.trim();
+  if (!text?.startsWith("{")) return value;
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(text);
+  } catch {
+    return value;
+  }
+  const sources = (parsed as { sources?: unknown }).sources;
+  for (const source of Array.isArray(sources) ? sources : []) {
+    const s = source as { link?: { written?: unknown }; p?: unknown };
+    if (s?.link?.written === true && typeof s.p === "number" && Number.isFinite(s.p))
+      value = Math.max(value, Math.min(1, Math.max(0, Math.fround(s.p))));
+  }
+  return value;
 }
 
 /** Everything `classify` reads about a statement's entities and values. */
@@ -152,11 +210,16 @@ export interface Seen {
   current?: string[];
 }
 
+/** Why an entity cannot be written: the graph has no instance of it and no proposal types it. */
+export const untyped = (e: Known) =>
+  `<${e.iri}> is not an instance of the graph, and no proposal of its rdf:type gives its class`;
+
 /**
- * The terms of a statement in a records graph, or why it cannot hold it:
- * `rdf:type` of a class, `rdfs:label`, a relation between two instances, a
- * property value. `proposalClass` is the class of the proposals: the review
- * writes no statement about a proposal.
+ * The terms of a statement in a records graph, or why it cannot hold it, in the order and words
+ * of LBB's review: `rdf:type` of a class, `rdfs:label`, a relation between two instances, a
+ * property value. `proposalClass` is the class of the proposals: the review writes no statement
+ * about a proposal. A relation's ends must fit its domain and range, superclasses included (LBB's
+ * review leaves that check to the commit).
  */
 export function classify(
   s: Statement,
@@ -169,26 +232,25 @@ export function classify(
     return refused(`The subject <${s.subject}> is not an instance IRI of this graph.`);
   const known = (iri: string): Known => seen.entities.get(iri) ?? { iri, exists: false };
   const subject = known(s.subject);
-  if (subject.class === proposalClass)
-    return refused("The review writes no statement about a proposal.");
-  const untyped = (e: Known) =>
-    `<${e.iri}> is not an instance of the graph, and no proposal of its rdf:type gives its class.`;
+  const aboutProposal = refused("The review writes no statement about a proposal.");
   const fits = (cls: string | undefined, allowed: string[]) =>
     !allowed.length || allowed.some((a) => ontology.ancestors.get(cls ?? "")?.has(a));
   if (s.predicate === RDF_TYPE) {
     const cls = ontology.classes.get(s.object.trim());
     if (!cls) return refused(`<${s.object}> is not a class of the graph's ontology.`);
+    if (subject.class === proposalClass) return aboutProposal;
     if (!subject.exists) return { kind: "type", class: cls, subject, holds: false };
     const holds = ontology.ancestors.get(subject.class ?? "")?.has(cls) ?? false;
     if (!holds)
       return refused(
-        `<${s.subject}> is an instance of ${subject.class} already; a records graph gives an instance one class.`,
+        `<${s.subject}> is an instance of ${subject.class ?? ""} already; a records graph gives an instance one class.`,
       );
     return { kind: "type", class: cls, subject, holds };
   }
   if (s.predicate === RDFS_LABEL) {
     if (!s.datatype || !s.object.trim())
       return refused("A label is a text; the object is an IRI or empty.");
+    if (subject.class === proposalClass) return aboutProposal;
     if (!subject.class) return refused(untyped(subject));
     return { kind: "label", label: s.object.trim(), subject };
   }
@@ -198,6 +260,7 @@ export function classify(
       return refused(
         `The relation ${relation.name} links two instances; the object is not an instance IRI.`,
       );
+    if (subject.class === proposalClass) return aboutProposal;
     const object = known(s.object.trim());
     for (const end of [subject, object]) if (!end.class) return refused(untyped(end));
     if (!fits(subject.class, relation.domain))
@@ -212,21 +275,21 @@ export function classify(
   }
   const property = ontology.properties.get(s.predicate);
   if (property) {
+    if (subject.class === proposalClass) return aboutProposal;
+    const coerced = coerceValue(s.object, property.type);
+    if ("error" in coerced) return refused(coerced.error);
     if (!subject.class) return refused(untyped(subject));
-    const value = coerce(s.object, property.type);
-    if (value === null)
-      return refused(`"${s.object}" is not a value of ${property.name} (${property.type}).`);
     return {
       kind: "property",
       field: property.name,
       type: property.type,
       subject,
-      value,
-      current: seen.current ?? [],
+      value: coerced.value,
+      current: subject.exists ? (seen.current ?? []) : [],
     };
   }
   return refused(
-    `<${s.predicate}> is not a relation or a property of the graph's records ontology (nor rdf:type or rdfs:label). The template writes with POST /v1/graph/commit, which takes those only.`,
+    `<${s.predicate}> is not a relation or a property of the graph's ontology (nor rdf:type or rdfs:label).`,
   );
 }
 
@@ -305,7 +368,7 @@ export function decide(
   if (t.kind === "label" && t.subject.exists && t.subject.label && t.subject.label !== t.label)
     return {
       status: "in_review",
-      why: `The subject is named ${t.subject.label} already: writing ${t.label} would rename it (a records entity has one name).`,
+      why: `The subject is named ${t.subject.label} already: writing ${t.label} would rename it.`,
     };
   if (!Number.isFinite(confidence) || confidence < rules.gate)
     return {
@@ -416,6 +479,8 @@ export interface Shown {
   kind: string;
   /** The fact in words, seen from its instance: `is a Room`, `HAS_EQUIPMENT → T 1`. */
   text: string;
+  /** A link to an instance the graph does not have: its name. The link waits for that instance. */
+  waitsFor?: string;
 }
 
 /** What an item shows of a fact about the instance `group`. */
@@ -425,19 +490,35 @@ export function shownOf(
   group: string,
 ): Shown {
   const name = (e: Known) => e.label?.trim() || e.iri.slice(e.iri.lastIndexOf("/") + 1);
+  const shown = (kind: string, text: string, waitsFor?: string): Shown => ({
+    kind,
+    text: clip(text, 200),
+    ...(waitsFor !== undefined ? { waitsFor } : {}),
+  });
   switch (t.kind) {
     case "type":
-      return { kind: "type", text: `is a ${t.class}` };
+      return shown("type", `is a ${t.class}`);
     case "label":
-      return { kind: "label", text: `label · ${t.label}` };
+      return shown("label", `label · ${t.label}`);
     case "property":
-      return { kind: "value", text: `${t.field} · ${t.value}` };
+      return shown("value", `${t.field} · ${t.value}`);
     case "relation":
-      if (isTrace(s.predicate)) return { kind: "source", text: name(t.subject) };
-      return t.object.iri === group && t.subject.iri !== group
-        ? { kind: "link", text: `${t.relation} ← ${name(t.subject)}` }
-        : { kind: "link", text: `${t.relation} → ${name(t.object)}` };
+      if (isTrace(s.predicate)) return shown("source", name(t.subject));
+      if (t.object.iri === group && t.subject.iri !== group)
+        return shown("link", `${t.relation} ← ${name(t.subject)}`);
+      return shown(
+        "link",
+        `${t.relation} → ${name(t.object)}`,
+        !t.object.exists && t.object.iri !== t.subject.iri ? name(t.object) : undefined,
+      );
   }
+}
+
+/** The key of an instance's review item: LBB's, from the instance and the proposals it holds. */
+export function itemKey(workflow: string, instance: string, proposals: string[]): string {
+  const group = stableHashHex(["review_group_v1", instance]).slice(0, 24);
+  const held = stableHashHex(["review_item_v1", ...[...proposals].sort()]).slice(0, 12);
+  return `starter:${workflow}:instance:${group}:${held}`;
 }
 
 /** The order of the kinds in an item: the type, the label, values, links, the trace. */

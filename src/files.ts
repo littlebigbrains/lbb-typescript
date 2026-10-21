@@ -360,6 +360,33 @@ export class FilesNamespace {
   }
 
   /**
+   * Store what a parser outside the server made of one upload of a file
+   * (`PUT /v1/files/pages`): `status` `parsed` with every page, in the
+   * shape {@link pages} serves, or `failed` or `unsupported` with its
+   * `error`, and `uploaded_at`, the upload the parser read (the record's
+   * `uploaded_at`, {@link get}). The pages are stored once under `parser`
+   * (a parser id such as `poppler-26.03.0`): the same pages again store
+   * nothing (`stored: false`), other pages under the same id answer `409
+   * file_pages_conflict`. A file deleted and uploaded again since answers
+   * `409 file_upload_changed`, and a deleted file `404 file_not_found`:
+   * nothing is stored. LBB's hosted `documents.parse` stores its pages
+   * this way. Safe to retry.
+   */
+  async putPages(
+    sha256: string,
+    parser: string,
+    upload: Schemas["FilePagesPutRequest"],
+    opts: CallOptions = {},
+  ): Promise<Schemas["FilePagesPutResponse"]> {
+    return this.client.request("PUT", "/v1/files/pages", {
+      ...opts,
+      query: { sha256: sha256Of(sha256), parser },
+      body: upload,
+      retry: true,
+    });
+  }
+
+  /**
    * Remove a file from the list and retract its `Document` entity; the
    * client repeats the SHA-256 as `confirm`. An installed `documents.link`
    * retracts the entries and mentions it wrote for the document. The bytes

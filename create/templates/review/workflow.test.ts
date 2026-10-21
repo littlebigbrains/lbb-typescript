@@ -188,7 +188,16 @@ test("the samples get the statuses and the facts of the answer key", async () =>
   assert.deepEqual(edges, want);
   assert.equal(lbb.graph.entities.get(iris.get("room-012")!)!.properties.area_m2, 62.4);
   assert.equal(lbb.reviews.size, EXPECTED.review_items);
-  assert.deepEqual(state, { proposals: 14, written: 4, held: 1, in_review: 5, refused: 4 });
+  // LBB's counters: written counts a statement the graph held already too.
+  assert.deepEqual(state, {
+    proposals: 14,
+    written: 5,
+    held_already: 1,
+    in_review: 5,
+    refused: 4,
+    new_instance: 3,
+    items: 3,
+  });
   assert.equal(turns.length, 1);
   assert.ok(turns[0]!.keys.length <= 64);
   // Each step reports its phase as the LBB-run review words it.
@@ -252,12 +261,17 @@ test("one item per instance: a new instance's facts in order, its type required"
     ["p7", "p8", "p9"].map((id) => proposals.get(id)),
   );
   assert.equal(samples[0]!.line, "M 7 Medienwagen, 1 Stück");
-  // The type's write and its status are required; the link is not.
+  // The type's status and its write are required; the link is not. The status rows come
+  // first, one per fact, as in LBB's item; the statements after them.
   const required = (m7.facts as { required?: { row: number }[] }).required!.map((r) => r.row);
-  assert.deepEqual(required, [samples[0]!.rows, samples[0]!.row].flat());
+  assert.deepEqual(required, [samples[0]!.row, samples[0]!.rows].flat());
+  assert.deepEqual(
+    samples.map((sample) => sample.row),
+    [0, 1, 2],
+  );
   assert.equal(samples[2]!.required, undefined);
   assert.deepEqual(samples[2]!.triplets, [0]);
-  assert.match(m7.key!, /^starter:review:instance:[0-9a-f]{32}:[0-9a-f]{12}$/);
+  assert.match(m7.key!, /^starter:review:instance:[0-9a-f]{24}:[0-9a-f]{12}$/);
   assert.deepEqual((m7.mapping as { review: { new: boolean } }).review.new, true);
 });
 
@@ -294,11 +308,9 @@ test("accepting a review item writes its statement and the proposal's accepted",
   const rename = [...lbb.reviews.values()].find((r) =>
     r.title.startsWith("Equipment S 2.1 Spiegel"),
   )!;
-  assert.deepEqual(rename.facts!.entity_properties![0]!.name, "S 2.1 Spiegel, Kristallglas");
-  assert.equal(
-    rename.facts!.entity_properties![0]!.key,
-    `\u0000lbb-eid:${iris.get("s21")!.slice(-32)}`,
-  );
+  const renamed = rename.facts!.entity_properties!.find((row) => row.type === "Equipment")!;
+  assert.deepEqual(renamed.name, "S 2.1 Spiegel, Kristallglas");
+  assert.equal(renamed.key, `\u0000lbb-eid:${iris.get("s21")!.slice(-32)}`);
 });
 
 test("by default the gate decides a new instance: written at the gate, an item below it", async () => {
@@ -389,7 +401,15 @@ test("a message of more proposals than a turn decides continues in a new turn", 
   assert.equal(turns.length, 2);
   assert.ok(turns.every((t) => t.keys.length <= 64));
   // The first value of each room is written; each later one would replace it, so it goes to a person.
-  assert.deepEqual(state, { proposals: 40, written: 2, held: 0, in_review: 38, refused: 0 });
+  assert.deepEqual(state, {
+    proposals: 40,
+    written: 2,
+    held_already: 0,
+    in_review: 38,
+    refused: 0,
+    new_instance: 0,
+    items: 4,
+  });
 });
 
 test("the decision reads the statement's terms as the LBB review does", () => {

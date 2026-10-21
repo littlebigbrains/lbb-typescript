@@ -533,3 +533,61 @@ test("files.head answers the length, type and digest", async () => {
     `http://h/v1/files/content?graph=docs&sha256=${SHA}`,
   );
 });
+
+test("files.putPages sends the pages under the file and the parser id", async () => {
+  const { fetch, seen } = filesFetch([
+    {
+      body: {
+        sha256: SHA,
+        parser: "poppler-26.03.0",
+        status: "parsed",
+        page_count: 1,
+        stored: true,
+      },
+    },
+  ]);
+  const pages = [
+    {
+      page: 0,
+      width: 612,
+      height: 792,
+      lines: [
+        {
+          id: "p1-l1",
+          text: "S 1.1",
+          box: [0.1, 0.1, 0.2, 0.12] as [number, number, number, number],
+          words: [
+            {
+              text: "S",
+              box: [0.1, 0.1, 0.12, 0.12] as [number, number, number, number],
+            },
+            {
+              text: "1.1",
+              box: [0.13, 0.1, 0.2, 0.12] as [number, number, number, number],
+            },
+          ],
+        },
+      ],
+    },
+  ];
+  const answer = await client(fetch).files.putPages(
+    SHA.toUpperCase(),
+    "poppler-26.03.0",
+    {
+      status: "parsed",
+      pages,
+      uploaded_at: "2026-10-21T08:00:00.000000Z",
+    },
+  );
+  assert.equal(answer.stored, true);
+  assert.equal(seen[0].method, "PUT");
+  assert.equal(
+    seen[0].url,
+    `http://h/v1/files/pages?graph=docs&sha256=${SHA}&parser=poppler-26.03.0`,
+  );
+  assert.deepEqual(JSON.parse(String(seen[0].body)), {
+    status: "parsed",
+    pages,
+    uploaded_at: "2026-10-21T08:00:00.000000Z",
+  });
+});

@@ -2,7 +2,10 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { LbbClient, type FetchLike, type Schemas } from "./client.js";
 import { WorkflowError, WorkflowWorker } from "./workflows.js";
+import { LbbError } from "./transport.js";
+import { WorkflowWait } from "./workflows.js";
 import {
+  requeueFailed,
   ENTITY_ID_KEY_SENTINEL,
   ENTITY_IRI_NAMESPACE,
   entityIdFromIri,
@@ -538,7 +541,8 @@ function task(
 }
 
 /** A worker's server: hands out `tasks`, answers commits, keeps each call. */
-function worker(tasks: Task[]) {
+/** A worker on a mock data plane; `graph: null` builds a client with no graph. */
+function worker(tasks: Task[], graph: string | null = "main") {
   const calls: Array<{
     path: string;
     query: string;
@@ -547,7 +551,7 @@ function worker(tasks: Task[]) {
   }> = [];
   const client = new LbbClient({
     baseUrl: "http://h",
-    graph: "main",
+    ...(graph === null ? {} : { graph }),
     maxRetries: 0,
     retryDelayMs: 0,
     fetch: async (input, init) => {
@@ -739,6 +743,8 @@ test("writeOwned commits in a step with the step's effect id as idempotency key"
       subjects: [{ type: "Note", name: "n1" }],
       properties: ["word_count"],
     },
+    // No fence: the turn lives in the worker's graph (`main`), and the
+    // engine of `crm` holds no such turn.
   });
   const saved = {
     commit_seq: 43,
@@ -792,6 +798,71 @@ test("a replayed turn returns the saved write and never commits twice", async ()
   assert.deepEqual(results, [saved]);
   assert.equal(calls.filter((c) => c.path === "/v1/graph/commit").length, 0);
   assert.equal(calls.filter((c) => c.path.endsWith("/complete")).length, 1);
+});
+
+test("writeOwned fences a write to the worker's own graph with the step's turn", async () => {
+  const { client, calls } = worker([task(MESSAGE)]);
+  const notes = triggeredWorkflow({
+    name: "word-count",
+    version: "v1",
+    async onInstances(ctx) {
+      for (const [key, graph] of [
+        ["own", undefined],
+        ["named", "main"],
+      ] as const)
+        await writeOwned(
+          client,
+          ctx,
+          key,
+          {
+            subjects: [{ type: "Note", name: "n1" }],
+            properties: ["word_count"],
+          },
+          graph ? { graph } : {},
+        );
+    },
+  });
+  await new WorkflowWorker(client, [notes], { worker: "w" }).runOnce();
+  const commits = calls.filter((c) => c.path === "/v1/graph/commit");
+  assert.equal(commits.length, 2);
+  for (const commit of commits)
+    // The fence: the server refuses a new commit once the lease is gone.
+    assert.deepEqual(commit.body.workflow_fence, {
+      workflow_id: "starter.notes",
+      turn: 3,
+      token: "token",
+    });
+});
+
+test("a worker whose client names no graph fences the write to the message's graph", async () => {
+  // The turn's graph is then the one the write names (`message.graph`):
+  // the documented pattern stays fenced.
+  const { client, calls } = worker([task(MESSAGE)], null);
+  const notes = triggeredWorkflow({
+    name: "word-count",
+    version: "v1",
+    async onInstances(ctx, message) {
+      await writeOwned(
+        client,
+        ctx,
+        "write-counts",
+        {
+          subjects: [{ type: "Note", name: "n1" }],
+          properties: ["word_count"],
+        },
+        { graph: message.graph },
+      );
+    },
+  });
+  await new WorkflowWorker(client, [notes], { worker: "w" }).runOnce();
+  const commits = calls.filter((c) => c.path === "/v1/graph/commit");
+  assert.equal(commits.length, 1);
+  assert.equal(commits[0]?.query, "?graph=crm");
+  assert.deepEqual(commits[0]?.body.workflow_fence, {
+    workflow_id: "starter.notes",
+    turn: 3,
+    token: "token",
+  });
 });
 
 test("writeOwned with nothing to write saves the step without a commit", async () => {
@@ -852,4 +923,124 @@ test("a writeOwned write function gets the step's context and reports progress b
   const commit = calls.find((c) => c.path === "/v1/graph/commit");
   assert.ok(commit, "the write commits");
   assert.ok(calls.indexOf(progress[0]!) < calls.indexOf(commit!));
+});
+
+test("a spent budget fails the turn with retry_at_ms and counts no attempt", async () => {
+  const { client, calls } = worker([task(MESSAGE)]);
+  const retryAt = Date.now() + 30 * 86_400_000;
+  const notes = triggeredWorkflow({
+    name: "word-count",
+    version: "v1",
+    async onInstances(ctx) {
+      await ctx.step("count", async () => {
+        throw new LbbError(429, "{}", {
+          code: "workflow_budget_exceeded",
+          message: "the workflow `notes` spent its budget",
+          retry_at_ms: retryAt,
+        });
+      });
+    },
+  });
+  await new WorkflowWorker(client, [notes], { worker: "w" }).runOnce();
+  const failed = calls.find((c) => c.path === "/v1/workflows/turns/fail");
+  assert.equal(failed?.body.retry_at_ms, retryAt);
+  assert.equal(failed?.body.non_retryable, false);
+});
+
+test("a thrown WorkflowWait waits until its time; a WorkflowError stays final", async () => {
+  const { client, calls } = worker([task(MESSAGE), task(MESSAGE)]);
+  let n = 0;
+  const notes = triggeredWorkflow({
+    name: "word-count",
+    version: "v1",
+    async onInstances() {
+      n += 1;
+      if (n === 1)
+        throw new WorkflowWait(Date.now() + 60_000, "the parse has not run");
+      throw new WorkflowError("bad message");
+    },
+  });
+  const worker2 = new WorkflowWorker(client, [notes], { worker: "w" });
+  await worker2.runOnce();
+  await worker2.runOnce();
+  const fails = calls.filter((c) => c.path === "/v1/workflows/turns/fail");
+  assert.equal(fails.length, 2);
+  assert.ok(typeof fails[0]?.body.retry_at_ms === "number");
+  assert.equal(fails[0]?.body.non_retryable, false);
+  assert.equal(fails[1]?.body.retry_at_ms, undefined);
+  assert.equal(fails[1]?.body.non_retryable, true);
+});
+
+test("a wait of now still waits a second, so a turn that keeps waiting cannot spin", async () => {
+  const { client, calls } = worker([task(MESSAGE)]);
+  const notes = triggeredWorkflow({
+    name: "word-count",
+    version: "v1",
+    async onInstances() {
+      throw new WorkflowWait(Date.now() - 5_000, "a clock behind the server's");
+    },
+  });
+  const before = Date.now();
+  await new WorkflowWorker(client, [notes], { worker: "w" }).runOnce();
+  const fail = calls.find((c) => c.path === "/v1/workflows/turns/fail");
+  assert.ok(
+    typeof fail?.body.retry_at_ms === "number" &&
+      fail.body.retry_at_ms >= before + 1_000,
+    `${fail?.body.retry_at_ms} waits at least a second`,
+  );
+});
+
+test("requeueFailed asks the watch for the failed instances inside a step", async () => {
+  const { client, calls } = worker([task(MESSAGE)]);
+  const notes = triggeredWorkflow({
+    name: "word-count",
+    version: "v1",
+    async onInstances(ctx, message) {
+      assert.equal(ctx.workflowName, "notes");
+      await requeueFailed(
+        client,
+        ctx,
+        "requeue",
+        [{ instance: message.instances[0]!, error: "refused" }],
+        { graph: message.graph },
+      );
+      // No failed instance: no call.
+      assert.equal(await requeueFailed(client, ctx, "requeue-none", []), null);
+    },
+  });
+  await new WorkflowWorker(client, [notes], { worker: "w" }).runOnce();
+  const requeue = calls.find((c) => c.path === "/v1/workflows/named/requeue");
+  assert.equal(requeue?.query, "?graph=crm&name=notes");
+  assert.deepEqual(requeue?.body, {
+    workflow_id: "starter.notes",
+    turn: 3,
+    items: [{ instance: MESSAGE.instances[0], error: "refused" }],
+  });
+  const checkpoint = calls.find((c) => c.path.endsWith("/turns/checkpoint"));
+  assert.equal(checkpoint?.body.key, "requeue");
+});
+
+test("a fan-in identity's message goes to onFanIn, not to the trigger parser", async () => {
+  const fanIn = task({ type: "decided", pairs: "rooms/ab" });
+  fanIn.turn.workflow_id = "starter.notes.things";
+  const { client, calls } = worker([fanIn]);
+  const seen: unknown[] = [];
+  const notes = triggeredWorkflow({
+    name: "word-count",
+    version: "v1",
+    async onInstances() {
+      throw new Error("not a trigger message");
+    },
+    async onFanIn(ctx, message, state) {
+      assert.equal(ctx.workflowName, "notes");
+      seen.push(message);
+      return { state: { ...(state as object), built: 1 } };
+    },
+  });
+  await new WorkflowWorker(client, [notes], { worker: "w" }).runOnce();
+  assert.deepEqual(seen, [{ type: "decided", pairs: "rooms/ab" }]);
+  const completed = calls.find(
+    (c) => c.path === "/v1/workflows/turns/complete",
+  );
+  assert.deepEqual(completed?.body.state, { seen: 0, built: 1 });
 });

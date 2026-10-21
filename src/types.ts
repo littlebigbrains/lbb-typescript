@@ -424,6 +424,12 @@ export interface LbbErrorPayload {
   doc_url?: string | null;
   retryable?: boolean;
   retry_after_seconds?: number;
+  /**
+   * When a spent monthly budget is whole again (`429
+   * workflow_budget_exceeded`): RFC 3339, and in milliseconds.
+   */
+  retry_at?: string;
+  retry_at_ms?: number;
   /** Per-item reasons for a refusal, for example `conflicts` of `starter_conflict`. */
   details?: Record<string, unknown>;
 }

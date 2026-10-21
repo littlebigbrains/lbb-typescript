@@ -12,8 +12,11 @@
 // `docs/reference/workflow-activities.md`.
 import type { LbbClient } from "./client.js";
 import type { FilePages } from "./files.js";
+import type { OntologySuggestionListOptions } from "./namespaces.js";
 import {
+  requeueFailed,
   writeOwned,
+  type FailedInstance,
   type OwnedWrite,
   type OwnedWriteOptions,
   type OwnedWriteResult,
@@ -168,6 +171,18 @@ export interface LbbActivities {
     options?: OwnedWriteOptions,
   ): Promise<OwnedWriteResult>;
   /**
+   * Send the instances a turn could not do back to the watch, inside the
+   * step `stepKey`: `requeueFailed(client, ctx, …)` bound to this client.
+   * Past 3 attempts the instances are exhausted. Without failed instances
+   * it calls nothing.
+   */
+  requeue(
+    ctx: WorkflowContext,
+    stepKey: string,
+    failed: readonly FailedInstance[],
+    options?: { graph?: string },
+  ): Promise<Schemas["WorkflowRequeueResponse"] | null>;
+  /**
    * File a review item (`POST /v1/ontology/suggestions`): facts or ontology
    * changes for a person to accept. The same `key` again updates the item,
    * so a failed call is retried.
@@ -176,6 +191,23 @@ export interface LbbActivities {
     request: ReviewRequest,
     options?: CallOptions,
   ): Promise<Schemas["OntologyChangeSuggestion"]>;
+  /**
+   * The review items, newest update first, with counts per status
+   * (`GET /v1/ontology/suggestions`): `client.ontology.suggestions.list`.
+   * Filter by `originId` (`starter:<workflow>`, `fit:<source>`), `status`,
+   * `key` or `anchor`.
+   */
+  listReviews(
+    options?: OntologySuggestionListOptions,
+  ): Promise<Schemas["OntologyChangeSuggestionList"]>;
+  /**
+   * The review item filed under `key`, with its evidence, or null when none
+   * is: a merge of new evidence into an item reads it first.
+   */
+  reviewItem(
+    key: string,
+    options?: CallOptions,
+  ): Promise<Schemas["OntologyChangeSuggestion"] | null>;
   /**
    * Change the ontology (`POST /v1/ontology/evolve`). With `dryRun: true`
    * it writes nothing and answers what the change would do: `no_op` when
@@ -361,6 +393,9 @@ export function lbbActivities(client: LbbClient): LbbActivities {
     writeOwned(ctx, stepKey, write, options) {
       return writeOwned(client, ctx, stepKey, write, options);
     },
+    requeue(ctx, stepKey, failed, options) {
+      return requeueFailed(client, ctx, stepKey, failed, options);
+    },
     review(request, options = {}) {
       const { workflow, origin, ...suggestion } = request;
       return client.ontology.suggestions.create(
@@ -373,6 +408,20 @@ export function lbbActivities(client: LbbClient): LbbActivities {
         },
         options,
       );
+    },
+    listReviews(options = {}) {
+      return client.ontology.suggestions.list(options);
+    },
+    async reviewItem(key, options = {}) {
+      const list = await client.ontology.suggestions.list({
+        ...options,
+        key,
+        limit: 1,
+      });
+      const found = list.suggestions.find((item) => item.key === key);
+      return found
+        ? client.ontology.suggestions.get(found.suggestion_id, options)
+        : null;
     },
     evolve(ops, options = {}) {
       return client.ontology.evolve({ ops }, options);

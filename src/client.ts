@@ -291,7 +291,8 @@ export class LbbClient {
   /** The integrations API, `https://api.littlebigbrain.com` by default. */
   readonly integrationsUrl: string;
   private readonly apiKey?: string;
-  private readonly graphName?: string;
+  /** The graph this client is scoped to, when it names one. */
+  readonly graphName?: string;
   private readonly expectedGraphEpoch?: string;
   private readonly environment?: string;
   private readonly fetchImpl: FetchLike;

@@ -1950,7 +1950,11 @@ export class QueryNamespace {
    * first. Use it in your own agent before you write a query: put the IRI
    * in the query instead of matching the name with `CONTAINS`.
    * `index_ready: false` means the name index is still building; ask again
-   * in a few seconds. No model call.
+   * in a few seconds. `commit_seq` is the newest commit the index holds.
+   * Right after a write, send its `commit_seq` as `min_commit_seq`: the
+   * server waits a few seconds for the index to hold it, then answers the
+   * retryable `429 read_your_writes_pending`, which this call retries. No
+   * model call.
    */
   names(
     body: Schemas["QueryNamesRequest"],

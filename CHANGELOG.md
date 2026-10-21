@@ -4,6 +4,23 @@ All notable changes to the `@littlebigbrain/client` package are documented here.
 
 ## Unreleased
 
+- `files.putPages(sha256, parser, upload)` stores what a parser outside the
+  server made of one upload of a file (`PUT /v1/files/pages`, with the
+  upload's `uploaded_at`). `WorkflowTurnReader` gains the hosted workers'
+  grants (`fileRecord`, `fileContent`, `fileContentStream`, `filePages`,
+  `putPages`, `commitOwned`); a server issues them to LBB's work token
+  only, with `LBB_WORKFLOW_EXECUTION_GRANTS`.
+
+- `client.query.names({ text, min_commit_seq })` waits for the name index to
+  hold a write's commit; `commit_seq` in the answer is the newest commit the
+  index holds.
+- `WorkflowWorker`: a `409` or a `404` on a turn route (a stale lease, or an
+  instance that is gone) and a `409 workflow_fence_lost` of a fenced write stop
+  the turn. The worker sends no `turns/fail` for it, and `run()` goes on. Before,
+  the refusal of that `fail` was thrown out of `run()`. The scenarios of
+  `sdk/conformance/workflow-worker` pin these rules for the TypeScript and the
+  Python worker.
+
 - Release 2 adds opt-in `WorkflowWorker({ executionReads: true })`, task-bound
   `WorkflowTurnReader`, and optional `WorkflowContext.sparql` for bounded
   SELECT/ASK. Custom contexts remain compatible without the method; feature-check
@@ -26,6 +43,40 @@ All notable changes to the `@littlebigbrain/client` package are documented here.
   revoke scoped read tokens. `sparqlDataset` queries explicitly authorized primary
   and reference graphs with exact decimal-string epochs. These require separately
   enabled server capabilities; they add no delegated writes or automatic capacity.
+
+- Phase 3 of the workflow engine (the server of this release):
+  - `writeOwned` sends `workflow_fence` (the step's turn and token,
+    `WorkflowStepContext.fence`): the server refuses a new commit of a
+    worker whose lease ended (`409 workflow_fence_lost`), and a repeat of
+    the effect id is a replay. It fences only a write to the turn's graph
+    (`WorkflowStepContext.graph`, the worker client's graph; with a client
+    that names none, the graph the write names).
+  - A turn that throws `WorkflowWait(retryAtMs)`, or a step that meets
+    `429 workflow_budget_exceeded` (`LbbError.retryAtMs`), fails with
+    `retry_at_ms`: the turn waits and counts no attempt.
+    `WorkflowHandle.wake()` ends such a wait (control action `wake`).
+  - `workflows.start(definition, id, { onExhausted })`: `skip` moves a
+    turn that failed for good to the history and goes on.
+  - `client.workflows.named.requeue(name, { workflow_id, turn, items })`
+    and `requeueFailed(client, ctx, stepKey, failed, { graph })` send the
+    instances a turn could not do again later, at most 3 times.
+  - `client.workflows.blobs.put(data, { workflowId })`, `get(key)`,
+    `getText`, `putJson`, `getJson`: blobs of at most 8 MiB, keyed by their
+    SHA-256 under the writing identity's workflow.
+  - `triggeredWorkflow({ onFanIn })` handles the messages of a workflow's
+    fan-in identity (`fan_in` of `named.put`); `fanInIdentity(name, id)`,
+    `isFanInIdentity(id)`, `workflowOfIdentity(id)` and
+    `WorkflowContext.workflowName` name them.
+  - `named.put` takes `budget_usd_per_month`, `on_exhausted` and `fan_in`.
+  - `lbbActivities(client).requeue(ctx, stepKey, failed, { graph })`:
+    `requeueFailed` bound to the client, for the templates.
+  - `lbbActivities(client).listReviews(options)` and `reviewItem(key)`:
+    the review items of a workflow, and the one filed under a key with its
+    evidence, so a workflow merges new evidence into its items.
+- `stableHashHex(parts)`: the data plane's stable hash
+  (`lbb_core::stable_hash_hex`, BLAKE3 over the parts, each followed by a
+  zero byte, cut to 16 bytes). LBB's own workflows key their review items
+  with it; a worker that files the same items uses it too.
 
 ## 0.28.0 (2026-10-16)
 

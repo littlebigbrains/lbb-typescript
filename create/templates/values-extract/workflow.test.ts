@@ -7,18 +7,25 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { join } from "node:path";
-import { ENTITY_IRI_NAMESPACE, type DecideAnswer } from "@littlebigbrain/client";
+import {
+  ENTITY_IRI_NAMESPACE,
+  entityIdFromIri,
+  stableHashHex,
+  type DecideAnswer,
+} from "@littlebigbrain/client";
 import {
   MockActivities,
   mockId,
   phases,
   readJson,
   runMessage,
+  runTurn,
   samplesDir,
   triggerMessage,
   type MockRules,
 } from "../_shared/testing.js";
 import {
+  check,
   createWorkflow,
   defaults,
   ontology,
@@ -96,7 +103,13 @@ function support(text: string, instructions: string, options: string[]): DecideA
   };
 }
 
-function rules(records: { name: string; text: string }[], more: MockRules = {}): MockRules {
+interface Row {
+  name: string;
+  text?: string;
+  box?: Record<string, number>;
+}
+
+function rules(records: Row[], more: MockRules = {}): MockRules {
   return {
     reason: (request) => ({
       values: readValues((JSON.parse(request.prompt) as { text: string }).text),
@@ -116,7 +129,12 @@ function rules(records: { name: string; text: string }[], more: MockRules = {}):
       assert.ok(query.startsWith("# values-extract: texts"));
       return records
         .filter((r) => query.includes(iriOf(r.name)))
-        .map((r) => ({ s: iriOf(r.name), label: r.name, text: r.text }));
+        .map((r) => ({
+          s: iriOf(r.name),
+          label: r.name,
+          ...(r.text !== undefined ? { text: r.text } : {}),
+          ...Object.fromEntries(Object.entries(r.box ?? {}).map(([k, v]) => [k, String(v)])),
+        }));
     },
     ...more,
   };
@@ -161,7 +179,20 @@ test("the samples give the values of the answer key and none it leaves out", asy
       record.name,
     );
   }
-  assert.deepEqual(state, { instances: 6, written: 20, review: 0, dropped: 2 });
+  assert.deepEqual(state, {
+    instances: 6,
+    values_proposed: 22,
+    written: 20,
+    review: 0,
+    weak_support: 2,
+    quote_not_found: 0,
+    invalid_value: 0,
+    unknown_property: 0,
+    duplicate: 0,
+    failed: 0,
+    commits: 1,
+    removed: 0,
+  });
   assert.equal(lbb.reviews.size, 0);
   assert.equal(turns.length, 1);
 });
@@ -206,16 +237,20 @@ test("each step reports its phase as the LBB-run values.extract words it", async
   );
 });
 
-test("a value below the gate goes to review, and the checks drop wrong types and quotes", async () => {
+test("a value below the gate goes to review, and the checks run in LBB's order", async () => {
   const record = {
     name: "S 9.1",
     text: "S 9.1 Becken aus Kunststoff. Breite etwa 70 cm, Tiefe 40 cm.",
   };
+  // The checks of values.extract: the property, then the first value of
+  // it, then the type, then the quote. A second material is a duplicate
+  // even when the first one fails a later check.
   const proposals = [
     { property: "width_cm", value: "70", unit: "cm", quote: "Breite etwa 70 cm" },
     { property: "depth_cm", value: "vierzig", unit: "cm", quote: "Tiefe 40 cm" },
-    { property: "material", value: "Holz", unit: "", quote: "aus Holz gefertigt" },
     { property: "material", value: "Kunststoff", unit: "", quote: "Becken aus Kunststoff" },
+    { property: "material", value: "Holz", unit: "", quote: "aus Holz gefertigt" },
+    { property: "height_cm", value: "80", unit: "", quote: "Becken aus Kunststoff" },
   ];
   const lbb = new MockActivities(rules([record], { reason: () => ({ values: proposals }) }));
   const { state, turns } = await runMessage(
@@ -228,9 +263,28 @@ test("a value below the gate goes to review, and the checks drop wrong types and
   );
 
   assert.deepEqual(written(lbb, record.name), { material: "Kunststoff" });
-  assert.deepEqual(state, { instances: 1, written: 1, review: 1, dropped: 0 });
-  const [item] = [...lbb.reviews.values()];
+  assert.equal(state.values_proposed, 5);
+  assert.equal(state.written, 1);
+  assert.equal(state.review, 1);
+  assert.equal(state.invalid_value, 1);
+  assert.equal(state.duplicate, 1);
+  assert.equal(state.unknown_property, 1);
+  const [key, item] = [...lbb.reviews.entries()][0]!;
+  // The key of LBB's values.extract: its instance, property and value.
+  assert.equal(
+    key,
+    `starter:values-extract:value:${stableHashHex([entityIdFromIri(iriOf(record.name)), "width_cm", "70"]).slice(0, 24)}`,
+  );
   assert.equal(item!.title, "Set width_cm of S 9.1 to 70");
+  assert.equal(
+    item!.rationale,
+    'The text supports the value with 0.60, below the gate 0.8: "Breite etwa 70 cm"',
+  );
+  assert.deepEqual(item!.origin, {
+    kind: "agent",
+    id: "starter:values-extract",
+    label: "values.extract",
+  });
   assert.equal(item!.workflow, "values-extract");
   assert.deepEqual(item!.facts!.entity_properties![0]!.properties, { width_cm: 70 });
 
@@ -245,21 +299,119 @@ test("a value below the gate goes to review, and the checks drop wrong types and
   assert.deepEqual(written(accepting, record.name), { width_cm: 70, material: "Kunststoff" });
 });
 
-test("an instance that leaves the class loses its values and their sources", async () => {
+test("an instance that leaves the class keeps its values, as in LBB's values.extract", async () => {
   const lbb = new MockActivities(rules(RECORDS));
   const workflow = createWorkflow(lbb);
-  await runMessage(
+  const first = await runMessage(
     workflow,
     triggerMessage(
       "values-extract",
       RECORDS.map((r) => iriOf(r.name)),
     ),
   );
-  await runMessage(workflow, triggerMessage("values-extract", [], [iriOf("S 4.1")]));
+  const commits = lbb.graph.commits;
+  const { state } = await runMessage(
+    workflow,
+    triggerMessage("values-extract", [], [iriOf("S 4.1")]),
+    first.state,
+  );
 
-  assert.deepEqual(written(lbb, "S 4.1"), {});
-  assert.ok(!lbb.graph.edgesOf("HAS_VALUE_SOURCE").some((e) => e.source === iriOf("S 4.1")));
-  assert.equal(lbb.graph.ofType("ValueSource").length, 20 - 4);
+  // Its values go with its fields when it is retracted; the turn writes nothing.
+  assert.equal(written(lbb, "S 4.1").width_cm, 60);
+  assert.equal(lbb.graph.ofType("ValueSource").length, 20);
+  assert.equal(lbb.graph.commits, commits);
+  assert.equal(state.removed, 1);
+  assert.equal(state.instances, 6);
+});
+
+test("a value that changes back is written again: each write's id is its turn's effect id", async () => {
+  // The finding of workflows-dogfooding.md 1.5: an id made from what a
+  // write holds repeats when the value goes A, B, A, and the commit path
+  // answers the repeat as a replay. An effect id is new for each message.
+  const texts = [
+    "S 7.1 Waschtisch, Breite 55 cm.",
+    "S 7.1 Waschtisch, Breite 60 cm.",
+    "S 7.1 Waschtisch, Breite 55 cm.",
+  ];
+  let text = texts[0]!;
+  const lbb = new MockActivities(
+    rules([
+      {
+        name: "S 7.1",
+        get text() {
+          return text;
+        },
+      },
+    ]),
+  );
+  const workflow = createWorkflow(lbb);
+  const widths: unknown[] = [];
+  const keys: string[] = [];
+  let state: unknown = {};
+  for (const [n, next] of texts.entries()) {
+    text = next;
+    const message = {
+      ...triggerMessage("values-extract", [iriOf("S 7.1")]),
+      as_of_commit_seq: 7 + n,
+    };
+    const { result, turn } = await runTurn(workflow, state, message);
+    state = result.state;
+    widths.push(written(lbb, "S 7.1").width_cm);
+    keys.push(
+      (turn.outputs[turn.keys.indexOf("write")] as { idempotency_key: string }).idempotency_key,
+    );
+  }
+  assert.deepEqual(widths, [55, 60, 55]);
+  assert.equal(new Set(keys).size, 3, keys.join(" "));
+  assert.equal(lbb.graph.commits, 3);
+});
+
+test("an instance whose model call is refused goes back to the watch and keeps its values", async () => {
+  const lbb = new MockActivities(rules(RECORDS));
+  const workflow = createWorkflow(lbb);
+  const iris = RECORDS.map((r) => iriOf(r.name));
+  const first = await runMessage(workflow, triggerMessage("values-extract", iris));
+  const refusing = new MockActivities({
+    ...rules(RECORDS),
+    refuses: (kind, request) =>
+      kind === "reason" && (request as { prompt: string }).prompt.includes("S 4.2"),
+  });
+  // The graph of the first run, read by the second.
+  for (const [iri, entity] of lbb.graph.entities) refusing.graph.entities.set(iri, entity);
+  refusing.graph.edges = [...lbb.graph.edges];
+  const { state, turns } = await runMessage(
+    createWorkflow(refusing),
+    { ...triggerMessage("values-extract", iris), as_of_commit_seq: 8 },
+    first.state,
+  );
+
+  assert.equal(turns.length, 1);
+  assert.deepEqual(
+    refusing.requeued.map((r) => r.failed.map((f) => f.instance)),
+    [[iriOf("S 4.2")]],
+  );
+  assert.equal(written(refusing, "S 4.2").width_cm, 50);
+  assert.equal(state.failed, 1);
+  assert.equal(state.instances, 12);
+});
+
+test("a value's evidence has the instance's page box as its region", async () => {
+  const record = {
+    name: "S 9.2",
+    text: "S 9.2 Handtuchspender, Edelstahl, 30x10 cm.",
+    box: { page: 3, x0: 0.1, y0: 0.2, x1: 0.6, y1: 0.3 },
+  };
+  const lbb = new MockActivities(rules([record]));
+  await runMessage(createWorkflow(lbb), triggerMessage("values-extract", [iriOf(record.name)]));
+  const edge = lbb.graph.edgesOf("HAS_VALUE_SOURCE")[0]!;
+  assert.deepEqual((edge.evidence as { region: unknown }).region, {
+    page: 3,
+    x0: 0.1,
+    y0: 0.2,
+    x1: 0.6,
+    y1: 0.3,
+    confidence: 0.92,
+  });
 });
 
 test("a message of more instances than a turn reads continues in a new turn", async () => {
@@ -284,6 +436,20 @@ test("values take their property's type, and a quote is in the text", () => {
   assert.equal(typed("ja", "bool"), true);
   assert.equal(typed("2026-09-16", "date_time"), "2026-09-16T00:00:00Z");
   assert.equal(typed("16.09.2026", "date_time"), null);
+  assert.equal(typed("2026-09-16T08:30:00Z", "datetime"), "2026-09-16T08:30:00Z");
+  assert.equal(typed("0x10", "i64"), null);
+  assert.equal(typed("1,5", "f64"), 1.5);
+  assert.deepEqual(
+    check(
+      [
+        { property: "width_cm", value: "60", quote: "60x40" },
+        { property: "width_cm", value: "61", quote: "61x40" },
+      ],
+      defaults.properties,
+      "text: Waschtisch 60x40",
+    ).map((v) => v.outcome),
+    ["", "duplicate"],
+  );
   assert.ok(quoteHolds("ca.  60x40 cm", "60", "Waschtisch, ca. 60x40 cm, weiß"));
   assert.ok(!quoteHolds("weiß", "Keramik", "Waschtisch, weiß"));
   assert.ok(!quoteHolds("aus Holz gefertigt", "Holz", "Waschtisch aus Keramik"));
@@ -305,7 +471,10 @@ test("a number in another unit, or with none, goes to review and is not written"
     triggerMessage("values-extract", [iriOf(record.name)]),
   );
   assert.deepEqual(written(lbb, record.name), { material: "Keramik" });
-  assert.deepEqual(state, { instances: 1, written: 1, review: 2, dropped: 0 });
+  assert.equal(state.instances, 1);
+  assert.equal(state.values_proposed, 3);
+  assert.equal(state.written, 1);
+  assert.equal(state.review, 2);
   const rationales = [...lbb.reviews.values()].map((item) => item.rationale).sort();
   assert.match(
     rationales[0]!,
@@ -332,4 +501,14 @@ test("the ontology declares the unit of each number property", () => {
   assert.equal(unitProblem("m2", "m²", "20 m²"), undefined);
   assert.equal(unitProblem("cm", "cm", "Breite 60"), "the quote does not state the unit cm");
   assert.equal(unitProblem("m", "m", "600 mm"), "the quote does not state the unit m");
+  // A number with its unit in `value`, against the rules: LBB reads the two
+  // apart, and so does the template.
+  const [width] = check(
+    [{ property: "width_cm", value: "60 cm", unit: "", quote: "Breite 60 cm" }],
+    defaults.properties,
+    "Waschtisch, Breite 60 cm",
+    { width_cm: "cm" },
+  );
+  assert.equal(width!.typed, 60);
+  assert.equal(width!.unconfirmed, undefined);
 });
