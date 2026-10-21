@@ -4,6 +4,10 @@ All notable changes to the `@littlebigbrain/client` package are documented here.
 
 ## Unreleased
 
+- `WorkflowWorker` stops a turn on `409 turn_lease_lost`, the code a turn
+  route now answers when the attempt's token no longer holds its turn. It
+  still stops on any other 409 or a 404, as an older server answers a lost
+  lease `409 conflict`.
 - `lbbActivities(client).waitForReview` names its steps `<key>.ask`,
   `<key>.answer` and `<key>.read`. A step key holds no `:`, so a worker
   refused the old names `<key>:ask`, `<key>:answer` and `<key>:read`. The
