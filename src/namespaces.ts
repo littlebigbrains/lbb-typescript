@@ -419,6 +419,9 @@ export class EmbeddingsNamespace {
    * hit; `explain: true` plans without running. `rerank: true` orders the
    * best hits by the managed rerank model (each hit then carries its
    * `relevance`); without it the graph's search setting decides.
+   * `min_commit_seq` (the `commit_seq` a write returned) waits a few seconds
+   * until every searched embedding covers that commit; past the wait the
+   * server answers the retryable 429 `read_your_writes_pending`.
    */
   search(
     body: Schemas["SearchRequest"],
