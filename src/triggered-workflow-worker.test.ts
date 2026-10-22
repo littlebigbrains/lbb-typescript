@@ -267,6 +267,80 @@ test("workflows.named lists page with limit and cursor, and the iterators read e
   assert.equal(requests[0]?.headers?.["lbb-version"], "2026-10-21");
 });
 
+test("workflows.named reads the settings history and activates a revision", async () => {
+  const revision = (id: string, activation: number, bound = false) => ({
+    id,
+    object: "workflow_revision",
+    activation,
+    bound,
+    settings: { batch: activation },
+  });
+  const first = "wrev_00000000000000000000000000000001";
+  const second = "wrev_00000000000000000000000000000002";
+  const { fetch, requests } = queuedFetch([
+    {
+      body: {
+        object: "list",
+        data: [revision(second, 2, true)],
+        has_more: true,
+        next_cursor: "2",
+      },
+    },
+    { body: { object: "list", data: [revision(first, 1)], has_more: false } },
+    { body: revision(first, 1) },
+    {
+      status: 503,
+      body: { error: { code: "storage_degraded", message: "busy" } },
+    },
+    { body: { object: "workflow", name: "sinks", active_revision: first } },
+    { body: { object: "workflow", name: "sinks", active_revision: first } },
+  ]);
+  const client = new LbbClient({
+    baseUrl: "http://h",
+    graph: "crm",
+    fetch,
+    retryDelayMs: 0,
+  });
+
+  const ids: string[] = [];
+  for await (const one of client.workflows.named.allRevisions("sinks", {
+    limit: 1,
+  }))
+    ids.push(one.id);
+  const one = await client.workflows.named.getRevision("sinks", first);
+  // Activating is safe to repeat: a failed call is retried.
+  const activated = await client.workflows.named.activateRevision(
+    "sinks",
+    first,
+    {
+      expectedRevision: second,
+    },
+  );
+  const again = await client.workflows.named.activateRevision("sinks", first);
+
+  assert.deepEqual(ids, [second, first]);
+  assert.equal(one.activation, 1);
+  assert.equal(activated.active_revision, first);
+  assert.equal(again.active_revision, first);
+  assert.deepEqual(
+    requests.map(({ method, url }) => `${method} ${url}`),
+    [
+      "GET http://h/v1/workflows/named/revisions?graph=crm&name=sinks&limit=1",
+      "GET http://h/v1/workflows/named/revisions?graph=crm&name=sinks&cursor=2&limit=1",
+      `GET http://h/v1/workflows/named/revisions/get?graph=crm&name=sinks&id=${first}`,
+      "POST http://h/v1/workflows/named/revisions/activate?graph=crm",
+      "POST http://h/v1/workflows/named/revisions/activate?graph=crm",
+      "POST http://h/v1/workflows/named/revisions/activate?graph=crm",
+    ],
+  );
+  assert.deepEqual(requests[3]?.body, {
+    name: "sinks",
+    id: first,
+    expected_revision: second,
+  });
+  assert.deepEqual(requests[5]?.body, { name: "sinks", id: first });
+});
+
 test("workflows.named reads what the runs did with each input, page by page", async () => {
   const result = (id: string, outcome: string) => ({
     id,
