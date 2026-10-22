@@ -13,6 +13,12 @@ import {
   TriggeredWorkflowsNamespace,
 } from "./triggered-workflows.js";
 import { WorkflowTestsNamespace } from "./workflow-tests.js";
+import {
+  replayedInputs,
+  RunResultsCollector,
+  stepOutputResults,
+  stepOutputWithResults,
+} from "./run-results.js";
 
 type Turn = Schemas["WorkflowTurn"];
 type Task = Schemas["WorkflowTurnTask"];
@@ -624,11 +630,81 @@ export interface ActivityTurn {
   workflow: Schemas["ActivityWorkflow"];
   usage: Schemas["WorkflowRunUsage"];
   /**
+   * What the turn did with each input (`writeOwned`, `review`,
+   * `requeue`), for the completion's `results`; absent when the claim
+   * named no `results_max`.
+   */
+  results?: RunResultsCollector;
+  /** The instances of the turn's trigger message. */
+  instances?: ReadonlySet<string>;
+  /**
    * Each step whose function ran in this attempt: its effect id and its
    * key. At most 64 (the steps of a turn), cleared when the turn ends.
    */
   steps: Map<string, string>;
 }
+
+/** The run of the turn a context belongs to. @internal */
+export const TURN_RUN: unique symbol = Symbol("lbb.workflow.turnRun");
+
+/** The run of the turn `ctx` belongs to, when a worker made it. @internal */
+export function turnRunOf(ctx: WorkflowContext): ActivityTurn | undefined {
+  return (ctx as { [TURN_RUN]?: ActivityTurn })[TURN_RUN];
+}
+
+/** The instances a trigger message (or a continuation's message) names. */
+function messageInstances(message: unknown): string[] {
+  const instances =
+    message && typeof message === "object"
+      ? (message as { instances?: unknown }).instances
+      : undefined;
+  return Array.isArray(instances)
+    ? instances.filter((iri): iri is string => typeof iri === "string")
+    : [];
+}
+
+/**
+ * The results a turn reports: what its calls reported, and, at a
+ * completion, the instances of its trigger message that it named nowhere
+ * and that its continuation does not carry (`no_value`). Nothing when the
+ * claim named no `results_max`, or when no call reported an input.
+ */
+function reportedResults(
+  turn: ActivityTurn,
+  message: unknown,
+  continuation?: { message: unknown } | null,
+) {
+  const results = turn.results;
+  if (!results?.size) return {};
+  if (message !== undefined) {
+    const carried = new Set(messageInstances(continuation?.message));
+    for (const iri of messageInstances(message))
+      if (!results.has(iri) && !carried.has(iri))
+        results.add({ iri, label: "", outcome: "no_value", values: [] });
+  }
+  const report = results.report();
+  return report ? { results: report } : {};
+}
+
+/**
+ * The running turn whose trigger message names `iri`: a review item about
+ * an input belongs to the turn that reads it. `undefined` when none or
+ * more than one does.
+ * @internal
+ */
+export function turnOfInstance(iri: string): ActivityTurn | undefined {
+  let found: ActivityTurn | undefined;
+  for (const turn of runningTurns.values()) {
+    if (!turn.instances?.has(iri)) continue;
+    if (found) return undefined;
+    found = turn;
+  }
+  return found;
+}
+
+/** A request the server refused as too large (`413`). */
+const tooLarge = (error: unknown) =>
+  error instanceof LbbError && error.status === 413;
 
 /** The turns this process runs now, by their effect prefix. */
 const runningTurns = new Map<string, ActivityTurn>();
@@ -822,6 +898,11 @@ export class WorkflowWorker {
         tokens_out: 0,
         cost_micro_usd: 0,
       },
+      // A server that writes results names how many a run keeps whole.
+      ...(task.results_max
+        ? { results: new RunResultsCollector(task.results_max) }
+        : {}),
+      instances: new Set(messageInstances(task.turn.message)),
       steps: new Map(),
     };
     runningTurns.set(task.effect_prefix, turnRun);
@@ -918,13 +999,22 @@ export class WorkflowWorker {
             );
             throw invalid;
           }
-          return copy(old.output);
+          // A step that reported inputs saved them: report them again, as
+          // they were in this run (a resume), or as an earlier attempt's.
+          const saved = stepOutputResults(old.output);
+          for (const input of saved.run === turnRun.workflow.run_id
+            ? saved.results
+            : replayedInputs(saved.results))
+            turnRun.results?.add(input);
+          return copy(saved.value);
         }
         if (task.turn.steps.some((s) => s.key === key)) {
           invalid = new WorkflowError("Step keys must be unique within a turn");
           throw invalid;
         }
         let output: unknown = null;
+        // What the step reported, kept in its saved output.
+        let reported: ReturnType<RunResultsCollector["endStep"]> = [];
         if (kind === "step") {
           const timeout = stepOptions.timeoutMs ?? 300_000;
           const progressTimeout = stepOptions.heartbeatTimeoutMs;
@@ -1020,6 +1110,7 @@ export class WorkflowWorker {
           const effectId = `${task.effect_prefix}/${key}`;
           // An activity call with this id, or one made from it, names the step.
           turnRun.steps.set(effectId, key);
+          turnRun.results?.beginStep();
           try {
             output = copy(
               await effect!({
@@ -1060,6 +1151,7 @@ export class WorkflowWorker {
             active = false;
             await pending;
           } finally {
+            reported = turnRun.results?.endStep() ?? [];
             active = false;
             clearOperationTimers();
             controller.signal.removeEventListener(
@@ -1070,6 +1162,11 @@ export class WorkflowWorker {
         }
         check();
         if (kind !== "step") stopHeartbeat();
+        const savedOutput = stepOutputWithResults(
+          output,
+          turnRun.workflow.run_id ?? "",
+          reported,
+        );
         const saved = await turnRequest<Turn>(
           kind === "signal" ? "wait-signal" : "checkpoint",
           kind === "signal"
@@ -1085,7 +1182,7 @@ export class WorkflowWorker {
                 position: index,
                 key,
                 kind,
-                output,
+                output: savedOutput,
                 delay_ms: delay,
               },
         );
@@ -1105,7 +1202,7 @@ export class WorkflowWorker {
         task.turn.steps.push({
           key,
           kind,
-          output,
+          output: savedOutput,
           delay_ms: delay ?? null,
           at_ms: 0,
           wake_at_ms: null,
@@ -1177,6 +1274,8 @@ export class WorkflowWorker {
       },
       continue: (state, message) => ({ state, continuation: { message } }),
     };
+    // `writeOwned` and `requeue` report their inputs to the turn's run.
+    Object.defineProperty(ctx, TURN_RUN, { value: turnRun });
     let onAbort: () => void = () => {};
     const aborted = new Promise<never>((_resolve, reject) => {
       onAbort = () =>
@@ -1212,9 +1311,21 @@ export class WorkflowWorker {
           : null,
         ...reportedUsage(turnRun),
       };
+      const results = reportedResults(
+        turnRun,
+        task.turn.message,
+        result.continuation,
+      );
       // Serialize completion retries exactly; a lost response must not rerun effects.
       stopHeartbeat();
-      await turnRequest("complete", body);
+      try {
+        await turnRequest("complete", { ...body, ...results });
+      } catch (error) {
+        // Results never cost a completion: a body too large for the server
+        // goes again without them.
+        if (!(tooLarge(error) && "results" in results)) throw error;
+        await turnRequest("complete", body);
+      }
     } catch (error) {
       if (error === suspended) return;
       if (controller.signal.aborted) {
@@ -1227,23 +1338,33 @@ export class WorkflowWorker {
       stopHeartbeat();
       // A wait for a cause outside the turn counts no attempt.
       const retryAt = waitOf(error);
-      try {
-        await this.client.request("POST", `${base}/turns/fail`, {
-          body: {
-            ...lease,
-            error: String(error).slice(0, 1000),
-            non_retryable:
-              retryAt === undefined &&
-              (error instanceof WorkflowError ||
-                error instanceof WorkflowExecutionError),
-            ...(retryAt !== undefined
-              ? { retry_at_ms: Math.max(retryAt, Date.now() + MIN_WAIT_MS) }
-              : {}),
-            ...reportedUsage(turnRun),
-          },
+      const failBody = {
+        ...lease,
+        error: String(error).slice(0, 1000),
+        non_retryable:
+          retryAt === undefined &&
+          (error instanceof WorkflowError ||
+            error instanceof WorkflowExecutionError),
+        ...(retryAt !== undefined
+          ? { retry_at_ms: Math.max(retryAt, Date.now() + MIN_WAIT_MS) }
+          : {}),
+        ...reportedUsage(turnRun),
+      };
+      const failResults = reportedResults(turnRun, undefined);
+      const sendFail = (body: object) =>
+        this.client.request("POST", `${base}/turns/fail`, {
+          body,
           retry: false,
           signal: controller.signal,
         });
+      try {
+        try {
+          await sendFail({ ...failBody, ...failResults });
+        } catch (refused) {
+          // Results never cost a failure either.
+          if (!(tooLarge(refused) && "results" in failResults)) throw refused;
+          await sendFail(failBody);
+        }
       } catch (refused) {
         // The turn is no longer this worker's: nothing to fail.
         if (!gone(refused)) throw refused;

@@ -4,6 +4,23 @@ All notable changes to the `@littlebigbrain/client` package are documented here.
 
 ## Unreleased
 
+- `WorkflowWorker` reports what each run did with each input (the run's
+  results) when the claim names `results_max`: `writeOwned` reports each
+  subject `written` (or `no_value` when it sets nothing) with its fields and
+  out-edges, `review` of an item with a `subject` reports it `review` with
+  the item's id, `waitForReview` with what the wait ended with, and
+  `requeue` reports each instance `failed`. The completion and the failure
+  send them as `results`, at most 512 KiB; a `413` sends them again without
+  `results`, and a server that names no `results_max` gets none. A step that
+  reported inputs keeps them in its saved output, so a replay reports them
+  again; the step's code sees its own value. An earlier version of this
+  package does not unwrap that output: when it replays such a step (after a
+  rollback, or in a fleet of mixed versions), the workflow's code gets
+  `{lbb_step_results, run, results, value}` in place of its value. Roll
+  workers forward only. `captureActivities(...).result()`
+  gains `results`, the same records. Types: `WorkflowRunInput`,
+  `WorkflowRunResultOutcome`, `WorkflowRunResultCounts`,
+  `WorkflowRunResultsReport`.
 - `client.reviews.list`, `patterns` and `all` take `evalId`: the items
   Evals filed for one record (a calibration session, a model call's
   check, a golden).

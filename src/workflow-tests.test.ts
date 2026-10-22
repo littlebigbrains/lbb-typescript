@@ -220,8 +220,19 @@ test("a capture checks owned writes with the dry run and keeps them, and keeps r
     result.reviews[0]?.request.title,
     "Set material of f1 to Keramik",
   );
+  // What a live run would report: the write's subject with its field. The
+  // review item names no subject, so it reports no input.
+  assert.deepEqual(result.results, [
+    {
+      label: "f1",
+      outcome: "written",
+      values: [
+        { property: "width_cm", value: "55", quote: "", outcome: "written" },
+      ],
+    },
+  ]);
   capture.reset();
-  assert.deepEqual(capture.result(), { writes: [], reviews: [] });
+  assert.deepEqual(capture.result(), { writes: [], reviews: [], results: [] });
 });
 
 test("a capture checks a write's shape first, then the dry run, which an RDF-native graph refuses", async () => {

@@ -106,6 +106,17 @@ function merge(base: Json, overrides: Json): Json {
   return overrides;
 }
 
+/** A template with `{i}` in its texts replaced by `i` (`$repeat`). */
+function withIndex(value: Json, i: number): Json {
+  if (typeof value === "string") return value.replaceAll("{i}", String(i));
+  if (Array.isArray(value)) return value.map((item) => withIndex(item, i));
+  if (isObj(value))
+    return Object.fromEntries(
+      Object.entries(value).map(([k, v]) => [k, withIndex(v, i)]),
+    );
+  return value;
+}
+
 function at(value: Json, path: string): Json {
   for (const part of path.split(".").filter(Boolean))
     value = (value as Obj)[part];
@@ -121,6 +132,15 @@ function matches(
   if (isObj(want) && "$absent" in want) return missing;
   if (missing) return false;
   if (isObj(want) && "$any" in want) return true;
+  if (isObj(want) && "$all" in want)
+    return (want.$all as Json[]).every((each) => matches(each, got, arrivedMs));
+  if (isObj(want) && "$length" in want)
+    return Array.isArray(got) && got.length === want.$length;
+  if (isObj(want) && "$json_bytes_at_most" in want)
+    return (
+      new TextEncoder().encode(JSON.stringify(got)).length <=
+      (want.$json_bytes_at_most as number)
+    );
   if (isObj(want) && "$at_least_now_plus_ms" in want)
     return (
       typeof got === "number" &&
@@ -226,6 +246,7 @@ function captured(result: ActivityCaptureResult): Json {
       ...(write.report ? { report: write.report } : {}),
     })),
     reviews: result.reviews.map((review) => ({ request: review.request })),
+    results: result.results,
   };
 }
 
@@ -250,6 +271,12 @@ class Program {
 
   resolve(value: Json, outputs: Obj, state: Json, message: Json): Json {
     if (isObj(value)) {
+      if ("$repeat" in value)
+        return Array.from({ length: value.$repeat as number }, (_, i) =>
+          this.resolve(withIndex(value.of, i), outputs, state, message),
+        );
+      if ("$chars" in value)
+        return String(value.char ?? "q").repeat(value.$chars as number);
       if ("$ref" in value) {
         const [key, ...rest] = String(value.$ref).split(".");
         return at(outputs[key!], rest.join("."));
@@ -300,7 +327,9 @@ class Program {
       await this.activities.reason(request, {
         ...(action.effect_id ? { effectId: `${step.effectId}${suffix}` } : {}),
       });
-    } else if ("blob_put" in action)
+    } else if ("review" in action)
+      await this.activities.review(action.review as ReviewItemRequest);
+    else if ("blob_put" in action)
       await this.client.workflows.blobs.put(String(action.blob_put), {
         workflowId: ctx.workflowId,
       });
@@ -352,7 +381,7 @@ class Program {
         outputs[String(op.write_owned)] = await this.activities.writeOwned(
           ctx,
           String(op.write_owned),
-          op.write as OwnedWrite,
+          value(op.write) as OwnedWrite,
           graph ? { graph } : {},
         );
       } else if ("requeue" in op) {

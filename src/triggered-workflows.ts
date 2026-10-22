@@ -34,6 +34,22 @@ export interface WorkflowRunsOptions extends CallOptions {
   outcome?: Schemas["WorkflowRunOutcome"];
 }
 
+/** The filters and paging of what a workflow's runs did with each input (`runResults`). */
+export interface WorkflowRunResultsOptions extends CallOptions {
+  /** One run's results, in input order; without it, the newest runs'. */
+  run?: string;
+  /** Only the inputs of these outcomes. */
+  outcome?:
+    | Schemas["WorkflowRunResultOutcome"]
+    | readonly Schemas["WorkflowRunResultOutcome"][];
+  /** Only the results of this input. */
+  iri?: string;
+  /** The `next_cursor` of the previous page. */
+  cursor?: string;
+  /** Results per page: 1 to 200, default 50. */
+  limit?: number;
+}
+
 /** The hours of a workflow's run stats (`runStats`). */
 export interface WorkflowRunStatsOptions extends CallOptions {
   /** Hours up to the current one: 1 to 168, default 24. */
@@ -669,6 +685,44 @@ export class NamedWorkflowsNamespace {
       ...opts,
       query: { name, hours },
     });
+  }
+
+  /**
+   * What a workflow's runs did with each input, newest run first and each
+   * run's inputs in order: the input, its outcome (`written`, `review`,
+   * `no_value`, `failed`, `duplicate`) and its values as a test gives them
+   * (the value, quote, support, conversion, and the review item it went
+   * to). A run records them when it ends and keeps its first 200 inputs
+   * whole; with `run`, `run_counts` counts all of them. Kept 30 days. A page
+   * in the list envelope: pass `next_cursor` as `cursor` for the next page.
+   * `404 workflow_run_not_found` for a `run` the workflow does not have.
+   */
+  runResults(
+    name: string,
+    options: WorkflowRunResultsOptions = {},
+  ): Promise<Schemas["WorkflowRunResultList"]> {
+    const { run, outcome, iri, cursor, limit, ...opts } = options;
+    return this.client.request("GET", "/v1/workflows/named/runs/results", {
+      ...opts,
+      query: {
+        name,
+        run,
+        outcome: typeof outcome === "string" ? outcome : outcome?.join(","),
+        iri,
+        cursor,
+        limit,
+      },
+    });
+  }
+
+  /** Every result of a workflow's runs kept, newest run first: `runResults` page by page. */
+  allRunResults(
+    name: string,
+    options: Omit<WorkflowRunResultsOptions, "cursor"> = {},
+  ): AsyncGenerator<Schemas["WorkflowRunResult"], void, unknown> {
+    return this.client.listAll((cursor) =>
+      this.runResults(name, { ...options, cursor }),
+    );
   }
 
   /**
