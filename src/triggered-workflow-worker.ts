@@ -1,8 +1,10 @@
 // Developer workflows (`workflow@v1`). A triggered workflow of the starter
 // workflow `workflow` sends the new and changed instances of the class it
 // watches to a workflow of your worker, as trigger messages of type
-// `instances`. `triggeredWorkflow()` defines that workflow: it checks each
-// message and hands it to `onInstances` with the workflow's state.
+// `instances`, and a workflow with a schedule sends one message of type
+// `schedule` per slot. `triggeredWorkflow()` defines that workflow: it
+// checks each message and hands it to `onInstances` or `onSchedule` with
+// the workflow's state.
 // `writeOwned()` commits what your code owns on the instances with
 // `replace_owned`, inside a named step, with the step's effect id as the
 // commit's idempotency key.
@@ -26,6 +28,16 @@ export type WorkflowTriggerReason = Schemas["WorkflowTriggerReason"];
 
 /** The `type` of every trigger message. */
 export const TRIGGER_MESSAGE_TYPE = "instances";
+
+/**
+ * One slot of a schedule (`type: "schedule"`): the slot's time, the slots
+ * skipped since the previous run, and the commits since it
+ * (`since_commit_seq` to `as_of_commit_seq`). `changed` is false when no
+ * commit was published since the previous run.
+ */
+export type WorkflowScheduleMessage = Schemas["WorkflowScheduleMessage"];
+/** The `type` of a schedule slot's message. */
+export const SCHEDULE_MESSAGE_TYPE = "schedule";
 
 /** The answer to a review item, as a workflow with a review trigger gets it. */
 export type ReviewAnsweredMessage = Schemas["ReviewAnsweredMessage"];
@@ -108,14 +120,29 @@ export interface TriggeredWorkflowDefinition<S, R = unknown> {
    */
   initialState?: S;
   /**
-   * Handle one message: read `message.instances` at
-   * `message.as_of_commit_seq` (or later), do the work inside `ctx.step`,
-   * and write with {@link writeOwned}. Drop what you wrote for
-   * `message.removed`.
+   * Handle one message of a watch or a content trigger: read
+   * `message.instances` at `message.as_of_commit_seq` (or later), do the
+   * work inside `ctx.step`, and write with {@link writeOwned}. Drop what you
+   * wrote for `message.removed`. Without this handler such a message fails
+   * the turn.
    */
-  onInstances(
+  onInstances?(
     ctx: WorkflowContext,
     message: WorkflowTriggerMessage,
+    state: S,
+  ): Promise<TriggeredWorkflowTurn<S, R> | void>;
+  /**
+   * Handle one slot of a schedule (`{ schedule: { cron } }` or
+   * `{ schedule: { every } }`): one message per slot, with the slot's time
+   * (`due_at`), the slots skipped since the previous run (`missed`) and the
+   * commits since it (`since_commit_seq` to `as_of_commit_seq`, read at
+   * `as_of_commit_seq`). A run that only reads changes ends at once when
+   * `message.changed` is false. Without this handler such a message fails
+   * the turn.
+   */
+  onSchedule?(
+    ctx: WorkflowContext,
+    message: WorkflowScheduleMessage,
     state: S,
   ): Promise<TriggeredWorkflowTurn<S, R> | void>;
   /**
@@ -199,25 +226,43 @@ export function triggeredWorkflow<S = Record<string, unknown>, R = unknown>(
         };
       }
       const raw: unknown = message;
-      const answered =
-        isObject(raw) && raw.type === REVIEW_ANSWERED_MESSAGE_TYPE;
-      if (answered && !definition.onReviewAnswered) {
-        throw new WorkflowError(
-          `${definition.name} received a review answer (it has a review trigger) but defines no onReviewAnswered`,
+      const type = isObject(raw) ? raw.type : undefined;
+      const missing = (what: string, hook: string) =>
+        new WorkflowError(
+          `${definition.name} received ${what} but defines no ${hook}`,
         );
+      let turn: TriggeredWorkflowTurn<S, R> | void;
+      if (type === REVIEW_ANSWERED_MESSAGE_TYPE) {
+        if (!definition.onReviewAnswered)
+          throw missing(
+            "a review answer (it has a review trigger)",
+            "onReviewAnswered",
+          );
+        turn = await definition.onReviewAnswered(
+          ctx,
+          raw as ReviewAnsweredMessage,
+          state,
+        );
+      } else if (type === SCHEDULE_MESSAGE_TYPE) {
+        if (!definition.onSchedule)
+          throw missing(
+            "a schedule slot (it has a schedule trigger)",
+            "onSchedule",
+          );
+        turn = await definition.onSchedule(
+          ctx,
+          raw as WorkflowScheduleMessage,
+          state,
+        );
+      } else {
+        const parsed = parseTriggerMessage(message);
+        if (!definition.onInstances)
+          throw missing(
+            "instances (it has a watch or a content trigger)",
+            "onInstances",
+          );
+        turn = await definition.onInstances(ctx, parsed, state);
       }
-      const turn =
-        answered && definition.onReviewAnswered
-          ? await definition.onReviewAnswered(
-              ctx,
-              raw as ReviewAnsweredMessage,
-              state,
-            )
-          : await definition.onInstances(
-              ctx,
-              parseTriggerMessage(message),
-              state,
-            );
       return {
         state: turn?.state !== undefined ? turn.state : state,
         ...(turn?.result !== undefined ? { result: turn.result } : {}),

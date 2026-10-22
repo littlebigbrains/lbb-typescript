@@ -229,6 +229,7 @@ export type {
   ReviewAnsweredMessage,
   TriggeredWorkflowDefinition,
   TriggeredWorkflowTurn,
+  WorkflowScheduleMessage,
   WorkflowTriggerMessage,
   WorkflowTriggerReason,
 } from "./triggered-workflow-worker.js";

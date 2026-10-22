@@ -68,6 +68,7 @@ interface Scenario {
   handler?: Obj[];
   on_instances?: Obj[];
   on_fan_in?: Obj[];
+  on_schedule?: Obj[];
   task: Obj;
   runs?: number;
   client_graph?: string;
@@ -458,8 +459,24 @@ function definition(scenario: Scenario, program: Program) {
     name: spec.name,
     version: spec.version,
     initialState: spec.initial_state,
-    onInstances: (ctx, message, state) =>
-      turn(scenario.on_instances!, ctx, state, message),
+    ...(scenario.on_instances
+      ? {
+          onInstances: (
+            ctx: WorkflowContext,
+            message: unknown,
+            state: unknown,
+          ) => turn(scenario.on_instances!, ctx, state, message as Json),
+        }
+      : {}),
+    ...(scenario.on_schedule
+      ? {
+          onSchedule: (
+            ctx: WorkflowContext,
+            message: unknown,
+            state: unknown,
+          ) => turn(scenario.on_schedule!, ctx, state, message as Json),
+        }
+      : {}),
     ...(scenario.on_fan_in
       ? {
           onFanIn: (ctx: WorkflowContext, message: unknown, state: unknown) =>
