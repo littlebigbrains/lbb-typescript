@@ -4,6 +4,13 @@ All notable changes to the `@littlebigbrain/client` package are documented here.
 
 ## Unreleased
 
+- `client.workflows.named` reads the history of a workflow's settings and
+  uses earlier settings again: `revisions(name, { cursor, limit })`,
+  `allRevisions(name)`, `getRevision(name, id)` and
+  `activateRevision(name, id, { expectedRevision })`. A workflow has
+  `active_revision`, and a run summary and a test have `revision`.
+  `client.workflows.tests.create` takes `revision` (with `name`) to test a
+  kept revision without activating it.
 - `WorkflowWorker` reports what each run did with each input (the run's
   results) when the claim names `results_max`: `writeOwned` reports each
   subject `written` (or `no_value` when it sets nothing) with its fields and

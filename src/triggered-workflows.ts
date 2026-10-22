@@ -81,6 +81,21 @@ export interface TriggeredWorkflowDocumentsOptions extends WorkflowDocumentsOpti
   after?: string;
 }
 
+/** Paging of a workflow's settings history (`client.workflows.named.revisions`). */
+export interface WorkflowRevisionsOptions extends CallOptions {
+  /** The `next_cursor` of the previous page. */
+  cursor?: string;
+  /** Revisions per page: 1 to 100, default 20. */
+  limit?: number;
+}
+
+/** The revision a caller read as active (`client.workflows.named.activateRevision`). */
+export interface ActivateRevisionOptions extends CallOptions {
+  /** The active revision the caller read: another active one fails with
+   * `409 workflow_revision_conflict`. */
+  expectedRevision?: string;
+}
+
 /** Paging of the graph's workflows (`client.workflows.named.list`). */
 export interface NamedWorkflowListOptions extends CallOptions {
   /** Workflows per page: 1 to 200, default 100. */
@@ -752,6 +767,90 @@ export class NamedWorkflowsNamespace {
   ): AsyncGenerator<unknown, void, unknown> {
     return this.client.listAll((cursor) =>
       this.documents(name, { ...options, cursor }),
+    );
+  }
+
+  /**
+   * The history of a workflow's settings, newest activation first. Each
+   * item is a revision (the settings a person set, hashed into its `wrev_`
+   * id, and the request that makes it) with the facts of one activation:
+   * `activation`, `action` (`create`, `change`, `activate` or `existing`),
+   * `activated_at`, `activated_by`, `previous_revision` and `bound` (this
+   * activation is the one in use). A revision activated twice is listed
+   * twice. The history keeps the newest 100 activations. A page in the
+   * list envelope: pass `next_cursor` as `cursor` for the next page.
+   *
+   * ```ts
+   * const page = await client.workflows.named.revisions("sinks");
+   * const inUse = page.data.find((revision) => revision.bound);
+   * ```
+   */
+  revisions(
+    name: string,
+    options: WorkflowRevisionsOptions = {},
+  ): Promise<Schemas["WorkflowRevisionList"]> {
+    const { cursor, limit, ...opts } = options;
+    return this.client.request("GET", "/v1/workflows/named/revisions", {
+      ...opts,
+      query: { name, cursor, limit },
+    });
+  }
+
+  /** Every kept activation of a workflow's settings, newest first: `revisions` page by page. */
+  allRevisions(
+    name: string,
+    options: Omit<WorkflowRevisionsOptions, "cursor"> = {},
+  ): AsyncGenerator<Schemas["WorkflowRevision"], void, unknown> {
+    return this.client.listAll((cursor) =>
+      this.revisions(name, { ...options, cursor }),
+    );
+  }
+
+  /**
+   * One revision of a workflow's settings, with the facts of its newest
+   * kept activation. Compare two revisions by their `settings`. `404
+   * workflow_revision_not_found` for a revision the workflow does not keep
+   * (a run summary keeps its `revision` after that).
+   */
+  getRevision(
+    name: string,
+    id: string,
+    opts: CallOptions = {},
+  ): Promise<Schemas["WorkflowRevision"]> {
+    return this.client.request("GET", "/v1/workflows/named/revisions/get", {
+      ...opts,
+      query: { name, id },
+    });
+  }
+
+  /**
+   * Make a kept revision the workflow's settings: its request goes through
+   * the change path again, with every check a change makes, and must
+   * produce the revision (`409 workflow_revision_stale` when the graph now
+   * reads the settings differently). With `expectedRevision`, another
+   * active revision fails with `409 workflow_revision_conflict`. Activating
+   * the active revision changes nothing, so a failed call is retried. Work
+   * that waits or runs keeps the revision it started with. Answers the
+   * workflow, whose `active_revision` names the revision.
+   */
+  activateRevision(
+    name: string,
+    id: string,
+    options: ActivateRevisionOptions = {},
+  ): Promise<Schemas["NamedWorkflow"]> {
+    const { expectedRevision, ...opts } = options;
+    return this.client.request(
+      "POST",
+      "/v1/workflows/named/revisions/activate",
+      {
+        ...opts,
+        retry: opts.retry ?? true,
+        body: {
+          name,
+          id,
+          ...(expectedRevision ? { expected_revision: expectedRevision } : {}),
+        } satisfies Schemas["WorkflowRevisionActivateRequest"],
+      },
     );
   }
 

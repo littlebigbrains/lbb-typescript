@@ -4160,6 +4160,57 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/workflows/named/revisions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The history of a workflow's settings, newest activation first: each item is a revision (the settings a person set, hashed into its `wrev_` id, and the request that makes it) with the facts of one activation (`activation`, `action`, `activated_at`, `activated_by`, `previous_revision`, `bound`). A revision activated twice is listed twice. The history keeps the newest 100 activations. 404 `named_workflow_not_found` */
+        get: operations["get_v1_workflows_named_revisions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/workflows/named/revisions/activate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Make a kept revision the workflow's settings: its request goes through the change path again, with every check a change makes, and must produce the revision (409 `workflow_revision_stale`). With `expected_revision`, another bound revision answers 409 `workflow_revision_conflict`. Activating the bound revision changes nothing. Runs in flight keep the revision they started on */
+        post: operations["post_v1_workflows_named_revisions_activate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/workflows/named/revisions/get": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** One revision of a workflow's settings, with the facts of its newest kept activation. 404 `workflow_revision_not_found` for an id the workflow does not keep (a run summary keeps the id after its revision is collected) */
+        get: operations["get_v1_workflows_named_revisions_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/workflows/named/run": {
         parameters: {
             query?: never;
@@ -11865,6 +11916,12 @@ export interface components {
         };
         /** @description One workflow with triggers (`GET /v1/workflows/named?name=`). */
         NamedWorkflow: {
+            /**
+             * @description The settings revision the workflow runs on (`wrev_…`):
+             *     `GET /v1/workflows/named/revisions` lists its history, and
+             *     `POST /v1/workflows/named/revisions/activate` moves it.
+             */
+            active_revision?: string | null;
             /** Format: int32 */
             batch?: number | null;
             /** Format: double */
@@ -18844,6 +18901,12 @@ export interface components {
         TriggeredDocumentSort: "review" | "name" | "recent";
         /** @description One triggered workflow (`GET /v1/workflows/triggered?starter=&name=`). */
         TriggeredWorkflow: {
+            /**
+             * @description The settings revision the workflow runs on (`wrev_…`;
+             *     `GET /v1/workflows/named/revisions` lists its history). Absent for
+             *     `search.embed` and `ontology.fit`, which keep no revisions.
+             */
+            active_revision?: string | null;
             /** Format: int32 */
             batch?: number | null;
             created_at?: string | null;
@@ -19918,6 +19981,12 @@ export interface components {
             reason?: string | null;
             /** @description The request ids of the commits that caused it. */
             requests?: string[];
+            /**
+             * @description The settings revision of the named workflow whose watch sent the
+             *     message (`wrev_…`): its settings when the watch wrote it. A
+             *     continuation keeps its turn's.
+             */
+            revision?: string | null;
             /** @description A `content` origin: the SHA-256 of the content, lowercase hex. */
             sha256?: string | null;
             /**
@@ -20127,6 +20196,104 @@ export interface components {
         WorkflowReviewTrigger: {
             /** @description The workflow whose items' answers arrive. Absent: this workflow. */
             workflow?: string | null;
+        };
+        /**
+         * @description One revision of a workflow's settings, with the facts of one
+         *     activation (`GET /v1/workflows/named/revisions`: the activation of the
+         *     item; `…/revisions/get`: the newest kept activation of the revision,
+         *     none when the history keeps none).
+         */
+        WorkflowRevision: {
+            action?: null | components["schemas"]["WorkflowRevisionAction"];
+            activated_at?: string | null;
+            /**
+             * @description The key (`key:<id>`) or the account (`account:<id>`) that asked;
+             *     absent for an `existing` activation.
+             */
+            activated_by?: string | null;
+            /**
+             * Format: int64
+             * @description The activation's number in the workflow's history.
+             */
+            activation?: number | null;
+            /**
+             * @description The settings are kept and read: `false` for a history row whose
+             *     revision was deleted (it raced a collection), which has no
+             *     `target`, `settings` or `request`.
+             */
+            available: boolean;
+            /** @description The workflow's binding names this revision now. */
+            bound: boolean;
+            /** @description When the revision was first written (RFC 3339). */
+            created: string;
+            /** @description `wrev_` and 32 hex characters: the hash of `settings`. */
+            id: string;
+            /** @description `workflow_revision`. */
+            object: string;
+            /** @description The revision the activation replaced. */
+            previous_revision?: string | null;
+            request?: null | components["schemas"]["WorkflowRevisionRequest"];
+            /**
+             * @description The settings a person set, as the hash covers them: the template,
+             *     the trigger, `params`, `gate`, the owned outputs, the budget and,
+             *     for a workflow of your worker, its batch and routing. `null` when
+             *     not `available`.
+             */
+            settings?: unknown;
+            /** @description `calibration` for a gate applied from its measurement. */
+            source?: string | null;
+            /**
+             * @description The starter workflow it was made from (`workflow`, `values.extract`,
+             *     …).
+             */
+            starter: string;
+            target?: null | components["schemas"]["WorkflowTypeRef"];
+            /** @description The workflow's name. */
+            workflow: string;
+        };
+        /**
+         * @description How an activation moved the binding.
+         * @enum {string}
+         */
+        WorkflowRevisionAction: "create" | "change" | "activate" | "existing";
+        /**
+         * @description `POST /v1/workflows/named/revisions/activate`: make a kept revision the
+         *     workflow's settings.
+         */
+        WorkflowRevisionActivateRequest: {
+            /**
+             * @description The revision the caller read as bound: another one answers `409
+             *     workflow_revision_conflict`.
+             */
+            expected_revision?: string | null;
+            /** @description The revision to activate. */
+            id: string;
+            /** @description The workflow's name. */
+            name: string;
+        };
+        /**
+         * @description `GET /v1/workflows/named/revisions?name=&cursor=&limit=`: the history,
+         *     newest activation first, in the list envelope.
+         */
+        WorkflowRevisionList: {
+            data: components["schemas"]["WorkflowRevision"][];
+            has_more: boolean;
+            /**
+             * @description Pass as `cursor` for the next page (an activation number); absent on
+             *     the last page.
+             */
+            next_cursor?: string | null;
+            /** @description `list`. */
+            object: string;
+        };
+        /**
+         * @description The request a revision resolves from: the body of the `PUT` route that
+         *     makes it (`route` `named` for `PUT /v1/workflows/named`, `triggered`
+         *     for `PUT /v1/workflows/triggered`). An activation sends it again.
+         */
+        WorkflowRevisionRequest: {
+            body: unknown;
+            route: string;
         };
         WorkflowRun: {
             /** Format: int64 */
@@ -20443,6 +20610,15 @@ export interface components {
              */
             queue_before?: number;
             /**
+             * @description The settings revision the run ran on (`wrev_…`, added 2026-10-21):
+             *     for a step of the Rust path the settings it read first, for an
+             *     engine run the revision its message was sent with (its origin's
+             *     `revision`). Absent for an identity of no named workflow and for a
+             *     message without one. A summary keeps it after the revision is
+             *     collected.
+             */
+            revision?: string | null;
+            /**
              * @description At most 20 names of what the run processed: the turn result's
              *     `sample` (a list of text); for the document workflows of the Rust
              *     path the documents' names, else instance IRIs.
@@ -20682,6 +20858,13 @@ export interface components {
             object: string;
             /** @description One result per read input, in input order. */
             results?: components["schemas"]["WorkflowTestResult"][];
+            /**
+             * @description The settings revision the test ran on (`wrev_…`, added 2026-10-21):
+             *     the one it named (`revision` of the create), else the workflow's.
+             *     Absent for a test of a create request. A run summary with the same
+             *     revision ran on the same settings.
+             */
+            revision?: string | null;
             settings: components["schemas"]["WorkflowTestSettings"];
             status: components["schemas"]["WorkflowTestStatus"];
             /**
@@ -20749,6 +20932,14 @@ export interface components {
             iris?: string[];
             /** @description The name of a workflow of the graph (`GET /v1/workflows/named`). */
             name?: string | null;
+            /**
+             * @description With `name`: a kept revision of the workflow's settings
+             *     (`GET /v1/workflows/named/revisions`) to run on instead of the one
+             *     in use, so two revisions compare on the same inputs without either
+             *     being activated. `404 workflow_revision_not_found` for one the
+             *     workflow does not keep.
+             */
+            revision?: string | null;
             /** Format: int32 */
             sample?: number | null;
             workflow?: null | components["schemas"]["WorkflowTestWorkflow"];
@@ -62436,6 +62627,445 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["WorkflowRequeueResponse"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Rate limit exceeded */
+            429: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Service unavailable */
+            503: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+        };
+    };
+    get_v1_workflows_named_revisions: {
+        parameters: {
+            query?: {
+                /** @description Graph name (default `main`) */
+                graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
+                /** @description the workflow's name */
+                name?: string;
+                /** @description the `next_cursor` of the page before */
+                cursor?: string;
+                /** @description revisions per page, 1 to 100 (default 20) */
+                limit?: string;
+            };
+            header?: {
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                "Lbb-Version"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkflowRevisionList"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Rate limit exceeded */
+            429: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Service unavailable */
+            503: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+        };
+    };
+    post_v1_workflows_named_revisions_activate: {
+        parameters: {
+            query?: {
+                /** @description Graph name (default `main`) */
+                graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
+            };
+            header?: {
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                "Lbb-Version"?: string;
+                /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
+                "Idempotency-Key"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WorkflowRevisionActivateRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NamedWorkflow"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Rate limit exceeded */
+            429: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Service unavailable */
+            503: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+        };
+    };
+    get_v1_workflows_named_revisions_get: {
+        parameters: {
+            query?: {
+                /** @description Graph name (default `main`) */
+                graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
+                /** @description the workflow's name */
+                name?: string;
+                /** @description the revision id */
+                id?: string;
+            };
+            header?: {
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                "Lbb-Version"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkflowRevision"];
                 };
             };
             /** @description Bad request */
