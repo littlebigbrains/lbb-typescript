@@ -32,6 +32,9 @@ export interface ReviewListOptions extends CallOptions {
   cursor?: string;
   /** The items filed under these producer keys (at most 100). */
   key?: string | string[];
+  /** The items of one owner record Evals filed for: a calibration
+   * session, a model call's check, a golden (`eval.id`). */
+  evalId?: string;
 }
 
 /**
@@ -75,6 +78,7 @@ export class ReviewsNamespace {
       limit,
       cursor,
       key,
+      evalId,
       ...opts
     } = options;
     return this.client.request("GET", "/v1/reviews", {
@@ -89,6 +93,7 @@ export class ReviewsNamespace {
         limit,
         cursor,
         key: Array.isArray(key) ? key.join(",") : key,
+        eval_id: evalId,
       },
     });
   }
@@ -102,12 +107,14 @@ export class ReviewsNamespace {
       status?: Schemas["ReviewStatus"];
       originId?: string;
       type?: Schemas["SuggestionKind"];
+      /** The items of one owner record Evals filed for (`eval.id`). */
+      evalId?: string;
     } = {},
   ): Promise<Schemas["OntologySuggestionPatternList"]> {
-    const { status, originId, type, ...opts } = options;
+    const { status, originId, type, evalId, ...opts } = options;
     return this.client.request("GET", "/v1/reviews/patterns", {
       ...opts,
-      query: { status, origin_id: originId, type },
+      query: { status, origin_id: originId, type, eval_id: evalId },
     });
   }
 

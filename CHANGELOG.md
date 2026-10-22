@@ -4,6 +4,9 @@ All notable changes to the `@littlebigbrain/client` package are documented here.
 
 ## Unreleased
 
+- `client.reviews.list`, `patterns` and `all` take `evalId`: the items
+  Evals filed for one record (a calibration session, a model call's
+  check, a golden).
 - The earlier test routes, `/v1/workflows/triggered/tests*`, answer as
   before until the release after the next one; their `starter` list
   filter is ignored. An unknown workflow name answers `404

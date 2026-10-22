@@ -158,6 +158,19 @@ test("ontology suggestions namespace maps each operation to its route", async ()
   assert.deepEqual(JSON.parse(bodies[5] ?? ""), { reason: "not now" });
 });
 
+test("reviews list and patterns take the owner record of an eval item", async () => {
+  const { fetch, urls } = queuedFetch([]);
+  const client = new LbbClient({ baseUrl: "http://h", fetch });
+
+  await client.reviews.list({ originId: "evals:calibration", evalId: "s1" });
+  await client.reviews.patterns({ status: "open", evalId: "s1" });
+
+  assert.deepEqual(urls, [
+    "http://h/v1/reviews?origin_id=evals%3Acalibration&eval_id=s1",
+    "http://h/v1/reviews/patterns?status=open&eval_id=s1",
+  ]);
+});
+
 test("fit sources namespace maps each operation to its route", async () => {
   const { fetch, urls, bodies } = queuedFetch([]);
   const client = new LbbClient({ baseUrl: "http://h", fetch });
