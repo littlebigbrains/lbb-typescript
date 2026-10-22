@@ -64,6 +64,13 @@ All notable changes to the `@littlebigbrain/client` package are documented here.
   `ListResponse` extends it. The `before` option of `runs` and the `after`
   option of `queue` and `documents` still work and are deprecated in favor
   of `cursor`.
+- `reviews.get` reads `GET /v1/reviews/get`, the new name of
+  `/v1/reviews/detail`. A data plane without the new route answers its
+  catch-all `404`, and the client then reads `/v1/reviews/detail`.
+- `reviews.all(options)` iterates every item with the filters of `list`.
+- `reviews.answer`, `answerBatch`, `withdraw` and `comment` send an
+  `Idempotency-Key`: yours (`idempotencyKey`), else one the call makes. So
+  the client's retry of a network failure or a 5xx is safe.
 
 ## 0.29.0 (2026-10-21)
 

@@ -3374,8 +3374,28 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Read one review item with its question, evidence, answer and effects */
+        /**
+         * Deprecated: `GET /v1/reviews/get`, the same read
+         * @deprecated
+         */
         get: operations["get_v1_reviews_detail"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/reviews/get": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read one review item with its question, evidence, answer and effects */
+        get: operations["get_v1_reviews_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -4062,7 +4082,7 @@ export interface paths {
         };
         /** The graph's workflows with triggers: a target workflow type, its shards (engine identities `starter.<name>`, `starter.<name>.<k>`), its settings and its one trigger (a watch, or a content trigger on the uploads of some media types), with the status shape of `/v1/workflows/triggered` and each shard's engine state. Lists your workflows and LBB's document, values and review workflows (their target is an `lbb.*` type and they run in LBB). `name` for one (returns NamedWorkflow; 404 `named_workflow_not_found`) */
         get: operations["get_v1_workflows_named"];
-        /** Create or change a workflow of your worker with one trigger. A watch sends the class's new, changed and removed instances as messages to `shards` engine identities (1 to 16, default 1), routed by `route_by` (a field; default the instance IRI) so the changes of one key stay in order, at most `window` messages queued per shard (1 to 128, default 4). A content trigger (`content.media_types`) sends each upload of those media types as it is logged, without a wait for a publication: one content per message, routed by its SHA-256, with origin `content`. Each message names its origin. The same request again is a no-op; a workflow keeps its trigger's kind. 400 `workflow_trigger_unsupported` for a schedule or more than one trigger; 400 `workflow_param_invalid` for an `lbb.*` target; 409 `workflow_shards_busy` for a change of `shards` or `route_by` while a shard's inbox holds messages; 409 `workflow_cycle`, `workflow_owns_conflict`; 503 `workflows_disabled` */
+        /** Create or change a workflow of your worker with one trigger. A watch sends the class's new, changed and removed instances as messages to `shards` engine identities (1 to 16, default 1), routed by `route_by` (a field; default the instance IRI) so the changes of one key stay in order, at most `window` messages queued per shard (1 to 128, default 4). A content trigger (`content.media_types`) sends each upload of those media types as it is logged, without a wait for a publication: one content per message, routed by its SHA-256, with origin `content`. Each message names its origin. The same request again is a no-op; a workflow keeps its trigger's kind. 400 `workflow_trigger_unsupported` for a schedule or more than one trigger; 400 `workflow_param_invalid` for an `lbb.*` target; 409 `workflow_shards_busy` for a change of `shards` or `route_by` while a shard's inbox holds messages; 409 `workflow_cycle`, `workflow_owns_conflict`; 503 `workflows_disabled`. The PUT replaces the whole workflow, so a repeat with the same body changes nothing: it needs no `Idempotency-Key` */
         put: operations["put_v1_workflows_named"];
         post?: never;
         /** Delete a workflow's triggers. What it wrote stays, and so do the engine identities of your worker's type */
@@ -4098,7 +4118,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Pause (`paused: true`) or resume a workflow: its watch, and every shard of your worker's type (no new claims). A resume catches up */
+        /** Pause (`paused: true`) or resume a workflow: its watch, and every shard of your worker's type (no new claims). A resume catches up. A repeat changes nothing, so it needs no `Idempotency-Key` */
         post: operations["post_v1_workflows_named_pause"];
         delete?: never;
         options?: never;
@@ -4132,7 +4152,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Send the instances a turn of a shard could not do again later: they go back into the watch's queue on the same shard, with origin `requeue` (the attempt, the asking turn and message, the first error) and a backoff of one minute, then four, then sixteen. The attempt is one more than the asking message's (`origin.attempt` of a requeue); past 3 the instances are exhausted, not sent again, and counted in the workflow's `exhausted`. Record the failure in the turn's result, ask for the requeue, and complete the turn */
+        /** Send the instances a turn of a shard could not do again later: they go back into the watch's queue on the same shard, with origin `requeue` (the attempt, the asking turn and message, the first error) and a backoff of one minute, then four, then sixteen. The attempt is one more than the asking message's (`origin.attempt` of a requeue); past 3 the instances are exhausted, not sent again, and counted in the workflow's `exhausted`. Record the failure in the turn's result, ask for the requeue, and complete the turn. A repeat from the same turn queues nothing again (the items wait with this attempt already); past 3 attempts a repeat counts the same items in `exhausted` again. It takes no `Idempotency-Key` */
         post: operations["post_v1_workflows_named_requeue"];
         delete?: never;
         options?: never;
@@ -4149,7 +4169,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Run a workflow now: its watch reads every instance of the class again and sends them with origin `manual`; a content trigger reads its content log again from the start. Answers at once (`queued`) */
+        /** Run a workflow now: its watch reads every instance of the class again and sends them with origin `manual`; a content trigger reads its content log again from the start. Answers at once (`queued`). A repeat while the run waits adds nothing; a repeat after the pass started starts the pass again from its first instance. It takes no `Idempotency-Key` */
         post: operations["post_v1_workflows_named_run"];
         delete?: never;
         options?: never;
@@ -14888,7 +14908,7 @@ export interface components {
         /**
          * @description The answered item a `review.answered` event carries: what a workflow
          *     acts on, each text cut so the message stays within the engine's 32 KiB.
-         *     `GET /v1/reviews/detail?id=` reads the whole item.
+         *     `GET /v1/reviews/get?id=` reads the whole item.
          */
         ReviewAnsweredItem: {
             answer: components["schemas"]["ReviewAnswer"];
@@ -15019,7 +15039,7 @@ export interface components {
          * @description A question for a person (`/v1/reviews`). A list holds each item without
          *     its `facts` and `comments`, with its first quote only, and with
          *     `rationale` and long question texts cut to 300 characters; `GET
-         *     /v1/reviews/detail` returns it in full.
+         *     /v1/reviews/get` returns it in full.
          */
         ReviewItem: {
             answer?: null | components["schemas"]["ReviewAnswer"];
@@ -54393,6 +54413,149 @@ export interface operations {
         };
     };
     get_v1_reviews_detail: {
+        parameters: {
+            query?: {
+                /** @description Graph name (default `main`) */
+                graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
+                /** @description Review item id (`rev_…`) */
+                id?: string;
+            };
+            header?: {
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                "Lbb-Version"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReviewItem"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Rate limit exceeded */
+            429: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Service unavailable */
+            503: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+        };
+    };
+    get_v1_reviews_get: {
         parameters: {
             query?: {
                 /** @description Graph name (default `main`) */
