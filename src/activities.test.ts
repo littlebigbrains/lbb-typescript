@@ -613,7 +613,7 @@ test("waitForReview reads the item again when its wait times out", async () => {
     { timeoutMs: 1_000 },
   );
   assert.deepEqual(keys, ["floor.ask", "floor.read"]);
-  assert.equal(seen[1]?.path, "/v1/reviews/detail");
+  assert.equal(seen[1]?.path, "/v1/reviews/get");
   assert.equal(result.answered, true);
   assert.deepEqual(result.answer, { decision: "choose", option: "b" });
 });
