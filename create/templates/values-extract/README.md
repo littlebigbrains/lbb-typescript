@@ -1,8 +1,8 @@
 # values-extract
 
 Fills properties of a class from the text of its instances. Each value
-comes with the words of the text that state it: `width_cm` 60 and
-`depth_cm` 40 from `ca. 60x40 cm`. The value is written on the instance,
+comes with the words of the text that state it: `width_cm` 120 and
+`depth_cm` 80 from `120 x 80 cm`. The value is written on the instance,
 with an edge `HAS_VALUE_SOURCE` to a `ValueSource` entity whose evidence is
 the quote.
 
@@ -85,9 +85,9 @@ a new turn (`ctx.continue`).
 
 | Setting | Default | Meaning |
 | --- | --- | --- |
-| `className` | `EquipmentItem` | The class whose instances are read |
+| `className` | `Product` | The class whose instances are read |
 | `textField` | `text` | The property that holds the text |
-| `properties` | `width_cm`, `depth_cm` (`f64`), `material` (`text`), `water_supply` (`keyword`) | The properties to fill, with their types (`text`, `keyword`, `i64`, `f64`, `bool`, `date_time`) |
+| `properties` | `width_cm`, `depth_cm` (`f64`), `material` (`text`), `color` (`keyword`) | The properties to fill, with their types (`text`, `keyword`, `i64`, `f64`, `bool`, `date_time`) |
 | `context` | the samples' | One sentence about what the text is |
 | `gate` | 0.8 | The support a value needs to be written |
 | `units` | `width_cm`, `depth_cm`: `cm` | The unit of each number property; `ontology()` declares it on the property |
@@ -119,17 +119,26 @@ converted value, the template's the value as stated.
 
 ## Samples and test
 
-`samples/records.json` holds six invented entries of a sanitary equipment
-list; `samples/expected.json` gives the values a correct run writes, and the
-ones it leaves out ([`../_samples/README.md`](../_samples/README.md)).
+`samples/records.json` holds six invented product data sheets of office
+furniture and small appliances, five in English and one in German;
+`samples/expected.json` gives the values a correct run reads, and the ones it
+leaves out ([`../_samples/README.md`](../_samples/README.md)).
 
 `workflow.test.ts` runs the workflow with mock models: the reasoning model
-reads the first size, material and water supply of each text, and the
-decision model says a quote from a sentence about an accessory (`Zubehör`)
-or a conditional variant (`Bei Einsatz`) does not support its value. The run
-writes the values of the answer key and none it leaves out. The test also
-checks the review path, the checks of type and quote, an instance that
-leaves the class, and a message larger than a turn.
+reads the first size with the unit the text states, the first material and
+the color of each text. The decision model says a quote from a sentence
+about an accessory (`Accessory:`) or a variant under a condition
+(`For two screens:`) does not support its value, and gives a quote that
+says `about` 0.6, below the gate. The run writes the values of the answer
+key and none it leaves out. Four values go to a person for review:
+
+- the width and depth of `T-160`, which the text states in `m` and `mm`
+  (LBB's version converts them);
+- the width of `R-3`, whose quote states no unit;
+- the width of `K-17`, whose quote says `about`.
+
+The test also checks the review path, the checks of type and quote, an
+instance that leaves the class, and a message larger than a turn.
 
 ## Test on examples
 
@@ -141,8 +150,8 @@ prints, for each input, the values the workflow would write and the values
 it would give a person to review.
 
 ```sh
-LBB_URL=... LBB_API_KEY=... LBB_GRAPH=tender npm run test:examples           # the first 6 instances
-LBB_URL=... LBB_API_KEY=... LBB_GRAPH=tender npm run test:examples -- <iri>  # chosen instances
+LBB_URL=... LBB_API_KEY=... LBB_GRAPH=products npm run test:examples           # the first 6 instances
+LBB_URL=... LBB_API_KEY=... LBB_GRAPH=products npm run test:examples -- <iri>  # chosen instances
 ```
 
 The model calls count in your environment's budget. For the LBB-run

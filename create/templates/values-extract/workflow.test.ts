@@ -1,9 +1,11 @@
 // values-extract on its samples, with mock models whose rules are fixed:
-// the reasoning model reads the first size (`60x40 cm`, or `Breite 60 cm`)
-// with its unit, the first material and the water supply of each text, and the decision
-// model says a quote from a sentence about an accessory (`Zubehör`) or a
-// conditional variant (`Bei Einsatz`) does not support its value. The
-// expected values come from samples/expected.json.
+// the reasoning model reads the first size (`120 x 80 cm`, else `width 1.6 m`
+// and `depth 800 mm`, or `Breite 43`) with the unit the text states, the
+// first material and the color of each text. The decision model says a
+// quote from a sentence about an accessory (`Accessory:`) or a variant under
+// a condition (`For two screens:`) does not support its value, and gives a
+// quote that says `about` 0.6, below the gate. The expected values come from
+// samples/expected.json.
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { join } from "node:path";
@@ -53,30 +55,41 @@ const EXPECTED = readJson<{
   records: { name: string; values: ExpectedValue[]; leave_out: ExpectedValue[] }[];
 }>(join(SAMPLES, "expected.json"));
 
-const iriOf = (name: string) => ENTITY_IRI_NAMESPACE + mockId(`EquipmentItem:${name}`);
+const iriOf = (name: string) => ENTITY_IRI_NAMESPACE + mockId(`Product:${name}`);
 
 const MATERIALS = [
-  "Sanitärkeramik",
-  "Stahl emailliert",
-  "Mineralguss",
-  "Edelstahl",
-  "Kristallglas",
-  "Keramik",
-  "Glas",
+  "beech veneer",
+  "oak veneer",
+  "aluminium",
+  "brushed stainless steel",
+  "stainless steel",
+  "bamboo",
+  "Stahlblech",
+  "plastic",
+  "steel",
 ];
 
-/** The mock reasoning model: the first size, material and water supply of a text. */
+/** A size with the unit the text states it in, if any: `width 1.6 m`, `Breite 43`. */
+const sized = (words: string) =>
+  new RegExp(`(?:${words}) (?:about )?(\\d+(?:\\.\\d+)?)(?: (mm|cm|m)\\b)?`, "i");
+
+/** The mock reasoning model: the first size, material and color of a text. */
 function readValues(text: string) {
   const values: { property: string; value: string; unit: string; quote: string }[] = [];
-  const size = text.match(/(?:ca\. )?(\d+)x(\d+) cm/);
-  const width = text.match(/Breite (\d+) cm/);
+  const size = text.match(/(\d+) x (\d+) cm/);
+  const width = text.match(sized("width|Breite"));
+  const depth = text.match(sized("depth|Tiefe"));
   if (size)
     values.push(
       { property: "width_cm", value: size[1]!, unit: "cm", quote: size[0] },
       { property: "depth_cm", value: size[2]!, unit: "cm", quote: size[0] },
     );
-  else if (width)
-    values.push({ property: "width_cm", value: width[1]!, unit: "cm", quote: width[0] });
+  else
+    for (const [property, found] of [
+      ["width_cm", width],
+      ["depth_cm", depth],
+    ] as const)
+      if (found) values.push({ property, value: found[1]!, unit: found[2] ?? "", quote: found[0] });
   const material = MATERIALS.map((m) => ({
     m,
     at: text.search(new RegExp(`(?<![\\p{L}])${m}(?![\\p{L}])`, "u")),
@@ -85,22 +98,20 @@ function readValues(text: string) {
     .sort((a, b) => a.at - b.at)[0];
   if (material)
     values.push({ property: "material", value: material.m, unit: "", quote: material.m });
-  const water = text.match(/Anschluss[^.]*?(Kalt- und Warmwasser|Kaltwasser)/);
-  if (water)
-    values.push({
-      property: "water_supply",
-      value: water[1] === "Kaltwasser" ? "kalt" : "kalt und warm",
-      unit: "",
-      quote: water[0],
-    });
+  const color = text.match(/(?:Color|Farbe): (\p{L}+)/u);
+  if (color) values.push({ property: "color", value: color[1]!, unit: "", quote: color[0] });
   return values;
 }
 
-/** The mock decision model: the support of each quote, from the sentence that holds it. */
+/** The mock decision model: the support of each quote, from the quote and the sentence that holds it. */
 function support(text: string, instructions: string, options: string[]): DecideAnswer {
   const quote = instructions.match(/Quote: "(.*)"$/s)![1]!;
   const sentence = text.split(/(?<=\.)\s+/).find((s) => s.includes(quote)) ?? "";
-  const p = /Zubehör|Bei Einsatz/.test(sentence) ? 0.05 : /etwa/.test(sentence) ? 0.6 : 0.92;
+  const p = /^(?:Accessory|For [^:]+):/.test(sentence)
+    ? 0.05
+    : /\babout\b/i.test(quote)
+      ? 0.6
+      : 0.92;
   const choice = p >= 0.5 ? "supported" : "not_supported";
   return {
     choice,
@@ -157,6 +168,21 @@ const matches = (got: unknown, want: ExpectedValue) =>
         String(got).trim().toLowerCase(),
       );
 
+/**
+ * The values of the answer key that the template gives a person to review,
+ * with the reason it gives: a number the text states in another unit (the
+ * key's `stated`, which LBB's values.extract converts), a number whose quote
+ * states no unit, and a quote that says `about` (the mock decision model
+ * gives it 0.6, below the gate).
+ */
+const REVIEWED: Record<string, RegExp> = {
+  "T-160 width_cm": /^The unit is not confirmed: the text states m; the property holds cm\./,
+  "T-160 depth_cm": /^The unit is not confirmed: the text states mm; the property holds cm\./,
+  "K-17 width_cm": /^The text supports the value with 0\.60, below the gate 0\.8\.$/,
+  "R-3 width_cm": /^The unit is not confirmed: the text states no unit; the property holds cm\./,
+};
+const reviewed = (record: string, property: string) => `${record} ${property}` in REVIEWED;
+
 test("the samples give the values of the answer key and none it leaves out", async () => {
   const lbb = new MockActivities(rules(RECORDS));
   const { state, turns } = await runMessage(
@@ -171,7 +197,9 @@ test("the samples give the values of the answer key and none it leaves out", asy
     const values = written(lbb, record.name);
     for (const want of record.values)
       assert.ok(
-        matches(values[want.property], want),
+        reviewed(record.name, want.property)
+          ? !(want.property in values)
+          : matches(values[want.property], want),
         `${record.name} ${want.property}: ${values[want.property]}`,
       );
     for (const out of record.leave_out)
@@ -181,15 +209,29 @@ test("the samples give the values of the answer key and none it leaves out", asy
       );
     assert.deepEqual(
       Object.keys(values).sort(),
-      record.values.map((v) => v.property).sort(),
+      record.values
+        .filter((v) => !reviewed(record.name, v.property))
+        .map((v) => v.property)
+        .sort(),
       record.name,
     );
   }
+  // One value item per value in review, with its reason.
+  const items = [...lbb.questions.values()];
+  assert.deepEqual(
+    items.map((item) => `${item.subject!.name} ${item.question.property}`).sort(),
+    Object.keys(REVIEWED).sort(),
+  );
+  for (const item of items)
+    assert.match(
+      item.rationale ?? "",
+      REVIEWED[`${item.subject!.name} ${item.question.property}`]!,
+    );
   assert.deepEqual(state, {
     instances: 6,
     values_proposed: 22,
-    written: 20,
-    review: 0,
+    written: 16,
+    review: 4,
     weak_support: 2,
     quote_not_found: 0,
     invalid_value: 0,
@@ -199,7 +241,6 @@ test("the samples give the values of the answer key and none it leaves out", asy
     commits: 1,
     removed: 0,
   });
-  assert.equal(lbb.questions.size, 0);
   assert.equal(lbb.reviews.size, 0);
   assert.equal(turns.length, 1);
 });
@@ -215,7 +256,7 @@ test("each written value has a source whose evidence is a quote of the text", as
   );
 
   const edges = lbb.graph.edgesOf("HAS_VALUE_SOURCE");
-  assert.equal(edges.length, 20);
+  assert.equal(edges.length, 16);
   for (const edge of edges) {
     const record = RECORDS.find((r) => iriOf(r.name) === edge.source)!;
     const evidence = edge.evidence as { text: string };
@@ -235,7 +276,12 @@ test("each step reports its phase as the LBB-run values.extract words it", async
       RECORDS.map((r) => iriOf(r.name)),
     ),
   );
-  assert.deepEqual(phases(turns), ["reading values", "asking the decision model", "writing facts"]);
+  assert.deepEqual(phases(turns), [
+    "reading values",
+    "asking the decision model",
+    "filing review items",
+    "writing facts",
+  ]);
   assert.deepEqual(
     turns[0]!.progress
       .filter((p) => p.phase === "reading values")
@@ -247,17 +293,17 @@ test("each step reports its phase as the LBB-run values.extract words it", async
 test("a value below the gate goes to review, and the checks run in LBB's order", async () => {
   const record = {
     name: "S 9.1",
-    text: "S 9.1 Becken aus Kunststoff. Breite etwa 70 cm, Tiefe 40 cm.",
+    text: "S 9.1 Bench of plastic. Width about 70 cm, depth 40 cm.",
   };
   // The checks of values.extract: the property, then the first value of
   // it, then the type, then the quote. A second material is a duplicate
   // even when the first one fails a later check.
   const proposals = [
-    { property: "width_cm", value: "70", unit: "cm", quote: "Breite etwa 70 cm" },
-    { property: "depth_cm", value: "vierzig", unit: "cm", quote: "Tiefe 40 cm" },
-    { property: "material", value: "Kunststoff", unit: "", quote: "Becken aus Kunststoff" },
-    { property: "material", value: "Holz", unit: "", quote: "aus Holz gefertigt" },
-    { property: "height_cm", value: "80", unit: "", quote: "Becken aus Kunststoff" },
+    { property: "width_cm", value: "70", unit: "cm", quote: "Width about 70 cm" },
+    { property: "depth_cm", value: "forty", unit: "cm", quote: "depth 40 cm" },
+    { property: "material", value: "plastic", unit: "", quote: "Bench of plastic" },
+    { property: "material", value: "wood", unit: "", quote: "made of wood" },
+    { property: "height_cm", value: "80", unit: "", quote: "Bench of plastic" },
   ];
   const lbb = new MockActivities(rules([record], { reason: () => ({ values: proposals }) }));
   const { state, turns } = await runMessage(
@@ -269,7 +315,7 @@ test("a value below the gate goes to review, and the checks run in LBB's order",
     { step: "review", phase: "filing review items", done: 0, total: 1, unit: "items" },
   );
 
-  assert.deepEqual(written(lbb, record.name), { material: "Kunststoff" });
+  assert.deepEqual(written(lbb, record.name), { material: "plastic" });
   assert.equal(state.values_proposed, 5);
   assert.equal(state.written, 1);
   assert.equal(state.review, 1);
@@ -289,7 +335,7 @@ test("a value below the gate goes to review, and the checks run in LBB's order",
   assert.deepEqual(item!.workflow, { name: "values-extract" });
   assert.deepEqual(item!.subject, {
     iri: iriOf(record.name),
-    type: "EquipmentItem",
+    type: "Product",
     name: record.name,
   });
   assert.deepEqual(item!.question, {
@@ -298,7 +344,7 @@ test("a value below the gate goes to review, and the checks run in LBB's order",
     unit: "cm",
     confidence: item!.question.confidence,
   });
-  assert.equal(item!.evidence![0]!.quote, "Breite etwa 70 cm");
+  assert.equal(item!.evidence![0]!.quote, "Width about 70 cm");
   assert.deepEqual(item!.facts!.entity_properties![0]!.properties, { width_cm: 70 });
 
   // Accepted, the value is written with the others the next time the instance is read.
@@ -312,7 +358,7 @@ test("a value below the gate goes to review, and the checks run in LBB's order",
     createWorkflow(accepting),
     triggerMessage("values-extract", [iriOf(record.name)]),
   );
-  assert.deepEqual(written(accepting, record.name), { width_cm: 70, material: "Kunststoff" });
+  assert.deepEqual(written(accepting, record.name), { width_cm: 70, material: "plastic" });
 
   // Corrected, the person's number is written as given, in the property's unit.
   const correcting = new MockActivities(
@@ -325,7 +371,7 @@ test("a value below the gate goes to review, and the checks run in LBB's order",
     createWorkflow(correcting),
     triggerMessage("values-extract", [iriOf(record.name)]),
   );
-  assert.deepEqual(written(correcting, record.name), { width_cm: 72, material: "Kunststoff" });
+  assert.deepEqual(written(correcting, record.name), { width_cm: 72, material: "plastic" });
 });
 
 /** A second message to the same workflow, at a later commit (its own step effect ids). */
@@ -336,9 +382,9 @@ const later = (iri: string) => ({
 
 test("a person's correction stays when new evidence reads another value, which asks again", async () => {
   const records = [
-    { name: "S 9.3", text: "S 9.3 Becken aus Kunststoff. Breite etwa 70 cm, Tiefe 40 cm." },
+    { name: "S 9.3", text: "S 9.3 Bench of plastic. Width about 70 cm, depth 40 cm." },
   ];
-  let proposals = [{ property: "width_cm", value: "70", unit: "cm", quote: "Breite etwa 70 cm" }];
+  let proposals = [{ property: "width_cm", value: "70", unit: "cm", quote: "Width about 70 cm" }];
   const lbb = new MockActivities(
     rules(records, {
       reason: () => ({ values: proposals }),
@@ -352,8 +398,8 @@ test("a person's correction stays when new evidence reads another value, which a
 
   // A new version of the text, and the model reads 80 above the gate: the
   // person is asked again, and the corrected 72 stays until they answer.
-  records[0]!.text = "S 9.3 Becken aus Kunststoff. Breite 80 cm.";
-  proposals = [{ property: "width_cm", value: "80", unit: "cm", quote: "Breite 80 cm" }];
+  records[0]!.text = "S 9.3 Bench of plastic. Width 80 cm.";
+  proposals = [{ property: "width_cm", value: "80", unit: "cm", quote: "Width 80 cm" }];
   await runMessage(workflow, later(iriOf("S 9.3")));
   assert.deepEqual(written(lbb, "S 9.3"), { width_cm: 72 });
   const [item] = await lbb.reviewItems([
@@ -365,8 +411,8 @@ test("a person's correction stays when new evidence reads another value, which a
 });
 
 test("an accepted value stays when new evidence reads the same value, and asks nothing", async () => {
-  const records = [{ name: "S 9.5", text: "S 9.5 Becken. Breite etwa 70 cm." }];
-  let proposals = [{ property: "width_cm", value: "70", unit: "cm", quote: "Breite etwa 70 cm" }];
+  const records = [{ name: "S 9.5", text: "S 9.5 Bench. Width about 70 cm." }];
+  let proposals = [{ property: "width_cm", value: "70", unit: "cm", quote: "Width about 70 cm" }];
   const lbb = new MockActivities(
     rules(records, {
       reason: () => ({ values: proposals }),
@@ -376,16 +422,16 @@ test("an accepted value stays when new evidence reads the same value, and asks n
   const workflow = createWorkflow(lbb);
   await runMessage(workflow, triggerMessage("values-extract", [iriOf("S 9.5")]));
   assert.deepEqual(written(lbb, "S 9.5"), { width_cm: 70 });
-  records[0]!.text = "S 9.5 Becken. Breite 70 cm.";
-  proposals = [{ property: "width_cm", value: "70", unit: "cm", quote: "Breite 70 cm" }];
+  records[0]!.text = "S 9.5 Bench. Width 70 cm.";
+  proposals = [{ property: "width_cm", value: "70", unit: "cm", quote: "Width 70 cm" }];
   await runMessage(workflow, later(iriOf("S 9.5")));
   assert.deepEqual(written(lbb, "S 9.5"), { width_cm: 70 });
   assert.equal(lbb.previous.size, 0, "nothing is asked again");
 });
 
 test("a rejected value is not written again, even above the gate", async () => {
-  const records = [{ name: "S 9.6", text: "S 9.6 Becken. Breite etwa 70 cm." }];
-  let proposals = [{ property: "width_cm", value: "70", unit: "cm", quote: "Breite etwa 70 cm" }];
+  const records = [{ name: "S 9.6", text: "S 9.6 Bench. Width about 70 cm." }];
+  let proposals = [{ property: "width_cm", value: "70", unit: "cm", quote: "Width about 70 cm" }];
   const lbb = new MockActivities(
     rules(records, {
       reason: () => ({ values: proposals }),
@@ -395,16 +441,16 @@ test("a rejected value is not written again, even above the gate", async () => {
   const workflow = createWorkflow(lbb);
   await runMessage(workflow, triggerMessage("values-extract", [iriOf("S 9.6")]));
   assert.deepEqual(written(lbb, "S 9.6"), {});
-  records[0]!.text = "S 9.6 Becken. Breite 70 cm.";
-  proposals = [{ property: "width_cm", value: "70", unit: "cm", quote: "Breite 70 cm" }];
+  records[0]!.text = "S 9.6 Bench. Width 70 cm.";
+  proposals = [{ property: "width_cm", value: "70", unit: "cm", quote: "Width 70 cm" }];
   await runMessage(workflow, later(iriOf("S 9.6")));
   assert.deepEqual(written(lbb, "S 9.6"), {});
 });
 
 test("an answer the graph refused is not written, and the batch's other values are", async () => {
   const records = [
-    { name: "S 9.7", text: "S 9.7 Becken. Breite etwa 70 cm." },
-    { name: "S 9.8", text: "S 9.8 Becken. Breite 60 cm." },
+    { name: "S 9.7", text: "S 9.7 Bench. Width about 70 cm." },
+    { name: "S 9.8", text: "S 9.8 Bench. Width 60 cm." },
   ];
   const lbb = new MockActivities(
     rules(records, {
@@ -412,10 +458,10 @@ test("an answer the graph refused is not written, and the batch's other values a
         (JSON.parse(request.prompt) as { text: string }).text.includes("S 9.7")
           ? {
               values: [
-                { property: "width_cm", value: "70", unit: "cm", quote: "Breite etwa 70 cm" },
+                { property: "width_cm", value: "70", unit: "cm", quote: "Width about 70 cm" },
               ],
             }
-          : { values: [{ property: "width_cm", value: "60", unit: "cm", quote: "Breite 60 cm" }] },
+          : { values: [{ property: "width_cm", value: "60", unit: "cm", quote: "Width 60 cm" }] },
       reviewAnswer: () => ({ decision: "correct", value: 72 }),
       reviewRefused: () => "the shape MaxWidth rejects 72",
     }),
@@ -432,8 +478,8 @@ test("an answer the graph refused is not written, and the batch's other values a
 });
 
 test("a value the graph refused is not written when a later text states it", async () => {
-  const records = [{ name: "S 9.6", text: "S 9.6 Becken. Breite etwa 70 cm." }];
-  let proposals = [{ property: "width_cm", value: "70", unit: "cm", quote: "Breite etwa 70 cm" }];
+  const records = [{ name: "S 9.6", text: "S 9.6 Bench. Width about 70 cm." }];
+  let proposals = [{ property: "width_cm", value: "70", unit: "cm", quote: "Width about 70 cm" }];
   const lbb = new MockActivities(
     rules(records, {
       reason: () => ({ values: proposals }),
@@ -446,15 +492,15 @@ test("a value the graph refused is not written when a later text states it", asy
   assert.deepEqual(written(lbb, "S 9.6"), {});
   // The text now states 72 above the gate: the graph refused it, so it is
   // not written; the item stays open for the person.
-  records[0]!.text = "S 9.6 Becken. Breite 72 cm.";
-  proposals = [{ property: "width_cm", value: "72", unit: "cm", quote: "Breite 72 cm" }];
+  records[0]!.text = "S 9.6 Bench. Width 72 cm.";
+  proposals = [{ property: "width_cm", value: "72", unit: "cm", quote: "Width 72 cm" }];
   await runMessage(workflow, later(iriOf("S 9.6")));
   assert.deepEqual(written(lbb, "S 9.6"), {});
 });
 
 test("the value a person decided on, quoted from another span, asks nothing", async () => {
-  const records = [{ name: "S 9.2", text: "S 9.2 Becken. Breite etwa 70 cm." }];
-  let proposals = [{ property: "width_cm", value: "70", unit: "cm", quote: "Breite etwa 70 cm" }];
+  const records = [{ name: "S 9.2", text: "S 9.2 Bench. Width about 70 cm." }];
+  let proposals = [{ property: "width_cm", value: "70", unit: "cm", quote: "Width about 70 cm" }];
   const lbb = new MockActivities(
     rules(records, {
       reason: () => ({ values: proposals }),
@@ -466,7 +512,7 @@ test("the value a person decided on, quoted from another span, asks nothing", as
   assert.deepEqual(written(lbb, "S 9.2"), { width_cm: 72 });
   // The same text; the model quotes another span of it, and spells the unit
   // otherwise. The person decided on 70 already.
-  proposals = [{ property: "width_cm", value: "70", unit: "CM", quote: "etwa 70 cm" }];
+  proposals = [{ property: "width_cm", value: "70", unit: "CM", quote: "about 70 cm" }];
   await runMessage(workflow, later(iriOf("S 9.2")));
   assert.deepEqual(written(lbb, "S 9.2"), { width_cm: 72 });
   assert.equal(lbb.previous.size, 0, "nothing is asked again");
@@ -476,7 +522,7 @@ test("the evidence of a value is its quote and the unit the text states, as LBB 
   const [checked] = check(
     [{ property: "width_cm", value: "60", unit: "CM", quote: "Breite  60 cm" }],
     defaults.properties,
-    "Waschtisch, Breite 60 cm",
+    "Breite 60 cm",
     { width_cm: "cm" },
   );
   // LBB's golden: values_evidence_hash("Breite 60 cm", "cm").
@@ -484,8 +530,8 @@ test("the evidence of a value is its quote and the unit the text states, as LBB 
 });
 
 test("a held value keeps its source link", async () => {
-  const records = [{ name: "S 9.9", text: "S 9.9 Becken. Breite etwa 70 cm." }];
-  let proposals = [{ property: "width_cm", value: "70", unit: "cm", quote: "Breite etwa 70 cm" }];
+  const records = [{ name: "S 9.9", text: "S 9.9 Bench. Width about 70 cm." }];
+  let proposals = [{ property: "width_cm", value: "70", unit: "cm", quote: "Width about 70 cm" }];
   const lbb = new MockActivities(
     rules(records, {
       reason: () => ({ values: proposals }),
@@ -499,8 +545,8 @@ test("a held value keeps its source link", async () => {
   assert.equal(links(), 1);
   // New evidence with another value: asked again, the accepted 70 and its
   // source link stay.
-  records[0]!.text = "S 9.9 Becken. Breite 85 cm.";
-  proposals = [{ property: "width_cm", value: "85", unit: "cm", quote: "Breite 85 cm" }];
+  records[0]!.text = "S 9.9 Bench. Width 85 cm.";
+  proposals = [{ property: "width_cm", value: "85", unit: "cm", quote: "Width 85 cm" }];
   await runMessage(workflow, later(iriOf("S 9.9")));
   assert.deepEqual(written(lbb, "S 9.9"), { width_cm: 70 });
   assert.equal(links(), 1);
@@ -513,9 +559,9 @@ for (const [status, writes] of [
   ["dismissed", {}],
 ] as const) {
   test(`a value an earlier version filed as a suggestion keeps working (${status})`, async () => {
-    const record = { name: "S 9.4", text: "S 9.4 Becken. Breite etwa 70 cm." };
+    const record = { name: "S 9.4", text: "S 9.4 Bench. Width about 70 cm." };
     const proposals = [
-      { property: "width_cm", value: "70", unit: "cm", quote: "Breite etwa 70 cm" },
+      { property: "width_cm", value: "70", unit: "cm", quote: "Width about 70 cm" },
     ];
     const lbb = new MockActivities(rules([record], { reason: () => ({ values: proposals }) }));
     // The key of the suggestion: one per value.
@@ -528,7 +574,7 @@ for (const [status, writes] of [
     const facts: Schemas["SuggestedFacts"] = {
       entity_properties: [
         {
-          ...entityRef(iriOf(record.name), "EquipmentItem", record.name),
+          ...entityRef(iriOf(record.name), "Product", record.name),
           properties: { width_cm: 70 },
         },
       ],
@@ -557,13 +603,13 @@ test("an instance that leaves the class keeps its values, as in LBB's values.ext
   const commits = lbb.graph.commits;
   const { state } = await runMessage(
     workflow,
-    triggerMessage("values-extract", [], [iriOf("S 4.1")]),
+    triggerMessage("values-extract", [], [iriOf("D-120")]),
     first.state,
   );
 
   // Its values go with its fields when it is retracted; the turn writes nothing.
-  assert.equal(written(lbb, "S 4.1").width_cm, 60);
-  assert.equal(lbb.graph.ofType("ValueSource").length, 20);
+  assert.equal(written(lbb, "D-120").width_cm, 120);
+  assert.equal(lbb.graph.ofType("ValueSource").length, 16);
   assert.equal(lbb.graph.commits, commits);
   assert.equal(state.removed, 1);
   assert.equal(state.instances, 6);
@@ -574,9 +620,9 @@ test("a value that changes back is written again: each write's id is its turn's 
   // write holds repeats when the value goes A, B, A, and the commit path
   // answers the repeat as a replay. An effect id is new for each message.
   const texts = [
-    "S 7.1 Waschtisch, Breite 55 cm.",
-    "S 7.1 Waschtisch, Breite 60 cm.",
-    "S 7.1 Waschtisch, Breite 55 cm.",
+    "S 7.1 Desk, width 55 cm.",
+    "S 7.1 Desk, width 60 cm.",
+    "S 7.1 Desk, width 55 cm.",
   ];
   let text = texts[0]!;
   const lbb = new MockActivities(
@@ -619,7 +665,7 @@ test("an instance whose model call is refused goes back to the watch and keeps i
   const refusing = new MockActivities({
     ...rules(RECORDS),
     refuses: (kind, request) =>
-      kind === "reason" && (request as { prompt: string }).prompt.includes("S 4.2"),
+      kind === "reason" && (request as { prompt: string }).prompt.includes("D-120"),
   });
   // The graph of the first run, read by the second.
   for (const [iri, entity] of lbb.graph.entities) refusing.graph.entities.set(iri, entity);
@@ -633,9 +679,9 @@ test("an instance whose model call is refused goes back to the watch and keeps i
   assert.equal(turns.length, 1);
   assert.deepEqual(
     refusing.requeued.map((r) => r.failed.map((f) => f.instance)),
-    [[iriOf("S 4.2")]],
+    [[iriOf("D-120")]],
   );
-  assert.equal(written(refusing, "S 4.2").width_cm, 50);
+  assert.equal(written(refusing, "D-120").width_cm, 120);
   assert.equal(state.failed, 1);
   assert.equal(state.instances, 12);
 });
@@ -643,7 +689,7 @@ test("an instance whose model call is refused goes back to the watch and keeps i
 test("a value's evidence has the instance's page box as its region", async () => {
   const record = {
     name: "S 9.2",
-    text: "S 9.2 Handtuchspender, Edelstahl, 30x10 cm.",
+    text: "S 9.2 Coat rail, stainless steel, 30 x 10 cm.",
     box: { page: 3, x0: 0.1, y0: 0.2, x1: 0.6, y1: 0.3 },
   };
   const lbb = new MockActivities(rules([record]));
@@ -691,31 +737,31 @@ test("values take their property's type, and a quote is in the text", () => {
         { property: "width_cm", value: "61", quote: "61x40" },
       ],
       defaults.properties,
-      "text: Waschtisch 60x40",
+      "text: Desk 60x40",
     ).map((v) => v.outcome),
     ["", "duplicate"],
   );
-  assert.ok(quoteHolds("ca.  60x40 cm", "60", "Waschtisch, ca. 60x40 cm, weiß"));
-  assert.ok(!quoteHolds("weiß", "Keramik", "Waschtisch, weiß"));
-  assert.ok(!quoteHolds("aus Holz gefertigt", "Holz", "Waschtisch aus Keramik"));
+  assert.ok(quoteHolds("about  60x40 cm", "60", "Desk, about 60x40 cm, white"));
+  assert.ok(!quoteHolds("white", "oak", "Desk, white"));
+  assert.ok(!quoteHolds("made of wood", "wood", "Desk of oak"));
 });
 
 test("a number in another unit, or with none, goes to review and is not written", async () => {
   const record = {
     name: "S 9.2",
-    text: "S 9.2 Waschtisch, Breite 600 mm, Tiefe 45, aus Keramik.",
+    text: "S 9.2 Desk, width 600 mm, depth 45, of oak.",
   };
   const proposals = [
-    { property: "width_cm", value: "600", unit: "mm", quote: "Breite 600 mm" },
-    { property: "depth_cm", value: "45", unit: "", quote: "Waschtisch, Breite 600 mm, Tiefe 45" },
-    { property: "material", value: "Keramik", unit: "", quote: "aus Keramik" },
+    { property: "width_cm", value: "600", unit: "mm", quote: "width 600 mm" },
+    { property: "depth_cm", value: "45", unit: "", quote: "Desk, width 600 mm, depth 45" },
+    { property: "material", value: "oak", unit: "", quote: "of oak" },
   ];
   const lbb = new MockActivities(rules([record], { reason: () => ({ values: proposals }) }));
   const { state } = await runMessage(
     createWorkflow(lbb),
     triggerMessage("values-extract", [iriOf(record.name)]),
   );
-  assert.deepEqual(written(lbb, record.name), { material: "Keramik" });
+  assert.deepEqual(written(lbb, record.name), { material: "oak" });
   assert.equal(state.instances, 1);
   assert.equal(state.values_proposed, 3);
   assert.equal(state.written, 1);
@@ -742,16 +788,16 @@ test("the ontology declares the unit of each number property", () => {
   );
   assert.equal(unitOf(defaults, "material"), undefined);
   assert.equal(unitOf({ ...defaults, units: { material: "cm" } }, "material"), undefined);
-  assert.equal(unitProblem("cm", "cm", "ca. 60x40cm"), undefined);
+  assert.equal(unitProblem("cm", "cm", "about 60x40cm"), undefined);
   assert.equal(unitProblem("m2", "m²", "20 m²"), undefined);
-  assert.equal(unitProblem("cm", "cm", "Breite 60"), "the quote does not state the unit cm");
+  assert.equal(unitProblem("cm", "cm", "width 60"), "the quote does not state the unit cm");
   assert.equal(unitProblem("m", "m", "600 mm"), "the quote does not state the unit m");
   // A number with its unit in `value`, against the rules: LBB reads the two
   // apart, and so does the template.
   const [width] = check(
-    [{ property: "width_cm", value: "60 cm", unit: "", quote: "Breite 60 cm" }],
+    [{ property: "width_cm", value: "60 cm", unit: "", quote: "width 60 cm" }],
     defaults.properties,
-    "Waschtisch, Breite 60 cm",
+    "Desk, width 60 cm",
     { width_cm: "cm" },
   );
   assert.equal(width!.typed, 60);
@@ -771,8 +817,8 @@ test("test:examples runs the workflow on chosen inputs and writes nothing", asyn
   assert.deepEqual(first.errors, []);
   assert.deepEqual(first.review, []);
   const width = first.written.find((v) => v.property === "width_cm");
-  assert.equal(width?.value, "60");
-  assert.equal(width?.quote, "ca. 60x40 cm");
+  assert.equal(width?.value, "120");
+  assert.equal(width?.quote, "120 x 80 cm");
   assert.equal(width?.support, 0.92);
   assert.deepEqual(
     first.written.map((v) => v.property).sort(),
@@ -780,5 +826,5 @@ test("test:examples runs the workflow on chosen inputs and writes nothing", asyn
   );
   const lines = report(results);
   assert.equal(lines[0], iris[0]);
-  assert.ok(lines.some((line) => line.startsWith("  write   width_cm = 60 (support 0.92)")));
+  assert.ok(lines.some((line) => line.startsWith("  write   width_cm = 120 (support 0.92)")));
 });

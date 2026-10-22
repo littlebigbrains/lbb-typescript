@@ -20,12 +20,23 @@ export type ModelTrialReport = Schemas["ModelTrialReport"];
 export type ModelSwitch = Schemas["ModelSwitch"];
 
 /**
- * Cursor-based list envelope used by bounded collection reads.
+ * The list envelope: one page of a list, whether more follow, and the
+ * cursor of the next page (pass it as `cursor`). `client.listAll` pages
+ * through any list of this shape.
  */
-export interface ListResponse<T> {
-  object: "list";
+export interface ListPage<T> {
+  object?: string;
   data: T[];
   has_more: boolean;
+  next_cursor?: string | null;
+}
+
+/**
+ * The list envelope of a graph collection read, with the snapshot it read
+ * and the count of every row.
+ */
+export interface ListResponse<T> extends ListPage<T> {
+  object: "list";
   next_cursor: string | null;
   snapshot: Schemas["SnapshotView"];
   total_count: number;
@@ -329,7 +340,10 @@ export interface LbbClientOptions {
   stack?: string;
   /** Override the fetch implementation (defaults to the global `fetch`). */
   fetch?: FetchLike;
-  /** API version header sent on every request. Defaults to the beta reset contract. */
+  /**
+   * The `Lbb-Version` header sent on every request. Defaults to
+   * `2026-10-21`, the contract of the list envelope.
+   */
   apiVersion?: string;
   /**
    * Secondary safety cap on retries for 429/5xx responses and network failures.

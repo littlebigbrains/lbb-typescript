@@ -2,8 +2,79 @@
 
 All notable changes to the `@littlebigbrain/client` package are documented here.
 
+## Unreleased
+
+- The earlier test routes, `/v1/workflows/triggered/tests*`, answer as
+  before until the release after the next one; their `starter` list
+  filter is ignored. An unknown workflow name answers `404
+  named_workflow_not_found` (before: `triggered_workflow_not_found`,
+  the same status).
+- A second save of a test keeps the items added to its dataset by hand,
+  and a delete takes the dataset off its test (`dataset` is `null`
+  again).
+- `client.workflows.tests` calls `/v1/workflows/named/tests*`. `create`
+  names a workflow of the graph with `name` (in place of
+  `workflow: { starter, name }`), and `list({ name, limit, cursor })` takes
+  no `starter`.
+- A `WorkflowTest` has `dataset`: the id of the Evals dataset saved from its
+  answers, `null` until the first save.
+- `client.evals.datasets.create({ source: { kind: "test", id } })` keeps one
+  dataset per test: a later save of the test brings that dataset up to date
+  and returns it with the same id.
+- `client.evals.datasets.delete(id)` deletes a dataset and its items
+  (`DELETE /v1/evals/datasets`, with an idempotency key) and returns
+  `EvalDatasetDeleted` (`{ id, object: "eval_dataset", deleted: true }`). A
+  get or an export of it then fails with `404`, and the next save of its
+  test makes a new dataset.
+- `client.workflows.tests.all({ name })` and `client.evals.datasets.all()`
+  read every page of the list.
+- `client.workflows.tests.wait(id)` throws an `Error` named `TimeoutError`,
+  with the test and its status in the message, when the test is still open
+  after `timeoutMs` (default 10 minutes). Before, it returned the open test.
+- `client.workflows.tests.dataset(id)` and the type `WorkflowTestDataset`
+  are removed. Save the test with `client.evals.datasets.create` and its
+  `source`, then read `client.evals.datasets.export(dataset.id)`.
+- The client sends `Lbb-Version: 2026-10-21` by default. On this version
+  the workflow lists answer in the list envelope,
+  `{ object: "list", data, has_more, next_cursor }`, with `limit` and
+  `cursor`: `workflows.named.list`, `queue`, `runs` and `documents`, and
+  `workflows.triggered.runs` and `documents`. Read `.data` where you read
+  `.workflows`, `.items`, `.runs` or `.documents`, and pass `next_cursor`
+  as `cursor`. The queue's `next_cursor` is a string. The list methods
+  always return the envelope, whatever `apiVersion` says; only a raw
+  `client.request(...)` sent with `apiVersion: "2026-07-23"` gets the
+  earlier shapes.
+- Each list method reads both shapes. A server older than the envelope
+  answers the earlier shape, and the method returns it converted, so this
+  client works against an older data plane too. A `cursor` that server
+  ignored is sent again under its earlier name (`before` or `after`).
+- `workflows.named.list({ limit, cursor })` returns one page (`limit` 1 to
+  200, default 100), and `all()` iterates every workflow.
+  `runs(name, { cursor, limit, outcome })` and `allRuns(name)`,
+  `queue(name, { trigger, cursor, limit })`, and the new
+  `documents(name, { q, sort, cursor, limit })` and `allDocuments(name)`
+  (`GET /v1/workflows/named/documents`). A workflow has `object: "workflow"`
+  and `created`.
+- `workflows.triggered.{list, get, refresh, pause, runs, run, runStats,
+  documents, delete}` are deprecated; each doc comment names its
+  `workflows.named` method. They keep working. `starters.use`,
+  `triggered.preview` and the calibration routes have no named form and
+  stay.
+- `listAll` takes any page in the list envelope (`ListPage`, now exported);
+  `ListResponse` extends it. The `before` option of `runs` and the `after`
+  option of `queue` and `documents` still work and are deprecated in favor
+  of `cursor`.
+
 ## 0.29.0 (2026-10-21)
 
+- Activity calls name their step (`workflow.step`): `reason`, `decide` and
+  `embed` called in a step of a `WorkflowWorker` turn send the step's key, so
+  the call log names the step (`scope: live`). The worker records each step's
+  effect id when the step starts. A call whose effect id is a step's, or
+  starts with it followed by `.` or `:` (such as `${s.effectId}.2`), names
+  that step; a call with no such step names none. `captureActivities` sends
+  the step the same way. A data plane before this field refuses it, so roll
+  the data plane first.
 - `WorkflowWorker` stops a turn on `409 turn_lease_lost`, the code a turn
   route now answers when the attempt's token no longer holds its turn. It
   still stops on any other 409 or a 404, as an older server answers a lost

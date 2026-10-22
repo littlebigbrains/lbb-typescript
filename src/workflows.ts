@@ -426,14 +426,18 @@ export class WorkflowNamespace {
    */
   readonly starters: StarterWorkflowsNamespace;
   /**
-   * The workflows created from a starter workflow on this graph: each one
-   * runs when a published commit changes the class it watches.
+   * The workflows created from a starter workflow on this graph, by
+   * starter and name: each one runs when a published commit changes the
+   * class it watches. `named` reads and changes the same workflows by
+   * name; `preview` and the calibration of a gate stay here.
    */
   readonly triggered: TriggeredWorkflowsNamespace;
   /**
-   * Workflows with triggers: a target workflow type, shards, settings and
-   * a watch or content trigger; and the queue of what each trigger has not
-   * sent yet. `triggered` is the watches in their older shape.
+   * The workflows of the graph by name: a target workflow type, shards,
+   * settings and a watch or content trigger; the queue of what each
+   * trigger has not sent yet, the runs, and the documents of a document
+   * workflow. The lists answer in the list envelope and have iterators
+   * (`all`, `allRuns`, `allDocuments`).
    */
   readonly named: NamedWorkflowsNamespace;
   /**
@@ -443,7 +447,8 @@ export class WorkflowNamespace {
   readonly derivations: DerivationsNamespace;
   /**
    * Tests: a workflow runs on chosen inputs and writes nothing; a person
-   * answers each value, and the answers export as a dataset.
+   * answers each value, and the answers save as the test's dataset
+   * (`client.evals.datasets`).
    */
   readonly tests: WorkflowTestsNamespace;
   /** Blobs: large step outputs and shared reads, keyed by their SHA-256. */
@@ -611,12 +616,18 @@ const suspended = Symbol("workflow sleep");
 
 /**
  * The run of a turn this process runs: the `workflow` its activity calls
- * name, and what those calls used, added up for the completion.
+ * name, what those calls used, added up for the completion, and the steps
+ * whose function ran in this attempt.
  * @internal
  */
 export interface ActivityTurn {
   workflow: Schemas["ActivityWorkflow"];
   usage: Schemas["WorkflowRunUsage"];
+  /**
+   * Each step whose function ran in this attempt: its effect id and its
+   * key. At most 64 (the steps of a turn), cleared when the turn ends.
+   */
+  steps: Map<string, string>;
 }
 
 /** The turns this process runs now, by their effect prefix. */
@@ -640,6 +651,34 @@ export function activityTurn(
   }
   if (runningTurns.size !== 1) return undefined;
   return runningTurns.values().next().value;
+}
+
+/**
+ * The key of the step of `turn` that makes an activity call: the step whose
+ * effect id is `effectId`, else the step with the longest effect id that
+ * `effectId` starts with followed by `.` or `:` (an id made from it, such as
+ * `${s.effectId}.2`). `undefined` when no step of the turn matches. The
+ * lookup reads the step runner's record and parses no step from the id.
+ * @internal
+ */
+export function activityStep(
+  turn: ActivityTurn,
+  effectId: string | undefined,
+): string | undefined {
+  if (effectId === undefined) return undefined;
+  const exact = turn.steps.get(effectId);
+  if (exact !== undefined) return exact;
+  let found: { id: string; key: string } | undefined;
+  for (const [id, key] of turn.steps) {
+    const next = effectId[id.length];
+    if (
+      (next === "." || next === ":") &&
+      effectId.startsWith(id) &&
+      (!found || id.length > found.id.length)
+    )
+      found = { id, key };
+  }
+  return found?.key;
 }
 
 /** Add one activity call's usage to its turn. @internal */
@@ -783,6 +822,7 @@ export class WorkflowWorker {
         tokens_out: 0,
         cost_micro_usd: 0,
       },
+      steps: new Map(),
     };
     runningTurns.set(task.effect_prefix, turnRun);
     let alive = true,
@@ -977,10 +1017,13 @@ export class WorkflowWorker {
           controller.signal.addEventListener("abort", clearOperationTimers, {
             once: true,
           });
+          const effectId = `${task.effect_prefix}/${key}`;
+          // An activity call with this id, or one made from it, names the step.
+          turnRun.steps.set(effectId, key);
           try {
             output = copy(
               await effect!({
-                effectId: `${task.effect_prefix}/${key}`,
+                effectId,
                 fence: { ...lease },
                 graph: turnGraph,
                 signal: controller.signal,
@@ -1208,6 +1251,7 @@ export class WorkflowWorker {
     } finally {
       if (runningTurns.get(task.effect_prefix) === turnRun)
         runningTurns.delete(task.effect_prefix);
+      turnRun.steps.clear();
       controller.signal.removeEventListener("abort", onAbort);
       alive = false;
       stopHeartbeat();

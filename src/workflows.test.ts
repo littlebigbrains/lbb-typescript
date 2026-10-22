@@ -664,12 +664,14 @@ test("activity calls of a turn name its run and their usage goes with the comple
     identity: "agent",
     turn: 1,
     run_id: "0000000000001-agent-1",
+    step: "define",
     instance: "manual-px-210.pdf",
   });
   assert.deepEqual(activity[1].body.workflow, {
     identity: "agent",
     turn: 1,
     run_id: "0000000000001-agent-1",
+    step: "embed",
   });
   const done = calls.filter((c) => c.path.endsWith("/complete"));
   // The completion's retry after a lost answer sends the same usage.

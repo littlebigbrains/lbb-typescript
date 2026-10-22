@@ -38,6 +38,7 @@ const CLIENT_SOURCES = [
   "src/triggered-workflows.ts",
   "src/triggered-workflow-worker.ts",
   "src/workflow-tests.ts",
+  "src/eval-datasets.ts",
 ].map((file) => resolve(process.cwd(), file));
 
 const HTTP_METHODS = new Set(["get", "head", "post", "put", "patch", "delete"]);
@@ -69,6 +70,11 @@ function clientRoutes(): Set<string> {
   let match: RegExpExecArray | null;
   while ((match = re.exec(source)) !== null) {
     routes.add(`${match[1]} ${match[2]}`);
+  }
+  // The workflow lists read through `listPage(this.client, "/v1/…", …)`.
+  const lists = /listPage\(\s*this\.client,\s*"([^"]+)"/g;
+  while ((match = lists.exec(source)) !== null) {
+    routes.add(`GET ${match[1]}`);
   }
   return routes;
 }

@@ -172,7 +172,7 @@ LBB-run
   tokens (28,000), per page, four at once.
 - **A new ontology version maps again**, and a new decision model asks
   again (its version holds the model). The template maps on a message: call
-  `client.workflows.triggered.refresh` after an ontology change, and change
+  `client.workflows.named.run(name)` after an ontology change, and change
   `m1` in the effect id to ask a new model.
 - **Stale suggestions.** It supersedes the open suggestions a later run no
   longer finds.

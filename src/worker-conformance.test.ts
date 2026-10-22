@@ -294,8 +294,11 @@ class Program {
         prompt: string;
         schema: Record<string, unknown>;
       };
+      // `effect_id`: true for the step's own, text for an id made from it.
+      const suffix =
+        typeof action.effect_id === "string" ? action.effect_id : "";
       await this.activities.reason(request, {
-        ...(action.effect_id ? { effectId: step.effectId } : {}),
+        ...(action.effect_id ? { effectId: `${step.effectId}${suffix}` } : {}),
       });
     } else if ("blob_put" in action)
       await this.client.workflows.blobs.put(String(action.blob_put), {

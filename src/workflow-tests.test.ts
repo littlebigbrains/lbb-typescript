@@ -68,7 +68,7 @@ const TEST = {
   status: "queued",
 };
 
-test("tests start with an idempotency key and read, list, answer, cancel and export", async () => {
+test("tests start with an idempotency key and read, list, answer and cancel", async () => {
   const { client: lbb, seen } = client([
     { body: TEST },
     { body: { ...TEST, status: "done" } },
@@ -83,33 +83,31 @@ test("tests start with an idempotency key and read, list, answer, cancel and exp
     { body: { object: "list", data: [TEST], has_more: false } },
     { body: TEST },
     { body: { ...TEST, status: "cancelled" } },
-    { body: { kind: "values", test: TEST.id, records: [], expected: {} } },
   ]);
   const started = await lbb.workflows.tests.create({
-    workflow: { starter: "values.extract", name: "sinks" },
+    name: "sinks",
     sample: 3,
   });
   assert.equal(started.id, TEST.id);
   assert.equal(seen[0]?.method, "POST");
-  assert.equal(seen[0]?.path, "/v1/workflows/triggered/tests");
+  assert.equal(seen[0]?.path, "/v1/workflows/named/tests");
   assert.match(
     seen[0]?.headers["idempotency-key"] ?? "",
     /^workflow-tests\.create:/,
   );
-  assert.deepEqual(seen[0]?.body, {
-    workflow: { starter: "values.extract", name: "sinks" },
-    sample: 3,
-  });
+  assert.deepEqual(seen[0]?.body, { name: "sinks", sample: 3 });
   const done = await lbb.workflows.tests.get(TEST.id);
   assert.equal(done.status, "done");
-  assert.equal(seen[1]?.path, "/v1/workflows/triggered/tests/get");
+  assert.equal(seen[1]?.path, "/v1/workflows/named/tests/get");
   assert.equal(seen[1]?.query.get("id"), TEST.id);
   // `all` pages through the list.
   const all = [];
   for await (const item of lbb.workflows.tests.all({ name: "sinks" }))
     all.push(item);
   assert.equal(all.length, 2);
+  assert.equal(seen[2]?.path, "/v1/workflows/named/tests");
   assert.equal(seen[2]?.query.get("name"), "sinks");
+  assert.equal(seen[2]?.query.has("starter"), false);
   assert.equal(seen[3]?.query.get("cursor"), TEST.id);
   await lbb.workflows.tests.answer({
     id: TEST.id,
@@ -117,7 +115,7 @@ test("tests start with an idempotency key and read, list, answer, cancel and exp
     property: "width_cm",
     answer: { decision: "correct", value: 45 },
   });
-  assert.equal(seen[4]?.path, "/v1/workflows/triggered/tests/answer");
+  assert.equal(seen[4]?.path, "/v1/workflows/named/tests/answer");
   assert.match(
     seen[4]?.headers["idempotency-key"] ?? "",
     /^workflow-tests\.answer:/,
@@ -125,10 +123,13 @@ test("tests start with an idempotency key and read, list, answer, cancel and exp
   const cancelled = await lbb.workflows.tests.cancel(TEST.id);
   assert.equal(cancelled.status, "cancelled");
   assert.equal(seen[5]?.method, "POST");
+  assert.equal(seen[5]?.path, "/v1/workflows/named/tests/cancel");
   assert.equal(seen[5]?.query.get("id"), TEST.id);
-  const dataset = await lbb.workflows.tests.dataset(TEST.id);
-  assert.equal(dataset.kind, "values");
-  assert.equal(seen[6]?.path, "/v1/workflows/triggered/tests/dataset");
+  assert.equal(
+    "dataset" in lbb.workflows.tests,
+    false,
+    "a test's answers save as a dataset through evals.datasets",
+  );
   assert.equal(isWorkflowTestOpen({ status: "running" }), true);
   assert.equal(isWorkflowTestOpen({ status: "failed" }), false);
 });
@@ -141,6 +142,22 @@ test("wait reads the test until it ends", async () => {
   const ended = await lbb.workflows.tests.wait(TEST.id, { intervalMs: 1 });
   assert.equal(ended.status, "done");
   assert.equal(seen.length, 2);
+});
+
+test("wait throws a TimeoutError when the test is still open after its timeout", async () => {
+  const { client: lbb, seen } = client([
+    { body: { ...TEST, status: "running" } },
+    { body: { ...TEST, status: "running" } },
+  ]);
+  await assert.rejects(
+    lbb.workflows.tests.wait(TEST.id, { intervalMs: 1, timeoutMs: 0 }),
+    (error: Error) => {
+      assert.equal(error.name, "TimeoutError");
+      assert.equal(error.message, `workflow test ${TEST.id} is still running`);
+      return true;
+    },
+  );
+  assert.equal(seen.length, 1, "a timeout of 0 reads the test once");
 });
 
 /** A step context that runs each step once and names its effect id. */

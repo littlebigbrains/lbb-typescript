@@ -1364,9 +1364,10 @@ export interface paths {
         /** The graph's Evals datasets, newest first, without their items */
         get: operations["get_v1_evals_datasets"];
         put?: never;
-        /** Create an Evals dataset of kind `values`: a `name` and its first `items` (each a name, the input `text`, the `values` a correct run writes and the ones it must `leave_out`), with the `install` it is graded with. Or create it from a workflow test (`source: {kind: "test", id}`): the test's answers become the items. At most 500 items and 8 MiB of items; a write's body is at most 1 MiB. Takes `Idempotency-Key`: the same key with the same body answers the same dataset, with another body 409 `idempotency_conflict` */
+        /** Create an Evals dataset of kind `values`: a `name` and its first `items` (each a name, the input `text`, the `values` a correct run writes and the ones it must `leave_out`), with the `install` it is graded with. Or create it from a workflow test (`source: {kind: "test", id}`): the test's answers become the items. A test has one dataset, which the test names (`dataset`): a save of a test whose dataset exists brings that dataset up to date and answers it. At most 500 items and 8 MiB of items; a write's body is at most 1 MiB. Takes `Idempotency-Key`: the same key with the same body answers the same dataset, with another body 409 `idempotency_conflict` */
         post: operations["post_v1_evals_datasets"];
-        delete?: never;
+        /** Delete an Evals dataset: its items (the graph's texts) are removed, and a list, a get and an export no longer find it (404). The next save of its test makes a new dataset. A delete repeated answers the same `{id, object, deleted: true}` */
+        delete: operations["delete_v1_evals_datasets"];
         options?: never;
         head?: never;
         patch?: never;
@@ -4071,6 +4072,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/workflows/named/documents": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** One page of the documents of a `documents.link` or `documents.map` workflow, by the workflow's name, rows as in its `details.documents` (which lists only the 20 with the most review items). 400 `workflow_param_invalid` for another workflow, and for a `cursor` whose document is gone; 404 `named_workflow_not_found` */
+        get: operations["get_v1_workflows_named_documents"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/workflows/named/pause": {
         parameters: {
             query?: never;
@@ -4190,6 +4208,75 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/workflows/named/tests": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The graph's workflow tests, newest first, without their inputs' texts and their results */
+        get: operations["get_v1_workflows_named_tests"];
+        put?: never;
+        /** Test a `values.extract` workflow on chosen inputs: it reads them as it would live and writes nothing to the graph. Name a workflow of the graph (`name`) or a workflow to create (`install`), and `iris` (at most 20) or a `sample` of the watched class (default 6). The test starts `queued`, then `running`, and ends `done`, `failed` or `cancelled`; poll `get`. Its calls count in the call log and the environment's budget, and never in calibration or the checks. Takes `Idempotency-Key`: the same key with the same body answers the same test, with another body 409 `idempotency_conflict`. 429 `workflow_budget_exceeded` when its estimate passes the budget left, 409 `conflict` while a test of the workflow is open, 503 `workflows_disabled` without the workflow engine */
+        post: operations["post_v1_workflows_named_tests"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/workflows/named/tests/answer": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** A person's answer to one property of one read input, as a `value` review item takes it: `accept`, `reject`, `correct` with the right `value`, or `cant_tell`; `answer: null` removes it. Writes nothing to the graph. Takes `Idempotency-Key` */
+        post: operations["post_v1_workflows_named_tests_answer"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/workflows/named/tests/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Stop a queued or running test. The inputs it read keep their results; a test that ended stays as it is */
+        post: operations["post_v1_workflows_named_tests_cancel"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/workflows/named/tests/get": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** One workflow test: its frozen settings and fingerprint, its inputs with their texts, and per input the values with their quotes, support and outcome, and the answers */
+        get: operations["get_v1_workflows_named_tests_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/workflows/run": {
         parameters: {
             query?: never;
@@ -4299,12 +4386,18 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Every triggered workflow of the graph (a workflow created from a starter workflow) in one status shape: embeddings, fit sources and the rest; `starter` and `name` for one (returns TriggeredWorkflow). The list is light: each workflow's status (with `outputs`) without its own status in `details`, which the read of one workflow carries; `details=true` adds it to the list */
+        /**
+         * Every triggered workflow of the graph (a workflow created from a starter workflow) in one status shape: embeddings, fit sources and the rest; `starter` and `name` for one (returns TriggeredWorkflow). The list is light: each workflow's status (with `outputs`) without its own status in `details`, which the read of one workflow carries; `details=true` adds it to the list
+         * @deprecated
+         */
         get: operations["get_v1_workflows_triggered"];
         /** Create a workflow from a starter workflow, or change one. `search.embed` and `ontology.fit` write the same documents as `/v1/embeddings` and `/v1/ontology/fit-sources`; `workflow` sends the watched instances to a workflow of your worker; `documents.parse`, `documents.link` and `values.extract` run in LBB and write the facts they own (409 `workflow_cycle`, 409 `workflow_owns_conflict`, 400 `rdf_native_graph`, 503 `workflows_disabled`, 503 `parser_unavailable`) */
         put: operations["put_v1_workflows_triggered"];
         post?: never;
-        /** Delete a triggered workflow. What it already wrote stays */
+        /**
+         * Delete a triggered workflow. What it already wrote stays
+         * @deprecated
+         */
         delete: operations["delete_v1_workflows_triggered"];
         options?: never;
         head?: never;
@@ -4352,7 +4445,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** One page of the documents of a `documents.link` or `documents.map` workflow, rows as in its `details.documents` (which lists only the 20 with the most review items). 400 `workflow_param_invalid` for the other starter workflows, and for an `after` whose document is gone */
+        /**
+         * One page of the documents of a `documents.link` or `documents.map` workflow, rows as in its `details.documents` (which lists only the 20 with the most review items). 400 `workflow_param_invalid` for the other starter workflows, and for an `after` whose document is gone
+         * @deprecated
+         */
         get: operations["get_v1_workflows_triggered_documents"];
         put?: never;
         post?: never;
@@ -4371,7 +4467,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Pause (`paused: true`) or resume a triggered workflow of `workflow` or of a first-party starter workflow. A paused workflow reads and sends nothing; a resumed one catches up. 400 `workflow_pause_unsupported` for `search.embed` and `ontology.fit` */
+        /**
+         * Pause (`paused: true`) or resume a triggered workflow of `workflow` or of a first-party starter workflow. A paused workflow reads and sends nothing; a resumed one catches up. 400 `workflow_pause_unsupported` for `search.embed` and `ontology.fit`
+         * @deprecated
+         */
         post: operations["post_v1_workflows_triggered_pause"];
         delete?: never;
         options?: never;
@@ -4405,7 +4504,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Ask a triggered workflow to run now (`queued: true`) and return its status at once */
+        /**
+         * Ask a triggered workflow to run now (`queued: true`) and return its status at once
+         * @deprecated
+         */
         post: operations["post_v1_workflows_triggered_refresh"];
         delete?: never;
         options?: never;
@@ -4420,7 +4522,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** The runs of a triggered workflow of the starter store: `GET /v1/workflows/named/runs` by `starter` and `name`, the compatibility view until phase 7. 400 `workflow_param_invalid` for `search.embed` and `ontology.fit`, which keep no runs */
+        /**
+         * The runs of a triggered workflow of the starter store: `GET /v1/workflows/named/runs` by `starter` and `name`, the compatibility view until phase 7. 400 `workflow_param_invalid` for `search.embed` and `ontology.fit`, which keep no runs
+         * @deprecated
+         */
         get: operations["get_v1_workflows_triggered_runs"];
         put?: never;
         post?: never;
@@ -4437,7 +4542,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** One run of a triggered workflow with its model calls: `GET /v1/workflows/named/runs/get` by `starter` and `name`. 404 `workflow_run_not_found` */
+        /**
+         * One run of a triggered workflow with its model calls: `GET /v1/workflows/named/runs/get` by `starter` and `name`. 404 `workflow_run_not_found`
+         * @deprecated
+         */
         get: operations["get_v1_workflows_triggered_runs_get"];
         put?: never;
         post?: never;
@@ -4454,94 +4562,11 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** A triggered workflow's runs by hour: `GET /v1/workflows/named/runs/stats` by `starter` and `name` */
+        /**
+         * A triggered workflow's runs by hour: `GET /v1/workflows/named/runs/stats` by `starter` and `name`
+         * @deprecated
+         */
         get: operations["get_v1_workflows_triggered_runs_stats"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/workflows/triggered/tests": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** The graph's workflow tests, newest first, without their inputs' texts and their results */
-        get: operations["get_v1_workflows_triggered_tests"];
-        put?: never;
-        /** Test a `values.extract` workflow on chosen inputs: it reads them as it would live and writes nothing to the graph. Name a workflow of the graph (`workflow`) or a workflow to create (`install`), and `iris` (at most 20) or a `sample` of the watched class (default 6). The test starts `queued`, then `running`, and ends `done`, `failed` or `cancelled`; poll `get`. Its calls count in the call log and the environment's budget, and never in calibration or the checks. Takes `Idempotency-Key`: the same key with the same body answers the same test, with another body 409 `idempotency_conflict`. 429 `workflow_budget_exceeded` when its estimate passes the budget left, 409 `conflict` while a test of the workflow is open, 503 `workflows_disabled` without the workflow engine */
-        post: operations["post_v1_workflows_triggered_tests"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/workflows/triggered/tests/answer": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** A person's answer to one property of one read input, as a `value` review item takes it: `accept`, `reject`, `correct` with the right `value`, or `cant_tell`; `answer: null` removes it. Writes nothing to the graph. Takes `Idempotency-Key` */
-        post: operations["post_v1_workflows_triggered_tests_answer"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/workflows/triggered/tests/cancel": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Stop a queued or running test. The inputs it read keep their results; a test that ended stays as it is */
-        post: operations["post_v1_workflows_triggered_tests_cancel"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/workflows/triggered/tests/dataset": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** A test's answers as an Evals dataset of kind `values`, in the shape of a template's samples: `records` (records.json) and `expected` (expected.json). Only answered properties are in it */
-        get: operations["get_v1_workflows_triggered_tests_dataset"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/workflows/triggered/tests/get": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** One workflow test: its frozen settings and fingerprint, its inputs with their texts, and per input the values with their quotes, support and outcome, and the answers */
-        get: operations["get_v1_workflows_triggered_tests_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -4828,9 +4853,11 @@ export interface components {
         ActivityUnit: "phases" | "partitions" | "lines" | "bytes" | "entities" | "commits" | "tables" | "documents" | "pages" | "mentions" | "links" | "proposals" | "instances" | "questions" | "messages" | "items";
         /**
          * @description The run of a workflow turn that an activity call belongs to
-         *     (`workflow` of `POST /v1/workflows/activities/*`). The TypeScript SDK
-         *     sets it from the step context. The server checks its shape only: the
-         *     work token names the graph only, so the instance object is not read.
+         *     (`workflow` of `POST /v1/workflows/activities/*`). The SDKs set it from
+         *     the step context. The caller names its workflow and turn; the server
+         *     checks the shape, and counts the call under the named workflow that
+         *     owns the identity when the graph has one. It does not check that the
+         *     caller holds the turn: the work token names the graph only.
          */
         ActivityWorkflow: {
             /**
@@ -4848,6 +4875,13 @@ export interface components {
              *     identity and turn.
              */
             run_id?: string | null;
+            /**
+             * @description The key of the step that makes the call (`ctx.step`'s key, 1 to 128
+             *     characters of `A-Z a-z 0-9 _ . -`): the call log names it (`step`)
+             *     with `scope: live`. Added 2026-10-21; an older server refuses the
+             *     field.
+             */
+            step?: string | null;
             /**
              * Format: int64
              * @description The turn's number, at least 1.
@@ -7323,7 +7357,9 @@ export interface components {
         /**
          * @description `POST /v1/evals/datasets`: create a dataset with its first items, or
          *     from a source: `source: {kind: "test", id}` makes the answers of that
-         *     workflow test the items, and its settings the `install`.
+         *     workflow test the items, and its settings the `install`. A test has one
+         *     dataset (the test's `dataset`): a save of a test whose dataset exists
+         *     brings that dataset up to date and answers it.
          */
         EvalDatasetCreateRequest: {
             about?: string[];
@@ -7332,6 +7368,17 @@ export interface components {
             kind: components["schemas"]["EvalDatasetKind"];
             name: string;
             source?: null | components["schemas"]["EvalDatasetSource"];
+        };
+        /**
+         * @description `DELETE /v1/evals/datasets?id=`: the dataset was deleted. A delete
+         *     repeated answers the same.
+         */
+        EvalDatasetDeleted: {
+            /** @description Always `true`. */
+            deleted: boolean;
+            id: string;
+            /** @description `eval_dataset`. */
+            object: string;
         };
         /**
          * @description `expected.json` of an export: the answer key. Its `records` are the
@@ -10203,10 +10250,11 @@ export interface components {
         };
         /**
          * @description One workflow, job and model on one graph over the month: the calls of the
-         *     `workflows` feature, per workflow and job. `workflow` is the triggered
-         *     workflow's name, `@activities` for the workflow activities (a developer
-         *     workflow's code calls them without naming its workflow), or `*` (with
-         *     `graph` `*`) for the workflows past the ledger's bound. Added
+         *     `workflows` feature, per workflow and job. `workflow` is the workflow's
+         *     name: a triggered workflow's own calls, and the activity calls a turn of
+         *     a named workflow makes (the request's `workflow` names the turn; since
+         *     2026-10-21). `@activities` holds the activity calls outside such a turn,
+         *     and `*` (with `graph` `*`) the workflows past the ledger's bound. Added
          *     2026-10-11: a month recorded before has no rows.
          */
         ModelActivityWorkflow: {
@@ -10843,7 +10891,8 @@ export interface components {
             scope?: null | components["schemas"]["ModelCallScope"];
             /**
              * @description The step of the workflow that made the call (added 2026-10-20):
-             *     `values` or `support` for `values.extract`.
+             *     `values` or `support` for `values.extract`, the step key the SDK
+             *     sends (`workflow.step`) for an activity call inside a turn.
              */
             step?: string | null;
             /** @description A text or a list was cut to fit the bounds. */
@@ -10851,8 +10900,9 @@ export interface components {
             usage: components["schemas"]["ModelCallUsage"];
             /**
              * @description The model use the call served (added 2026-10-20): `extract` for an
-             *     AI step's reasoning call, `decide` for its decision call. Calls of
-             *     `values.extract` carry it.
+             *     AI step's reasoning call and for a `reason` activity call, `decide`
+             *     for a decision call and a `decide` activity call. Calls of
+             *     `values.extract` and the activity calls carry it.
              */
             use?: string | null;
         };
@@ -10902,6 +10952,14 @@ export interface components {
             run?: null | components["schemas"]["ModelCallRun"];
             /** @description The eval trace of the request, when it has one. */
             trace_id?: string | null;
+            /**
+             * @description The named workflow the call counts under (added 2026-10-21): the
+             *     workflow LBB runs (`starters/<name>`), the workflow whose turn made
+             *     an activity call, or the workflow a test names. Absent for a call of
+             *     no workflow. The model activity, Evals and the workflow page read
+             *     it, not the run's identity.
+             */
+            workflow?: string | null;
         };
         /** @description One call the SaaS API reports. */
         ModelCallReport: {
@@ -11774,10 +11832,26 @@ export interface components {
             batch?: number | null;
             /** Format: double */
             budget_usd_per_month?: number | null;
+            /** @description When it was created, RFC 3339 (the same as `created_at`). */
+            created?: string | null;
             created_at?: string | null;
+            /**
+             * @description The workflow's own status, on a read of one workflow (`?name=`): for a
+             *     workflow your worker runs `DeveloperWorkflowDetails` (the message in
+             *     flight, the instances waiting); for LBB's own its steps' status (the
+             *     documents of `documents.link`, the properties of `values.extract`).
+             *     A list and a workflow with a content trigger leave it out.
+             */
+            details?: unknown;
             fan_in?: null | components["schemas"]["NamedWorkflowFanIn"];
             gate?: null | components["schemas"]["WorkflowGate"];
+            /**
+             * @description The workflow's id: unique on the graph, and the key of every
+             *     `/v1/workflows/named*` route.
+             */
             name: string;
+            /** @description `workflow`. */
+            object?: string;
             /**
              * @description What a turn of a shard that failed for good does: absent while
              *     `block`.
@@ -11834,32 +11908,48 @@ export interface components {
             /** @description `starter.<name>.<id>`. */
             workflow_id: string;
         };
-        /** @description `GET /v1/workflows/named`: the graph's workflows with triggers, by name. */
+        /**
+         * @description `GET /v1/workflows/named`: the graph's workflows, by name, in the list
+         *     envelope (`limit` 1 to 200, default 100; `cursor`). A request with
+         *     `Lbb-Version` before 2026-10-21 gets the earlier shape: every workflow
+         *     in `workflows`.
+         */
         NamedWorkflowList: {
-            workflows: components["schemas"]["NamedWorkflow"][];
+            data: components["schemas"]["NamedWorkflow"][];
+            has_more: boolean;
+            /** @description Pass as `cursor` for the next page; absent on the last page. */
+            next_cursor?: string | null;
+            /** @description `list`. */
+            object: string;
         };
         /** @description `POST /v1/workflows/named/pause`: pause (`paused: true`) or resume. */
         NamedWorkflowPauseRequest: {
             paused: boolean;
         };
         /**
-         * @description `GET /v1/workflows/named/queue?name=&trigger=&after=&limit=`: what a
+         * @description `GET /v1/workflows/named/queue?name=&trigger=&cursor=&limit=`: what a
          *     watch has not sent yet, with origins, the pass in progress, and per
-         *     shard its unfinished turns and its running turn's progress.
+         *     shard its unfinished turns and its running turn's progress. The items
+         *     are a page in the list envelope; the other fields describe the queue. A
+         *     request with `Lbb-Version` before 2026-10-21 gets the earlier shape:
+         *     `items` and an integer `next_after` in place of `object`, `data`,
+         *     `has_more` and `next_cursor`.
          */
         NamedWorkflowQueue: {
             /**
-             * @description From position `after`, at most `limit` (1 to 100, default 50):
-             *     instances first, then removed instances, in send order.
+             * @description From the position `cursor` names, at most `limit` (1 to 100, default
+             *     50): instances first, then removed instances, in send order.
              */
-            items: components["schemas"]["WorkflowQueueItem"][];
+            data: components["schemas"]["WorkflowQueueItem"][];
+            has_more: boolean;
             name: string;
             /**
-             * Format: int64
-             * @description The position to pass as `after` for the next page. The queue moves
-             *     as it drains, so a page is a view at one time.
+             * @description Pass as `cursor` for the next page; absent on the last page. The
+             *     queue moves as it drains, so a page is a view at one time.
              */
-            next_after?: number | null;
+            next_cursor?: string | null;
+            /** @description `list`. */
+            object: string;
             pass?: null | components["schemas"]["WorkflowQueuePass"];
             /**
              * Format: int64
@@ -18672,14 +18762,20 @@ export interface components {
             weights?: null | components["schemas"]["SearchSignalWeights"];
         };
         /**
-         * @description `GET /v1/workflows/triggered/documents`: one page of the documents of a
-         *     `documents.link` or `documents.map` workflow. Each row has the fields
-         *     of a row of the workflow's `details.documents`.
+         * @description `GET /v1/workflows/named/documents`: one page of the documents of a
+         *     `documents.link` or `documents.map` workflow, in the list envelope. Each
+         *     row has the fields of a row of the workflow's `details.documents`. A
+         *     request with `Lbb-Version` before 2026-10-21 gets the earlier shape:
+         *     `documents` and `next_after` in place of `object`, `data`, `has_more`
+         *     and `next_cursor`.
          */
         TriggeredDocumentPage: {
-            documents: unknown[];
-            /** @description Pass as `after` for the next page; absent on the last page. */
-            next_after?: string | null;
+            data: unknown[];
+            has_more: boolean;
+            /** @description Pass as `cursor` for the next page; absent on the last page. */
+            next_cursor?: string | null;
+            /** @description `list`. */
+            object: string;
             /**
              * Format: int64
              * @description The documents that match `q`, on every page.
@@ -20042,17 +20138,25 @@ export interface components {
              */
             units?: number;
         };
-        /** @description A page of a workflow's runs, newest first. */
+        /**
+         * @description A page of a workflow's runs, newest first, in the list envelope. A
+         *     request with `Lbb-Version` before 2026-10-21 gets the earlier shape:
+         *     `runs` and `next_before` in place of `object`, `data`, `has_more` and
+         *     `next_cursor`.
+         */
         WorkflowRunList: {
-            /** @description Pass as `before` for the next page; absent on the last page. */
-            next_before?: string | null;
+            data: components["schemas"]["WorkflowRunSummary"][];
+            has_more: boolean;
+            /** @description Pass as `cursor` for the next page; absent on the last page. */
+            next_cursor?: string | null;
+            /** @description `list`. */
+            object: string;
             /**
              * Format: int64
              * @description Summaries this read wrote again from the engine's history (the
              *     first page only).
              */
             repaired?: number;
-            runs: components["schemas"]["WorkflowRunSummary"][];
         };
         /**
          * @description How a run ended.
@@ -20349,6 +20453,13 @@ export interface components {
             created: string;
             /** @description Who started it, when known. */
             created_by?: string | null;
+            /**
+             * @description The id of the Evals dataset saved from the test's answers
+             *     (`POST /v1/evals/datasets` with `source: {kind: "test", id}`); `null`
+             *     until the first save. A test has one dataset: a later save brings it
+             *     up to date with the answers.
+             */
+            dataset?: string | null;
             /** @description Why it failed, at most 500 characters. */
             error?: string | null;
             /**
@@ -20389,7 +20500,7 @@ export interface components {
             workflow: components["schemas"]["WorkflowTestWorkflow"];
         };
         /**
-         * @description `POST /v1/workflows/triggered/tests/answer`: a person's answer to one
+         * @description `POST /v1/workflows/named/tests/answer`: a person's answer to one
          *     property of one read input; `answer: null` removes it.
          */
         WorkflowTestAnswerRequest: {
@@ -20433,35 +20544,20 @@ export interface components {
             review: number;
         };
         /**
-         * @description `POST /v1/workflows/triggered/tests`: run a workflow on chosen inputs.
-         *     Name a workflow of the graph (`workflow`), or a workflow to create
-         *     (`install`, the body of `PUT /v1/workflows/triggered`); and the inputs
-         *     (`iris`, at most 20), or a sample of the watched class's first instances
-         *     (`sample`, 1 to 20, default 6).
+         * @description `POST /v1/workflows/named/tests`: run a workflow on chosen inputs. Name
+         *     a workflow of the graph (`name`), or a workflow to create (`install`,
+         *     the body that creates it from its template); and the inputs (`iris`, at
+         *     most 20), or a sample of the watched class's first instances (`sample`,
+         *     1 to 20, default 6).
          */
         WorkflowTestCreateRequest: {
             install?: null | components["schemas"]["TriggeredWorkflowRequest"];
             iris?: string[];
+            /** @description The name of a workflow of the graph (`GET /v1/workflows/named`). */
+            name?: string | null;
             /** Format: int32 */
             sample?: number | null;
             workflow?: null | components["schemas"]["WorkflowTestWorkflow"];
-        };
-        /**
-         * @description `GET /v1/workflows/triggered/tests/dataset`: a test's answers as an Evals
-         *     dataset of kind `values`, in the shape of a template's samples: the
-         *     inputs (`records.json`) and the answer key (`expected.json`). An input
-         *     is in it when a person answered at least one of its properties; only
-         *     answered properties are, and `cant_tell` answers are not.
-         *     `POST /v1/evals/datasets` with `source: {kind: "test", id}` stores the
-         *     same items as a dataset.
-         */
-        WorkflowTestDataset: {
-            expected: components["schemas"]["EvalDatasetExpected"];
-            fingerprint: string;
-            kind: components["schemas"]["EvalDatasetKind"];
-            records: components["schemas"]["EvalDatasetRecord"][];
-            /** @description The test's id. */
-            test: string;
         };
         /** @description One input of a test: an instance of the watched class. */
         WorkflowTestInput: {
@@ -20474,7 +20570,7 @@ export interface components {
              */
             text?: string;
         };
-        /** @description `GET /v1/workflows/triggered/tests`: the graph's tests, newest first. */
+        /** @description `GET /v1/workflows/named/tests`: the graph's tests, newest first. */
         WorkflowTestList: {
             data: components["schemas"]["WorkflowTest"][];
             has_more: boolean;
@@ -21040,7 +21136,7 @@ export interface operations {
                 stack?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -21187,7 +21283,7 @@ export interface operations {
                 stack?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -21334,7 +21430,7 @@ export interface operations {
                 stack?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -21483,7 +21579,7 @@ export interface operations {
                 limit?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -21624,7 +21720,7 @@ export interface operations {
                 stack?: string;
             };
             header: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key": string;
@@ -21771,7 +21867,7 @@ export interface operations {
                 stack?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -21920,7 +22016,7 @@ export interface operations {
                 id?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -22067,7 +22163,7 @@ export interface operations {
                 limit?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -22208,7 +22304,7 @@ export interface operations {
                 stack?: string;
             };
             header: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key": string;
@@ -22357,7 +22453,7 @@ export interface operations {
                 path?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -22502,7 +22598,7 @@ export interface operations {
                 limit?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -22643,7 +22739,7 @@ export interface operations {
                 stack?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -22790,7 +22886,7 @@ export interface operations {
                 stack?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -22943,7 +23039,7 @@ export interface operations {
                 limit?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -23086,7 +23182,7 @@ export interface operations {
                 revision?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -23227,7 +23323,7 @@ export interface operations {
                 stack?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -23374,7 +23470,7 @@ export interface operations {
                 stack?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -23521,7 +23617,7 @@ export interface operations {
                 stack?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -23668,7 +23764,7 @@ export interface operations {
                 stack?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -23815,7 +23911,7 @@ export interface operations {
                 stack?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -23962,7 +24058,7 @@ export interface operations {
                 stack?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -24109,7 +24205,7 @@ export interface operations {
                 stack?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -24256,7 +24352,7 @@ export interface operations {
                 stack?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -24403,7 +24499,7 @@ export interface operations {
                 stack?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -24550,7 +24646,7 @@ export interface operations {
                 stack?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -24691,7 +24787,7 @@ export interface operations {
                 stack?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -24838,7 +24934,7 @@ export interface operations {
                 stack?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -24985,7 +25081,7 @@ export interface operations {
                 stack?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -25132,7 +25228,7 @@ export interface operations {
                 stack?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -25279,7 +25375,7 @@ export interface operations {
                 stack?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -25426,7 +25522,7 @@ export interface operations {
                 stack?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -25573,7 +25669,7 @@ export interface operations {
                 stack?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -25720,7 +25816,7 @@ export interface operations {
                 stack?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -25861,7 +25957,7 @@ export interface operations {
                 stack?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -26008,7 +26104,7 @@ export interface operations {
                 stack?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -26155,7 +26251,7 @@ export interface operations {
                 stack?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -26296,7 +26392,7 @@ export interface operations {
                 stack?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -26443,7 +26539,7 @@ export interface operations {
                 stack?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -26590,7 +26686,7 @@ export interface operations {
                 stack?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -26737,7 +26833,7 @@ export interface operations {
                 stack?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -26884,7 +26980,7 @@ export interface operations {
                 stack?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -27031,7 +27127,7 @@ export interface operations {
                 stack?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -27178,7 +27274,7 @@ export interface operations {
                 stack?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -27325,7 +27421,7 @@ export interface operations {
                 stack?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -27466,7 +27562,7 @@ export interface operations {
                 stack?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -27613,7 +27709,7 @@ export interface operations {
                 stack?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -27764,7 +27860,7 @@ export interface operations {
                 name: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -27905,7 +28001,7 @@ export interface operations {
                 stack?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -28065,7 +28161,7 @@ export interface operations {
                 stack?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -28206,7 +28302,7 @@ export interface operations {
                 stack?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -28353,7 +28449,7 @@ export interface operations {
                 connection_id: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -28494,7 +28590,7 @@ export interface operations {
                 connection_id: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -28641,7 +28737,7 @@ export interface operations {
                 connection_id: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -28788,7 +28884,7 @@ export interface operations {
                 connection_id: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -28935,7 +29031,7 @@ export interface operations {
                 connection_id: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -29082,7 +29178,7 @@ export interface operations {
                 connection_id: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -29229,7 +29325,7 @@ export interface operations {
                 connection_id: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -29372,7 +29468,7 @@ export interface operations {
                 connection_id?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -29521,7 +29617,7 @@ export interface operations {
                 connection_id?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -29670,7 +29766,7 @@ export interface operations {
                 connection_id?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -29819,7 +29915,7 @@ export interface operations {
                 connection_id?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -29968,7 +30064,7 @@ export interface operations {
                 connection_id?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -30117,7 +30213,7 @@ export interface operations {
                 connection_id?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -30266,7 +30362,7 @@ export interface operations {
                 connection_id?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -30415,7 +30511,7 @@ export interface operations {
                 connection_id?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -30558,7 +30654,7 @@ export interface operations {
                 connection_id?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -30707,7 +30803,7 @@ export interface operations {
                 connection_id?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -30856,7 +30952,7 @@ export interface operations {
                 connection_id?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -31005,7 +31101,7 @@ export interface operations {
                 connection_id?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -31148,7 +31244,7 @@ export interface operations {
                 connection_id?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -31297,7 +31393,7 @@ export interface operations {
                 connection_id?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -31442,7 +31538,7 @@ export interface operations {
                 connection_id?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -31591,7 +31687,7 @@ export interface operations {
                 connection_id?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -31732,7 +31828,7 @@ export interface operations {
                 stack?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -31873,7 +31969,7 @@ export interface operations {
                 stack?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -32016,7 +32112,7 @@ export interface operations {
                 dataset?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -32163,7 +32259,7 @@ export interface operations {
                 build?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -32306,7 +32402,7 @@ export interface operations {
                 stack?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -32449,7 +32545,7 @@ export interface operations {
                 dataset?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -32594,7 +32690,7 @@ export interface operations {
                 name?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -32735,7 +32831,7 @@ export interface operations {
                 stack?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -32884,7 +32980,7 @@ export interface operations {
                 confirm?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -33027,7 +33123,7 @@ export interface operations {
                 stack?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -33172,7 +33268,7 @@ export interface operations {
                 stack?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -33321,7 +33417,7 @@ export interface operations {
                 name?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -33464,7 +33560,7 @@ export interface operations {
                 stack?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -33609,7 +33705,7 @@ export interface operations {
                 cursor?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -33750,7 +33846,7 @@ export interface operations {
                 stack?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -33883,6 +33979,151 @@ export interface operations {
             };
         };
     };
+    delete_v1_evals_datasets: {
+        parameters: {
+            query?: {
+                /** @description Graph name (default `main`) */
+                graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
+                /** @description the dataset's id */
+                id?: string;
+            };
+            header?: {
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                "Lbb-Version"?: string;
+                /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
+                "Idempotency-Key"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EvalDatasetDeleted"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Rate limit exceeded */
+            429: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Service unavailable */
+            503: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+        };
+    };
     get_v1_evals_datasets_export: {
         parameters: {
             query?: {
@@ -33899,7 +34140,7 @@ export interface operations {
                 id?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -34042,7 +34283,7 @@ export interface operations {
                 id?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -34183,7 +34424,7 @@ export interface operations {
                 stack?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -34330,7 +34571,7 @@ export interface operations {
                 stack?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -34471,7 +34712,7 @@ export interface operations {
                 stack?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -34620,7 +34861,7 @@ export interface operations {
                 id?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -34767,7 +35008,7 @@ export interface operations {
                 consistency?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -34914,7 +35155,7 @@ export interface operations {
                 limit?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -35059,7 +35300,7 @@ export interface operations {
                 trace?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -35210,7 +35451,7 @@ export interface operations {
                 runner?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -35353,7 +35594,7 @@ export interface operations {
                 consistency?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -35498,7 +35739,7 @@ export interface operations {
                 consistency?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -35645,7 +35886,7 @@ export interface operations {
                 stack?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -35786,7 +36027,7 @@ export interface operations {
                 stack?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -35933,7 +36174,7 @@ export interface operations {
                 id?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -36078,7 +36319,7 @@ export interface operations {
                 unlabeled?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -36227,7 +36468,7 @@ export interface operations {
                 name?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -36374,7 +36615,7 @@ export interface operations {
                 schema?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -36528,7 +36769,7 @@ export interface operations {
                 purge?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -36675,7 +36916,7 @@ export interface operations {
                 deleted?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
                 /** @description One byte range: `bytes=a-b`, `bytes=a-` or `bytes=-n` (RFC 9110) */
                 Range?: string;
@@ -36854,7 +37095,7 @@ export interface operations {
                 sha256?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -36995,7 +37236,7 @@ export interface operations {
                 stack?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -37144,7 +37385,7 @@ export interface operations {
                 deleted?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -37289,7 +37530,7 @@ export interface operations {
                 parser?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -37438,7 +37679,7 @@ export interface operations {
                 deleted?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -37579,7 +37820,7 @@ export interface operations {
                 stack?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -37724,7 +37965,7 @@ export interface operations {
                 dry_run?: string;
             };
             header: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key": string;
@@ -37875,7 +38116,7 @@ export interface operations {
                 moment?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -38020,7 +38261,7 @@ export interface operations {
                 max_segments?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -38163,7 +38404,7 @@ export interface operations {
                 stack?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -38308,7 +38549,7 @@ export interface operations {
                 confirm?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -38467,7 +38708,7 @@ export interface operations {
                 evidence?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -38610,7 +38851,7 @@ export interface operations {
                 job_id?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -38753,7 +38994,7 @@ export interface operations {
                 as_of_commit_seq?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -38902,7 +39143,7 @@ export interface operations {
                 confirm?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -39053,7 +39294,7 @@ export interface operations {
                 observed_at?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -39198,7 +39439,7 @@ export interface operations {
                 job_id: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -39345,7 +39586,7 @@ export interface operations {
                 observed_at?: string;
             };
             header: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key": string;
@@ -39508,7 +39749,7 @@ export interface operations {
                 job_id: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -39671,7 +39912,7 @@ export interface operations {
                 build?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -39816,7 +40057,7 @@ export interface operations {
                 target?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -39957,7 +40198,7 @@ export interface operations {
                 stack?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -40106,7 +40347,7 @@ export interface operations {
                 job_id?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -40249,7 +40490,7 @@ export interface operations {
                 expected_graph_epoch?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -40394,7 +40635,7 @@ export interface operations {
                 cursor?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -40535,7 +40776,7 @@ export interface operations {
                 stack?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -40676,7 +40917,7 @@ export interface operations {
                 stack?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -40825,7 +41066,7 @@ export interface operations {
                 observed_at?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -40970,7 +41211,7 @@ export interface operations {
                 expected_graph_epoch?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -41117,7 +41358,7 @@ export interface operations {
                 stack?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -41258,7 +41499,7 @@ export interface operations {
                 stack?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -41403,7 +41644,7 @@ export interface operations {
                 cursor?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -41544,7 +41785,7 @@ export interface operations {
                 stack?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -41687,7 +41928,7 @@ export interface operations {
                 month?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -41830,7 +42071,7 @@ export interface operations {
                 kind?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -41973,7 +42214,7 @@ export interface operations {
                 limit?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -42114,7 +42355,7 @@ export interface operations {
                 stack?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -42263,7 +42504,7 @@ export interface operations {
                 id?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -42412,7 +42653,7 @@ export interface operations {
                 id?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -42561,7 +42802,7 @@ export interface operations {
                 id?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -42712,7 +42953,7 @@ export interface operations {
                 limit?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -42855,7 +43096,7 @@ export interface operations {
                 id?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -43000,7 +43241,7 @@ export interface operations {
                 id?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -43153,7 +43394,7 @@ export interface operations {
                 limit?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -43298,7 +43539,7 @@ export interface operations {
                 month?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -43441,7 +43682,7 @@ export interface operations {
                 id?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -43590,7 +43831,7 @@ export interface operations {
                 month?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -43735,7 +43976,7 @@ export interface operations {
                 split_seq?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -43880,7 +44121,7 @@ export interface operations {
                 run?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -44027,7 +44268,7 @@ export interface operations {
                 allow_regression?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -44170,7 +44411,7 @@ export interface operations {
                 stack?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -44319,7 +44560,7 @@ export interface operations {
                 kind?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -44464,7 +44705,7 @@ export interface operations {
                 keep?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -44607,7 +44848,7 @@ export interface operations {
                 stack?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -44758,7 +44999,7 @@ export interface operations {
                 run?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -44903,7 +45144,7 @@ export interface operations {
                 split_seq?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -45044,7 +45285,7 @@ export interface operations {
                 stack?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -45185,7 +45426,7 @@ export interface operations {
                 stack?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -45334,7 +45575,7 @@ export interface operations {
                 job?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -45479,7 +45720,7 @@ export interface operations {
                 limit?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -45620,7 +45861,7 @@ export interface operations {
                 stack?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -45763,7 +46004,7 @@ export interface operations {
                 job_id?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -45904,7 +46145,7 @@ export interface operations {
                 stack?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -46051,7 +46292,7 @@ export interface operations {
                 stack?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -46198,7 +46439,7 @@ export interface operations {
                 stack?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -46339,7 +46580,7 @@ export interface operations {
                 stack?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -46490,7 +46731,7 @@ export interface operations {
                 limit?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -46631,7 +46872,7 @@ export interface operations {
                 stack?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -46782,7 +47023,7 @@ export interface operations {
                 call?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -46925,7 +47166,7 @@ export interface operations {
                 id?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -47066,7 +47307,7 @@ export interface operations {
                 stack?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -47209,7 +47450,7 @@ export interface operations {
                 id?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -47354,7 +47595,7 @@ export interface operations {
                 expected_graph_epoch?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -47499,7 +47740,7 @@ export interface operations {
                 limit?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -47644,7 +47885,7 @@ export interface operations {
                 dry_run?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -47793,7 +48034,7 @@ export interface operations {
                 draft_id?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -47934,7 +48175,7 @@ export interface operations {
                 stack?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -48083,7 +48324,7 @@ export interface operations {
                 draft_id?: string;
             };
             header: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key": string;
@@ -48230,7 +48471,7 @@ export interface operations {
                 reason?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -48375,7 +48616,7 @@ export interface operations {
                 draft_id?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -48522,7 +48763,7 @@ export interface operations {
                 dry_run?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -48671,7 +48912,7 @@ export interface operations {
                 name?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -48812,7 +49053,7 @@ export interface operations {
                 stack?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -48961,7 +49202,7 @@ export interface operations {
                 confirm?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -49104,7 +49345,7 @@ export interface operations {
                 stack?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -49253,7 +49494,7 @@ export interface operations {
                 name?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -49396,7 +49637,7 @@ export interface operations {
                 stack?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -49543,7 +49784,7 @@ export interface operations {
                 stack?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -49690,7 +49931,7 @@ export interface operations {
                 stack?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -49839,7 +50080,7 @@ export interface operations {
                 expected_graph_epoch?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -49982,7 +50223,7 @@ export interface operations {
                 expected_graph_epoch?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -50133,7 +50374,7 @@ export interface operations {
                 starter?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -50274,7 +50515,7 @@ export interface operations {
                 stack?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -50435,7 +50676,7 @@ export interface operations {
                 limit?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -50578,7 +50819,7 @@ export interface operations {
                 expected_graph_epoch?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -50729,7 +50970,7 @@ export interface operations {
                 suggestion_id?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -50876,7 +51117,7 @@ export interface operations {
                 stack?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -51027,7 +51268,7 @@ export interface operations {
                 suggestion_id?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -51178,7 +51419,7 @@ export interface operations {
                 suggestion_id?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -51323,7 +51564,7 @@ export interface operations {
                 suggestion_id?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -51470,7 +51711,7 @@ export interface operations {
                 stack?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -51623,7 +51864,7 @@ export interface operations {
                 type?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -51768,7 +52009,7 @@ export interface operations {
                 suggestion_id?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -51919,7 +52160,7 @@ export interface operations {
                 suggestion_id?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -52064,7 +52305,7 @@ export interface operations {
                 consistency?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -52214,7 +52455,7 @@ export interface operations {
                 consistency?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -52363,7 +52604,7 @@ export interface operations {
                 expected_graph_epoch?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -52510,7 +52751,7 @@ export interface operations {
                 stack?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -52657,7 +52898,7 @@ export interface operations {
                 stack?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -52804,7 +53045,7 @@ export interface operations {
                 stack?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -52947,7 +53188,7 @@ export interface operations {
                 dry_run?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -53092,7 +53333,7 @@ export interface operations {
                 stack?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -53241,7 +53482,7 @@ export interface operations {
                 expected_graph_epoch?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -53432,7 +53673,7 @@ export interface operations {
                 key?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -53573,7 +53814,7 @@ export interface operations {
                 stack?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -53722,7 +53963,7 @@ export interface operations {
                 id?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -53869,7 +54110,7 @@ export interface operations {
                 stack?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -54018,7 +54259,7 @@ export interface operations {
                 id?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -54167,7 +54408,7 @@ export interface operations {
                 id?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -54314,7 +54555,7 @@ export interface operations {
                 type?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -54457,7 +54698,7 @@ export interface operations {
                 id?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -54606,7 +54847,7 @@ export interface operations {
                 expected_graph_epoch?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -54751,7 +54992,7 @@ export interface operations {
                 dry_run?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -54898,7 +55139,7 @@ export interface operations {
                 stack?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -55045,7 +55286,7 @@ export interface operations {
                 stack?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -55192,7 +55433,7 @@ export interface operations {
                 stack?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -55333,7 +55574,7 @@ export interface operations {
                 stack?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -55474,7 +55715,7 @@ export interface operations {
                 stack?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -55615,7 +55856,7 @@ export interface operations {
                 stack?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -55762,7 +56003,7 @@ export interface operations {
                 limit?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -55903,7 +56144,7 @@ export interface operations {
                 stack?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -56052,7 +56293,7 @@ export interface operations {
                 id?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -56197,7 +56438,7 @@ export interface operations {
                 id?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -56344,7 +56585,7 @@ export interface operations {
                 limit?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -56485,7 +56726,7 @@ export interface operations {
                 stack?: string;
             };
             header: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key": string;
@@ -56632,7 +56873,7 @@ export interface operations {
                 stack?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -56779,7 +57020,7 @@ export interface operations {
                 cursor?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -56926,7 +57167,7 @@ export interface operations {
                 limit?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -57069,7 +57310,7 @@ export interface operations {
                 expected_graph_epoch?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -57216,7 +57457,7 @@ export interface operations {
                 stack?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -57363,7 +57604,7 @@ export interface operations {
                 stack?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -57510,7 +57751,7 @@ export interface operations {
                 stack?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -57659,7 +57900,7 @@ export interface operations {
                 expected_graph_epoch?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -57806,7 +58047,7 @@ export interface operations {
                 key?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -57951,7 +58192,7 @@ export interface operations {
                 workflow_id?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -58103,7 +58344,7 @@ export interface operations {
                 id?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -58248,7 +58489,7 @@ export interface operations {
                 expected_graph_epoch?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -58397,7 +58638,7 @@ export interface operations {
                 expected_graph_epoch?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -58546,7 +58787,7 @@ export interface operations {
                 expected_graph_epoch?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -58695,7 +58936,7 @@ export interface operations {
                 expected_graph_epoch?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -58844,7 +59085,7 @@ export interface operations {
                 expected_graph_epoch?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -59001,7 +59242,7 @@ export interface operations {
                 limit?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -59148,7 +59389,7 @@ export interface operations {
                 limit?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -59291,7 +59532,7 @@ export interface operations {
                 expected_graph_epoch?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -59440,7 +59681,7 @@ export interface operations {
                 expected_graph_epoch?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -59589,7 +59830,7 @@ export interface operations {
                 expected_graph_epoch?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -59740,7 +59981,7 @@ export interface operations {
                 id?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -59889,7 +60130,7 @@ export interface operations {
                 limit?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -60040,7 +60281,7 @@ export interface operations {
                 payloads?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -60183,7 +60424,7 @@ export interface operations {
                 expected_graph_epoch?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -60330,15 +60571,15 @@ export interface operations {
                 stack?: string;
                 /** @description the workflow instance's id */
                 id?: string;
-                /** @description the `next_before` of the previous page */
-                before?: string;
+                /** @description the `next_cursor` of the previous page (`before` is its earlier name) */
+                cursor?: string;
                 /** @description runs, 1 to 200; default 50 */
                 limit?: string;
                 /** @description `done`, `more`, `failed`, `retried`, `budget`, `cancelled` or `paused` */
                 outcome?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -60483,7 +60724,7 @@ export interface operations {
                 run?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -60628,7 +60869,7 @@ export interface operations {
                 hours?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -60775,7 +61016,7 @@ export interface operations {
                 turn?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -60916,9 +61157,13 @@ export interface operations {
                 stack?: string;
                 /** @description the workflow's name, for one workflow */
                 name?: string;
+                /** @description workflows, 1 to 200; default 100 */
+                limit?: string;
+                /** @description the `next_cursor` of the previous page */
+                cursor?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -61059,7 +61304,7 @@ export interface operations {
                 stack?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -61208,7 +61453,7 @@ export interface operations {
                 confirm?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -61337,6 +61582,157 @@ export interface operations {
             };
         };
     };
+    get_v1_workflows_named_documents: {
+        parameters: {
+            query?: {
+                /** @description Graph name (default `main`) */
+                graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
+                /** @description the workflow's name */
+                name?: string;
+                /** @description the documents whose name holds this text (any case) */
+                q?: string;
+                /** @description `review` (the most review items first; the default), `name`, or `recent` (the last one read first) */
+                sort?: string;
+                /** @description the `next_cursor` of the previous page */
+                cursor?: string;
+                /** @description documents, 1 to 200; default 50 */
+                limit?: string;
+            };
+            header?: {
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                "Lbb-Version"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TriggeredDocumentPage"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Rate limit exceeded */
+            429: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Service unavailable */
+            503: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+        };
+    };
     post_v1_workflows_named_pause: {
         parameters: {
             query?: {
@@ -61353,7 +61749,7 @@ export interface operations {
                 name?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -61502,13 +61898,13 @@ export interface operations {
                 name?: string;
                 /** @description the trigger's id (404 for another) */
                 trigger?: string;
-                /** @description the position to start from (`next_after` of the page before) */
-                after?: string;
+                /** @description the `next_cursor` of the page before (`after` is its earlier name) */
+                cursor?: string;
                 /** @description items per page, 1 to 100 (default 50) */
                 limit?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -61651,7 +62047,7 @@ export interface operations {
                 name?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -61800,7 +62196,7 @@ export interface operations {
                 name?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -61943,15 +62339,15 @@ export interface operations {
                 stack?: string;
                 /** @description the workflow's name */
                 name?: string;
-                /** @description the `next_before` of the previous page */
-                before?: string;
+                /** @description the `next_cursor` of the previous page (`before` is its earlier name) */
+                cursor?: string;
                 /** @description runs, 1 to 200; default 50 */
                 limit?: string;
                 /** @description `done`, `more`, `failed`, `retried`, `budget`, `cancelled` or `paused` */
                 outcome?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -62096,7 +62492,7 @@ export interface operations {
                 run?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -62241,7 +62637,7 @@ export interface operations {
                 hours?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -62368,6 +62764,735 @@ export interface operations {
             };
         };
     };
+    get_v1_workflows_named_tests: {
+        parameters: {
+            query?: {
+                /** @description Graph name (default `main`) */
+                graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
+                /** @description the tests of the workflow of this name */
+                name?: string;
+                /** @description tests, 1 to 50; default 10 */
+                limit?: string;
+                /** @description the `next_cursor` of the previous page */
+                cursor?: string;
+            };
+            header?: {
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                "Lbb-Version"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkflowTestList"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Rate limit exceeded */
+            429: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Service unavailable */
+            503: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+        };
+    };
+    post_v1_workflows_named_tests: {
+        parameters: {
+            query?: {
+                /** @description Graph name (default `main`) */
+                graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
+            };
+            header?: {
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                "Lbb-Version"?: string;
+                /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
+                "Idempotency-Key"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WorkflowTestCreateRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkflowTest"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Rate limit exceeded */
+            429: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Service unavailable */
+            503: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+        };
+    };
+    post_v1_workflows_named_tests_answer: {
+        parameters: {
+            query?: {
+                /** @description Graph name (default `main`) */
+                graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
+            };
+            header?: {
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                "Lbb-Version"?: string;
+                /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
+                "Idempotency-Key"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WorkflowTestAnswerRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkflowTest"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Rate limit exceeded */
+            429: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Service unavailable */
+            503: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+        };
+    };
+    post_v1_workflows_named_tests_cancel: {
+        parameters: {
+            query?: {
+                /** @description Graph name (default `main`) */
+                graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
+                /** @description the test's id */
+                id?: string;
+            };
+            header?: {
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                "Lbb-Version"?: string;
+                /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
+                "Idempotency-Key"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkflowTest"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Rate limit exceeded */
+            429: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Service unavailable */
+            503: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+        };
+    };
+    get_v1_workflows_named_tests_get: {
+        parameters: {
+            query?: {
+                /** @description Graph name (default `main`) */
+                graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
+                /** @description the test's id */
+                id?: string;
+            };
+            header?: {
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                "Lbb-Version"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkflowTest"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Rate limit exceeded */
+            429: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Service unavailable */
+            503: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+        };
+    };
     get_v1_workflows_run: {
         parameters: {
             query?: {
@@ -62386,7 +63511,7 @@ export interface operations {
                 id?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -62529,7 +63654,7 @@ export interface operations {
                 expected_graph_epoch?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -62672,7 +63797,7 @@ export interface operations {
                 expected_graph_epoch?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -62819,7 +63944,7 @@ export interface operations {
                 stack?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -62960,7 +64085,7 @@ export interface operations {
                 stack?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -63109,7 +64234,7 @@ export interface operations {
                 expected_graph_epoch?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -63256,7 +64381,7 @@ export interface operations {
                 details?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -63397,7 +64522,7 @@ export interface operations {
                 stack?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -63550,7 +64675,7 @@ export interface operations {
                 outputs?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -63695,7 +64820,7 @@ export interface operations {
                 include_batch?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -63836,7 +64961,7 @@ export interface operations {
                 stack?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -63989,13 +65114,13 @@ export interface operations {
                 q?: string;
                 /** @description `review` (the most review items first; the default), `name`, or `recent` (the last one read first) */
                 sort?: string;
-                /** @description the `next_after` of the previous page */
-                after?: string;
+                /** @description the `next_cursor` of the previous page (`after` is its earlier name) */
+                cursor?: string;
                 /** @description documents, 1 to 200; default 50 */
                 limit?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -64140,7 +65265,7 @@ export interface operations {
                 name?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -64287,7 +65412,7 @@ export interface operations {
                 stack?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -64438,7 +65563,7 @@ export interface operations {
                 name?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -64583,15 +65708,15 @@ export interface operations {
                 starter?: string;
                 /** @description the triggered workflow's name */
                 name?: string;
-                /** @description the `next_before` of the previous page */
-                before?: string;
+                /** @description the `next_cursor` of the previous page (`before` is its earlier name) */
+                cursor?: string;
                 /** @description runs, 1 to 200; default 50 */
                 limit?: string;
                 /** @description `done`, `more`, `failed`, `retried`, `budget`, `cancelled` or `paused` */
                 outcome?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -64738,7 +65863,7 @@ export interface operations {
                 run?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -64885,7 +66010,7 @@ export interface operations {
                 hours?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -65012,880 +66137,6 @@ export interface operations {
             };
         };
     };
-    get_v1_workflows_triggered_tests: {
-        parameters: {
-            query?: {
-                /** @description Graph name (default `main`) */
-                graph?: string;
-                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
-                environment?: string;
-                /**
-                 * @deprecated
-                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
-                 */
-                stack?: string;
-                /** @description the tests of this starter workflow */
-                starter?: string;
-                /** @description the tests of the workflow of this name */
-                name?: string;
-                /** @description tests, 1 to 50; default 10 */
-                limit?: string;
-                /** @description the `next_cursor` of the previous page */
-                cursor?: string;
-            };
-            header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
-                "Lbb-Version"?: string;
-            };
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["WorkflowTestList"];
-                };
-            };
-            /** @description Bad request */
-            400: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Forbidden */
-            403: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Not found */
-            404: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Conflict */
-            409: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Rate limit exceeded */
-            429: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Internal server error */
-            500: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Service unavailable */
-            503: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-        };
-    };
-    post_v1_workflows_triggered_tests: {
-        parameters: {
-            query?: {
-                /** @description Graph name (default `main`) */
-                graph?: string;
-                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
-                environment?: string;
-                /**
-                 * @deprecated
-                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
-                 */
-                stack?: string;
-            };
-            header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
-                "Lbb-Version"?: string;
-                /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
-                "Idempotency-Key"?: string;
-            };
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["WorkflowTestCreateRequest"];
-            };
-        };
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["WorkflowTest"];
-                };
-            };
-            /** @description Bad request */
-            400: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Forbidden */
-            403: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Not found */
-            404: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Conflict */
-            409: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Rate limit exceeded */
-            429: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Internal server error */
-            500: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Service unavailable */
-            503: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-        };
-    };
-    post_v1_workflows_triggered_tests_answer: {
-        parameters: {
-            query?: {
-                /** @description Graph name (default `main`) */
-                graph?: string;
-                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
-                environment?: string;
-                /**
-                 * @deprecated
-                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
-                 */
-                stack?: string;
-            };
-            header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
-                "Lbb-Version"?: string;
-                /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
-                "Idempotency-Key"?: string;
-            };
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["WorkflowTestAnswerRequest"];
-            };
-        };
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["WorkflowTest"];
-                };
-            };
-            /** @description Bad request */
-            400: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Forbidden */
-            403: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Not found */
-            404: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Conflict */
-            409: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Rate limit exceeded */
-            429: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Internal server error */
-            500: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Service unavailable */
-            503: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-        };
-    };
-    post_v1_workflows_triggered_tests_cancel: {
-        parameters: {
-            query?: {
-                /** @description Graph name (default `main`) */
-                graph?: string;
-                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
-                environment?: string;
-                /**
-                 * @deprecated
-                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
-                 */
-                stack?: string;
-                /** @description the test's id */
-                id?: string;
-            };
-            header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
-                "Lbb-Version"?: string;
-                /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
-                "Idempotency-Key"?: string;
-            };
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["WorkflowTest"];
-                };
-            };
-            /** @description Bad request */
-            400: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Forbidden */
-            403: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Not found */
-            404: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Conflict */
-            409: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Rate limit exceeded */
-            429: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Internal server error */
-            500: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Service unavailable */
-            503: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-        };
-    };
-    get_v1_workflows_triggered_tests_dataset: {
-        parameters: {
-            query?: {
-                /** @description Graph name (default `main`) */
-                graph?: string;
-                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
-                environment?: string;
-                /**
-                 * @deprecated
-                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
-                 */
-                stack?: string;
-                /** @description the test's id */
-                id?: string;
-            };
-            header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
-                "Lbb-Version"?: string;
-            };
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["WorkflowTestDataset"];
-                };
-            };
-            /** @description Bad request */
-            400: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Forbidden */
-            403: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Not found */
-            404: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Conflict */
-            409: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Rate limit exceeded */
-            429: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Internal server error */
-            500: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Service unavailable */
-            503: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-        };
-    };
-    get_v1_workflows_triggered_tests_get: {
-        parameters: {
-            query?: {
-                /** @description Graph name (default `main`) */
-                graph?: string;
-                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
-                environment?: string;
-                /**
-                 * @deprecated
-                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
-                 */
-                stack?: string;
-                /** @description the test's id */
-                id?: string;
-            };
-            header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
-                "Lbb-Version"?: string;
-            };
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["WorkflowTest"];
-                };
-            };
-            /** @description Bad request */
-            400: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Forbidden */
-            403: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Not found */
-            404: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Conflict */
-            409: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Rate limit exceeded */
-            429: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Internal server error */
-            500: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-            /** @description Service unavailable */
-            503: {
-                headers: {
-                    /** @description API contract version used for the response */
-                    "Lbb-Version"?: string;
-                    /** @description Request correlation id */
-                    "X-Request-Id"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LbbErrorEnvelope"];
-                };
-            };
-        };
-    };
     post_v1_workflows_turns_checkpoint: {
         parameters: {
             query?: {
@@ -65902,7 +66153,7 @@ export interface operations {
                 expected_graph_epoch?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -66051,7 +66302,7 @@ export interface operations {
                 expected_graph_epoch?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -66200,7 +66451,7 @@ export interface operations {
                 expected_graph_epoch?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -66349,7 +66600,7 @@ export interface operations {
                 expected_graph_epoch?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -66498,7 +66749,7 @@ export interface operations {
                 expected_graph_epoch?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -66647,7 +66898,7 @@ export interface operations {
                 expected_graph_epoch?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -66796,7 +67047,7 @@ export interface operations {
                 expected_graph_epoch?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -66945,7 +67196,7 @@ export interface operations {
                 expected_graph_epoch?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -67094,7 +67345,7 @@ export interface operations {
                 expected_graph_epoch?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -67243,7 +67494,7 @@ export interface operations {
                 expected_graph_epoch?: string;
             };
             header?: {
-                /** @description API contract version to pin. Use `2026-07-23` for this beta-breaking shape. */
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;

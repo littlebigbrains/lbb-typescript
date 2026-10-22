@@ -16,7 +16,7 @@ import type {
   LbbRequestEvent,
   LbbResponseEvent,
   LbbRetryEvent,
-  ListResponse,
+  ListPage,
   RawLbbResponse,
   ReadConsistencyOptions,
   RdfImportDocument,
@@ -81,6 +81,7 @@ export type {
   LbbResponseEvent,
   LbbRetryEvent,
   LbbErrorPayload,
+  ListPage,
   ListResponse,
   RawLbbResponse,
   ReadConsistencyOptions,
@@ -357,7 +358,7 @@ export class LbbClient {
     )
       throw new RangeError("expectedGraphEpoch must be a decimal epoch string");
     this.environment = environmentScope(options);
-    this.apiVersion = options.apiVersion ?? "2026-07-23";
+    this.apiVersion = options.apiVersion ?? "2026-10-21";
     this.maxRetries = options.maxRetries ?? 6;
     this.retryDelayMs = options.retryDelayMs ?? 100;
     this.retryBudgetMs = options.retryBudgetMs ?? 60_000;
@@ -1726,13 +1727,15 @@ export class LbbClient {
   }
 
   /**
-   * Page through every row of a list endpoint, following `next_cursor` until
-   * exhausted. Pass a fetcher that takes a cursor and returns a
-   * {@link ListResponse}:
-   * The caller supplies a bounded collection endpoint and its cursor.
+   * Page through every row of a list in the list envelope, following
+   * `next_cursor` until `has_more` is false. Pass a fetcher that takes a
+   * cursor and returns a page ({@link ListPage}), for example
+   * `client.listAll((cursor) => client.reviews.list({ cursor }))`. The
+   * workflow lists have their own iterators
+   * (`client.workflows.named.all()`, `allRuns`, `allDocuments`).
    */
   async *listAll<T>(
-    fetchPage: (cursor?: string) => Promise<ListResponse<T>>,
+    fetchPage: (cursor?: string) => Promise<ListPage<T>>,
   ): AsyncGenerator<T, void, unknown> {
     let cursor: string | undefined;
     for (;;) {

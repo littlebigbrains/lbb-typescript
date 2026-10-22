@@ -4,7 +4,9 @@
 // text, the property values a correct run reads from it, and the values it
 // must leave out. A dataset exports in the files of a template's samples
 // (`records.json` and `expected.json`), and an answer key loads back as the
-// same items. Reference: `docs/reference/server.md` ("Evals datasets").
+// same items. A workflow test has one dataset: saving the test again brings
+// that dataset up to date. Reference: `docs/reference/server.md` ("Evals
+// datasets").
 import type { LbbClient, Schemas } from "./client.js";
 import type { CallOptions } from "./transport.js";
 
@@ -18,6 +20,8 @@ export type EvalDatasetCreateRequest = Schemas["EvalDatasetCreateRequest"];
 export type EvalDatasetExport = Schemas["EvalDatasetExport"];
 /** One page of datasets. */
 export type EvalDatasetList = Schemas["EvalDatasetList"];
+/** A deleted dataset: `{ id, object: "eval_dataset", deleted: true }`. */
+export type EvalDatasetDeleted = Schemas["EvalDatasetDeleted"];
 
 /** The page of {@link EvalDatasetsNamespace.list}. */
 export interface EvalDatasetListOptions extends CallOptions {
@@ -27,15 +31,17 @@ export interface EvalDatasetListOptions extends CallOptions {
   cursor?: string;
 }
 
-/** `client.evals.datasets`: create, list, all, get, addItems and export. */
+/** `client.evals.datasets`: create, list, all, get, addItems, export and delete. */
 export class EvalDatasetsNamespace {
   constructor(private readonly client: LbbClient) {}
 
   /**
-   * Create a dataset with its first `items`, or from a workflow test's
-   * answers (`source: { kind: "test", id }`). At most 500 items. The
-   * client sends an idempotency key (or yours), so a retry answers the same
-   * dataset; the same key with another body fails with
+   * Create a dataset with its first `items`, or save a workflow test's
+   * answers (`source: { kind: "test", id }`). A test has one dataset, which
+   * the test names (`test.dataset`): saving the test again brings that
+   * dataset up to date and returns it with the same id. At most 500 items.
+   * The client sends an idempotency key (or yours), so a retry answers the
+   * same dataset; the same key with another body fails with
    * `409 idempotency_conflict`.
    */
   create(
@@ -106,6 +112,22 @@ export class EvalDatasetsNamespace {
   export(id: string, opts: CallOptions = {}): Promise<EvalDatasetExport> {
     return this.client.request("GET", "/v1/evals/datasets/export", {
       ...opts,
+      query: { id },
+    });
+  }
+
+  /**
+   * Delete a dataset and its items. A get or an export of it then fails
+   * with `404`, and the next save of its test makes a new dataset. A
+   * repeated delete returns the same answer. The client sends an
+   * idempotency key (or yours), so a retry is safe.
+   */
+  delete(id: string, opts: CallOptions = {}): Promise<EvalDatasetDeleted> {
+    return this.client.request("DELETE", "/v1/evals/datasets", {
+      ...opts,
+      idempotencyKey:
+        opts.idempotencyKey ??
+        this.client.idempotencyKey("eval-datasets.delete"),
       query: { id },
     });
   }

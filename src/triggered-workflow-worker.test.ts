@@ -112,10 +112,8 @@ test("workflows.named reads, changes, runs, pauses and deletes one workflow, and
     status: { state: "ready", pending: 0 },
   };
   const queue = {
-    name: "notes",
-    trigger: "watch",
-    pending: 1,
-    items: [
+    object: "list",
+    data: [
       {
         iri: "https://littlebigbrain.com/e/aa",
         reason: "changed",
@@ -123,10 +121,13 @@ test("workflows.named reads, changes, runs, pauses and deletes one workflow, and
         origin: { kind: "commit", trigger: "watch", from_seq: 4, to_seq: 5 },
       },
     ],
-    next_after: null,
+    has_more: false,
+    name: "notes",
+    trigger: "watch",
+    pending: 1,
   };
   const { fetch, requests } = queuedFetch([
-    { body: { workflows: [named] } },
+    { body: { object: "list", data: [named], has_more: false } },
     { body: named },
     { body: named },
     { body: { workflow: named, queued: true } },
@@ -149,16 +150,17 @@ test("workflows.named reads, changes, runs, pauses and deletes one workflow, and
   const ran = await client.workflows.named.run("notes");
   const paused = await client.workflows.named.pause("notes");
   const waiting = await client.workflows.named.queue("notes", {
-    after: 50,
+    cursor: "50",
     limit: 25,
   });
   await client.workflows.named.delete("notes");
 
-  assert.equal(listed.workflows[0]?.shards, 2);
+  assert.equal(listed.data[0]?.shards, 2);
   assert.equal(one.triggers[0]?.id, "watch");
   assert.equal(ran.queued, true);
   assert.equal(paused.paused, true);
-  assert.equal(waiting.items[0]?.origin.kind, "commit");
+  assert.equal(waiting.data[0]?.origin.kind, "commit");
+  assert.equal(waiting.has_more, false);
   assert.deepEqual(
     requests.map(({ url, method, body }) => ({ url, method, body })),
     [
@@ -188,7 +190,7 @@ test("workflows.named reads, changes, runs, pauses and deletes one workflow, and
         body: { paused: true },
       },
       {
-        url: "http://h/v1/workflows/named/queue?graph=crm&name=notes&after=50&limit=25",
+        url: "http://h/v1/workflows/named/queue?graph=crm&name=notes&cursor=50&limit=25",
         method: "GET",
         body: undefined,
       },
@@ -197,6 +199,148 @@ test("workflows.named reads, changes, runs, pauses and deletes one workflow, and
         method: "DELETE",
         body: undefined,
       },
+    ],
+  );
+});
+
+test("workflows.named lists page with limit and cursor, and the iterators read every page", async () => {
+  const workflow = (name: string) => ({ object: "workflow", name });
+  const run = (id: string) => ({ id, outcome: "done" });
+  const { fetch, requests } = queuedFetch([
+    {
+      body: {
+        object: "list",
+        data: [workflow("a"), workflow("b")],
+        has_more: true,
+        next_cursor: "b",
+      },
+    },
+    { body: { object: "list", data: [workflow("c")], has_more: false } },
+    {
+      body: {
+        object: "list",
+        data: [run("r2")],
+        has_more: true,
+        next_cursor: "r2",
+      },
+    },
+    { body: { object: "list", data: [run("r1")], has_more: false } },
+    {
+      body: {
+        object: "list",
+        data: [{ sha256: "ab", name: "Plan.pdf" }],
+        has_more: false,
+        total: 1,
+      },
+    },
+  ]);
+  const client = new LbbClient({ baseUrl: "http://h", graph: "crm", fetch });
+
+  const names: string[] = [];
+  for await (const one of client.workflows.named.all({ limit: 2 }))
+    names.push(one.name);
+  const runs: string[] = [];
+  for await (const one of client.workflows.named.allRuns("notes", {
+    outcome: "done",
+  }))
+    runs.push(one.id);
+  const documents = await client.workflows.named.documents("plans", {
+    q: "plan",
+    sort: "recent",
+    limit: 10,
+  });
+
+  assert.deepEqual(names, ["a", "b", "c"]);
+  assert.deepEqual(runs, ["r2", "r1"]);
+  assert.equal(documents.total, 1);
+  assert.equal(documents.has_more, false);
+  assert.deepEqual(
+    requests.map(({ url }) => url),
+    [
+      "http://h/v1/workflows/named?graph=crm&limit=2",
+      "http://h/v1/workflows/named?graph=crm&limit=2&cursor=b",
+      "http://h/v1/workflows/named/runs?graph=crm&name=notes&outcome=done",
+      "http://h/v1/workflows/named/runs?graph=crm&name=notes&cursor=r2&outcome=done",
+      "http://h/v1/workflows/named/documents?graph=crm&name=plans&q=plan&sort=recent&limit=10",
+    ],
+  );
+  assert.equal(requests[0]?.headers?.["lbb-version"], "2026-10-21");
+});
+
+test("workflows.named reads the lists of a server before the list envelope in the envelope", async () => {
+  const named = { name: "notes" };
+  const run = (id: string) => ({ id, outcome: "done" });
+  const { fetch, requests } = queuedFetch([
+    // GET /v1/workflows/named: every workflow under `workflows`.
+    { body: { workflows: [named] } },
+    // GET /v1/workflows/named/runs: `runs` and `next_before`.
+    { body: { runs: [run("r2")], next_before: "r2", repaired: 1 } },
+    // The server ignored `cursor`, so the page is read again with `before`.
+    { body: { runs: [run("r2")], next_before: "r2" } },
+    { body: { runs: [run("r1")] } },
+    // GET /v1/workflows/named/queue: `items` and an integer `next_after`.
+    {
+      body: {
+        name: "notes",
+        trigger: "watch",
+        pending: 30,
+        items: [{ iri: "https://littlebigbrain.com/e/aa" }],
+        next_after: 25,
+      },
+    },
+    // GET /v1/workflows/triggered/documents: `documents` and `next_after`.
+    { body: { documents: [{ sha256: "ab" }], total: 1 } },
+  ]);
+  const client = new LbbClient({ baseUrl: "http://h", graph: "crm", fetch });
+
+  const listed = await client.workflows.named.list();
+  const first = await client.workflows.named.runs("notes");
+  const second = await client.workflows.named.runs("notes", {
+    cursor: first.next_cursor ?? undefined,
+  });
+  const waiting = await client.workflows.named.queue("notes", { limit: 25 });
+  const documents = await client.workflows.triggered.documents({
+    starter: "documents.link",
+    name: "plans",
+  });
+
+  assert.deepEqual(listed, { object: "list", data: [named], has_more: false });
+  assert.deepEqual(first, {
+    object: "list",
+    data: [run("r2")],
+    has_more: true,
+    next_cursor: "r2",
+    repaired: 1,
+  });
+  assert.deepEqual(second, {
+    object: "list",
+    data: [run("r1")],
+    has_more: false,
+  });
+  assert.deepEqual(waiting, {
+    object: "list",
+    data: [{ iri: "https://littlebigbrain.com/e/aa" }],
+    has_more: true,
+    next_cursor: "25",
+    name: "notes",
+    trigger: "watch",
+    pending: 30,
+  });
+  assert.deepEqual(documents, {
+    object: "list",
+    data: [{ sha256: "ab" }],
+    has_more: false,
+    total: 1,
+  });
+  assert.deepEqual(
+    requests.map(({ url }) => url),
+    [
+      "http://h/v1/workflows/named?graph=crm",
+      "http://h/v1/workflows/named/runs?graph=crm&name=notes",
+      "http://h/v1/workflows/named/runs?graph=crm&name=notes&cursor=r2",
+      "http://h/v1/workflows/named/runs?graph=crm&name=notes&before=r2",
+      "http://h/v1/workflows/named/queue?graph=crm&name=notes&limit=25",
+      "http://h/v1/workflows/triggered/documents?graph=crm&starter=documents.link&name=plans",
     ],
   );
 });
