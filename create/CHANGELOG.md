@@ -2,6 +2,13 @@
 
 All notable changes to the `@littlebigbrain/create` package are documented here.
 
+## 0.7.0 (2026-10-22)
+
+- A new project requires `@littlebigbrain/client` ^0.30.0, and a
+  `--lang python` project `littlebigbrain>=0.31.0`: the releases with the
+  workflow tree `/v1/workflows/named`, workflow tests under
+  `/v1/workflows/named/tests` and one list envelope.
+
 ## 0.6.0 (2026-10-21)
 
 - `--lang <ts|python>` (default `ts`). `--lang python` creates the Python
