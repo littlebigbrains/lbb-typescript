@@ -245,6 +245,13 @@ export interface WorkflowContext {
    * executionReads opt-in. Optional for compatibility with custom contexts.
    */
   execution?(): WorkflowTurnReader;
+  /**
+   * The JSON value of workflow blob `key` (`GET /v1/workflows/blobs`), with
+   * the worker's client. A blob's bytes never change, so a read outside a
+   * step reads the same value on every attempt. Optional for compatibility
+   * with custom contexts.
+   */
+  blobJson?<T = unknown>(key: string): Promise<T>;
   /** Where the message came from, when its sender named it. */
   readonly origin?: Schemas["WorkflowMessageOrigin"] | null;
   /** The named workflow of this identity (a shard's or a fan-in identity's), if any. */
@@ -1235,6 +1242,12 @@ export class WorkflowWorker {
             "Enable executionReads on this worker; nothing was sent",
           );
         return executionReader;
+      },
+      blobJson: async <T>(key: string) => {
+        check();
+        return new WorkflowBlobsNamespace(this.client).getJson<T>(key, {
+          signal: controller.signal,
+        });
       },
       origin: task.turn.origin ?? null,
       workflowName: workflowOfIdentity(lease.workflow_id),

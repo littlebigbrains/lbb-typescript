@@ -559,7 +559,8 @@ export class NamedWorkflowsNamespace {
   /**
    * Run now: the watch reads every instance of its class again and sends
    * them with origin `manual`; a content trigger reads its content log
-   * again from the start. Answers at once with `queued`.
+   * again from the start; a schedule sends one run outside its slots; a
+   * stream sends its partial batches. Answers at once with `queued`.
    */
   run(
     name: string,
@@ -587,6 +588,28 @@ export class NamedWorkflowsNamespace {
       retry: opts.retry ?? true,
       query: { name },
       body: { paused } satisfies Schemas["NamedWorkflowPauseRequest"],
+    });
+  }
+
+  /**
+   * Send 1 to 500 events to a workflow with a stream trigger (`POST
+   * /v1/workflows/named/events`). Each event's `id` is its idempotency key:
+   * the stream drops an id it received in the last 24 hours (at most
+   * 100,000 ids), so a failed call is retried with the same events. A
+   * `429` (`workflow_stream_rate_limited` past the workflow's rate,
+   * `workflow_stream_full` past its backlog) is retried after its
+   * `Retry-After`.
+   */
+  sendEvents(
+    name: string,
+    events: Schemas["WorkflowEvent"][],
+    opts: CallOptions = {},
+  ): Promise<Schemas["WorkflowEventsReceipt"]> {
+    return this.client.request("POST", "/v1/workflows/named/events", {
+      ...opts,
+      retry: opts.retry ?? true,
+      query: { name },
+      body: { events } satisfies Schemas["WorkflowEventsRequest"],
     });
   }
 

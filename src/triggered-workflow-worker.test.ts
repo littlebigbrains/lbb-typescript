@@ -524,6 +524,52 @@ test("workflows.named.put takes a content trigger, and a content message names i
   assert.equal(origin.sha256?.length, 64);
 });
 
+test("workflows.named.sendEvents posts the events of a stream under the workflow's name, and a refused send is retried", async () => {
+  const receipt = {
+    object: "workflow_events",
+    workflow: "orders",
+    trigger: "stream",
+    received: 1,
+    received_at: "2026-10-21T10:00:00.120000Z",
+  };
+  const { fetch, requests } = queuedFetch([
+    {
+      status: 429,
+      body: {
+        error: { code: "workflow_stream_rate_limited", message: "slow down" },
+      },
+    },
+    { body: receipt },
+  ]);
+  const client = new LbbClient({
+    baseUrl: "http://h",
+    graph: "crm",
+    fetch,
+    retryDelayMs: 0,
+  });
+  const events: Schemas["WorkflowEvent"][] = [
+    {
+      id: "evt_1",
+      key: "customer-42",
+      type: "order.paid",
+      data: { order: "A-1007" },
+    },
+  ];
+
+  const sent = await client.workflows.named.sendEvents("orders", events);
+
+  assert.deepEqual(sent, receipt);
+  assert.equal(requests.length, 2);
+  for (const request of requests) {
+    assert.equal(request.method, "POST");
+    assert.equal(
+      request.url,
+      "http://h/v1/workflows/named/events?graph=crm&name=orders",
+    );
+    assert.deepEqual(request.body, { events });
+  }
+});
+
 test("workflows.starters.use sends the workflow, the owned outputs and the batch", async () => {
   const { fetch, requests } = queuedFetch([{ body: TRIGGERED }]);
   const client = new LbbClient({ baseUrl: "http://h", graph: "crm", fetch });

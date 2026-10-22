@@ -22,6 +22,17 @@ All notable changes to the `@littlebigbrain/client` package are documented here.
   the commit range since the last run and `changed`), and `onInstances`
   becomes optional. A schedule message without `onSchedule` fails the turn
   for good. `WorkflowScheduleMessage` is exported.
+- `triggeredWorkflow({ onEvents })` handles the batches of a workflow with
+  a stream trigger (`type: "events"`): the worker reads the batch's blob
+  and calls `onEvents(ctx, events, message, state)` with the events in
+  order. A batch without `onEvents` fails the turn for good.
+  `WorkflowEventsMessage`, `WorkflowEventRecord` and `EVENTS_MESSAGE_TYPE`
+  are exported, and a handler's context has `blobJson(key)`, which reads a
+  JSON blob of the workflow.
+- `client.workflows.named.sendEvents(name, events)` sends 1 to 500 events
+  to a workflow with a stream trigger (`POST /v1/workflows/named/events`).
+  Each event's `id` is its idempotency key, so a refused send is sent
+  again as it is; a `429` waits for its `Retry-After`.
 
 ## 0.30.0 (2026-10-22)
 

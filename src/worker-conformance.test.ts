@@ -69,6 +69,7 @@ interface Scenario {
   on_instances?: Obj[];
   on_fan_in?: Obj[];
   on_schedule?: Obj[];
+  on_events?: Obj[];
   task: Obj;
   runs?: number;
   client_graph?: string;
@@ -475,6 +476,21 @@ function definition(scenario: Scenario, program: Program) {
             message: unknown,
             state: unknown,
           ) => turn(scenario.on_schedule!, ctx, state, message as Json),
+        }
+      : {}),
+    ...(scenario.on_events
+      ? {
+          // The program reads the batch's message with its events beside it.
+          onEvents: (
+            ctx: WorkflowContext,
+            events: unknown[],
+            message: unknown,
+            state: unknown,
+          ) =>
+            turn(scenario.on_events!, ctx, state, {
+              ...(message as Obj),
+              events,
+            } as Json),
         }
       : {}),
     ...(scenario.on_fan_in
