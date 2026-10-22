@@ -75,6 +75,8 @@ export type {
   ModelCallListOptions,
   ModelCheckExportLine,
   ModelCheckListOptions,
+  ModelChoiceListOptions,
+  ModelChoicesNamespace,
   ModelsNamespace,
   ModelSwitchesNamespace,
   ModelTrialListOptions,

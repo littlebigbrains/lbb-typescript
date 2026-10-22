@@ -75,7 +75,11 @@ export class WorkflowTestsNamespace {
    * an idempotency key (or yours), so a retry answers the same test; the
    * same key with another body fails with `409 idempotency_conflict`.
    * `429 workflow_budget_exceeded` when the test may cost more than the
-   * environment's monthly budget has left.
+   * environment's monthly budget has left. `models` runs the test on other
+   * models, per use (`{ extract: { provider: "anthropic", model:
+   * "claude-haiku-5-5", effort: "low" } }`), one of each use's `options` in
+   * `client.models.choices.list()`; the test's `models` names the ones it
+   * ran.
    */
   create(
     request: WorkflowTestCreateRequest,

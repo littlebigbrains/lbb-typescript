@@ -134,6 +134,28 @@ test("tests start with an idempotency key and read, list, answer and cancel", as
   assert.equal(isWorkflowTestOpen({ status: "failed" }), false);
 });
 
+test("a test on other models sends them per use", async () => {
+  const haiku = {
+    provider: "anthropic",
+    model: "claude-haiku-5-5",
+    effort: "low",
+  };
+  const { client: lbb, seen } = client([
+    { body: { ...TEST, models: { extract: haiku } } },
+  ]);
+  const started = await lbb.workflows.tests.create({
+    name: "sinks",
+    models: { extract: haiku },
+    sample: 3,
+  });
+  assert.deepEqual(seen[0]?.body, {
+    name: "sinks",
+    models: { extract: haiku },
+    sample: 3,
+  });
+  assert.equal(started.models?.extract?.model, "claude-haiku-5-5");
+});
+
 test("wait reads the test until it ends", async () => {
   const { client: lbb, seen } = client([
     { body: { ...TEST, status: "running" } },

@@ -1083,14 +1083,124 @@ export class ModelSwitchesNamespace {
   }
 }
 
-/** The models of the graph's uses: trials of other models, and switches. */
+/** Options of {@link ModelChoicesNamespace.list}. */
+export interface ModelChoiceListOptions extends CallOptions {
+  /** A named workflow of the graph: the row in force for each of its uses. */
+  workflow?: string;
+  /** One use: `extract`, `decide` or `embed`. */
+  use?: Schemas["ModelUse"];
+  /** Rows per page, 1 to 200 (default 50). */
+  limit?: number;
+  /** The `next_cursor` of the previous page. */
+  cursor?: string;
+}
+
+/**
+ * Model choices: which model each use of a workflow runs, for the
+ * environment or for one workflow of the graph. `extract` is the reasoning
+ * model of an AI step (`values.extract`'s values, the `reason` activity),
+ * `decide` its decision model (the support of a value, the `decide`
+ * activity); `embed` is listed with its model and takes no choice. A call
+ * runs a test's model, else its workflow's choice, else the environment's,
+ * else the use's default, and names the choice in the call log (`choice`).
+ *
+ * ```ts
+ * const [extract] = (await lbb.models.choices.list({ use: "extract" })).data;
+ * await lbb.models.choices.put({
+ *   use: "extract",
+ *   model: { provider: "anthropic", model: "claude-haiku-5-5", effort: "low" },
+ *   workflow: "products",
+ * });
+ * ```
+ */
+export class ModelChoicesNamespace {
+  constructor(private readonly client: LbbClient) {}
+
+  /**
+   * One page of rows. Without `workflow`: the environment's row of each
+   * use, then each workflow's own choice on the graph. With `workflow`: the
+   * row in force for each of its uses (its own, else the environment's,
+   * else the default, `source: "default"`). Each row lists the models its
+   * use can run (`options`, with efforts, list prices and `available`).
+   * `404 named_workflow_not_found` for a workflow the graph does not have.
+   */
+  list(
+    options: ModelChoiceListOptions = {},
+  ): Promise<Schemas["ModelChoiceList"]> {
+    const { workflow, use, limit, cursor, ...opts } = options;
+    return this.client.request("GET", "/v1/models/choices", {
+      ...opts,
+      query: { workflow, use, limit, cursor },
+    });
+  }
+
+  /** Every row: `list` page by page, with the same filters. */
+  all(
+    options: Omit<ModelChoiceListOptions, "cursor"> = {},
+  ): AsyncGenerator<Schemas["ModelChoice"], void, unknown> {
+    return this.client.listAll((cursor) => this.list({ ...options, cursor }));
+  }
+
+  /**
+   * Choose the model of a use, for the environment or for one `workflow`:
+   * the next calls run it (a step of LBB's workflows from its next step;
+   * other nodes within 30 s). The model is one of the row's `options`, with
+   * an effort it takes. The client sends an idempotency key (or yours), so
+   * a retry answers the saved row; the same key with another body fails
+   * with `409 idempotency_conflict`.
+   *
+   * Errors: `400 model_choice_unsupported` for `embed` or a model the use
+   * cannot run; `409 model_choice_unavailable` when the server holds no key
+   * for the provider or cannot price the model; `404
+   * named_workflow_not_found`.
+   */
+  put(
+    body: Schemas["ModelChoicePutRequest"],
+    opts: CallOptions = {},
+  ): Promise<Schemas["ModelChoice"]> {
+    return this.client.request("PUT", "/v1/models/choices", {
+      ...opts,
+      retry: opts.retry ?? true,
+      idempotencyKey:
+        opts.idempotencyKey ?? this.client.idempotencyKey("models.choices.put"),
+      body,
+    });
+  }
+
+  /**
+   * Remove a choice: the use runs the next level (a workflow's use the
+   * environment's choice, the environment's use its default). Returns
+   * `{ id, object: "model_choice", deleted: true }`, also for a choice that
+   * was not there. The client sends an idempotency key (or yours).
+   */
+  delete(
+    params: { use: Schemas["ModelUse"]; workflow?: string },
+    opts: CallOptions = {},
+  ): Promise<Schemas["ModelChoiceDeleted"]> {
+    return this.client.request("DELETE", "/v1/models/choices", {
+      ...opts,
+      retry: opts.retry ?? true,
+      idempotencyKey:
+        opts.idempotencyKey ??
+        this.client.idempotencyKey("models.choices.delete"),
+      query: { use: params.use, workflow: params.workflow },
+    });
+  }
+}
+
+/**
+ * The models of the graph's uses: trials of other models, switches, and
+ * the model choices of the workflow uses.
+ */
 export class ModelsNamespace {
   readonly trials: ModelTrialsNamespace;
   readonly switches: ModelSwitchesNamespace;
+  readonly choices: ModelChoicesNamespace;
 
   constructor(client: LbbClient) {
     this.trials = new ModelTrialsNamespace(client);
     this.switches = new ModelSwitchesNamespace(client);
+    this.choices = new ModelChoicesNamespace(client);
   }
 }
 
