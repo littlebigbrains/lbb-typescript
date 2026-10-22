@@ -15013,16 +15013,34 @@ export interface components {
             /** @description The request that answered (its `X-Request-Id`). */
             request_id?: string | null;
         };
-        /** @description A model check, a calibration session or a test that filed an item. */
+        /**
+         * @description A model check, a calibration session, a golden query or a test that
+         *     filed an item: the record that holds the answer as a label.
+         */
         ReviewEvalOrigin: {
+            /** @description The record: a check's call id, a session id, a golden id. */
             id: string;
+            /** @description A check's job (`rerank`, `route`, …). */
+            job?: string | null;
             kind: components["schemas"]["ReviewEvalOriginKind"];
+            /** @description A calibration question's id in its session (`q3`). */
+            question?: string | null;
+            /**
+             * @description A golden item's result id. Absent: the item asks about the answer of
+             *     the question as a whole.
+             */
+            result?: string | null;
+            /**
+             * @description A golden item's trace: the one it was filed from, which its label
+             *     goes to.
+             */
+            trace?: string | null;
         };
         /**
          * @description What in Evals filed an item.
          * @enum {string}
          */
-        ReviewEvalOriginKind: "check" | "calibration" | "test";
+        ReviewEvalOriginKind: "check" | "calibration" | "test" | "golden" | "unknown";
         /** @description A quote the producer read, and where it is. */
         ReviewEvidence: {
             /** Format: float */
@@ -53691,6 +53709,8 @@ export interface operations {
                 cursor?: string;
                 /** @description Producer keys, comma-separated (at most 100): the items filed under them */
                 key?: string;
+                /** @description The items of one owner record Evals filed for: a calibration session, a model call's check, a golden */
+                eval_id?: string;
             };
             header?: {
                 /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
@@ -54716,6 +54736,8 @@ export interface operations {
                 origin_id?: string;
                 /** @description facts | links | ontology | other */
                 type?: string;
+                /** @description The items of one owner record Evals filed for: a calibration session, a model call's check, a golden */
+                eval_id?: string;
             };
             header?: {
                 /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
