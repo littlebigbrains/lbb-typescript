@@ -1,28 +1,28 @@
 // Workflow tests (`client.workflows.tests`): run a workflow on chosen inputs
 // before it writes. A test reads each input as the live workflow would and
 // writes nothing to the graph; a person answers each value, and the answers
-// export as an Evals dataset in the shape of a template's samples. The first
-// workflow a test runs is LBB's `values.extract`. A test goes `queued` →
-// `running` → `done`, `failed` or `cancelled`; poll `get`, or `wait`.
+// save as the test's one Evals dataset (`client.evals.datasets.create` with
+// `source: { kind: "test", id }`). The first workflow a test runs is LBB's
+// `values.extract`. A test goes `queued` → `running` → `done`, `failed` or
+// `cancelled`; poll `get`, or `wait`.
 // Reference: `docs/reference/starter-workflows.md` ("Test a workflow").
 import type { LbbClient, Schemas } from "./client.js";
 import type { CallOptions } from "./transport.js";
 
-/** A test: its frozen settings, its inputs, and per input the values read. */
+/**
+ * A test: its frozen settings, its inputs, per input the values read, and
+ * the id of the dataset saved from its answers (`dataset`).
+ */
 export type WorkflowTest = Schemas["WorkflowTest"];
-/** What a test runs: a workflow of the graph, or a create request; the inputs. */
+/** What a test runs: a workflow of the graph (`name`) or a create request (`install`); the inputs. */
 export type WorkflowTestCreateRequest = Schemas["WorkflowTestCreateRequest"];
 /** A person's answer to one value of a test. */
 export type WorkflowTestAnswerRequest = Schemas["WorkflowTestAnswerRequest"];
-/** A test's answers as a dataset: `records` (records.json), `expected` (expected.json). */
-export type WorkflowTestDataset = Schemas["WorkflowTestDataset"];
 /** One page of tests. */
 export type WorkflowTestList = Schemas["WorkflowTestList"];
 
 /** The filters and the page of {@link WorkflowTestsNamespace.list}. */
 export interface WorkflowTestListOptions extends CallOptions {
-  /** The tests of this starter workflow, for example `values.extract`. */
-  starter?: string;
   /** The tests of the workflow of this name. */
   name?: string;
   /** Tests per page, 1 to 50; default 10. */
@@ -35,7 +35,10 @@ export interface WorkflowTestListOptions extends CallOptions {
 export interface WorkflowTestWaitOptions extends CallOptions {
   /** Time between two reads. Default 1,000 ms. */
   intervalMs?: number;
-  /** Give up after this long and return the test as it is. Default 10 minutes. */
+  /**
+   * Throw a `TimeoutError` when the test is still open after this long.
+   * Default 10 minutes.
+   */
   timeoutMs?: number;
 }
 
@@ -61,13 +64,13 @@ function sleep(ms: number, signal?: AbortSignal): Promise<void> {
   });
 }
 
-/** `client.workflows.tests`: create, get, list, answer, cancel and dataset. */
+/** `client.workflows.tests`: create, get, list, all, answer, cancel and wait. */
 export class WorkflowTestsNamespace {
   constructor(private readonly client: LbbClient) {}
 
   /**
-   * Start a test. Name a workflow of the graph (`workflow`) or a workflow
-   * to create (`install`), and `iris` (at most 20) or a `sample` of the
+   * Start a test. Name a workflow of the graph (`name`) or a workflow to
+   * create (`install`), and `iris` (at most 20) or a `sample` of the
    * watched class (default 6). The test starts `queued`. The client sends
    * an idempotency key (or yours), so a retry answers the same test; the
    * same key with another body fails with `409 idempotency_conflict`.
@@ -78,7 +81,7 @@ export class WorkflowTestsNamespace {
     request: WorkflowTestCreateRequest,
     opts: CallOptions = {},
   ): Promise<WorkflowTest> {
-    return this.client.request("POST", "/v1/workflows/triggered/tests", {
+    return this.client.request("POST", "/v1/workflows/named/tests", {
       ...opts,
       idempotencyKey:
         opts.idempotencyKey ??
@@ -89,7 +92,7 @@ export class WorkflowTestsNamespace {
 
   /** One test, with its inputs' texts and its results. */
   get(id: string, opts: CallOptions = {}): Promise<WorkflowTest> {
-    return this.client.request("GET", "/v1/workflows/triggered/tests/get", {
+    return this.client.request("GET", "/v1/workflows/named/tests/get", {
       ...opts,
       query: { id },
     });
@@ -97,10 +100,10 @@ export class WorkflowTestsNamespace {
 
   /** One page of the graph's tests, newest first, without texts and results. */
   list(options: WorkflowTestListOptions = {}): Promise<WorkflowTestList> {
-    const { starter, name, limit, cursor, ...opts } = options;
-    return this.client.request("GET", "/v1/workflows/triggered/tests", {
+    const { name, limit, cursor, ...opts } = options;
+    return this.client.request("GET", "/v1/workflows/named/tests", {
       ...opts,
-      query: { starter, name, limit, cursor },
+      query: { name, limit, cursor },
     });
   }
 
@@ -126,7 +129,7 @@ export class WorkflowTestsNamespace {
     request: WorkflowTestAnswerRequest,
     opts: CallOptions = {},
   ): Promise<WorkflowTest> {
-    return this.client.request("POST", "/v1/workflows/triggered/tests/answer", {
+    return this.client.request("POST", "/v1/workflows/named/tests/answer", {
       ...opts,
       idempotencyKey:
         opts.idempotencyKey ??
@@ -140,7 +143,7 @@ export class WorkflowTestsNamespace {
    * stays as it is, so a retry is safe.
    */
   cancel(id: string, opts: CallOptions = {}): Promise<WorkflowTest> {
-    return this.client.request("POST", "/v1/workflows/triggered/tests/cancel", {
+    return this.client.request("POST", "/v1/workflows/named/tests/cancel", {
       ...opts,
       retry: opts.retry ?? true,
       query: { id },
@@ -148,18 +151,10 @@ export class WorkflowTestsNamespace {
   }
 
   /**
-   * The test's answers as an Evals dataset of kind `values`: `records`
-   * (the inputs, as `samples/records.json`) and `expected` (the answer key,
-   * as `samples/expected.json`). Only answered properties are in it.
+   * Read the test until it ends (`done`, `failed` or `cancelled`), and
+   * return it. Throws an `Error` named `TimeoutError` when the test is
+   * still open after `timeoutMs` (default 10 minutes).
    */
-  dataset(id: string, opts: CallOptions = {}): Promise<WorkflowTestDataset> {
-    return this.client.request("GET", "/v1/workflows/triggered/tests/dataset", {
-      ...opts,
-      query: { id },
-    });
-  }
-
-  /** Read the test until it ends (or the time is up), and return it. */
   async wait(
     id: string,
     options: WorkflowTestWaitOptions = {},
@@ -168,7 +163,13 @@ export class WorkflowTestsNamespace {
     const until = Date.now() + timeoutMs;
     for (;;) {
       const test = await this.get(id, opts);
-      if (!isWorkflowTestOpen(test) || Date.now() >= until) return test;
+      if (!isWorkflowTestOpen(test)) return test;
+      if (Date.now() >= until) {
+        throw Object.assign(
+          new Error(`workflow test ${id} is still ${test.status}`),
+          { name: "TimeoutError" },
+        );
+      }
       await sleep(intervalMs, opts.signal);
     }
   }

@@ -6,9 +6,10 @@
 // answer it got the first time, at no cost. The other activities are thin
 // helpers over routes the client already has: parsed pages, SPARQL, owned
 // writes, review items and ontology changes. A model activity called from
-// a step of a `WorkflowWorker` turn names the turn's run (`workflow`), so
-// the call log links the call to the run, and its usage adds up for the
-// turn's completion: the worker's code does nothing for it. Reference:
+// a step of a `WorkflowWorker` turn names the turn's run and the step
+// (`workflow`), so the call log links the call to the run and the step, and
+// its usage adds up for the turn's completion: the worker's code does
+// nothing for it. Reference:
 // `docs/reference/workflow-activities.md`.
 import type { LbbClient } from "./client.js";
 import type { FilePages } from "./files.js";
@@ -29,6 +30,7 @@ import type {
   SparqlResults,
 } from "./types.js";
 import {
+  activityStep,
   activityTurn,
   addTurnUsage,
   WorkflowError,
@@ -53,8 +55,8 @@ export interface ActivityOptions extends CallOptions {
   label?: string;
   /**
    * What the call works on, for the call log and the run's page: an
-   * instance IRI or a document's name, at most 512 characters. The turn
-   * and its run are set from the step context.
+   * instance IRI or a document's name, at most 512 characters. The turn,
+   * its run and the step are set from the step context.
    */
   instance?: string;
 }
@@ -340,8 +342,10 @@ function activityCall<B extends object>(
   turn: ActivityTurn | undefined;
 } {
   const { effectId, label, instance, ...call } = options;
-  // The turn of the step that makes the call (none outside a turn).
+  // The turn of the step that makes the call (none outside a turn), and the
+  // step whose effect id is the call's or starts it (none for another id).
   const turn = activityTurn(effectId);
+  const step = turn ? activityStep(turn, effectId) : undefined;
   return {
     body: {
       ...request,
@@ -351,6 +355,7 @@ function activityCall<B extends object>(
         ? {
             workflow: {
               ...turn.workflow,
+              ...(step !== undefined ? { step } : {}),
               ...(instance !== undefined ? { instance } : {}),
             },
           }

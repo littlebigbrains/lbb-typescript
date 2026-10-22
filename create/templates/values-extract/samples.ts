@@ -1,6 +1,7 @@
-// The samples of values-extract, for `npm run try`: six invented entries
-// of a sanitary equipment list (samples/records.json), committed as
-// instances of the class the settings name, each with its text.
+// The samples of values-extract, for `npm run try`: six invented product
+// data sheets of office furniture and small appliances
+// (samples/records.json), committed as instances of the class the settings
+// name, each with its text.
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import type { LbbClient } from "@littlebigbrain/client";

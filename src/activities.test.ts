@@ -1,12 +1,13 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { LbbClient, LbbError, type FetchLike } from "./client.js";
+import { LbbClient, LbbError, type FetchLike, type Schemas } from "./client.js";
 import {
+  captureActivities,
   isActivityRefused,
   lbbActivities,
   splitInHalves,
 } from "./activities.js";
-import type { WorkflowContext } from "./workflows.js";
+import { workflow, WorkflowWorker, type WorkflowContext } from "./workflows.js";
 
 interface Seen {
   method: string;
@@ -683,4 +684,183 @@ test("splitInHalves splits a list in two, the first half the smaller", () => {
   assert.deepEqual(splitInHalves(["a", "b"]), [["a"], ["b"]]);
   assert.equal(splitInHalves([1]), null);
   assert.equal(splitInHalves([]), null);
+});
+
+/** A claimed task: the turn 1 of `agent`, with the effect prefix `stable`. */
+function turnTask(): Schemas["WorkflowTurnTask"] {
+  return {
+    workflow_type: "steps",
+    state: {},
+    token: "token",
+    lease_ms: 60_000,
+    effect_prefix: "stable",
+    turn: {
+      workflow_id: "agent",
+      number: 1,
+      message_id: "m1",
+      message: {},
+      version: "v1",
+      status: "running",
+      attempt: 1,
+      created_at_ms: 1,
+      updated_at_ms: 1,
+      ready_at_ms: 1,
+      steps: [],
+      result: null,
+      state_after: null,
+      sequence: 1,
+      run: { id: "0000000000001-agent-1", started_at_ms: 1, queue_before: 1 },
+    },
+  };
+}
+
+/** A worker's server: a claim hands out `tasks`, the activities answer, the other routes `{}`. */
+function turnServer(tasks: Schemas["WorkflowTurnTask"][]) {
+  const calls: { path: string; body: Record<string, unknown> }[] = [];
+  const fetch: FetchLike = async (input, init) => {
+    const path = new URL(input).pathname;
+    const body = JSON.parse(String(init?.body ?? "{}")) as Record<
+      string,
+      unknown
+    >;
+    calls.push({ path, body });
+    const used = { model: "m", ...USAGE, cached: false };
+    const answer = path.endsWith("/claim")
+      ? { task: tasks.shift() ?? null }
+      : path.endsWith("/activities/reason")
+        ? { value: {}, ...used }
+        : path.endsWith("/activities/decide")
+          ? { answers: {}, ...used }
+          : path.endsWith("/activities/embed")
+            ? { vectors: [[0.1]], dim: 1, ...used }
+            : {};
+    return {
+      ok: true,
+      status: 200,
+      headers: {
+        get: (name: string) =>
+          name.toLowerCase() === "content-type" ? "application/json" : null,
+      },
+      text: async () => JSON.stringify(answer),
+    };
+  };
+  const client = new LbbClient({
+    baseUrl: "http://h",
+    graph: "tender",
+    fetch,
+    retryDelayMs: 0,
+  });
+  const activityCalls = () =>
+    calls
+      .filter((c) => c.path.includes("/activities/"))
+      .map((c) => ({
+        effect_id: c.body.effect_id,
+        workflow: c.body.workflow as Schemas["ActivityWorkflow"] | undefined,
+        test: c.body.test,
+      }));
+  return { client, activityCalls };
+}
+
+const RUN = { identity: "agent", turn: 1, run_id: "0000000000001-agent-1" };
+const OBJECT = { type: "object" };
+
+test("a call in a step names the step's key, also with an id made from the step's", async () => {
+  const { client, activityCalls } = turnServer([turnTask()]);
+  const lbb = lbbActivities(client);
+  const steps = workflow({
+    name: "steps",
+    version: "v1",
+    initialState: {},
+    async onMessage(ctx, state) {
+      await ctx.step("define", async (s) => {
+        await lbb.reason(
+          { prompt: "p", schema: OBJECT },
+          { effectId: s.effectId },
+        );
+        // More calls of one step, with ids made from the step's.
+        await lbb.decide(
+          { state: {}, questions: {} },
+          { effectId: `${s.effectId}.2` },
+        );
+        await lbb.embed({ texts: ["t"] }, { effectId: `${s.effectId}:texts` });
+        // An id that only starts with the step's text names no step.
+        await lbb.reason(
+          { prompt: "p", schema: OBJECT },
+          { effectId: `${s.effectId}x` },
+        );
+        return null;
+      });
+      // A step key with a dot: the longest step id that starts the call's wins.
+      await ctx.step("page", async () => null);
+      await ctx.step("page.2", (s) =>
+        lbb.reason(
+          { prompt: "p", schema: OBJECT },
+          { effectId: `${s.effectId}.1` },
+        ),
+      );
+      // A call outside a step names the turn and no step.
+      await lbb.reason({ prompt: "p", schema: OBJECT });
+      return { state };
+    },
+  });
+  await new WorkflowWorker(client, [steps], { worker: "test" }).runOnce();
+  assert.deepEqual(
+    activityCalls().map(({ effect_id, workflow }) => ({ effect_id, workflow })),
+    [
+      { effect_id: "stable/define", workflow: { ...RUN, step: "define" } },
+      { effect_id: "stable/define.2", workflow: { ...RUN, step: "define" } },
+      {
+        effect_id: "stable/define:texts",
+        workflow: { ...RUN, step: "define" },
+      },
+      { effect_id: "stable/definex", workflow: RUN },
+      { effect_id: "stable/page.2.1", workflow: { ...RUN, step: "page.2" } },
+      { effect_id: undefined, workflow: RUN },
+    ],
+  );
+  // The steps go with the turn: outside a turn a call names no run and no step.
+  await lbb.reason(
+    { prompt: "p", schema: OBJECT },
+    { effectId: "stable/define" },
+  );
+  assert.equal(activityCalls().at(-1)?.workflow, undefined);
+});
+
+test("a capture's calls in a step name the step as the live calls do", async () => {
+  const { client, activityCalls } = turnServer([turnTask()]);
+  const capture = captureActivities(lbbActivities(client), {
+    workflow: "sinks",
+  });
+  const steps = workflow({
+    name: "steps",
+    version: "v1",
+    initialState: {},
+    async onMessage(ctx, state) {
+      await ctx.step("define", async (s) => {
+        await capture.activities.reason(
+          { prompt: "p", schema: OBJECT },
+          { effectId: s.effectId },
+        );
+        await capture.activities.decide(
+          { state: {}, questions: {} },
+          { effectId: `${s.effectId}.2` },
+        );
+        return null;
+      });
+      return { state };
+    },
+  });
+  await new WorkflowWorker(client, [steps], { worker: "test" }).runOnce();
+  assert.deepEqual(activityCalls(), [
+    {
+      effect_id: "stable/define",
+      workflow: { ...RUN, step: "define" },
+      test: { workflow: "sinks" },
+    },
+    {
+      effect_id: "stable/define.2",
+      workflow: { ...RUN, step: "define" },
+      test: { workflow: "sinks" },
+    },
+  ]);
 });

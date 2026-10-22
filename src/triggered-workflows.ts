@@ -1,16 +1,18 @@
-// Starter workflows and triggered workflows (`client.workflows.starters`,
-// `client.workflows.triggered`). A starter workflow is a template: what it
+// Starter workflows and the workflows of a graph (`client.workflows.starters`,
+// `client.workflows.named`, and `client.workflows.triggered`, the same
+// workflows by starter and name). A starter workflow is a template: what it
 // does, its trigger (a watch on a class and its fields), the outputs it owns
-// and its settings. A triggered workflow is a workflow created from one on a
-// graph, under a name. When a published commit adds or changes instances
-// that its watch covers, it reads them and does its work. Embeddings on
+// and its settings. A workflow made from one has a name on the graph. When a
+// published commit adds or changes instances that its watch covers, it
+// reads them and does its work. Embeddings on
 // classes (`search.embed`) and fit sources (`ontology.fit`) are triggered
 // workflows too: `client.embeddings` and `client.ontology.fitSources` read
 // and write the same documents. A developer workflow (`workflow`) sends the
 // instances to a workflow of your worker as messages; handle them with
 // `triggeredWorkflow()` and write with `writeOwned()`.
 import type { LbbClient, Schemas } from "./client.js";
-import { LbbError, type CallOptions } from "./transport.js";
+import { LbbError, type CallOptions, type Query } from "./transport.js";
+import type { ListPage } from "./types.js";
 
 /** One triggered workflow: its starter workflow's catalog id and its name. */
 export interface TriggeredWorkflowRef {
@@ -22,7 +24,9 @@ export interface TriggeredWorkflowRef {
 
 /** Paging and the filter of a workflow's runs (`runs`). */
 export interface WorkflowRunsOptions extends CallOptions {
-  /** The `next_before` of the previous page. */
+  /** The `next_cursor` of the previous page. */
+  cursor?: string;
+  /** @deprecated The earlier name of `cursor`. */
   before?: string;
   /** Runs per page: 1 to 200, default 50. */
   limit?: number;
@@ -42,17 +46,106 @@ export type TriggeredWorkflowRunsOptions = WorkflowRunsOptions;
 /** Options of {@link TriggeredWorkflowsNamespace.runStats}. */
 export type TriggeredWorkflowRunStatsOptions = WorkflowRunStatsOptions;
 
-/** Options of {@link TriggeredWorkflowsNamespace.documents}. */
-export interface TriggeredWorkflowDocumentsOptions extends CallOptions {
+/** The search, sort and paging of a workflow's documents (`documents`). */
+export interface WorkflowDocumentsOptions extends CallOptions {
   /** Only the documents whose name holds this text (any case). */
   q?: string;
   /** `review` (the most review items first; the default), `name`, or
    * `recent` (the last one read first). */
   sort?: Schemas["TriggeredDocumentSort"];
-  /** The `next_after` of the previous page. */
-  after?: string;
+  /** The `next_cursor` of the previous page. */
+  cursor?: string;
   /** Documents per page: 1 to 200, default 50. */
   limit?: number;
+}
+
+/** Options of {@link TriggeredWorkflowsNamespace.documents}. */
+export interface TriggeredWorkflowDocumentsOptions extends WorkflowDocumentsOptions {
+  /** @deprecated The earlier name of `cursor`. */
+  after?: string;
+}
+
+/** Paging of the graph's workflows (`client.workflows.named.list`). */
+export interface NamedWorkflowListOptions extends CallOptions {
+  /** Workflows per page: 1 to 200, default 100. */
+  limit?: number;
+  /** The `next_cursor` of the previous page. */
+  cursor?: string;
+}
+
+/**
+ * The names a workflow list had before the list envelope (a server older
+ * than `Lbb-Version` 2026-10-21): the field of the items, the field of the
+ * next page's cursor, and the query parameter that took the cursor.
+ */
+interface EarlierList {
+  items: string;
+  next?: string;
+  param?: string;
+}
+
+const EARLIER_RUNS: EarlierList = {
+  items: "runs",
+  next: "next_before",
+  param: "before",
+};
+const EARLIER_DOCUMENTS: EarlierList = {
+  items: "documents",
+  next: "next_after",
+  param: "after",
+};
+
+/**
+ * One page of a workflow list, in the list envelope. A server older than
+ * the envelope answers the earlier shape: the page comes back converted,
+ * and a `cursor` it ignored is sent again under its earlier name.
+ */
+async function listPage<T>(
+  client: LbbClient,
+  path: string,
+  query: Query,
+  opts: CallOptions,
+  earlier: EarlierList,
+): Promise<T> {
+  let body = await client.request<unknown>("GET", path, { ...opts, query });
+  if (!isEarlierList(body, earlier)) return body as T;
+  if (earlier.param && query.cursor !== undefined) {
+    const { cursor, ...rest } = query;
+    body = await client.request<unknown>("GET", path, {
+      ...opts,
+      query: { ...rest, [earlier.param]: cursor },
+    });
+    if (!isEarlierList(body, earlier)) return body as T;
+  }
+  return asListEnvelope(body, earlier) as T;
+}
+
+function isEarlierList(
+  body: unknown,
+  earlier: EarlierList,
+): body is Record<string, unknown> {
+  if (typeof body !== "object" || body === null) return false;
+  const fields = body as Record<string, unknown>;
+  return !Array.isArray(fields.data) && Array.isArray(fields[earlier.items]);
+}
+
+/** The earlier shape of a workflow list in the list envelope. */
+function asListEnvelope(
+  body: Record<string, unknown>,
+  earlier: EarlierList,
+): ListPage<unknown> & Record<string, unknown> {
+  const { [earlier.items]: items, ...rest }: Record<string, unknown> = body;
+  const next = earlier.next !== undefined ? rest[earlier.next] : undefined;
+  if (earlier.next !== undefined) delete rest[earlier.next];
+  const cursor =
+    typeof next === "string" || typeof next === "number" ? String(next) : null;
+  return {
+    object: "list",
+    data: items as unknown[],
+    has_more: cursor !== null,
+    ...(cursor !== null ? { next_cursor: cursor } : {}),
+    ...rest,
+  };
 }
 
 /**
@@ -116,11 +209,22 @@ export class StarterWorkflowsNamespace {
   }
 }
 
-/** The triggered workflows of the graph: read, preview, run now, pause, delete. */
+/**
+ * The triggered workflows of the graph, by starter and name: read,
+ * preview, run now, pause, delete. `client.workflows.named` reads and
+ * changes the same workflows by name; `preview` and the calibration of a
+ * gate stay here.
+ */
 export class TriggeredWorkflowsNamespace {
   constructor(private readonly client: LbbClient) {}
 
-  /** Every triggered workflow of the graph with its status, by starter, then name. */
+  /**
+   * Every triggered workflow of the graph with its status, by starter, then
+   * name.
+   *
+   * @deprecated Use {@link NamedWorkflowsNamespace.list}
+   * (`client.workflows.named.list`) or `client.workflows.named.all()`.
+   */
   list(opts: CallOptions = {}): Promise<Schemas["TriggeredWorkflowList"]> {
     return this.client.request("GET", "/v1/workflows/triggered", opts);
   }
@@ -130,6 +234,9 @@ export class TriggeredWorkflowsNamespace {
    * (state, lag, counters, spend, last error) and its own status in
    * `details`. A name the graph does not have fails with
    * `404 triggered_workflow_not_found`.
+   *
+   * @deprecated Use {@link NamedWorkflowsNamespace.get}
+   * (`client.workflows.named.get`).
    */
   get(
     ref: TriggeredWorkflowRef,
@@ -163,6 +270,9 @@ export class TriggeredWorkflowsNamespace {
   /**
    * Ask the workflow to run now. Answers at once with the workflow and
    * `queued`; read {@link get} for the progress.
+   *
+   * @deprecated Use {@link NamedWorkflowsNamespace.run}
+   * (`client.workflows.named.run`).
    */
   refresh(
     ref: TriggeredWorkflowRef,
@@ -183,6 +293,9 @@ export class TriggeredWorkflowsNamespace {
    * `400 workflow_pause_unsupported`. Returns the
    * triggered workflow; the same call again changes nothing, so a failed
    * call is retried.
+   *
+   * @deprecated Use {@link NamedWorkflowsNamespace.pause}
+   * (`client.workflows.named.pause`).
    */
   pause(
     ref: TriggeredWorkflowRef,
@@ -198,25 +311,40 @@ export class TriggeredWorkflowsNamespace {
   }
 
   /**
-   * The runs of a workflow, newest first: `client.workflows.named.runs` by
-   * starter and name (the compatibility view). `search.embed` and
-   * `ontology.fit` keep no runs (`400 workflow_param_invalid`).
+   * The runs of a workflow, newest first, by starter and name, in the list
+   * envelope. `search.embed` and `ontology.fit` keep no runs
+   * (`400 workflow_param_invalid`).
+   *
+   * @deprecated Use {@link NamedWorkflowsNamespace.runs}
+   * (`client.workflows.named.runs`).
    */
   runs(
     ref: TriggeredWorkflowRef,
     options: TriggeredWorkflowRunsOptions = {},
   ): Promise<Schemas["WorkflowRunList"]> {
-    const { before, limit, outcome, ...opts } = options;
-    return this.client.request("GET", "/v1/workflows/triggered/runs", {
-      ...opts,
-      query: { starter: ref.starter, name: ref.name, before, limit, outcome },
-    });
+    const { cursor, before, limit, outcome, ...opts } = options;
+    return listPage(
+      this.client,
+      "/v1/workflows/triggered/runs",
+      {
+        starter: ref.starter,
+        name: ref.name,
+        cursor,
+        before,
+        limit,
+        outcome,
+      },
+      opts,
+      EARLIER_RUNS,
+    );
   }
 
   /**
-   * One run with its model calls in time order:
-   * `client.workflows.named.getRun` by starter and name. `404 workflow_run_not_found` for a run the
-   * workflow does not have.
+   * One run with its model calls in time order, by starter and name.
+   * `404 workflow_run_not_found` for a run the workflow does not have.
+   *
+   * @deprecated Use {@link NamedWorkflowsNamespace.getRun}
+   * (`client.workflows.named.getRun`).
    */
   run(
     ref: TriggeredWorkflowRef,
@@ -230,8 +358,10 @@ export class TriggeredWorkflowsNamespace {
   }
 
   /**
-   * The runs of a workflow by hour: `client.workflows.named.runStats` by
-   * starter and name.
+   * The runs of a workflow by hour, by starter and name.
+   *
+   * @deprecated Use {@link NamedWorkflowsNamespace.runStats}
+   * (`client.workflows.named.runStats`).
    */
   runStats(
     ref: TriggeredWorkflowRef,
@@ -246,19 +376,31 @@ export class TriggeredWorkflowsNamespace {
 
   /**
    * One page of the documents of a `documents.link` or `documents.map`
-   * workflow, rows as in its `details.documents` (which lists only the 20
-   * with the most review items). Pass `next_after` as `after` for the next
-   * page.
+   * workflow, by starter and name, in the list envelope.
+   *
+   * @deprecated Use {@link NamedWorkflowsNamespace.documents}
+   * (`client.workflows.named.documents`).
    */
   documents(
     ref: TriggeredWorkflowRef,
     options: TriggeredWorkflowDocumentsOptions = {},
   ): Promise<Schemas["TriggeredDocumentPage"]> {
-    const { q, sort, after, limit, ...opts } = options;
-    return this.client.request("GET", "/v1/workflows/triggered/documents", {
-      ...opts,
-      query: { starter: ref.starter, name: ref.name, q, sort, after, limit },
-    });
+    const { q, sort, cursor, after, limit, ...opts } = options;
+    return listPage(
+      this.client,
+      "/v1/workflows/triggered/documents",
+      {
+        starter: ref.starter,
+        name: ref.name,
+        q,
+        sort,
+        cursor,
+        after,
+        limit,
+      },
+      opts,
+      EARLIER_DOCUMENTS,
+    );
   }
 
   /**
@@ -267,6 +409,9 @@ export class TriggeredWorkflowsNamespace {
    * and its vectors; the suggestions an `ontology.fit` filed stay in the
    * inbox; a developer workflow leaves its workflow instance and the facts
    * your code wrote.
+   *
+   * @deprecated Use {@link NamedWorkflowsNamespace.delete}
+   * (`client.workflows.named.delete`).
    */
   delete(
     ref: TriggeredWorkflowRef,
@@ -283,7 +428,9 @@ export class TriggeredWorkflowsNamespace {
 export interface NamedWorkflowQueueOptions extends CallOptions {
   /** The trigger's id; the workflow's own when absent. */
   trigger?: string;
-  /** The position to start from: `next_after` of the page before. */
+  /** The `next_cursor` of the page before. */
+  cursor?: string;
+  /** @deprecated The position to start from; use `cursor`. */
   after?: number;
   /** Items per page, 1 to 100 (default 50). */
   limit?: number;
@@ -301,16 +448,46 @@ export interface NamedWorkflowQueueOptions extends CallOptions {
  * upload of those media types as it is logged, without a wait for a
  * publication: one content per message, routed by its SHA-256, with an
  * origin of kind `content`. Each message names its origin. The workflows
- * LBB runs list here too, with their `lbb.*` target. The triggered
- * workflows of `client.workflows.triggered` are the watches in their older
- * shape.
+ * LBB runs list here too, with their `lbb.*` target.
+ *
+ * The lists (`list`, `runs`, `queue`, `documents`) answer in the list
+ * envelope, `{ object: "list", data, has_more, next_cursor }`: pass
+ * `next_cursor` as `cursor` for the next page, or iterate every item with
+ * `all`, `allRuns` and `allDocuments`.
  */
 export class NamedWorkflowsNamespace {
   constructor(private readonly client: LbbClient) {}
 
-  /** Every workflow with triggers of the graph, by name, with its status. */
-  list(opts: CallOptions = {}): Promise<Schemas["NamedWorkflowList"]> {
-    return this.client.request("GET", "/v1/workflows/named", opts);
+  /**
+   * One page of the graph's workflows, by name, with their status: at most
+   * `limit` (1 to 200, default 100) after `cursor`.
+   */
+  list(
+    options: NamedWorkflowListOptions = {},
+  ): Promise<Schemas["NamedWorkflowList"]> {
+    const { limit, cursor, ...opts } = options;
+    return listPage(
+      this.client,
+      "/v1/workflows/named",
+      { limit, cursor },
+      opts,
+      { items: "workflows" },
+    );
+  }
+
+  /**
+   * Every workflow of the graph, by name: `list` page by page.
+   *
+   * ```ts
+   * for await (const workflow of client.workflows.named.all()) {
+   *   console.log(workflow.name, workflow.status.state);
+   * }
+   * ```
+   */
+  all(
+    options: Omit<NamedWorkflowListOptions, "cursor"> = {},
+  ): AsyncGenerator<Schemas["NamedWorkflow"], void, unknown> {
+    return this.client.listAll((cursor) => this.list({ ...options, cursor }));
   }
 
   /**
@@ -410,21 +587,22 @@ export class NamedWorkflowsNamespace {
    * fields and the requests that changed it, a run now, a schema change),
    * the pass in progress, and per shard its message in flight, its first
    * unfinished turns with their origins and its running turn's progress.
+   * The items are a page in the list envelope (`data`, `has_more`,
+   * `next_cursor`); the queue moves as it drains, so a page is a view at
+   * one time.
    */
   queue(
     name: string,
     opts: NamedWorkflowQueueOptions = {},
   ): Promise<Schemas["NamedWorkflowQueue"]> {
-    const { trigger, after, limit, ...call } = opts;
-    return this.client.request("GET", "/v1/workflows/named/queue", {
-      ...call,
-      query: {
-        name,
-        ...(trigger !== undefined ? { trigger } : {}),
-        ...(after !== undefined ? { after: String(after) } : {}),
-        ...(limit !== undefined ? { limit: String(limit) } : {}),
-      },
-    });
+    const { trigger, cursor, after, limit, ...call } = opts;
+    return listPage(
+      this.client,
+      "/v1/workflows/named/queue",
+      { name, trigger, cursor, after, limit },
+      call,
+      { items: "items", next: "next_after", param: "after" },
+    );
   }
 
   /**
@@ -433,17 +611,31 @@ export class NamedWorkflowsNamespace {
    * LBB's own document, values and review workflows, with its origin,
    * outcome, the queue before and after, what it finished, a sample, its
    * steps and phases, and the usage of its model calls. Runs are kept 30
-   * days; pass `next_before` as `before` for the next page.
+   * days. A page in the list envelope: pass `next_cursor` as `cursor` for
+   * the next page.
    */
   runs(
     name: string,
     options: WorkflowRunsOptions = {},
   ): Promise<Schemas["WorkflowRunList"]> {
-    const { before, limit, outcome, ...opts } = options;
-    return this.client.request("GET", "/v1/workflows/named/runs", {
-      ...opts,
-      query: { name, before, limit, outcome },
-    });
+    const { cursor, before, limit, outcome, ...opts } = options;
+    return listPage(
+      this.client,
+      "/v1/workflows/named/runs",
+      { name, cursor, before, limit, outcome },
+      opts,
+      EARLIER_RUNS,
+    );
+  }
+
+  /** Every run of a workflow kept, newest first: `runs` page by page. */
+  allRuns(
+    name: string,
+    options: Omit<WorkflowRunsOptions, "cursor" | "before"> = {},
+  ): AsyncGenerator<Schemas["WorkflowRunSummary"], void, unknown> {
+    return this.client.listAll((cursor) =>
+      this.runs(name, { ...options, cursor }),
+    );
   }
 
   /**
@@ -477,6 +669,36 @@ export class NamedWorkflowsNamespace {
       ...opts,
       query: { name, hours },
     });
+  }
+
+  /**
+   * One page of the documents of a `documents.link` or `documents.map`
+   * workflow, rows as in its `details.documents` (which lists only the 20
+   * with the most review items), with `total`, the documents that match
+   * `q`. Another workflow answers `400 workflow_param_invalid`.
+   */
+  documents(
+    name: string,
+    options: WorkflowDocumentsOptions = {},
+  ): Promise<Schemas["TriggeredDocumentPage"]> {
+    const { q, sort, cursor, limit, ...opts } = options;
+    return listPage(
+      this.client,
+      "/v1/workflows/named/documents",
+      { name, q, sort, cursor, limit },
+      opts,
+      EARLIER_DOCUMENTS,
+    );
+  }
+
+  /** Every document of a `documents.link` or `documents.map` workflow: `documents` page by page. */
+  allDocuments(
+    name: string,
+    options: Omit<WorkflowDocumentsOptions, "cursor"> = {},
+  ): AsyncGenerator<unknown, void, unknown> {
+    return this.client.listAll((cursor) =>
+      this.documents(name, { ...options, cursor }),
+    );
   }
 
   /**

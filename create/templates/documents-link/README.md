@@ -121,7 +121,7 @@ classes `DocEntry` and `DocMention` and the relations `DEFINED_IN`,
 - **The catalogue follows.** When the catalogue changes, the documents
   already loaded are resolved again from their stored mentions. Here a
   document read before the entries it names keeps its mentions unlinked
-  until it is read again (`client.workflows.triggered.refresh`).
+  until it is read again (`client.workflows.named.run(name)`).
 - **Stale outputs.** A rerun retracts the entries and mentions an earlier
   load wrote that this one does not write again, and supersedes stale
   review items.

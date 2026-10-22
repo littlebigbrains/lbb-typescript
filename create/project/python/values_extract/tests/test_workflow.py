@@ -1,12 +1,15 @@
 """The workflow on its samples, with mock models and no server: the SDK's
 ``WorkflowWorker`` runs it against a fake LBB (``fake_lbb.py``).
 
-The mock reasoning model reads the first size (``60x40 cm`` or ``Breite 60
-cm``) with its unit, the first material and the water supply of each text.
-The mock decision model says a quote from a sentence about an accessory
-(``Zubehör``) or a conditional variant (``Bei Einsatz``) does not support its
-value. The values the workflow must write, and the values it must leave out,
-come from the answer key ``samples/expected.json``.
+The mock reasoning model reads the first size (``120 x 80 cm``, else
+``width 1.6 m`` and ``depth 800 mm``, or ``Breite 43``) with the unit the text
+states, the first material and the color of each text. The mock decision
+model says a quote from a sentence about an accessory (``Accessory:``) or a
+variant under a condition (``For two screens:``) does not support its value,
+and gives a quote that says ``about`` 0.6, below the gate. The values the
+workflow must write, and the values it must leave out, come from the answer
+key ``samples/expected.json``. Four values go to review instead: two sizes in
+another unit, one without a unit, and one below the gate.
 """
 
 from __future__ import annotations
@@ -23,28 +26,38 @@ from values_extract.workflow import DEFAULTS
 RECORDS: list[dict[str, str]] = json.loads((SAMPLES / "records.json").read_text(encoding="utf-8"))
 EXPECTED: dict[str, Any] = json.loads((SAMPLES / "expected.json").read_text(encoding="utf-8"))
 MATERIALS = [
-    "Sanitärkeramik",
-    "Stahl emailliert",
-    "Mineralguss",
-    "Edelstahl",
-    "Kristallglas",
-    "Keramik",
-    "Glas",
+    "beech veneer",
+    "oak veneer",
+    "aluminium",
+    "brushed stainless steel",
+    "stainless steel",
+    "bamboo",
+    "Stahlblech",
+    "plastic",
+    "steel",
 ]
 
 
+def sized(words: str) -> re.Pattern[str]:
+    """A size with the unit the text states it in, if any: ``width 1.6 m``, ``Breite 43``."""
+    return re.compile(rf"(?:{words}) (?:about )?(\d+(?:\.\d+)?)(?: (mm|cm|m)\b)?", re.I)
+
+
 def read_values(text: str) -> list[dict[str, str]]:
-    """The mock reasoning model: the first size, material and water supply of a text."""
+    """The mock reasoning model: the first size, material and color of a text."""
     values: list[dict[str, str]] = []
-    size = re.search(r"(?:ca\. )?(\d+)x(\d+) cm", text)
-    width = re.search(r"Breite (\d+) cm", text)
+    size = re.search(r"(\d+) x (\d+) cm", text)
     if size:
         values += [
             {"property": "width_cm", "value": size[1], "unit": "cm", "quote": size[0]},
             {"property": "depth_cm", "value": size[2], "unit": "cm", "quote": size[0]},
         ]
-    elif width:
-        values.append({"property": "width_cm", "value": width[1], "unit": "cm", "quote": width[0]})
+    else:
+        for prop, words in (("width_cm", "width|Breite"), ("depth_cm", "depth|Tiefe")):
+            if found := sized(words).search(text):
+                values.append(
+                    {"property": prop, "value": found[1], "unit": found[2] or "", "quote": found[0]}
+                )
     found = [
         (m.start(), name)
         for name in MATERIALS
@@ -53,26 +66,23 @@ def read_values(text: str) -> list[dict[str, str]]:
     if found:
         material = min(found)[1]
         values.append({"property": "material", "value": material, "unit": "", "quote": material})
-    water = re.search(r"Anschluss[^.]*?(Kalt- und Warmwasser|Kaltwasser)", text)
-    if water:
-        values.append(
-            {
-                "property": "water_supply",
-                "value": "kalt" if water[1] == "Kaltwasser" else "kalt und warm",
-                "unit": "",
-                "quote": water[0],
-            }
-        )
+    color = re.search(r"(?:Color|Farbe): ([^\W\d_]+)", text)
+    if color:
+        values.append({"property": "color", "value": color[1], "unit": "", "quote": color[0]})
     return values
 
 
 def support(text: str, instructions: str, options: list[str]) -> dict[str, Any]:
-    """The mock decision model: the support of each quote, from the sentence that holds it."""
+    """The mock decision model: the support of each quote, from the quote and the sentence
+    that holds it."""
     found = re.search(r'Quote: "(.*)"$', instructions, re.S)
     assert found, instructions
     quote = found[1]
     sentence = next((s for s in re.split(r"(?<=\.)\s+", text) if quote in s), "")
-    p = 0.05 if re.search("Zubehör|Bei Einsatz", sentence) else 0.6 if "etwa" in sentence else 0.92
+    if re.match(r"(?:Accessory|For [^:]+):", sentence):
+        p = 0.05
+    else:
+        p = 0.6 if re.search(r"\babout\b", quote, re.I) else 0.92
     return {
         "choice": "supported" if p >= 0.5 else "not_supported",
         "confidence": max(p, 1 - p),
@@ -119,22 +129,33 @@ def matches(got: Any, want: dict[str, Any]) -> bool:
     return str(got).strip().lower() in accepted
 
 
+# The values of the answer key that go to a person for review: two sizes the
+# text states in another unit (the key's ``stated``), one whose quote states
+# no unit, and one whose quote says ``about``.
+REVIEWED = {("T-160", "width_cm"), ("T-160", "depth_cm"), ("R-3", "width_cm"), ("K-17", "width_cm")}
+KEY_VALUES = sum(len(r["values"]) for r in EXPECTED["records"])
+
+
 def test_the_samples_give_the_values_of_the_answer_key() -> None:
     fake = run_samples()
     for record in EXPECTED["records"]:
         values = fake.written(record["name"])
-        for want in record["values"]:
+        written = [v for v in record["values"] if (record["name"], v["property"]) not in REVIEWED]
+        for want in written:
             assert matches(values.get(want["property"]), want), (record["name"], want)
         for out in record["leave_out"]:
             if out["value"] is None:
                 assert out["property"] not in values, (record["name"], out)
             else:
                 assert not matches(values.get(out["property"]), out), (record["name"], out)
-        assert sorted(values) == sorted(v["property"] for v in record["values"]), record["name"]
+        assert sorted(values) == sorted(v["property"] for v in written), record["name"]
+    asked = {(q["subject"]["name"], q["question"]["property"]) for q in fake.reviews.values()}
+    assert asked == REVIEWED
     (done,) = fake.completed
     state = done["state"]
     assert state["instances"] == len(RECORDS)
-    assert state["written"] == sum(len(r["values"]) for r in EXPECTED["records"])
+    assert state["written"] == KEY_VALUES - len(REVIEWED)
+    assert state["review"] == len(REVIEWED)
     assert state["failed"] == 0
 
 
@@ -142,7 +163,7 @@ def test_each_value_has_a_source_whose_evidence_is_a_quote_of_the_text() -> None
     fake = run_samples()
     texts = {r["name"]: r["text"] for r in RECORDS}
     edges = [edge for commit in fake.commits.values() for edge in commit.get("triplets", [])]
-    assert len(edges) == sum(len(r["values"]) for r in EXPECTED["records"])
+    assert len(edges) == KEY_VALUES - len(REVIEWED)
     for edge in edges:
         assert edge["relation"] == "HAS_VALUE_SOURCE"
         assert edge["target"]["type"] == "ValueSource"

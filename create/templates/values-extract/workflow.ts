@@ -71,10 +71,10 @@ export interface Settings {
 
 /** The settings: edit them for your class. These fit the samples. */
 export const defaults: Settings = {
-  className: "EquipmentItem",
+  className: "Product",
   textField: "text",
-  properties: { width_cm: "f64", depth_cm: "f64", material: "text", water_supply: "keyword" },
-  context: "Entries of the sanitary equipment list of a school building tender, in German.",
+  properties: { width_cm: "f64", depth_cm: "f64", material: "text", color: "keyword" },
+  context: "Product data sheets of office furniture and small appliances, in English and German.",
   gate: 0.8,
   units: { width_cm: "cm", depth_cm: "cm" },
 };

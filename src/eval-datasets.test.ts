@@ -67,7 +67,7 @@ const ITEM = {
   leave_out: [],
 };
 
-test("datasets create with an idempotency key, list, read, add items and export", async () => {
+test("datasets create with an idempotency key, list, read, add items, export and delete", async () => {
   const { client: lbb, seen } = client([
     { body: { ...DATASET, items: [ITEM] } },
     {
@@ -87,6 +87,7 @@ test("datasets create with an idempotency key, list, read, add items and export"
         expected: { about: [], install: DATASET.install, records: [] },
       },
     },
+    { body: { id: DATASET.id, object: "eval_dataset", deleted: true } },
   ]);
   const created = await lbb.evals.datasets.create({
     name: "sinks",
@@ -125,9 +126,37 @@ test("datasets create with an idempotency key, list, read, add items and export"
   const files = await lbb.evals.datasets.export(DATASET.id);
   assert.equal(files.records[0]?.text, ITEM.text);
   assert.equal(seen[5]?.path, "/v1/evals/datasets/export");
+  const deleted = await lbb.evals.datasets.delete(DATASET.id);
+  assert.deepEqual(deleted, {
+    id: DATASET.id,
+    object: "eval_dataset",
+    deleted: true,
+  });
+  assert.equal(seen[6]?.method, "DELETE");
+  assert.equal(seen[6]?.path, "/v1/evals/datasets");
+  assert.equal(seen[6]?.query.get("id"), DATASET.id);
+  assert.equal(seen[6]?.body, undefined);
+  assert.match(
+    seen[6]?.headers["idempotency-key"] ?? "",
+    /^eval-datasets\.delete:/,
+  );
 });
 
-test("a test's answers save as a dataset by its source", async () => {
+test("a delete that fails with a 5xx is retried under the same key", async () => {
+  const { client: lbb, seen } = client([
+    { status: 503, body: { error: { code: "unavailable", message: "busy" } } },
+    { body: { id: DATASET.id, object: "eval_dataset", deleted: true } },
+  ]);
+  const deleted = await lbb.evals.datasets.delete(DATASET.id);
+  assert.equal(deleted.deleted, true);
+  assert.equal(seen.length, 2);
+  assert.equal(
+    seen[0]?.headers["idempotency-key"],
+    seen[1]?.headers["idempotency-key"],
+  );
+});
+
+test("a test's answers save as its one dataset by its source", async () => {
   const { client: lbb, seen } = client([{ body: DATASET }]);
   await lbb.evals.datasets.create(
     {
