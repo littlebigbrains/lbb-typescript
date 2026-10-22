@@ -267,6 +267,76 @@ test("workflows.named lists page with limit and cursor, and the iterators read e
   assert.equal(requests[0]?.headers?.["lbb-version"], "2026-10-21");
 });
 
+test("workflows.named reads what the runs did with each input, page by page", async () => {
+  const result = (id: string, outcome: string) => ({
+    id,
+    object: "workflow_run_result",
+    created: "2026-10-21T10:00:00.000Z",
+    run: "1791967648726-starter.notes-3",
+    label: id,
+    outcome,
+    values: [],
+    cost_micro_usd: 0,
+  });
+  const { fetch, requests } = queuedFetch([
+    {
+      body: {
+        object: "list",
+        data: [result("wrr_a", "review")],
+        has_more: false,
+        run_counts: {
+          counts: {
+            written: 0,
+            review: 1,
+            no_value: 0,
+            failed: 0,
+            duplicate: 0,
+          },
+          inputs: 1,
+          listed: 1,
+        },
+      },
+    },
+    {
+      body: {
+        object: "list",
+        data: [result("wrr_b", "failed")],
+        has_more: true,
+        next_cursor: "1:1791967648726-starter.notes-3",
+      },
+    },
+    {
+      body: {
+        object: "list",
+        data: [result("wrr_c", "review")],
+        has_more: false,
+      },
+    },
+  ]);
+  const client = new LbbClient({ baseUrl: "http://h", graph: "crm", fetch });
+  const one = await client.workflows.named.runResults("notes", {
+    run: "1791967648726-starter.notes-3",
+    outcome: "review",
+    limit: 20,
+  });
+  assert.equal(one.run_counts?.inputs, 1);
+  const ids: string[] = [];
+  for await (const each of client.workflows.named.allRunResults("notes", {
+    outcome: ["review", "failed"],
+    iri: "https://littlebigbrain.com/e/01",
+  }))
+    ids.push(each.id);
+  assert.deepEqual(ids, ["wrr_b", "wrr_c"]);
+  assert.deepEqual(
+    requests.map(({ url }) => url),
+    [
+      "http://h/v1/workflows/named/runs/results?graph=crm&name=notes&run=1791967648726-starter.notes-3&outcome=review&limit=20",
+      "http://h/v1/workflows/named/runs/results?graph=crm&name=notes&outcome=review%2Cfailed&iri=https%3A%2F%2Flittlebigbrain.com%2Fe%2F01",
+      "http://h/v1/workflows/named/runs/results?graph=crm&name=notes&outcome=review%2Cfailed&iri=https%3A%2F%2Flittlebigbrain.com%2Fe%2F01&cursor=1%3A1791967648726-starter.notes-3",
+    ],
+  );
+});
+
 test("workflows.named reads the lists of a server before the list envelope in the envelope", async () => {
   const named = { name: "notes" };
   const run = (id: string) => ({ id, outcome: "done" });

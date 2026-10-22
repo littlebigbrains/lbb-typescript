@@ -33,11 +33,20 @@ import {
   activityStep,
   activityTurn,
   addTurnUsage,
+  turnOfInstance,
+  turnRunOf,
   WorkflowError,
   type ActivityTurn,
   type WorkflowContext,
   type WorkflowStepContext,
 } from "./workflows.js";
+import {
+  ownedWriteInputs,
+  requeuedInputs,
+  reviewInput,
+  RunResultsCollector,
+  type WorkflowRunInput,
+} from "./run-results.js";
 
 /** The options of a model activity (`reason`, `decide`, `embed`). */
 export interface ActivityOptions extends CallOptions {
@@ -253,6 +262,11 @@ export interface LbbActivities {
    * choice, a grade or a free-text answer. Returns at once; the answer
    * reaches a workflow with a review trigger as a `review.answered`
    * message. The same `key` again updates the item.
+   *
+   * Inside a turn of a `WorkflowWorker`, an item with a `subject` reports
+   * that input as `review` in the run's results. A step that a later
+   * attempt replays does not call `review` again, so only the attempt that
+   * filed the item reports it.
    */
   review(
     request: ReviewItemRequest,
@@ -501,7 +515,12 @@ export function lbbActivities(client: LbbClient): LbbActivities {
       options: CallOptions = {},
     ) => {
       if ("kind" in request && request.kind && request.kind !== "change") {
-        return client.reviews.create(reviewItemBody(request), options);
+        return client.reviews
+          .create(reviewItemBody(request), options)
+          .then((item) => {
+            reportReview(request as ReviewItemRequest, item);
+            return item;
+          });
       }
       const { workflow, origin, ...suggestion } = request as ReviewRequest;
       return client.ontology.suggestions.create(
@@ -539,7 +558,11 @@ export function lbbActivities(client: LbbClient): LbbActivities {
           }),
         ),
       );
+      // The input is reported with what the wait ended with: answered, or
+      // still open after a timeout.
+      const turn = turnRunOf(ctx);
       if (item.status !== "open" && item.answer) {
+        reportReview(request, item, turn);
         return { answered: true, answer: item.answer, item };
       }
       const signal = item.wait?.signal;
@@ -552,12 +575,16 @@ export function lbbActivities(client: LbbClient): LbbActivities {
         `${key}.answer`,
         { name: signal, timeoutMs },
       );
-      if (got.received) return { answered: true, answer: got.value, item };
+      if (got.received) {
+        reportReview(request, { id: item.id, status: "answered" }, turn);
+        return { answered: true, answer: got.value, item };
+      }
       // The wait timed out: the answer may have come and its signal not
       // (a dropped event). Read the item again.
       const now = await ctx.step(`${key}.read`, () =>
         client.reviews.get(item.id),
       );
+      reportReview(request, now, turn);
       return now.status === "answered" && now.answer
         ? { answered: true, answer: now.answer, item: now }
         : { answered: false, answer: null, item: now };
@@ -600,6 +627,23 @@ function refuseTriggerShard(ctx: WorkflowContext): void {
   }
 }
 
+/**
+ * Report a review item about a subject to the run of its turn: the turn
+ * whose trigger message names the subject, else the one turn this process
+ * runs. Nothing outside a turn, or when the worker records no results.
+ */
+function reportReview(
+  request: ReviewItemRequest,
+  item: { id?: string; status?: string },
+  turn?: ActivityTurn,
+): void {
+  const iri = request.subject?.iri;
+  const run =
+    turn ?? (iri ? turnOfInstance(iri) : undefined) ?? activityTurn(undefined);
+  const input = run?.results ? reviewInput(request, item) : null;
+  if (input) run?.results?.add(input);
+}
+
 /** The client {@link lbbActivities} made the activities with. */
 const ACTIVITIES_CLIENT = Symbol.for("littlebigbrain.activities.client");
 
@@ -634,6 +678,12 @@ export interface CapturedReview {
 export interface ActivityCaptureResult {
   writes: CapturedWrite[];
   reviews: CapturedReview[];
+  /**
+   * What the run would have done with each input, as a live run reports
+   * it (`results`): each subject of a write `written` (or `no_value`), each
+   * subject of a review item `review`, each requeued instance `failed`.
+   */
+  results: WorkflowRunInput[];
 }
 
 /** Activities that write nothing, and what they kept. */
@@ -814,6 +864,7 @@ export function captureActivities(
     ];
   let writes: CapturedWrite[] = [];
   let reviews: CapturedReview[] = [];
+  let results = new RunResultsCollector();
   let filed = 0;
   async function check(
     body: Schemas["TripletCommitFile"],
@@ -867,6 +918,15 @@ export function captureActivities(
               body,
               ...(await check(body, graph)),
             });
+            for (const input of ownedWriteInputs(
+              {
+                subjects: body.replace_owned?.subjects,
+                entity_properties: body.entity_properties,
+                triplets: body.triplets,
+              },
+              "written",
+            ))
+              results.add(input);
           }
           return {
             commit_seq: null,
@@ -880,15 +940,20 @@ export function captureActivities(
         stepOptions,
       );
     },
-    // A test sends nothing back to the watch.
-    requeue: async () => null,
+    // A test sends nothing back to the watch; its inputs failed.
+    requeue: async (_ctx, _key, failed) => {
+      for (const input of requeuedInputs(failed)) results.add(input);
+      return null;
+    },
     // Every kind of review item is kept, not filed.
     review: (async (request: ReviewRequest | ReviewItemRequest) => {
       reviews.push({ request });
       filed += 1;
-      return isItemRequest(request)
-        ? capturedItem(request, filed)
-        : capturedSuggestion(request, filed);
+      if (!isItemRequest(request)) return capturedSuggestion(request, filed);
+      const item = capturedItem(request, filed);
+      const input = reviewInput(request, item);
+      if (input) results.add(input);
+      return item;
     }) as LbbActivities["review"],
     // An item a test asks is kept and never answered: the wait ends at once.
     // A trigger shard is refused, as the live call refuses it.
@@ -896,11 +961,10 @@ export function captureActivities(
       refuseTriggerShard(ctx);
       reviews.push({ request });
       filed += 1;
-      return {
-        answered: false,
-        answer: null,
-        item: capturedItem(request, filed),
-      };
+      const item = capturedItem(request, filed);
+      const input = reviewInput(request, item);
+      if (input) results.add(input);
+      return { answered: false, answer: null, item };
     },
     reviewItems: (keys, itemsOptions) =>
       activities.reviewItems(keys, itemsOptions),
@@ -912,10 +976,15 @@ export function captureActivities(
   };
   return {
     activities: captured,
-    result: () => ({ writes: [...writes], reviews: [...reviews] }),
+    result: () => ({
+      writes: [...writes],
+      reviews: [...reviews],
+      results: results.report()?.inputs ?? [],
+    }),
     reset() {
       writes = [];
       reviews = [];
+      results = new RunResultsCollector();
     },
   };
 }

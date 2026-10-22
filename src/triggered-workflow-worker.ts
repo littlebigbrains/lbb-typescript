@@ -9,6 +9,7 @@
 import type { LbbClient, Schemas } from "./client.js";
 import {
   isFanInIdentity,
+  turnRunOf,
   workflow,
   WorkflowError,
   type WorkflowContext,
@@ -16,6 +17,7 @@ import {
   type WorkflowStepContext,
   type WorkflowStepOptions,
 } from "./workflows.js";
+import { ownedWriteInputs, requeuedInputs } from "./run-results.js";
 
 /** The trigger message a developer workflow receives. */
 export type WorkflowTriggerMessage = Schemas["WorkflowTriggerMessage"];
@@ -419,6 +421,9 @@ export function writeOwned(
   options: OwnedWriteOptions = {},
 ): Promise<OwnedWriteResult> {
   const { graph, edgeIdempotency, ...stepOptions } = options;
+  // The turn's run, when the worker records results. The step keeps what
+  // it reports in its saved output, so a replay reports it again.
+  const results = turnRunOf(ctx)?.results;
   return ctx.step(
     stepKey,
     async (step): Promise<OwnedWriteResult> => {
@@ -457,6 +462,18 @@ export function writeOwned(
           retry: true,
         },
       );
+      // The step's own write, also when the server answers it as a replay
+      // of a request this step sent before.
+      if (results)
+        for (const input of ownedWriteInputs(
+          {
+            subjects: body.replace_owned?.subjects,
+            entity_properties: body.entity_properties,
+            triplets: body.triplets,
+          },
+          "written",
+        ))
+          results.add(input);
       return {
         commit_seq: response.commit_seq,
         idempotency_key: response.idempotency_key ?? effectId,
@@ -510,6 +527,9 @@ export async function requeueFailed(
   const target = options.graph
     ? client.withScope({ graph: options.graph })
     : client;
+  // The requeued instances failed in this run (a replay reports them too).
+  for (const input of requeuedInputs(failed))
+    turnRunOf(ctx)?.results?.add(input);
   return ctx.step(stepKey, () =>
     target.workflows.named.requeue(name, {
       workflow_id: ctx.workflowId,

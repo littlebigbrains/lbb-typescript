@@ -4211,6 +4211,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/workflows/named/runs/results": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** What a named workflow's runs did with each input, newest run first and each run's inputs in order: the input's IRI and label, its outcome (`written`, `review`, `no_value`, `failed`, `duplicate`), and its values as a test gives them (the value, quote, support, conversion, what the run did with it, and the review item it went to). A run records its results when it ends; one keeps its first 200 inputs whole and counts every input (`run_counts` with `run`). Kept 30 days. A page reads at most 400 runs' results. 404 `named_workflow_not_found`, 404 `workflow_run_not_found` for a `run` the workflow does not have */
+        get: operations["get_v1_workflows_named_runs_results"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/workflows/named/runs/stats": {
         parameters: {
             query?: never;
@@ -20177,6 +20194,38 @@ export interface components {
             units?: number;
         };
         /**
+         * @description One input as a run records it: its IRI and label, what the run did with
+         *     it, and its values in the shape of a test's (`WorkflowTestValue`).
+         */
+        WorkflowRunInput: {
+            /**
+             * Format: int64
+             * @description The model cost of this input, in millionths of a US dollar, when the
+             *     calls named it.
+             */
+            cost_micro_usd?: number;
+            /**
+             * @description Why the input failed or has no values (the instance is gone), at
+             *     most 500 characters.
+             */
+            error?: string | null;
+            /**
+             * @description The input. Absent for a worker's write that names its subject by
+             *     type and name only.
+             */
+            iri?: string | null;
+            /** @description The input's label, or the subject's name. */
+            label?: string;
+            outcome: components["schemas"]["WorkflowRunResultOutcome"];
+            region?: null | components["schemas"]["WorkflowTestRegion"];
+            /**
+             * @description What the run read or wrote, at most 32: a value with its quote,
+             *     support, conversion (`stated`) and outcome; a value filed for review
+             *     names its `review_item`.
+             */
+            values?: components["schemas"]["WorkflowTestValue"][];
+        };
+        /**
          * @description A page of a workflow's runs, newest first, in the list envelope. A
          *     request with `Lbb-Version` before 2026-10-21 gets the earlier shape:
          *     `runs` and `next_before` in place of `object`, `data`, `has_more` and
@@ -20216,6 +20265,113 @@ export interface components {
             /** Format: int64 */
             total?: number | null;
             unit?: string | null;
+        };
+        /**
+         * @description One result as the list answers it: an input of a run with the run's id
+         *     and when the run recorded it.
+         */
+        WorkflowRunResult: {
+            /** Format: int64 */
+            cost_micro_usd?: number;
+            /** @description When the run recorded it (the run's end), RFC 3339. */
+            created: string;
+            error?: string | null;
+            /** @description `wrr_` and 24 hex. Opaque. */
+            id: string;
+            iri?: string | null;
+            label?: string;
+            /** @description `workflow_run_result`. */
+            object: string;
+            outcome: components["schemas"]["WorkflowRunResultOutcome"];
+            region?: null | components["schemas"]["WorkflowTestRegion"];
+            /** @description The run id, as `…/runs` and `…/runs/get` name it. */
+            run: string;
+            values?: components["schemas"]["WorkflowTestValue"][];
+        };
+        /** @description The inputs of a run by outcome. */
+        WorkflowRunResultCounts: {
+            /** Format: int64 */
+            duplicate?: number;
+            /** Format: int64 */
+            failed?: number;
+            /** Format: int64 */
+            no_value?: number;
+            /** Format: int64 */
+            review?: number;
+            /** Format: int64 */
+            written?: number;
+        };
+        /**
+         * @description `GET /v1/workflows/named/runs/results`: the results of a workflow's
+         *     runs, newest run first, each run's inputs in order.
+         */
+        WorkflowRunResultList: {
+            data: components["schemas"]["WorkflowRunResult"][];
+            has_more: boolean;
+            /** @description Pass as `cursor` for the next page; absent on the last page. */
+            next_cursor?: string | null;
+            /** @description `list`. */
+            object: string;
+            run_counts?: null | components["schemas"]["WorkflowRunResultRunCounts"];
+        };
+        /**
+         * @description What a run did with one input. When several hold, the first of
+         *     `failed`, `review`, `written`, `duplicate`, `no_value` is the input's.
+         * @enum {string}
+         */
+        WorkflowRunResultOutcome: "written" | "review" | "no_value" | "failed" | "duplicate";
+        /**
+         * @description The counts of the run a list names (`run`): every input by outcome, and
+         *     how many the run had.
+         */
+        WorkflowRunResultRunCounts: {
+            counts: components["schemas"]["WorkflowRunResultCounts"];
+            /** Format: int64 */
+            inputs: number;
+            /**
+             * Format: int64
+             * @description The inputs the run kept a result for (at most 200).
+             */
+            listed: number;
+        };
+        /**
+         * @description The results of one run as they are stored: one object per run, beside
+         *     its summary, written once.
+         */
+        WorkflowRunResults: {
+            /** @description Every input of the run by outcome. */
+            counts: components["schemas"]["WorkflowRunResultCounts"];
+            data?: components["schemas"]["WorkflowRunInput"][];
+            /**
+             * Format: int64
+             * @description The inputs of the run; `data` holds the first 200.
+             */
+            inputs: number;
+            /**
+             * Format: int64
+             * @description When the run recorded them, Unix milliseconds: the run's end.
+             */
+            recorded_at_ms: number;
+            /** @description The run id, as the run's summary names it. */
+            run: string;
+            /**
+             * Format: int32
+             * @description The format number, 1.
+             */
+            v: number;
+            /** @description The workflow folder of the run. */
+            workflow: string;
+        };
+        /**
+         * @description What a worker reports with the completion or the failure of a turn:
+         *     the inputs of the run, and the counts of every input it handled (also
+         *     those past the bound). The SDK fills it from `writeOwned`, `review` and
+         *     `requeue`.
+         */
+        WorkflowRunResultsReport: {
+            counts?: null | components["schemas"]["WorkflowRunResultCounts"];
+            /** @description At most 200 inputs, in the order the run first named them. */
+            inputs?: components["schemas"]["WorkflowRunInput"][];
         };
         /**
          * @description The last hours of a workflow's runs, oldest first, up to the current
@@ -20687,7 +20843,10 @@ export interface components {
         WorkflowTestStatus: "queued" | "running" | "done" | "failed" | "cancelled";
         /**
          * @description One value the workflow read from an input, after every check, as the live
-         *     workflow would decide it.
+         *     workflow would decide it. A live run records its values in this shape too
+         *     (`WorkflowRunInput`), with two more outcomes: `answered` (a person's
+         *     answer in force was written) and `rejected` (a person rejected the value,
+         *     or the graph refused it, so it was not written again).
          */
         WorkflowTestValue: {
             detail?: string | null;
@@ -20701,6 +20860,17 @@ export interface components {
             property: string;
             /** @description The words of the text the model quoted. */
             quote: string;
+            region?: null | components["schemas"]["WorkflowTestRegion"];
+            /**
+             * @description The review item a live run filed for the value (`rev_…`); a test
+             *     files none.
+             */
+            review_item?: string | null;
+            /**
+             * @description Where the quote is: the evidence's `Document` IRI with its place
+             *     (`#page=3`, `#row=5`), or a name.
+             */
+            source?: string | null;
             /**
              * @description The number and unit as the text states them (`600 mm`), when they
              *     were converted to the property's unit.
@@ -20877,6 +21047,7 @@ export interface components {
         WorkflowTurnCompleteRequest: {
             continuation?: null | components["schemas"]["WorkflowTurnContinuation"];
             result?: unknown;
+            results?: null | components["schemas"]["WorkflowRunResultsReport"];
             state: unknown;
             token: string;
             /** Format: int64 */
@@ -20890,6 +21061,7 @@ export interface components {
         WorkflowTurnFailRequest: {
             error: string;
             non_retryable?: boolean;
+            results?: null | components["schemas"]["WorkflowRunResultsReport"];
             /**
              * Format: int64
              * @description Wait until this time (Unix milliseconds, at most 366 days ahead) and
@@ -21025,6 +21197,13 @@ export interface components {
             execution_credential?: null | components["schemas"]["WorkflowExecutionCredential"];
             /** Format: int64 */
             lease_ms: number;
+            /**
+             * Format: int32
+             * @description The inputs a completion or a failure may report results for
+             *     (`results`, at most this many kept whole). Set by a server that takes
+             *     results; a worker sends `results` only when it is present.
+             */
+            results_max?: number | null;
             state: unknown;
             token: string;
             turn: components["schemas"]["WorkflowTurn"];
@@ -62696,6 +62875,159 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["WorkflowRunDetail"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Rate limit exceeded */
+            429: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Service unavailable */
+            503: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+        };
+    };
+    get_v1_workflows_named_runs_results: {
+        parameters: {
+            query?: {
+                /** @description Graph name (default `main`) */
+                graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
+                /** @description the workflow's name */
+                name?: string;
+                /** @description one run's results, in input order (a run id); without it, the newest runs' */
+                run?: string;
+                /** @description a comma list of `written`, `review`, `no_value`, `failed` and `duplicate` */
+                outcome?: string;
+                /** @description one input's results */
+                iri?: string;
+                /** @description the `next_cursor` of the previous page */
+                cursor?: string;
+                /** @description results, 1 to 200; default 50 */
+                limit?: string;
+            };
+            header?: {
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                "Lbb-Version"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkflowRunResultList"];
                 };
             };
             /** @description Bad request */

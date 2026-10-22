@@ -97,6 +97,12 @@ export type {
   EvalDatasetsNamespace,
 } from "./eval-datasets.js";
 export type {
+  WorkflowRunInput,
+  WorkflowRunResultCounts,
+  WorkflowRunResultOutcome,
+  WorkflowRunResultsReport,
+} from "./run-results.js";
+export type {
   WorkflowTest,
   WorkflowTestAnswerRequest,
   WorkflowTestCreateRequest,
@@ -122,6 +128,7 @@ export type {
   WorkflowDocumentsOptions,
   WorkflowRunStatsOptions,
   WorkflowRunsOptions,
+  WorkflowRunResultsOptions,
 } from "./triggered-workflows.js";
 export type {
   IntegrationsNamespace,
