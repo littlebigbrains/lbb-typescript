@@ -2,7 +2,7 @@
 
 All notable changes to the `@littlebigbrain/client` package are documented here.
 
-## Unreleased
+## 0.30.0 (2026-10-22)
 
 - `client.workflows.named` reads the history of a workflow's settings and
   uses earlier settings again: `revisions(name, { cursor, limit })`,
