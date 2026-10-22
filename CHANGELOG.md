@@ -2,6 +2,22 @@
 
 All notable changes to the `@littlebigbrain/client` package are documented here.
 
+## Unreleased
+
+- `client.models.choices`: the model each workflow use runs, for the
+  environment or for one workflow (`GET`, `PUT` and `DELETE
+  /v1/models/choices`). `list` takes `workflow`, `use`, `limit` and
+  `cursor`; `all` pages through it; `put` takes `{use, model, workflow?}`;
+  `delete` takes `{use, workflow?}` and returns `{id, object, deleted}`;
+  `put` and `delete` send an idempotency key. The uses are `extract` (the reasoning
+  model of an AI step) and `decide` (its decision model); `embed` is listed
+  and takes no choice. A logged call (`ModelCall`, a call list row) gains
+  `choice`: the row in force (`id`, `scope`, `source`) and `fallback`.
+  Types: `ModelChoiceListOptions`, `ModelChoicesNamespace`.
+  `client.workflows.tests.create` takes `models` (`{extract?, decide?}`):
+  the test runs on those models, and the test's `models` names the ones
+  it ran.
+
 ## 0.30.0 (2026-10-22)
 
 - `client.workflows.named` reads the history of a workflow's settings and

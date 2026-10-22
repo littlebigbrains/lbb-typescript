@@ -364,6 +364,58 @@ test("model trials and switches map each operation to its route", async () => {
   assert.deepEqual(JSON.parse(bodies[7] ?? ""), { trial: id });
 });
 
+test("model choices map each operation to its route", async () => {
+  const page = (cursor: string | null) => ({
+    body: {
+      object: "list",
+      data: [{ id: cursor ?? "last", use: "extract" }],
+      has_more: cursor !== null,
+      next_cursor: cursor,
+    },
+  });
+  const { fetch, urls, methods, bodies, headers } = queuedFetch([
+    page(null),
+    page("mch_1"),
+    page(null),
+    { body: {} },
+    { body: { id: "mch_2", object: "model_choice", deleted: true } },
+  ]);
+  const client = new LbbClient({ baseUrl: "http://h", graph: "crm", fetch });
+
+  await client.models.choices.list({ workflow: "products", use: "extract" });
+  const rows = [];
+  for await (const row of client.models.choices.all({ limit: 1 })) {
+    rows.push(row.id);
+  }
+  await client.models.choices.put({
+    use: "extract",
+    model: { provider: "anthropic", model: "claude-haiku-5-5", effort: "low" },
+    workflow: "products",
+  });
+  const deleted = await client.models.choices.delete({ use: "decide" });
+
+  assert.equal(deleted.deleted, true);
+  assert.match(headers[3]["idempotency-key"] ?? "", /^models\.choices\.put:/);
+  assert.match(
+    headers[4]["idempotency-key"] ?? "",
+    /^models\.choices\.delete:/,
+  );
+  assert.deepEqual(rows, ["mch_1", "last"]);
+  assert.deepEqual(urls, [
+    "http://h/v1/models/choices?graph=crm&workflow=products&use=extract",
+    "http://h/v1/models/choices?graph=crm&limit=1",
+    "http://h/v1/models/choices?graph=crm&limit=1&cursor=mch_1",
+    "http://h/v1/models/choices?graph=crm",
+    "http://h/v1/models/choices?graph=crm&use=decide",
+  ]);
+  assert.deepEqual(methods, ["GET", "GET", "GET", "PUT", "DELETE"]);
+  assert.deepEqual(JSON.parse(bodies[3] ?? ""), {
+    use: "extract",
+    model: { provider: "anthropic", model: "claude-haiku-5-5", effort: "low" },
+    workflow: "products",
+  });
+});
+
 test("models.trials.wait reads the trial until it compared what it can", async () => {
   const trial = (status: string, calls: number) => ({
     body: { id: "t1", status, report: { calls, qualifies: calls >= 20 } },
