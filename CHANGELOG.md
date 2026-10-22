@@ -17,6 +17,11 @@ All notable changes to the `@littlebigbrain/client` package are documented here.
   `client.workflows.tests.create` takes `models` (`{extract?, decide?}`):
   the test runs on those models, and the test's `models` names the ones
   it ran.
+- `triggeredWorkflow({ onSchedule })` handles the slots of a workflow with
+  a schedule trigger (`type: "schedule"`: the slot's time, the slots skipped,
+  the commit range since the last run and `changed`), and `onInstances`
+  becomes optional. A schedule message without `onSchedule` fails the turn
+  for good. `WorkflowScheduleMessage` is exported.
 
 ## 0.30.0 (2026-10-22)
 

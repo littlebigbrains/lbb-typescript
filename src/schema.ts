@@ -4101,7 +4101,7 @@ export interface paths {
         };
         /** The graph's workflows with triggers: a target workflow type, its shards (engine identities `starter.<name>`, `starter.<name>.<k>`), its settings and its one trigger (a watch, or a content trigger on the uploads of some media types), with the status shape of `/v1/workflows/triggered` and each shard's engine state. Lists your workflows and LBB's document, values and review workflows (their target is an `lbb.*` type and they run in LBB). `name` for one (returns NamedWorkflow; 404 `named_workflow_not_found`) */
         get: operations["get_v1_workflows_named"];
-        /** Create or change a workflow of your worker with one trigger. A watch sends the class's new, changed and removed instances as messages to `shards` engine identities (1 to 16, default 1), routed by `route_by` (a field; default the instance IRI) so the changes of one key stay in order, at most `window` messages queued per shard (1 to 128, default 4). A content trigger (`content.media_types`) sends each upload of those media types as it is logged, without a wait for a publication: one content per message, routed by its SHA-256, with origin `content`. Each message names its origin. The same request again is a no-op; a workflow keeps its trigger's kind. 400 `workflow_trigger_unsupported` for a schedule or more than one trigger; 400 `workflow_param_invalid` for an `lbb.*` target; 409 `workflow_shards_busy` for a change of `shards` or `route_by` while a shard's inbox holds messages; 409 `workflow_cycle`, `workflow_owns_conflict`; 503 `workflows_disabled`. The PUT replaces the whole workflow, so a repeat with the same body changes nothing: it needs no `Idempotency-Key` */
+        /** Create or change a workflow of your worker with one trigger. A watch sends the class's new, changed and removed instances as messages to `shards` engine identities (1 to 16, default 1), routed by `route_by` (a field; default the instance IRI) so the changes of one key stay in order, at most `window` messages queued per shard (1 to 128, default 4). A content trigger (`content.media_types`) sends each upload of those media types as it is logged, without a wait for a publication: one content per message, routed by its SHA-256, with origin `content`. A schedule (`schedule`: a cron expression in a time zone, or `every` with an `offset` in UTC, at least 5 minutes apart) sends one message per slot to one identity, with the published commit and whether the graph changed since the last slot. Each message names its origin. The same request again is a no-op; a workflow keeps its trigger's kind. 400 `workflow_trigger_unsupported` for more than one trigger; 400 `workflow_param_invalid` for an `lbb.*` target; 409 `workflow_shards_busy` for a change of `shards` or `route_by` while a shard's inbox holds messages; 409 `workflow_cycle`, `workflow_owns_conflict`; 503 `workflows_disabled`. The PUT replaces the whole workflow, so a repeat with the same body changes nothing: it needs no `Idempotency-Key` */
         put: operations["put_v1_workflows_named"];
         post?: never;
         /** Delete a workflow's triggers. What it wrote stays, and so do the engine identities of your worker's type */
@@ -4239,7 +4239,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Run a workflow now: its watch reads every instance of the class again and sends them with origin `manual`; a content trigger reads its content log again from the start. Answers at once (`queued`). A repeat while the run waits adds nothing; a repeat after the pass started starts the pass again from its first instance. It takes no `Idempotency-Key` */
+        /** Run a workflow now: its watch reads every instance of the class again and sends them with origin `manual`; a content trigger reads its content log again from the start; a schedule sends one message now, outside its slots. Answers at once (`queued`). A repeat while the run waits adds nothing; a repeat after the pass started starts the pass again from its first instance. It takes no `Idempotency-Key` */
         post: operations["post_v1_workflows_named_run"];
         delete?: never;
         options?: never;
@@ -12237,9 +12237,10 @@ export interface components {
              */
             shards?: number | null;
             /**
-             * @description Exactly one trigger in this release: a watch or a content trigger.
-             *     A workflow keeps its trigger's kind; to change it, delete the
-             *     workflow and create it again.
+             * @description Exactly one trigger in this release: a watch, a content trigger or a
+             *     schedule, and a review trigger beside it. A workflow keeps its
+             *     trigger's kind; to change it, delete the workflow and create it
+             *     again.
              */
             triggers: components["schemas"]["WorkflowTrigger"][];
             /**
@@ -20076,6 +20077,12 @@ export interface components {
              * @description How many times the item was sent before (a requeue).
              */
             attempt?: number | null;
+            /**
+             * Format: int64
+             * @description A `schedule` origin: the slot's time, in milliseconds since the Unix
+             *     epoch.
+             */
+            due_at_ms?: number | null;
             /** @description The event of the data plane that sent it. */
             event?: string | null;
             /** @description The fields (predicate IRIs or names) whose change caused it. */
@@ -20808,6 +20815,108 @@ export interface components {
          */
         WorkflowRunsIn: "lbb" | "worker";
         /**
+         * @description The message of one schedule slot (`type: "schedule"`): the slot's time,
+         *     the slots skipped since the last run, and the commit range since the
+         *     last run.
+         */
+        WorkflowScheduleMessage: {
+            /**
+             * Format: int64
+             * @description The graph's published commit when the slot was sent: read at this
+             *     commit or later.
+             */
+            as_of_commit_seq: number;
+            /**
+             * @description Whether a commit was published since the previous run
+             *     (`since_commit_seq < as_of_commit_seq`).
+             */
+            changed: boolean;
+            /**
+             * @description The slot's time (RFC 3339, UTC); for a run now, the time it was
+             *     asked.
+             */
+            due_at: string;
+            /** @description The graph id. */
+            graph: string;
+            /** @description A run now (`POST /v1/workflows/named/run`), outside the slots. */
+            manual?: boolean;
+            /**
+             * Format: int64
+             * @description Slots skipped since the previous run.
+             */
+            missed: number;
+            origin?: null | components["schemas"]["WorkflowMessageOrigin"];
+            /** @description The time of the previous run's slot; absent for the first run. */
+            previous_due_at?: string | null;
+            /**
+             * Format: int64
+             * @description The previous run's `as_of_commit_seq` (the first run: the published
+             *     commit when the trigger was made). The changes since the previous
+             *     run are the commits after it, up to `as_of_commit_seq`.
+             */
+            since_commit_seq: number;
+            /** @description The trigger's id. */
+            trigger: string;
+            /** @description Always `schedule`. */
+            type: string;
+            /** @description The workflow's name. */
+            workflow: string;
+        };
+        /**
+         * @description A schedule trigger as the server resolved it: the stored form (a cron
+         *     expression names its `timezone`) and where its slots stand.
+         */
+        WorkflowScheduleResolved: {
+            cron?: string | null;
+            every?: string | null;
+            jitter?: string | null;
+            /** @description The time of the last slot sent or skipped. */
+            last_due_at?: string | null;
+            /**
+             * Format: int64
+             * @description Slots skipped since the last run (a run that had not finished, the
+             *     budget, a downtime); the next run's `missed`.
+             */
+            missed?: number;
+            /**
+             * @description The next slot's time, RFC 3339 (absent while the workflow is
+             *     paused).
+             */
+            next_due_at?: string | null;
+            offset?: string | null;
+            timezone?: string | null;
+        };
+        /**
+         * @description A schedule trigger: a `cron` expression in a `timezone`, or a period
+         *     (`every`, with an `offset`) in UTC, and an optional `jitter`. Exactly one
+         *     of `cron` and `every`. Slots come at least 5 minutes apart.
+         */
+        WorkflowScheduleTrigger: {
+            /**
+             * @description Five fields (minute, hour, day of month, month, day of week): `*`,
+             *     lists, ranges, steps, month and day names, Sunday as 0 or 7. As in
+             *     Vixie cron and cronie, when either day field starts with `*` a day
+             *     matches both; otherwise it matches either.
+             *     `@hourly`, `@daily`, `@weekly`, `@monthly` and `@yearly` too.
+             */
+            cron?: string | null;
+            /**
+             * @description A period of whole minutes (`5m`, `6h`, `7d`), 5 minutes to 366 days:
+             *     slots at `offset + k * every` since the Unix epoch, in UTC.
+             */
+            every?: string | null;
+            /**
+             * @description Each slot is sent a fixed delay after its time, below this: at most 1
+             *     hour and half the shortest gap between slots. The message keeps the
+             *     slot's time.
+             */
+            jitter?: string | null;
+            /** @description With `every`: whole minutes from 0 to less than `every`. Default 0. */
+            offset?: string | null;
+            /** @description An IANA time zone name for `cron` (`Europe/Berlin`). Default `UTC`. */
+            timezone?: string | null;
+        };
+        /**
          * @description Current graph incarnation and the durable write model it owns. The epoch
          *     is a decimal string so clients preserve the entire u64 identity.
          */
@@ -21234,9 +21343,8 @@ export interface components {
             starter: string;
         };
         /**
-         * @description One trigger of a workflow: a watch or a content trigger, exactly one of
-         *     them, and at most one review trigger beside it. A schedule (design only)
-         *     is refused with `400 workflow_trigger_unsupported`.
+         * @description One trigger of a workflow: a watch, a content trigger or a schedule,
+         *     exactly one of them, and at most one review trigger beside it.
          */
         WorkflowTrigger: {
             content?: null | components["schemas"]["WorkflowContentTrigger"];
@@ -21246,11 +21354,7 @@ export interface components {
              */
             id?: string | null;
             review?: null | components["schemas"]["WorkflowReviewTrigger"];
-            /**
-             * @description Design only: a timer trigger. Refused in this release
-             *     (`workflow_trigger_unsupported`).
-             */
-            schedule?: Record<string, never> | null;
+            schedule?: null | components["schemas"]["WorkflowScheduleTrigger"];
             watch?: null | components["schemas"]["WorkflowWatch"];
         };
         /**
@@ -21300,13 +21404,17 @@ export interface components {
          * @enum {string}
          */
         WorkflowTriggerReason: "backfill" | "changed" | "refresh" | "schema_changed";
-        /** @description A trigger as the server resolved it: a watch or a content trigger. */
+        /**
+         * @description A trigger as the server resolved it: a watch, a content trigger, a
+         *     schedule or a review trigger.
+         */
         WorkflowTriggerResolved: {
             content?: null | components["schemas"]["WorkflowContentTrigger"];
             id: string;
-            /** @description `watch`, `content` or `review`. */
+            /** @description `watch`, `content`, `schedule` or `review`. */
             kind: string;
             review?: null | components["schemas"]["WorkflowReviewTrigger"];
+            schedule?: null | components["schemas"]["WorkflowScheduleResolved"];
             watch?: null | components["schemas"]["WorkflowWatchResolved"];
         };
         WorkflowTurn: {
