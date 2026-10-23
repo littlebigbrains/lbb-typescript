@@ -229,6 +229,8 @@ export type {
   ReviewAnsweredMessage,
   TriggeredWorkflowDefinition,
   TriggeredWorkflowTurn,
+  WorkflowEventRecord,
+  WorkflowEventsMessage,
   WorkflowScheduleMessage,
   WorkflowTriggerMessage,
   WorkflowTriggerReason,

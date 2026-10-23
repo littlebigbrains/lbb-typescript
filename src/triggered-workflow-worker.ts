@@ -1,10 +1,11 @@
 // Developer workflows (`workflow@v1`). A triggered workflow of the starter
 // workflow `workflow` sends the new and changed instances of the class it
 // watches to a workflow of your worker, as trigger messages of type
-// `instances`, and a workflow with a schedule sends one message of type
-// `schedule` per slot. `triggeredWorkflow()` defines that workflow: it
-// checks each message and hands it to `onInstances` or `onSchedule` with
-// the workflow's state.
+// `instances`, a workflow with a schedule sends one message of type
+// `schedule` per slot, and a workflow with a stream sends its events in
+// batches (`events`). `triggeredWorkflow()` defines that workflow: it
+// checks each message and hands it to `onInstances`, `onSchedule` or
+// `onEvents` with the workflow's state.
 // `writeOwned()` commits what your code owns on the instances with
 // `replace_owned`, inside a named step, with the step's effect id as the
 // commit's idempotency key.
@@ -38,6 +39,20 @@ export const TRIGGER_MESSAGE_TYPE = "instances";
 export type WorkflowScheduleMessage = Schemas["WorkflowScheduleMessage"];
 /** The `type` of a schedule slot's message. */
 export const SCHEDULE_MESSAGE_TYPE = "schedule";
+
+/**
+ * One batch of a stream's events (`type: "events"`): `count` events of one
+ * shard, kept in the workflow blob `blob`. The SDK reads the blob before
+ * `onEvents` runs.
+ */
+export type WorkflowEventsMessage = Schemas["WorkflowEventsMessage"];
+/**
+ * One event of a batch: the event as its producer sent it, when the stream
+ * received it (`received_at`) and the id of the request that sent it.
+ */
+export type WorkflowEventRecord = Schemas["WorkflowEventRecord"];
+/** The `type` of a stream batch's message. */
+export const EVENTS_MESSAGE_TYPE = "events";
 
 /** The answer to a review item, as a workflow with a review trigger gets it. */
 export type ReviewAnsweredMessage = Schemas["ReviewAnsweredMessage"];
@@ -143,6 +158,21 @@ export interface TriggeredWorkflowDefinition<S, R = unknown> {
   onSchedule?(
     ctx: WorkflowContext,
     message: WorkflowScheduleMessage,
+    state: S,
+  ): Promise<TriggeredWorkflowTurn<S, R> | void>;
+  /**
+   * Handle one batch of a stream's events (`{ stream: { max_wait } }`): up
+   * to the workflow's `batch` events of one shard, in the order the stream
+   * received them. The events of one `key` are always on one shard. The
+   * SDK reads the batch's blob first. An event id comes once within the
+   * stream's dedupe window (24 hours, at most 100,000 ids): when a producer
+   * can send an id again after it, make the work idempotent. Without this
+   * handler such a message fails the turn.
+   */
+  onEvents?(
+    ctx: WorkflowContext,
+    events: WorkflowEventRecord[],
+    message: WorkflowEventsMessage,
     state: S,
   ): Promise<TriggeredWorkflowTurn<S, R> | void>;
   /**
@@ -252,6 +282,28 @@ export function triggeredWorkflow<S = Record<string, unknown>, R = unknown>(
         turn = await definition.onSchedule(
           ctx,
           raw as WorkflowScheduleMessage,
+          state,
+        );
+      } else if (type === EVENTS_MESSAGE_TYPE) {
+        if (!definition.onEvents)
+          throw missing(
+            "a batch of events (it has a stream trigger)",
+            "onEvents",
+          );
+        const batch = raw as WorkflowEventsMessage;
+        if (!ctx.blobJson)
+          throw new WorkflowError(
+            `${definition.name} received a batch of events, and this context reads no blobs`,
+          );
+        const stored = await ctx.blobJson<unknown>(batch.blob);
+        if (!isObject(stored) || !Array.isArray(stored.events))
+          throw new WorkflowError(
+            `the blob ${batch.blob} holds no batch of events`,
+          );
+        turn = await definition.onEvents(
+          ctx,
+          stored.events as WorkflowEventRecord[],
+          batch,
           state,
         );
       } else {
