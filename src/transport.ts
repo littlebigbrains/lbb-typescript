@@ -77,7 +77,7 @@ export class LbbError extends Error {
   }
 }
 
-/** Thrown before upload when a server does not advertise a required additive capability. */
+/** Thrown when a server cannot supply a required additive capability. */
 export class LbbCapabilityError extends Error {
   constructor(readonly capability: string) {
     super(

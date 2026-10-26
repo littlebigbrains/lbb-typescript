@@ -1795,7 +1795,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Native entity attributes and relationships from the graph-owned RDF view, each relationship with its evidence; unavailable provenance sections are explicitly listed */
+        /** Entity read from one RDF snapshot; version=records/1 returns exact RDF terms, caller IRIs and independent assertion metadata, while the default preserves the native entity view */
         get: operations["get_v1_graph_entity"];
         put?: never;
         post?: never;
@@ -7422,6 +7422,11 @@ export interface components {
             outgoing: components["schemas"]["RdfEntityRelation"][];
             outgoing_truncation?: null | components["schemas"]["TruncatedCollection"];
         };
+        /**
+         * @description The existing entity resource selects its additive wire response only when
+         *     the caller explicitly requests `records/1`.
+         */
+        EntityReadResponse: components["schemas"]["EntityDetailResponse"] | components["schemas"]["RecordReadResponse"];
         EntitySelector: {
             entity_id?: null | components["schemas"]["EntityId"];
             entity_type?: string | null;
@@ -14737,6 +14742,106 @@ export interface components {
             /** @description The model's answer: JSON that follows the request's `schema`. */
             value: unknown;
         };
+        /**
+         * @description Raw statement-node facts are authoritative, including malformed/multivalued
+         *     reification. Optional membership never claims which source supplied support.
+         */
+        RecordAssertion: {
+            described?: null | components["schemas"]["RecordTriple"];
+            described_triple_present?: boolean | null;
+            id: components["schemas"]["RecordTerm"];
+            statements: components["schemas"]["RecordTriple"][];
+        };
+        /** @enum {string} */
+        RecordIriSelectorKind: "iri";
+        /** @enum {string} */
+        RecordKeySelectorKind: "key";
+        RecordLiteralTerm: {
+            /** @description RDF 1.2 directional language literals retain their direction explicitly. */
+            "@direction"?: string | null;
+            "@language"?: string | null;
+            "@type"?: string | null;
+            "@value": string;
+        };
+        /** @enum {string} */
+        RecordNativeIdSelectorKind: "native_id";
+        /** @enum {string} */
+        RecordObject: "record";
+        RecordQuotedTripleTerm: {
+            "@triple": components["schemas"]["RecordTriple"];
+        };
+        RecordReadLimits: {
+            /** @default 256 */
+            assertion_statements: number;
+            /** @default 50 */
+            assertions: number;
+            /** @default 100 */
+            incoming: number;
+            /** @default 100 */
+            outgoing: number;
+            /** @default 256 */
+            properties: number;
+        };
+        RecordReadRequest: {
+            /**
+             * @description Refuse a key/current-schema read if the exact active configuration has
+             *     changed. This is an opaque token, not an ontology version number.
+             */
+            expected_schema_revision?: string | null;
+            limits?: components["schemas"]["RecordReadLimits"];
+            selector: components["schemas"]["RecordSelector"];
+        };
+        RecordReadResponse: {
+            assertions: components["schemas"]["RecordAssertion"][];
+            /**
+             * @description U1 refuses the complete request with `record_read_limit` if any section
+             *     cannot fit. Successful reads are complete; paging is a U4 exit.
+             */
+            complete: boolean;
+            id: string;
+            incoming: components["schemas"]["RecordTriple"][];
+            native_entity_id?: null | components["schemas"]["EntityId"];
+            object: components["schemas"]["RecordObject"];
+            outgoing: components["schemas"]["RecordTriple"][];
+            properties: components["schemas"]["RecordTriple"][];
+            schema_binding: components["schemas"]["RecordSchemaAvailability"];
+            schema_revision?: string | null;
+            snapshot: components["schemas"]["SnapshotView"];
+            types: string[];
+            version: components["schemas"]["RecordsVersion"];
+        };
+        RecordReferenceTerm: {
+            "@id": string;
+        };
+        /** @enum {string} */
+        RecordSchemaAvailability: "available" | "snapshot_unavailable";
+        /**
+         * @description Full IRIs are authoritative. Stable keys require an explicitly activated
+         *     class binding and resolve on the same configuration pin as the read.
+         */
+        RecordSelector: {
+            kind: components["schemas"]["RecordIriSelectorKind"];
+            value: string;
+        } | {
+            kind: components["schemas"]["RecordNativeIdSelectorKind"];
+            value: components["schemas"]["EntityId"];
+        } | {
+            key: string;
+            kind: components["schemas"]["RecordKeySelectorKind"];
+            type: string;
+        };
+        /**
+         * @description Exact RDF terms. Literal lexical forms are always JSON strings: large
+         *     integers, decimal precision and timezone spelling never pass through f64.
+         */
+        RecordTerm: components["schemas"]["RecordReferenceTerm"] | components["schemas"]["RecordLiteralTerm"] | components["schemas"]["RecordQuotedTripleTerm"];
+        RecordTriple: {
+            object: components["schemas"]["RecordTerm"];
+            predicate: string;
+            subject: components["schemas"]["RecordTerm"];
+        };
+        /** @enum {string} */
+        RecordsVersion: "records/1";
         ReferenceDatasetRequest: {
             as_of_commit_seq?: null | components["schemas"]["CommitSeq"];
             /** @description The primary graph is selected by the usual graph query parameter. */
@@ -39499,21 +39604,37 @@ export interface operations {
                  * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
                  */
                 stack?: string;
-                /** @description Entity id */
+                /** @description records/1 for lossless records; omit for the existing native entity view */
+                version?: string;
+                /** @description Authoritative full RDF IRI; requires version=records/1 */
+                iri?: string;
+                /** @description Expected opaque schema revision for records/1; unavailable historical binding is refused */
+                schema_revision?: string;
+                /** @description records/1 property statement bound (default 256, maximum 10000); excess refuses the whole read */
+                max_properties?: string;
+                /** @description records/1 outgoing statement bound (default 100, maximum 10000) */
+                max_outgoing?: string;
+                /** @description records/1 incoming statement bound (default 100, maximum 10000) */
+                max_incoming?: string;
+                /** @description records/1 independent assertion bound (default 50, maximum 100) */
+                max_assertions?: string;
+                /** @description records/1 statement bound per assertion (default 256, maximum 10000) */
+                max_assertion_statements?: string;
+                /** @description Native entity id; alternative to full iri or type+key in records/1 */
                 id?: string;
-                /** @description Entity type for name-addressed lookup */
+                /** @description records/1: activated class alias or IRI, paired with key; legacy: entity type for name/key lookup */
                 type?: string;
-                /** @description Entity canonical name for name-addressed lookup */
+                /** @description Legacy native entity name; forbidden with records/1 */
                 name?: string;
-                /** @description External entity key; takes precedence over name */
+                /** @description records/1: exact stable key paired with type; legacy: external key taking precedence over name */
                 key?: string;
                 /** @description strong or eventual (default); strong includes the exact durable delta suffix */
                 consistency?: string;
                 /** @description Retained commit sequence; valid-time as_of is unsupported */
                 as_of_commit_seq?: string;
-                /** @description Maximum RDF relationships per direction (default 1000, ceiling 10000) */
+                /** @description Legacy native view only: maximum RDF relationships per direction (default 1000, ceiling 10000) */
                 edges?: string;
-                /** @description Evidence entries per relationship, newest commit first (default 5, 0 to 20; 0 reads none) */
+                /** @description Legacy native view only: evidence entries per relationship, newest commit first (default 5, 0 to 20; 0 reads none) */
                 evidence?: string;
             };
             header?: {
@@ -39535,7 +39656,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["EntityDetailResponse"];
+                    "application/json": components["schemas"]["EntityReadResponse"];
                 };
             };
             /** @description Bad request */
