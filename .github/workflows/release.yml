@@ -3,7 +3,10 @@ name: release
 # A canonical sync that lands a new package version on public main is the
 # release trigger. Already-published versions are a no-op. New versions run CI,
 # pause at the protected `npm` environment, publish through trusted publishing,
-# then receive their matching tag and GitHub Release.
+# then receive their matching tag and GitHub Release. A version that npm
+# refuses as already published or staged passes only once it is live on npm.
+# Once the client is live, the job release-create starts release-create.yml,
+# which checks the generator's projects against this client.
 
 on:
   push:
@@ -72,7 +75,35 @@ jobs:
           [ "$actual" = "$EXPECTED_VERSION" ] \
             || { echo "::error::package version $actual != expected $EXPECTED_VERSION"; exit 1; }
       - name: Publish @littlebigbrain/client
-        run: npm publish
+        # Two syncs can queue two runs of one version at the gate. When npm
+        # refuses this version as already published or staged, the step checks
+        # that the exact version is live; so does a publish. Only a live version
+        # passes, so github-release never tags a version that npm lacks.
+        env:
+          EXPECTED_VERSION: ${{ needs.preflight.outputs.version }}
+        run: |
+          set +e
+          set -uo pipefail
+          package="@littlebigbrain/client@${EXPECTED_VERSION:?}"
+          live() { [ "$(npm view "$package" version 2>/dev/null)" = "$EXPECTED_VERSION" ]; }
+          if live; then
+            echo "$package is already on npm; skipped"
+            exit 0
+          fi
+          npm publish 2>&1 | tee "$RUNNER_TEMP/publish.log"
+          status=${PIPESTATUS[0]}
+          if [ "$status" -ne 0 ]; then
+            grep -qE 'code (E409|EPUBLISHCONFLICT)|[Cc]annot publish over' "$RUNNER_TEMP/publish.log" \
+              || exit "$status"
+            echo "::warning::npm refused $package as already published or staged"
+          fi
+          for attempt in $(seq 1 20); do
+            live && { echo "$package is on npm"; exit 0; }
+            echo "$package is not on npm yet (attempt $attempt/20)"
+            sleep 15
+          done
+          echo "::error::$package is not on npm after 5 minutes"
+          exit 1
 
   github-release:
     needs: [preflight, publish-npm]
@@ -96,3 +127,29 @@ jobs:
               --title "$RELEASE_TAG" \
               --generate-notes
           fi
+
+  release-create:
+    # The generator's release checks its projects against this client, so it
+    # starts here once the client is live on npm. A long wait at this
+    # release's gate then cannot time out the generator's check.
+    needs: [preflight, publish-npm]
+    if: ${{ needs.preflight.outputs.publish == 'true' }}
+    runs-on: ubuntu-24.04
+    permissions:
+      actions: write
+    steps:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Check that the client is live on npm
+        env:
+          EXPECTED_VERSION: ${{ needs.preflight.outputs.version }}
+        run: |
+          set -euo pipefail
+          package="@littlebigbrain/client@${EXPECTED_VERSION:?}"
+          [ "$(npm view "$package" version)" = "$EXPECTED_VERSION" ] \
+            || { echo "::error::$package is not on npm"; exit 1; }
+      - name: Start release-create.yml
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run release-create.yml --repo "$GITHUB_REPOSITORY" --ref main

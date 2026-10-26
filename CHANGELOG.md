@@ -2,8 +2,19 @@
 
 All notable changes to the `@littlebigbrain/client` package are documented here.
 
-## Unreleased
+## 0.31.0 (2026-10-26)
 
+- `client.status({ version: "status/1" })` reads the current RDF and class
+  diagnostics and checks their shape (`CurrentStatusResponse`). `status()`
+  without `version` answers as before. `version: "legacy"` asks for the
+  earlier shape and throws `LbbCapabilityError` when the server answers
+  another one.
+- `client.demoRun({ dataset, version })` runs the fixed RDF fixture checks
+  (`POST /v1/demo/run`, dataset `semantic_graph` by default) and checks the
+  answer (`DemoCurrentRunResponse`). It sends `version: "demo/1"` by default
+  and needs the server capability `rdf_demo_checks_v1`: an older server
+  throws `LbbCapabilityError`. `version: "legacy"` returns the earlier
+  answer.
 - Add `client.entities.retrieve` for versioned `records/1` entity reads: caller IRIs, native ids, activated schema keys, exact RDF terms, independent assertions, explicit snapshot/schema availability and whole-read limits. Existing `entities.detail` is unchanged.
 
 - `client.models.choices`: the model each workflow use runs, for the
