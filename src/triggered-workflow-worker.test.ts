@@ -341,6 +341,24 @@ test("workflows.named reads the settings history and activates a revision", asyn
   assert.deepEqual(requests[5]?.body, { name: "sinks", id: first });
 });
 
+test("workflows.named applies an experiment's B with an activation", async () => {
+  const first = "wrev_00000000000000000000000000000001";
+  const experiment = "exp_1791967648726a1b2c3d4e5f6";
+  const { fetch, requests } = queuedFetch([
+    { body: { object: "workflow", name: "sinks", active_revision: first } },
+  ]);
+  const client = new LbbClient({ baseUrl: "http://h", graph: "crm", fetch });
+  const activated = await client.workflows.named.activateRevision(
+    "sinks",
+    first,
+    {
+      experiment,
+    },
+  );
+  assert.equal(activated.active_revision, first);
+  assert.deepEqual(requests[0]?.body, { name: "sinks", id: first, experiment });
+});
+
 test("workflows.named reads what the runs did with each input, page by page", async () => {
   const result = (id: string, outcome: string) => ({
     id,

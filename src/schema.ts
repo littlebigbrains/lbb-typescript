@@ -11545,6 +11545,11 @@ export interface components {
             /** @description When the row was first set, RFC 3339; `null` for a default row. */
             created?: string | null;
             default?: null | components["schemas"]["ModelTrialModel"];
+            /**
+             * @description The experiment whose B a person applied with this choice (`exp_…`,
+             *     added 2026-10-26); absent when the model was set otherwise.
+             */
+            experiment?: string | null;
             /** @description The graph of a `workflow` row; `null` for the environment. */
             graph?: string | null;
             /**
@@ -11595,6 +11600,14 @@ export interface components {
          *     environment, or for one workflow of the graph (`workflow`).
          */
         ModelChoicePutRequest: {
+            /**
+             * @description An experiment whose B this write applies (`exp_…`, added
+             *     2026-10-26): its model change for `use` on `workflow`. The write
+             *     checks that the workflow still runs the experiment's A (409
+             *     `experiment_outdated`); when it runs B already, it changes nothing.
+             *     The row then names the experiment.
+             */
+            experiment?: string | null;
             /** @description One of the row's `options`, with an effort it takes. */
             model: components["schemas"]["ModelTrialModel"];
             use: components["schemas"]["ModelUse"];
@@ -20790,6 +20803,14 @@ export interface components {
              *     workflow_revision_conflict`.
              */
             expected_revision?: string | null;
+            /**
+             * @description An experiment whose B this activation applies (`exp_…`, added
+             *     2026-10-26): its revision change on this workflow. The activation
+             *     checks that the workflow still runs the experiment's A (409
+             *     `experiment_outdated`); when B's revision is bound already, it
+             *     changes nothing.
+             */
+            experiment?: string | null;
             /** @description The revision to activate. */
             id: string;
             /** @description The workflow's name. */

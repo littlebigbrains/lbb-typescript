@@ -94,6 +94,9 @@ export interface ActivateRevisionOptions extends CallOptions {
   /** The active revision the caller read: another active one fails with
    * `409 workflow_revision_conflict`. */
   expectedRevision?: string;
+  /** An experiment whose B this activation applies (`exp_…`): the workflow
+   * must still run the experiment's A, else `409 experiment_outdated`. */
+  experiment?: string;
 }
 
 /** Paging of the graph's workflows (`client.workflows.named.list`). */
@@ -854,14 +857,16 @@ export class NamedWorkflowsNamespace {
    * active revision fails with `409 workflow_revision_conflict`. Activating
    * the active revision changes nothing, so a failed call is retried. Work
    * that waits or runs keeps the revision it started with. Answers the
-   * workflow, whose `active_revision` names the revision.
+   * workflow, whose `active_revision` names the revision. With
+   * `experiment`, it applies that experiment's B (whose change is `id`);
+   * when B's revision is active already, nothing changes.
    */
   activateRevision(
     name: string,
     id: string,
     options: ActivateRevisionOptions = {},
   ): Promise<Schemas["NamedWorkflow"]> {
-    const { expectedRevision, ...opts } = options;
+    const { expectedRevision, experiment, ...opts } = options;
     return this.client.request(
       "POST",
       "/v1/workflows/named/revisions/activate",
@@ -872,6 +877,7 @@ export class NamedWorkflowsNamespace {
           name,
           id,
           ...(expectedRevision ? { expected_revision: expectedRevision } : {}),
+          ...(experiment ? { experiment } : {}),
         } satisfies Schemas["WorkflowRevisionActivateRequest"],
       },
     );

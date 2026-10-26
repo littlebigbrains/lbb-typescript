@@ -1200,6 +1200,11 @@ export class ModelChoicesNamespace {
    * cannot run; `409 model_choice_unavailable` when the server holds no key
    * for the provider or cannot price the model; `404
    * named_workflow_not_found`.
+   *
+   * With `experiment` (an `exp_…` id) and `workflow`, the choice applies
+   * that experiment's B: `use` and `model` are B's change. The workflow
+   * must still run the experiment's A, else `409 experiment_outdated`; when
+   * it runs B already, nothing changes. The row then names the experiment.
    */
   put(
     body: Schemas["ModelChoicePutRequest"],
