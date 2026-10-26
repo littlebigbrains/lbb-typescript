@@ -416,6 +416,27 @@ test("model choices map each operation to its route", async () => {
   });
 });
 
+test("a model choice applies an experiment's B and the row names it", async () => {
+  const experiment = "exp_1791967648726a1b2c3d4e5f6";
+  const { fetch, bodies } = queuedFetch([
+    { body: { id: "mch_1", object: "model_choice", experiment } },
+  ]);
+  const client = new LbbClient({ baseUrl: "http://h", graph: "crm", fetch });
+  const row = await client.models.choices.put({
+    use: "extract",
+    model: { provider: "mock", model: "mock-candidate" },
+    workflow: "products",
+    experiment,
+  });
+  assert.equal(row.experiment, experiment);
+  assert.deepEqual(JSON.parse(bodies[0] ?? ""), {
+    use: "extract",
+    model: { provider: "mock", model: "mock-candidate" },
+    workflow: "products",
+    experiment,
+  });
+});
+
 test("models.trials.wait reads the trial until it compared what it can", async () => {
   const trial = (status: string, calls: number) => ({
     body: { id: "t1", status, report: { calls, qualifies: calls >= 20 } },
