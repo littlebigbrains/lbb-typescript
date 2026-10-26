@@ -1259,7 +1259,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Run canned checks against a demo dataset */
+        /** version=demo/1: three exact RDF fixture checks on one epoch/commit, without models, durable writes or legacy search; temporary unversioned/legacy compatibility follows the finite release receipt */
         post: operations["post_v1_demo_run"];
         delete?: never;
         options?: never;
@@ -1935,7 +1935,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Graph footprint, WAL tail, and index coverage */
+        /** Graph footprint, WAL tail, and RDF publication coverage */
         get: operations["get_v1_graph_metadata"];
         put?: never;
         post?: never;
@@ -3654,7 +3654,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Server, graph, and persisted-index status */
+        /** Server status; version=status/1 inspects bounded RDF publication and current class embeddings without legacy indexes. Unversioned/legacy compatibility is temporary; see the status response transition release gate */
         get: operations["get_v1_status"];
         put?: never;
         post?: never;
@@ -6183,6 +6183,41 @@ export interface components {
             /** Format: int64 */
             ontology_version: number;
         };
+        /**
+         * @description RDF and class observations from one graph incarnation. Their commit observations
+         *     may differ during concurrent writes; they are not an atomic transaction snapshot.
+         */
+        CurrentGraphStatus: {
+            class_embeddings: components["schemas"]["StatusClassEmbeddings"];
+            /** @description All requested diagnostics were inspected, independently of readiness/lag. */
+            complete: boolean;
+            /** Format: int64 */
+            epoch: number | null;
+            rdf: components["schemas"]["StatusRdfPublication"];
+        };
+        /**
+         * @description Selected only by `version=status/1` during the pre-release compatibility phase.
+         *     `ok` confirms that this status request completed, not database/model health.
+         */
+        CurrentStatusResponse: {
+            auth_required: boolean;
+            bind: string;
+            complete: boolean;
+            graph: components["schemas"]["GraphKey"];
+            graph_status: components["schemas"]["CurrentGraphStatus"];
+            mode: string;
+            /** @example status */
+            object: string;
+            ok: boolean;
+            service: string;
+            snapshot_cache: components["schemas"]["StatusSnapshotCache"];
+            storage: string;
+            /** Format: int64 */
+            uptime_seconds: number;
+            version: components["schemas"]["CurrentStatusVersion"];
+        };
+        /** @enum {string} */
+        CurrentStatusVersion: "status/1";
         CustomerBoundary: {
             columns: string[];
             relation: string;
@@ -6356,6 +6391,95 @@ export interface components {
             name: string;
             /** @description `enforced` | `advisory` | `reserved`. */
             status: string;
+        };
+        /** @enum {string} */
+        DemoCaseIssue: "malformed_result" | "unexpected_binding_shape" | "unexpected_term_shape" | "unexpected_rdf_term" | "duplicate_distinct_row" | "expected_terms_differ" | "result_budget";
+        /**
+         * @description Case evidence is returned only after the final graph-incarnation proof.
+         * @enum {string}
+         */
+        DemoCasePayloads: "available" | "withheld";
+        /** @enum {string} */
+        DemoClassEmbeddingChecks: "not_requested";
+        DemoCurrentCaseResult: {
+            /** @description At most max_result_bytes, preserved even for a wrong/unsupported term. */
+            actual_result: components["schemas"]["DemoSparqlResult"];
+            /** Format: int64 */
+            epoch: number;
+            expected: components["schemas"]["RecordReferenceTerm"][];
+            id: string;
+            issue: null | components["schemas"]["DemoCaseIssue"];
+            label: string;
+            outcome: components["schemas"]["DemoRunOutcome"];
+            query: string;
+            query_kind: components["schemas"]["DemoQueryKind"];
+            served_at_seq: components["schemas"]["CommitSeq"];
+            variable: string;
+        };
+        /**
+         * @description The fixed demo/1 RDF roster is identity-store, auth-outage and sso-customer
+         *     on semantic_graph. Known unported datasets are unavailable, not empty passes.
+         *     Every completed case uses exactly the response's one epoch/commit pin.
+         */
+        DemoCurrentRunResponse: {
+            case_payloads: components["schemas"]["DemoCasePayloads"];
+            cases: components["schemas"]["DemoCurrentCaseResult"][];
+            class_embedding_checks: components["schemas"]["DemoClassEmbeddingChecks"];
+            /**
+             * @description All three cases completed with interpretable answers, independently of
+             *     whether those answers matched. Timeout/partial/unavailable is false.
+             */
+            complete: boolean;
+            /** @description Unknown when case payloads are withheld after an interrupted run. */
+            completed_case_count: number | null;
+            dataset_id: string;
+            /** Format: int64 */
+            epoch: number | null;
+            /** @description Unknown (null) for a known dataset without a current case definition. */
+            expected_case_count: number | null;
+            graph: components["schemas"]["GraphKey"];
+            issue: null | components["schemas"]["DemoRunIssue"];
+            limits: components["schemas"]["DemoRunLimits"];
+            object: components["schemas"]["DemoRunObject"];
+            outcome: components["schemas"]["DemoRunOutcome"];
+            passed: boolean;
+            served_at_seq: null | components["schemas"]["CommitSeq"];
+            version: components["schemas"]["DemoRunVersion"];
+        };
+        /** @enum {string} */
+        DemoQueryKind: "sparql_select";
+        /** @enum {string} */
+        DemoResultFormat: "application/sparql-results+json";
+        /** @enum {string} */
+        DemoRunIssue: "missing_graph" | "publication_pending" | "metadata_unavailable" | "diagnostic_budget" | "definition_unavailable" | "query_unavailable" | "snapshot_changed" | "result_budget" | "timeout";
+        /** @description Diagnostic limits, not validity bounds on RDF data, ontologies or manifests. */
+        DemoRunLimits: {
+            /**
+             * Format: int64
+             * @description Cooperative IO/elapsed budget. Late synchronous completion cannot pass;
+             *     this does not claim that an operating-system thread is forcibly stopped.
+             */
+            deadline_millis: number;
+            max_cases: number;
+            max_ontology_bytes: number;
+            max_query_bytes: number;
+            max_result_bytes: number;
+            max_rows_per_case: number;
+        };
+        /** @enum {string} */
+        DemoRunObject: "demo_run";
+        /** @enum {string} */
+        DemoRunOutcome: "passed" | "failed" | "unavailable";
+        /** @enum {string} */
+        DemoRunVersion: "demo/1";
+        /**
+         * @description The engine's result document, preserved verbatim like SparqlTextResponse.
+         *     An unavailable malformed-result case can carry the reported document as
+         *     evidence; no lexical RDF value is converted through an application number.
+         */
+        DemoSparqlResult: {
+            document: string;
+            format: components["schemas"]["DemoResultFormat"];
         };
         /** @description One derivation as the server keeps it. */
         Derivation: components["schemas"]["DerivationKey"] & {
@@ -9547,6 +9671,11 @@ export interface components {
         GraphMetadataRequest: {
             /** Format: int32 */
             dim?: number | null;
+            /**
+             * @description Opt in to deprecated BM25/ANN family lineage inspection. RDF publication
+             *     status is always reported independently; this does not inspect current
+             *     class-declared embeddings. HTTP and CLI defaults are false.
+             */
             include_indexes?: boolean;
             max_clusters?: number | null;
             provider?: null | components["schemas"]["EmbeddingProviderConfig"];
@@ -9557,23 +9686,23 @@ export interface components {
             bm25_indexed_commit_seq?: null | components["schemas"]["CommitSeq"];
             graph: components["schemas"]["GraphKey"];
             /**
-             * @description One-shot "has the published generation caught up to head?" signal, so a
+             * @description One-shot "has the published RDF base caught up to head?" signal, so a
              *     bulk-import caller does not hand-assemble the predicate.
-             *     `Some(true)` iff the published generation is served at the head commit;
-             *     `Some(false)` when publication is still pending or absent; `None` when
-             *     indexes were not inspected (`include_indexes=false`).
+             *     `Some(true)` iff the validated RDF generation is served at the head commit;
+             *     `Some(false)` when publication is still pending or absent. This is
+             *     reported even when legacy index inspection is disabled. The optional
+             *     representation remains for wire compatibility with earlier servers.
              *
              *     This is a **publication lag** signal, not a statement about index
-             *     content. A generation whose BM25/ANN families are published as empty
-             *     roots — the steady state when the deployment runs without the search
-             *     stack — is caught up while holding no documents. Read
-             *     `index_lineage.bm25_empty` / `ann_empty` to tell the two apart.
+             *     content, class embedding readiness, or model/configuration coverage.
+             *     `include_indexes=true` separately reports legacy BM25/ANN lineage when
+             *     present; its watermarks never determine this RDF signal.
              */
             index_caught_up?: boolean | null;
             index_lineage?: null | components["schemas"]["IndexLineage"];
             /** Format: int64 */
             ontology_version: number;
-            /** @description Commit distance from the graph head to the pinned published generation. */
+            /** @description Commit distance from the graph head to its validated published RDF base. */
             published_lag_commits: number;
             /** Format: int64 */
             segment_bytes?: number;
@@ -18478,6 +18607,62 @@ export interface components {
             relation: components["schemas"]["RelationView"];
             target: components["schemas"]["EntityView"];
             valid_time: components["schemas"]["ValidTime"];
+        };
+        /** @enum {string} */
+        StatusAvailability: "available" | "unavailable";
+        StatusClassEmbeddings: {
+            attempted_count: number;
+            availability: components["schemas"]["StatusAvailability"];
+            /**
+             * @description True only when every configured recipe and its named versions were inspected.
+             *     This is diagnostic coverage, not a claim that all embeddings are ready.
+             */
+            complete: boolean;
+            /** @description Unknown when the roster could not be read, including a missing roster. */
+            configured_count: number | null;
+            embeddings: components["schemas"]["StatusEmbeddingDiagnostic"][];
+            inspected_count: number;
+            issue: null | components["schemas"]["StatusIssue"];
+            max_embeddings: number;
+            /**
+             * Format: int64
+             * @description Total control-object bytes admitted for this class inspection.
+             */
+            metadata_budget_bytes: number;
+            model_id: string | null;
+            next_model_id: string | null;
+        };
+        StatusEmbeddingDiagnostic: {
+            availability: components["schemas"]["StatusAvailability"];
+            issue: null | components["schemas"]["StatusIssue"];
+            name: string;
+            status: null | components["schemas"]["EmbeddingStatus"];
+        };
+        /**
+         * @description A diagnostic failure, without backend keys, credentials or raw storage errors.
+         * @enum {string}
+         */
+        StatusIssue: "missing" | "invalid_metadata" | "changed" | "budget" | "storage_unavailable";
+        StatusRdfPublication: {
+            availability: components["schemas"]["StatusAvailability"];
+            issue: null | components["schemas"]["StatusIssue"];
+            /** @description Validated RDF coverage only; says nothing about class embedding readiness. */
+            publication_caught_up: boolean | null;
+            published_lag_commits: number | null;
+            snapshot: null | components["schemas"]["SnapshotView"];
+        };
+        /**
+         * @description Accepted selectors during the finite source/release transition. The
+         *     response version stays CurrentStatusVersion and never claims legacy shape.
+         * @enum {string}
+         */
+        StatusResponseSelector: "status/1" | "legacy";
+        StatusSnapshotCache: {
+            budget_bytes: number;
+            entries: number;
+            pinned_bytes: number;
+            pinned_ceiling_bytes: number;
+            total_bytes: number;
         };
         /**
          * @description A streamed response ended with an error: the status, code and message of
@@ -33455,8 +33640,10 @@ export interface operations {
                  * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
                  */
                 stack?: string;
-                /** @description Dataset id */
+                /** @description semantic_graph has three fixed current cases; other known datasets are unavailable */
                 dataset?: string;
+                /** @description demo/1 for the typed current response; legacy or absent retains the temporary compatibility response */
+                version?: "demo/1" | "legacy";
             };
             header?: {
                 /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
@@ -33479,7 +33666,11 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": Record<string, never>;
+                    "application/json": components["schemas"]["DemoCurrentRunResponse"] | {
+                        cases: Record<string, never>[];
+                        dataset: Record<string, never>;
+                        passed: boolean;
+                    };
                 };
             };
             /** @description Bad request */
@@ -41418,6 +41609,11 @@ export interface operations {
                 stack?: string;
                 /** @description Optional decimal u64 graph incarnation from /v1/workflows/scope. A changed incarnation returns 409 graph_epoch_changed; a graph missing at admission returns 404. Synchronous writes and CAS retries cannot mutate a replacement incarnation; detached jobs are outside this precondition. */
                 expected_graph_epoch?: string;
+                /**
+                 * @deprecated
+                 * @description Opt in to deprecated legacy BM25/ANN lineage (default false). RDF publication status is reported independently; this does not inspect current class embeddings.
+                 */
+                include_indexes?: boolean;
             };
             header?: {
                 /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
@@ -58389,6 +58585,8 @@ export interface operations {
                  * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
                  */
                 stack?: string;
+                /** @description status/1 for the typed current response; legacy or absent retains the compatibility response until the unified API release transition */
+                version?: components["schemas"]["StatusResponseSelector"];
             };
             header?: {
                 /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
@@ -58409,7 +58607,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": Record<string, never>;
+                    "application/json": components["schemas"]["CurrentStatusResponse"] | Record<string, never>;
                 };
             };
             /** @description Bad request */

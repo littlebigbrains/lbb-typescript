@@ -1,4 +1,6 @@
 import { WorkflowNamespace } from "./workflows.js";
+import { checkedDemoRunResponse, checkedLegacyDemoRun } from "./demo.js";
+import { checkedCurrentStatus } from "./status.js";
 import { CdcNamespace } from "./cdc.js";
 import { FilesNamespace } from "./files.js";
 import { ReviewsNamespace } from "./reviews.js";
@@ -1923,11 +1925,62 @@ export class LbbClient {
     });
   }
 
+  /** Run the fixed RDF fixture checks; always sends an explicit response version. */
+  demoRun(opts?: {
+    dataset?: string;
+    version?: "demo/1";
+  }): Promise<Schemas["DemoCurrentRunResponse"]>;
+  /** Temporary explicit legacy compatibility; no current RDF-check promise. */
+  demoRun(opts: { dataset?: string; version: "legacy" }): Promise<unknown>;
+  async demoRun(
+    opts: { dataset?: string; version?: "demo/1" | "legacy" } = {},
+  ): Promise<unknown> {
+    const version = opts.version ?? "demo/1";
+    const dataset = opts.dataset ?? "semantic_graph";
+    if (version !== "demo/1" && version !== "legacy")
+      throw new TypeError("demo version must be demo/1 or legacy");
+    if (version === "demo/1")
+      await this.requireCapability("rdf_demo_checks_v1");
+    const response = await this.request<unknown>("POST", "/v1/demo/run", {
+      query: { version, dataset },
+    });
+    return version === "demo/1"
+      ? checkedDemoRunResponse(response, dataset)
+      : checkedLegacyDemoRun(response);
+  }
+
   // --- inspection ---
 
-  /** Server, graph, and persisted-index status. */
-  status(): Promise<unknown> {
-    return this.request("GET", "/v1/status");
+  /** Current RDF/class diagnostics, explicitly selected and checked on older servers. */
+  status(opts: {
+    version: "status/1";
+  }): Promise<Schemas["CurrentStatusResponse"]>;
+  /** Temporary legacy status compatibility. Omitted options preserve existing behavior. */
+  status(opts?: { version?: "legacy" }): Promise<unknown>;
+  async status(
+    opts: { version?: "status/1" | "legacy" } = {},
+  ): Promise<unknown> {
+    if (
+      opts.version !== undefined &&
+      opts.version !== "status/1" &&
+      opts.version !== "legacy"
+    ) {
+      throw new TypeError("status version must be status/1 or legacy");
+    }
+    const response = await this.request<unknown>("GET", "/v1/status", {
+      query: opts.version ? { version: opts.version } : undefined,
+    });
+    if (opts.version === "status/1") return checkedCurrentStatus(response);
+    if (
+      opts.version === "legacy" &&
+      (!isStatusObject(response) ||
+        !isStatusObject(response.persisted_index) ||
+        !isStatusObject(response.graph_status) ||
+        response.version === "status/1")
+    ) {
+      throw new LbbCapabilityError("legacy status response");
+    }
+    return response;
   }
 
   /** Graph footprint, WAL tail, and published-index coverage. */
@@ -2064,4 +2117,8 @@ export class LbbClient {
   listGraphs(): Promise<Schemas["GraphListResponse"]> {
     return this.request("GET", "/v1/graphs");
   }
+}
+
+function isStatusObject(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
 }
