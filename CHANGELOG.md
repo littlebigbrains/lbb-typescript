@@ -4,6 +4,8 @@ All notable changes to the `@littlebigbrain/client` package are documented here.
 
 ## Unreleased
 
+- Add `client.entities.retrieve` for versioned `records/1` entity reads: caller IRIs, native ids, activated schema keys, exact RDF terms, independent assertions, explicit snapshot/schema availability and whole-read limits. Existing `entities.detail` is unchanged.
+
 - `client.models.choices`: the model each workflow use runs, for the
   environment or for one workflow (`GET`, `PUT` and `DELETE
   /v1/models/choices`). `list` takes `workflow`, `use`, `limit` and

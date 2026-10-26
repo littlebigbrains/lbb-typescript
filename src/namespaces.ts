@@ -5,6 +5,7 @@ import { EvalDatasetsNamespace } from "./eval-datasets.js";
 import type { ReviewsNamespace } from "./reviews.js";
 import {
   parseLbbError,
+  LbbCapabilityError,
   sleep,
   type CallOptions,
   type LbbError,
@@ -289,6 +290,52 @@ export class SearchNamespace {
 
 export class EntityNamespace {
   constructor(private readonly client: LbbClient) {}
+
+  /**
+   * Retrieve a lossless RDF record through the versioned entity resource.
+   * Supply exactly one of `iri`, native `id`, or schema-bound `type` + `key`.
+   * Literal values remain strings with their RDF datatype/language. Reads that
+   * exceed a section limit fail explicitly; success never silently truncates.
+   */
+  retrieve(opts: {
+    iri?: string;
+    id?: string;
+    type?: string;
+    key?: string;
+    schemaRevision?: string;
+    consistency?: "strong" | "eventual";
+    asOfCommitSeq?: number;
+    limits?: Partial<Schemas["RecordReadLimits"]>;
+  }): Promise<Schemas["RecordReadResponse"]> {
+    return this.client
+      .request<Schemas["RecordReadResponse"]>("GET", "/v1/graph/entity", {
+        query: {
+          version: "records/1",
+          iri: opts.iri,
+          id: opts.id,
+          type: opts.type,
+          key: opts.key,
+          schema_revision: opts.schemaRevision,
+          consistency: opts.consistency ?? this.client.defaultConsistency,
+          as_of_commit_seq: opts.asOfCommitSeq,
+          max_properties: opts.limits?.properties,
+          max_outgoing: opts.limits?.outgoing,
+          max_incoming: opts.limits?.incoming,
+          max_assertions: opts.limits?.assertions,
+          max_assertion_statements: opts.limits?.assertion_statements,
+        },
+      })
+      .then((record) => {
+        if (
+          record?.object !== "record" ||
+          record.version !== "records/1" ||
+          record.complete !== true
+        ) {
+          throw new LbbCapabilityError("records/1 complete reads");
+        }
+        return record;
+      });
+  }
 
   detail(
     opts: Parameters<LbbClient["entityDetail"]>[0],

@@ -992,6 +992,53 @@ test("entityDetail pins a commit and sends no valid-time selector", async () => 
   assert.equal(url.searchParams.has("as_of"), false);
 });
 
+test("entities.retrieve preserves exact RDF terms and sends versioned snapshot and schema selectors", async () => {
+  const record = {
+    object: "record",
+    version: "records/1",
+    complete: true,
+    id: "https://example.org/people/alice",
+    properties: [
+      {
+        subject: { "@id": "https://example.org/people/alice" },
+        predicate: "https://example.org/id",
+        object: {
+          "@value": "9007199254740993",
+          "@type": "http://www.w3.org/2001/XMLSchema#integer",
+        },
+      },
+    ],
+  };
+  const { fetch, calls } = recordingFetch({ body: JSON.stringify(record) });
+  const client = new LbbClient({
+    baseUrl: "http://h",
+    graph: "people",
+    fetch,
+    defaultConsistency: "strong",
+  });
+  const result = await client.entities.retrieve({
+    iri: record.id,
+    asOfCommitSeq: 7,
+    limits: { assertions: 20 },
+  });
+  assert.deepEqual(result, record);
+  const first = new URL(calls[0].input);
+  assert.equal(first.pathname, "/v1/graph/entity");
+  assert.equal(first.searchParams.get("version"), "records/1");
+  assert.equal(first.searchParams.get("iri"), record.id);
+  assert.equal(first.searchParams.get("consistency"), "strong");
+  assert.equal(first.searchParams.get("as_of_commit_seq"), "7");
+  assert.equal(first.searchParams.get("max_assertions"), "20");
+  await client.entities.retrieve({
+    type: "Person",
+    key: " a/é ",
+    schemaRevision: "schema-v1:checked",
+  });
+  const keyed = new URL(calls[1].input);
+  assert.equal(keyed.searchParams.get("key"), " a/é ");
+  assert.equal(keyed.searchParams.get("schema_revision"), "schema-v1:checked");
+});
+
 test("namespace facts.create injects auth, scope, version, and idempotency", async () => {
   const { fetch, calls } = recordingFetch({
     body: JSON.stringify({
@@ -2427,4 +2474,19 @@ test("a scoped graph incarnation pins all requests and cannot be overridden", as
     new URL(calls.at(-1)!.input).searchParams.has("expected_graph_epoch"),
     false,
   );
+});
+
+test("entity retrieve refuses a legacy or incomplete success response", async () => {
+  for (const payload of [
+    { entity: { id: "native-id" } },
+    { object: "record", version: "records/1", complete: false },
+  ]) {
+    const fetch: FetchLike = async () =>
+      new Response(JSON.stringify(payload), { status: 200 });
+    const client = new LbbClient({ baseUrl: "http://h", fetch });
+    await assert.rejects(
+      client.entities.retrieve({ id: "native-id" }),
+      LbbCapabilityError,
+    );
+  }
 });
