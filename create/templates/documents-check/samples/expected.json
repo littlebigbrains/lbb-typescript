@@ -1,0 +1,110 @@
+{
+  "about": [
+    "The answer key for the documents-check samples: the values a correct run reads from each document, with the quote that supports each, and the checks it must report or must leave alone.",
+    "All text is invented: the companies, the references, the material and the prices. make-checks.mjs checks that every quote is in its record's text as written, and that a number's quote holds the number as the text states it.",
+    "records has the shape of the values-extract answer key, so it loads as an Evals dataset of kind values (name, values, leave_out), next to records.json. class says which class the document is read into; it is the only addition.",
+    "Numbers compare as numbers, in the property's unit. stated gives the number and unit as the text states them when the property holds another unit: 8000 g is 8 for quantity, whose unit is kg.",
+    "checks lists each rule of checks.ts (its shape is in shapes.ttl) with each document it applies to. result violation means a correct run files one review item for it, with the quotes listed. result conforms means a correct run files none."
+  ],
+  "install": {
+    "properties": {
+      "reference": "keyword",
+      "order": "keyword",
+      "delivery": "keyword",
+      "quantity": "f64",
+      "price": "f64",
+      "total": "f64"
+    },
+    "units": { "quantity": "kg" },
+    "context": "Purchase orders, delivery notes and invoices of one purchase, in English."
+  },
+  "records": [
+    {
+      "name": "purchase-order",
+      "class": "PurchaseOrder",
+      "case": "The order: 10 kg at 12.50 EUR, and a total that equals quantity times price.",
+      "values": [
+        { "property": "reference", "value": "PO-1001", "quote": "reference: PO-1001" },
+        { "property": "quantity", "value": 10, "quote": "quantity: 10 kg" },
+        { "property": "price", "value": 12.5, "quote": "price: 12.50 EUR" },
+        { "property": "total", "value": 125, "quote": "total: 125.00 EUR" }
+      ],
+      "leave_out": []
+    },
+    {
+      "name": "delivery-note",
+      "class": "DeliveryNote",
+      "case": "A partial delivery that states its weight in grams: 8000 g is 8 kg.",
+      "values": [
+        { "property": "reference", "value": "DN-1001", "quote": "reference: DN-1001" },
+        { "property": "order", "value": "PO-1001", "quote": "order: PO-1001" },
+        { "property": "quantity", "value": 8, "stated": "8000 g", "quote": "quantity: 8000 g" }
+      ],
+      "leave_out": []
+    },
+    {
+      "name": "invoice",
+      "class": "Invoice",
+      "case": "The invoice bills 10 kg where 8 kg arrived, at 14.00 EUR where the order says 12.50 EUR, and its total is 0.50 EUR below quantity times price.",
+      "values": [
+        { "property": "reference", "value": "INV-1001", "quote": "reference: INV-1001" },
+        { "property": "order", "value": "PO-1001", "quote": "order: PO-1001" },
+        { "property": "delivery", "value": "DN-1001", "quote": "delivery: DN-1001" },
+        { "property": "quantity", "value": 10, "quote": "quantity: 10 kg" },
+        { "property": "price", "value": 14, "quote": "price: 14.00 EUR" },
+        { "property": "total", "value": 139.5, "quote": "total: 139.50 EUR" }
+      ],
+      "leave_out": []
+    }
+  ],
+  "checks": [
+    {
+      "id": "invoice-quantity-vs-delivery",
+      "result": "violation",
+      "focus": "invoice",
+      "other": "delivery-note",
+      "case": "The invoice bills 10 kg. The delivery note shows 8 kg (8000 g).",
+      "quotes": [
+        { "record": "invoice", "quote": "quantity: 10 kg" },
+        { "record": "delivery-note", "quote": "quantity: 8000 g" }
+      ]
+    },
+    {
+      "id": "invoice-price-vs-order",
+      "result": "violation",
+      "focus": "invoice",
+      "other": "purchase-order",
+      "case": "The invoice prices the material at 14.00 EUR. The order says 12.50 EUR.",
+      "quotes": [
+        { "record": "invoice", "quote": "price: 14.00 EUR" },
+        { "record": "purchase-order", "quote": "price: 12.50 EUR" }
+      ]
+    },
+    {
+      "id": "total-matches-quantity-times-price",
+      "result": "violation",
+      "focus": "invoice",
+      "other": null,
+      "case": "10 kg at 14.00 EUR is 140.00 EUR. The invoice prints 139.50 EUR, which is 0.50 EUR away, past the tolerance of 0.01.",
+      "quotes": [
+        { "record": "invoice", "quote": "quantity: 10 kg" },
+        { "record": "invoice", "quote": "price: 14.00 EUR" },
+        { "record": "invoice", "quote": "total: 139.50 EUR" }
+      ]
+    },
+    {
+      "id": "invoice-quantity-vs-order",
+      "result": "conforms",
+      "focus": "invoice",
+      "other": "purchase-order",
+      "case": "The invoice bills 10 kg and the order asks for 10 kg."
+    },
+    {
+      "id": "total-matches-quantity-times-price",
+      "result": "conforms",
+      "focus": "purchase-order",
+      "other": null,
+      "case": "10 kg at 12.50 EUR is 125.00 EUR, and the order prints 125.00 EUR."
+    }
+  ]
+}

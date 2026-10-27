@@ -1,0 +1,74 @@
+# The rules of documents-check, as SHACL shapes. The template reads this file
+# (checks.ts), and so does the lbb-server test that runs it on the sample facts.
+#
+# Each rule compares values of two documents (or of one document with itself),
+# so it is a SHACL-SPARQL constraint (sh:sparql). Its sh:select returns $this,
+# the document that breaks the rule, and ?value, the document it was compared
+# with (the printed total, for a rule inside one document). The shapes are
+# published in `warn` mode: they report, and refuse no write.
+#
+# A record graph names a class https://littlebigbrain.com/class/<lower case name>
+# and a property https://littlebigbrain.com/p/<name>. Money is compared in whole
+# cents and a quantity in kg to the gram (a unit of 0.001), so a rounding
+# difference of one cent passes and a floating-point error never decides.
+@prefix sh: <http://www.w3.org/ns/shacl#> .
+@prefix dclass: <https://littlebigbrain.com/class/> .
+@prefix ex: <https://littlebigbrain.com/checks#> .
+
+# An invoice must not bill more than the delivery note it names shows.
+ex:InvoiceQuantityVsDelivery a sh:NodeShape ;
+  sh:targetClass dclass:invoice ;
+  sh:severity sh:Warning ;
+  sh:sparql [
+    sh:message "The invoice bills more than the delivery note shows" ;
+    sh:select """
+      PREFIX dclass: <https://littlebigbrain.com/class/>
+      PREFIX dp: <https://littlebigbrain.com/p/>
+      SELECT $this ?value WHERE {
+        $this dp:delivery ?reference ; dp:quantity ?billed .
+        ?value a dclass:deliverynote ; dp:reference ?reference ; dp:quantity ?delivered .
+        FILTER (ROUND(?billed * 1000) > ROUND(?delivered * 1000))
+      }""" ] .
+
+# An invoice must not bill more than the order it names asks for.
+ex:InvoiceQuantityVsOrder a sh:NodeShape ;
+  sh:targetClass dclass:invoice ;
+  sh:severity sh:Warning ;
+  sh:sparql [
+    sh:message "The invoice bills more than the order asks for" ;
+    sh:select """
+      PREFIX dclass: <https://littlebigbrain.com/class/>
+      PREFIX dp: <https://littlebigbrain.com/p/>
+      SELECT $this ?value WHERE {
+        $this dp:order ?reference ; dp:quantity ?billed .
+        ?value a dclass:purchaseorder ; dp:reference ?reference ; dp:quantity ?ordered .
+        FILTER (ROUND(?billed * 1000) > ROUND(?ordered * 1000))
+      }""" ] .
+
+# An invoice must use the price of the order it names, to the cent.
+ex:InvoicePriceVsOrder a sh:NodeShape ;
+  sh:targetClass dclass:invoice ;
+  sh:severity sh:Warning ;
+  sh:sparql [
+    sh:message "The invoice price differs from the order price" ;
+    sh:select """
+      PREFIX dclass: <https://littlebigbrain.com/class/>
+      PREFIX dp: <https://littlebigbrain.com/p/>
+      SELECT $this ?value WHERE {
+        $this dp:order ?reference ; dp:price ?billed .
+        ?value a dclass:purchaseorder ; dp:reference ?reference ; dp:price ?ordered .
+        FILTER (ROUND(?billed * 100) != ROUND(?ordered * 100))
+      }""" ] .
+
+# The total of an order or an invoice equals quantity times price, within one cent.
+ex:TotalMatchesQuantityTimesPrice a sh:NodeShape ;
+  sh:targetClass dclass:invoice, dclass:purchaseorder ;
+  sh:severity sh:Warning ;
+  sh:sparql [
+    sh:message "The total differs from quantity times price" ;
+    sh:select """
+      PREFIX dp: <https://littlebigbrain.com/p/>
+      SELECT $this ?value WHERE {
+        $this dp:quantity ?quantity ; dp:price ?price ; dp:total ?value .
+        FILTER (ABS(ROUND(?value * 100) - ROUND(?quantity * ?price * 100)) > 1)
+      }""" ] .

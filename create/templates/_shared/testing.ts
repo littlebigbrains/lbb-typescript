@@ -765,6 +765,8 @@ export interface Turn {
   outputs: unknown[];
   bytes: number;
   progress: ProgressCall[];
+  /** The durable timers (`ctx.sleep`) the turn set, in order. */
+  sleeps: { key: string; milliseconds: number }[];
 }
 
 const UNIT = /^[\p{L}\p{N} _-]{1,32}$/u;
@@ -840,7 +842,7 @@ export async function runTurn<S>(
   } = {},
 ): Promise<{ result: TurnResult<S>; turn: Turn }> {
   const prefix = options.prefix ?? mockId(JSON.stringify(message));
-  const turn: Turn = { message, keys: [], outputs: [], bytes: 0, progress: [] };
+  const turn: Turn = { message, keys: [], outputs: [], bytes: 0, progress: [], sleeps: [] };
   let busy = false;
   let ran = 0;
   const ctx = {
@@ -897,8 +899,15 @@ export async function runTurn<S>(
     async waitForSignal(): Promise<never> {
       throw new Error("not in the templates");
     },
-    async sleep(): Promise<never> {
-      throw new Error("not in the templates");
+    // A durable timer is a step of the turn: its key is unique and saved, and the test
+    // does not wait. The turn's `sleeps` lists the timers it set.
+    sleep(key: string, milliseconds: number) {
+      if (!(Number.isFinite(milliseconds) && milliseconds >= 0))
+        throw new Error(`sleep ${key}: ${milliseconds} milliseconds`);
+      return ctx.step(key, async () => {
+        turn.sleeps.push({ key, milliseconds });
+        return null;
+      });
     },
     continue: <T, M>(next: T, nextMessage: M) => ({
       state: next,

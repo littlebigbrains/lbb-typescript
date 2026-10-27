@@ -35,10 +35,11 @@ pytest
 | `link` | Connects the mentions of one thing across the records of a graph into one thing, and proposes records of one thing as an identity |
 | `rows` | Reads each CSV or TSV file into one instance per row, each with an edge to the file whose evidence is the row |
 | `sections` | Reads each Markdown file into its sections, each with an edge to its parent whose evidence is its lines |
+| `documents-check` | Checks PDFs against each other: SHACL rules over the values `values.extract` reads, and a review item with the quotes of both documents for each difference |
 
 A template id is the id of its starter workflow, with dashes for dots:
-`documents-link` is the code of `documents.link`. `link`, `rows` and
-`sections` have no LBB-run version.
+`documents-link` is the code of `documents.link`. `link`, `rows`,
+`sections` and `documents-check` have no LBB-run version.
 
 ## The project
 
