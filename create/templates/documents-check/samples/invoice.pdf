@@ -1,0 +1,53 @@
+%PDF-1.4
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [7 0 R] /Count 1 >>
+endobj
+3 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>
+endobj
+4 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>
+endobj
+5 0 obj
+<< /Title (INVOICE) /Producer (make-checks.mjs) >>
+endobj
+6 0 obj
+<< /Length 848 >>
+stream
+BT /F2 18 Tf 1 0 0 1 72 770 Tm (INVOICE) Tj ET
+0.6 G 0.5 w 72 756 m 523 756 l S 0 G
+BT /F1 11 Tf 1 0 0 1 72 730 Tm (reference: INV-1001) Tj ET
+BT /F1 11 Tf 1 0 0 1 72 706 Tm (date: 2026-10-24) Tj ET
+BT /F1 11 Tf 1 0 0 1 72 682 Tm (order: PO-1001) Tj ET
+BT /F1 11 Tf 1 0 0 1 72 658 Tm (delivery: DN-1001) Tj ET
+BT /F1 11 Tf 1 0 0 1 72 634 Tm (supplier: Sample Supplier Ltd) Tj ET
+BT /F1 11 Tf 1 0 0 1 72 610 Tm (buyer: Sample Buyer Ltd) Tj ET
+BT /F1 11 Tf 1 0 0 1 72 586 Tm (material: Material A) Tj ET
+BT /F1 11 Tf 1 0 0 1 72 562 Tm (quantity: 10 kg) Tj ET
+BT /F1 11 Tf 1 0 0 1 72 538 Tm (price: 14.00 EUR) Tj ET
+BT /F1 11 Tf 1 0 0 1 72 514 Tm (total: 139.50 EUR) Tj ET
+BT /F1 11 Tf 1 0 0 1 72 490 Tm (Prices are per kg. Payment is due in 30 days.) Tj ET
+BT /F1 11 Tf 1 0 0 1 72 466 Tm (Synthetic example. Not valid for ordering or payment.) Tj ET
+endstream
+endobj
+7 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> /Contents 6 0 R >>
+endobj
+xref
+0 8
+0000000000 65535 f 
+0000000009 00000 n 
+0000000058 00000 n 
+0000000115 00000 n 
+0000000212 00000 n 
+0000000314 00000 n 
+0000000380 00000 n 
+0000001278 00000 n 
+trailer
+<< /Size 8 /Root 1 0 R /Info 5 0 R /ID [<ba14b6eeea3110cb3f659a70553b7355> <ba14b6eeea3110cb3f659a70553b7355>] >>
+startxref
+1414
+%%EOF

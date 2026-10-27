@@ -31,6 +31,7 @@ export const TEMPLATES = [
   "link",
   "rows",
   "sections",
+  "documents-check",
 ];
 
 /**
@@ -219,6 +220,9 @@ export async function create({ template, dir, lang = "ts", client, root = PACKAG
       text.replaceAll(`../${up}_shared/testing.js`, `${up || "./"}testing.js`),
     );
   }
+  // A template's data files beside its code (documents-check's `shapes.ttl`) go to src/ too.
+  for (const file of await readdir(from))
+    if (file.endsWith(".ttl")) await cp(join(from, file), join(src, file));
   await cp(join(templates, "_shared", "testing.ts"), join(src, "testing.ts"));
   await cp(join(from, "samples"), join(dir, "samples"), { recursive: true });
   // A template's own commands win: a workflow of several parts sets itself up.

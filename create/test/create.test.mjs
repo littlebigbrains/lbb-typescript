@@ -320,6 +320,27 @@ test("the client dependency can name another source", async () => {
   assert.ok(existsSync(join(dir, "src", "test-examples.ts")));
 });
 
+test("a documents-check project holds shapes.ttl beside its code, and its README names no repository path", async () => {
+  const dir = join(await scratch(), "checks");
+  const files = await create({ template: "documents-check", dir });
+  for (const file of [
+    "src/shapes.ttl",
+    "src/checks.ts",
+    "src/live.test.ts",
+    "samples/expected.json",
+  ])
+    assert.ok(files.includes(file), file);
+  const readme = await readFile(join(dir, "README.md"), "utf8");
+  // The project is not the repository: no `npm run dev:stack`, no `.lbb-dev`, no link to a file of the repository.
+  assert.doesNotMatch(readme, /dev:stack|\.lbb-dev|_samples/);
+  assert.doesNotMatch(
+    readme,
+    /\]\((?!https:)[^)]*\)/,
+    "a markdown link in the README points at a file",
+  );
+  await rm(dirname(dir), { recursive: true, force: true });
+});
+
 const built = existsSync(join(REPO, "sdk", "typescript", "dist", "index.js"));
 const tsc = join(REPO, "node_modules", "typescript", "bin", "tsc");
 

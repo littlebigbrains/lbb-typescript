@@ -1,0 +1,14 @@
+[
+  {
+    "name": "purchase-order",
+    "text": "PURCHASE ORDER | reference: PO-1001 | date: 2026-10-20 | supplier: Sample Supplier Ltd | buyer: Sample Buyer Ltd | material: Material A | quantity: 10 kg | price: 12.50 EUR | total: 125.00 EUR | Prices are per kg. | Synthetic example. Not valid for ordering or payment."
+  },
+  {
+    "name": "delivery-note",
+    "text": "DELIVERY NOTE | reference: DN-1001 | date: 2026-10-22 | order: PO-1001 | supplier: Sample Supplier Ltd | buyer: Sample Buyer Ltd | material: Material A | quantity: 8000 g | Partial delivery. The rest follows later. | Synthetic example. Not valid for ordering or payment."
+  },
+  {
+    "name": "invoice",
+    "text": "INVOICE | reference: INV-1001 | date: 2026-10-24 | order: PO-1001 | delivery: DN-1001 | supplier: Sample Supplier Ltd | buyer: Sample Buyer Ltd | material: Material A | quantity: 10 kg | price: 14.00 EUR | total: 139.50 EUR | Prices are per kg. Payment is due in 30 days. | Synthetic example. Not valid for ordering or payment."
+  }
+]
