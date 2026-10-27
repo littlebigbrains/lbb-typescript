@@ -264,7 +264,7 @@ test("workflows.named lists page with limit and cursor, and the iterators read e
       "http://h/v1/workflows/named/documents?graph=crm&name=plans&q=plan&sort=recent&limit=10",
     ],
   );
-  assert.equal(requests[0]?.headers?.["lbb-version"], "2026-10-21");
+  assert.equal(requests[0]?.headers?.["lbb-version"], "2026-10-27");
 });
 
 test("workflows.named reads the settings history and activates a revision", async () => {
