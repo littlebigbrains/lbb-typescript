@@ -4,6 +4,16 @@ All notable changes to the `@littlebigbrain/client` package are documented here.
 
 ## Unreleased
 
+- The OpenAPI contract names the response of `POST /v1/graph/import/rdf`
+  `RdfImportResponse`. It is the ordinary bulk response
+  (`GraphRdfImportResponse`) or, when a request carries
+  `expected_graph_epoch`, the new `RdfImportCommitResult`
+  (`object: "rdf_import_commit"`, with an original `receipt`). The generated
+  schema adds `RdfImportResponse`, `RdfImportCommitResult`,
+  `RdfImportCommitReceipt`, `RdfImportCommitProjection` and
+  `RdfImportCommitObject`. `importRdf` sends no `expected_graph_epoch` and
+  returns the bulk response as before. No helper selects the new binding yet.
+
 - Add explicit-key `client.records.commit` and graph-scoped records commits with strict `records/1` selection, capability preflight, fixed retry bytes and checked original receipts. Protocol recognition does not activate or convert a graph; existing commit helpers are unchanged.
 
 - `FilePage` has `ocr_required` and `FileParse` has `ocr_pages`. A page with
