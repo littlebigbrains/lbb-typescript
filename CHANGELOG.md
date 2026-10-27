@@ -4,6 +4,11 @@ All notable changes to the `@littlebigbrain/client` package are documented here.
 
 ## Unreleased
 
+- `evals.experiments` compares two configurations of a workflow on a
+  dataset: `create`, `estimate`, `list`, `all`, `get`, `cancel` and `wait`
+  (`isEvalExperimentOpen`). B is the model of one use or a settings
+  revision. The report gives the difference with a 95% interval. Guide:
+  [Compare two versions of a workflow](https://docs.littlebigbrain.com/guides/experiments/).
 - `models.choices.put` takes `experiment` (an `exp_…` id) with `workflow`, and
   `workflows.named.activateRevision` takes `{ experiment }`: the write applies
   that experiment's B. The server answers `409 experiment_outdated` when the

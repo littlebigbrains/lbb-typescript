@@ -1424,6 +1424,75 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/evals/experiments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The graph's Evals experiments, newest first, without their items. A final experiment whose dataset changed since it was scored says `report.stale`, and a turn scores it again */
+        get: operations["get_v1_evals_experiments"];
+        put?: never;
+        /** Start an Evals experiment: B against A on the first `max_items` items of a dataset (at most 200, default 200). A is the workflow's configuration in use; `b` changes one part of it, the model of one use (`{model: {use, model}}`) or the settings revision (`{revision}`), not both (400 `experiment_arms_mixed`). Each arm runs as a workflow test on the items, writes nothing to the graph, and each item is graded against the dataset's labels. The estimate must fit `max_cost_usd` (default 5.00, at most 100) and the environment's monthly workflow budget (429 `workflow_budget_exceeded`). Experiments of a graph run one at a time. Takes `Idempotency-Key`: the same key with the same body answers the same experiment, with another body 409 `idempotency_conflict` */
+        post: operations["post_v1_evals_experiments"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/evals/experiments/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Stop an experiment that has not ended. It keeps the items it compared; a batch in flight finishes and counts its cost. An experiment that ended stays as it is. Takes `Idempotency-Key` */
+        post: operations["post_v1_evals_experiments_cancel"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/evals/experiments/estimate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** What a start with the same body would estimate, for both arms, with the cost limit and what is left of the environment's monthly workflow budget. It writes nothing and runs no model */
+        post: operations["post_v1_evals_experiments_estimate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/evals/experiments/get": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** One Evals experiment with its items, each with both arms' grades. The arms' values are in their tests (`arm.test`) */
+        get: operations["get_v1_evals_experiments_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/evals/goldens": {
         parameters: {
             query?: never;
@@ -7754,6 +7823,330 @@ export interface components {
              *     property.
              */
             value: unknown;
+        };
+        /**
+         * @description An Evals experiment. `get` returns it with its items; a list leaves them
+         *     out.
+         */
+        EvalExperiment: {
+            /** @description The configuration in use at the start. */
+            a: components["schemas"]["EvalExperimentArm"];
+            applied?: null | components["schemas"]["EvalExperimentApplied"];
+            /** @description A with one part changed (`change`). */
+            b: components["schemas"]["EvalExperimentArm"];
+            change: components["schemas"]["EvalExperimentChange"];
+            /**
+             * Format: int64
+             * @description What both arms spent so far.
+             */
+            cost_micro_usd: number;
+            /** @description When it was started, RFC 3339. */
+            created: string;
+            created_by?: string | null;
+            dataset: components["schemas"]["EvalExperimentDataset"];
+            /** @description Why it failed, at most 500 characters. */
+            error?: string | null;
+            /**
+             * Format: int64
+             * @description What the start estimated both arms to cost.
+             */
+            estimate_micro_usd: number;
+            finish_reason?: null | components["schemas"]["EvalExperimentFinishReason"];
+            /** @description When it reached `done`, `failed` or `cancelled`, RFC 3339. */
+            finished?: string | null;
+            /** @description `exp_` and an opaque suffix. */
+            id: string;
+            /** @description One row per item, in dataset order. A list leaves them out. */
+            items?: components["schemas"]["EvalExperimentItem"][];
+            /**
+             * Format: int64
+             * @description The cost limit of both arms together, in millionths of a US dollar.
+             */
+            max_cost_micro_usd: number;
+            /** @description `eval_experiment`. */
+            object: string;
+            report: components["schemas"]["EvalExperimentReport"];
+            status: components["schemas"]["EvalExperimentStatus"];
+            workflow: components["schemas"]["EvalExperimentWorkflow"];
+        };
+        /** @description A person applied B. */
+        EvalExperimentApplied: {
+            /** @description When, RFC 3339. */
+            at: string;
+            /** @description Who: the caller identity of the write (`account:<id>`, `key:<id>`). */
+            by: string;
+        };
+        /** @description One arm: a full configuration of the workflow, run as a workflow test. */
+        EvalExperimentArm: {
+            /**
+             * Format: int64
+             * @description What the arm's model calls cost so far, in millionths of a US dollar.
+             */
+            cost_micro_usd: number;
+            /**
+             * @description The arm test's fingerprint: a live run with the same one ran the same
+             *     configuration.
+             */
+            fingerprint: string;
+            /** @description The model of each use (`extract`, `decide`), fixed at the start. */
+            models: {
+                [key: string]: components["schemas"]["ModelTrialModel"];
+            };
+            /**
+             * @description The settings revision (`wrev_…`): the hash of the settings the arm
+             *     ran, which every workflow has.
+             */
+            revision: string;
+            /** @description The arm's workflow test (`wtest_…`), which holds its values. */
+            test: string;
+        };
+        /** @description One arm's grade of one item. */
+        EvalExperimentArmItem: {
+            /** Format: int32 */
+            correct: number;
+            /** Format: int64 */
+            cost_micro_usd: number;
+            failed?: boolean;
+            /** Format: int32 */
+            missed: number;
+            /** Format: int32 */
+            review: number;
+            /**
+             * Format: double
+             * @description F1 of the item's precision and recall, 0 to 1; 0 when the arm did
+             *     not answer.
+             */
+            score: number;
+            /** Format: int32 */
+            unlabeled: number;
+            /** Format: int32 */
+            wrong: number;
+        };
+        /** @description One arm's figures over the compared items. */
+        EvalExperimentArmReport: {
+            /** Format: int64 */
+            cost_micro_usd_per_item: number;
+            /**
+             * Format: int64
+             * @description Items the arm did not answer.
+             */
+            failed: number;
+            /**
+             * Format: double
+             * @description Over every compared item, as the template grader computes it.
+             */
+            precision: number;
+            /** Format: double */
+            recall: number;
+            /**
+             * Format: double
+             * @description Values sent to review over values written and sent to review.
+             */
+            review_share: number;
+            /**
+             * Format: double
+             * @description The mean item score (F1), 0 to 1.
+             */
+            score: number;
+        };
+        /**
+         * @description What B changes in A: `{model: {use, model}}` or `{revision}`, exactly
+         *     one (`experiment_arms_mixed` for both).
+         */
+        EvalExperimentArmRequest: {
+            model?: null | components["schemas"]["EvalExperimentModelChange"];
+            /** @description A revision the workflow keeps (`GET /v1/workflows/named/revisions`). */
+            revision?: string | null;
+        };
+        /** @description What B changes: `{kind: "model", use}` or `{kind: "revision"}`. */
+        EvalExperimentChange: {
+            kind: components["schemas"]["EvalExperimentChangeKind"];
+            use?: null | components["schemas"]["ModelUse"];
+        };
+        /**
+         * @description The part of the configuration B changes.
+         * @enum {string}
+         */
+        EvalExperimentChangeKind: "model" | "revision";
+        /**
+         * @description `POST /v1/evals/experiments` (and `…/estimate`): run B against the
+         *     workflow's configuration in use on a dataset's items.
+         */
+        EvalExperimentCreateRequest: {
+            b: components["schemas"]["EvalExperimentArmRequest"];
+            /** @description A dataset of the graph whose kind the workflow reads (`ds_…`). */
+            dataset: string;
+            /**
+             * Format: double
+             * @description The cost limit of both arms, in US dollars: more than 0, at most 100,
+             *     default 5.
+             */
+            max_cost_usd?: number | null;
+            /**
+             * Format: int32
+             * @description Items to run, the dataset's first ones: 1 to 200, default 200.
+             */
+            max_items?: number | null;
+            /** @description A named workflow of the graph. */
+            workflow: string;
+        };
+        /** @description The dataset an experiment runs on. */
+        EvalExperimentDataset: {
+            /**
+             * @description The dataset was deleted after the experiment ran; the report stays as
+             *     it was last scored.
+             */
+            deleted?: boolean;
+            /** @description `ds_…`. */
+            id: string;
+            /**
+             * Format: int32
+             * @description The items the experiment runs.
+             */
+            items: number;
+            name: string;
+        };
+        /**
+         * @description `POST /v1/evals/experiments/estimate`: what a start with the same body
+         *     would estimate. It writes nothing.
+         */
+        EvalExperimentEstimate: {
+            /** Format: int64 */
+            a_micro_usd: number;
+            /** Format: int64 */
+            b_micro_usd: number;
+            /**
+             * Format: int64
+             * @description What is left of the environment's monthly workflow budget; absent
+             *     when the environment has no limit.
+             */
+            budget_left_micro_usd?: number | null;
+            /**
+             * Format: int64
+             * @description Both arms.
+             */
+            estimate_micro_usd: number;
+            /**
+             * Format: int32
+             * @description The items the experiment would run.
+             */
+            items: number;
+            /** Format: int64 */
+            max_cost_micro_usd: number;
+            /** @description `eval_experiment_estimate`. */
+            object: string;
+        };
+        /**
+         * @description Why a `done` experiment ended.
+         * @enum {string}
+         */
+        EvalExperimentFinishReason: "all_items" | "max_cost" | "budget";
+        /** @description One item of an experiment: its names and each arm's grade. */
+        EvalExperimentItem: {
+            a?: null | components["schemas"]["EvalExperimentArmItem"];
+            b?: null | components["schemas"]["EvalExperimentArmItem"];
+            /**
+             * @description The arms' input IRI (`urn:lbb:item:…`): the arms' tests hold the
+             *     item's values under it.
+             */
+            input: string;
+            /** @description The item's instance, when it has one. */
+            iri?: string | null;
+            /** @description The item's name in the dataset. */
+            item: string;
+        };
+        /** @description `GET /v1/evals/experiments`: the graph's experiments, newest first. */
+        EvalExperimentList: {
+            data: components["schemas"]["EvalExperiment"][];
+            has_more: boolean;
+            /** @description Pass as `cursor` for the next page; absent on the last page. */
+            next_cursor?: string | null;
+            /** @description `list`. */
+            object: string;
+        };
+        /** @description B's model change: another model for one use. */
+        EvalExperimentModelChange: {
+            /** @description A model of the use's `options` (`GET /v1/models/choices`). */
+            model: components["schemas"]["ModelTrialModel"];
+            use: components["schemas"]["ModelUse"];
+        };
+        /**
+         * @description The comparison of B against A over the items both arms answered or
+         *     failed.
+         */
+        EvalExperimentReport: {
+            a: components["schemas"]["EvalExperimentArmReport"];
+            b: components["schemas"]["EvalExperimentArmReport"];
+            /** Format: double */
+            ci_high: number;
+            /**
+             * Format: double
+             * @description The 95% interval of the mean difference (a paired bootstrap).
+             */
+            ci_low: number;
+            /**
+             * Format: double
+             * @description B's cost per item over A's.
+             */
+            cost_ratio?: number | null;
+            /**
+             * Format: double
+             * @description `b.score − a.score`.
+             */
+            delta: number;
+            /**
+             * Format: int64
+             * @description Items compared.
+             */
+            items: number;
+            /** @description The etag of the dataset's items it was scored with. */
+            labels_etag?: string | null;
+            /**
+             * @description `too_few` under 10 items, else `better`, `worse` or `same` by the
+             *     interval.
+             */
+            outcome: components["schemas"]["ModelTrialOutcome"];
+            /**
+             * @description The trials' bar: at least 20 items, `ci_low` at least −0.05, B's
+             *     failure share at most A's plus 0.05, and B cheaper per item or
+             *     `better`.
+             */
+            qualifies: boolean;
+            /**
+             * @description The dataset's items changed since it was scored (set by a read; a
+             *     turn scores it again).
+             */
+            stale?: boolean;
+            /** @description Values of unlabeled properties on which the arms differ. */
+            unlabeled?: components["schemas"]["EvalExperimentUnlabeled"][];
+        };
+        /**
+         * @description Where an experiment stands. `queued` → `running` → `done`, `failed` or
+         *     `cancelled`; the last three are final.
+         * @enum {string}
+         */
+        EvalExperimentStatus: "queued" | "running" | "done" | "failed" | "cancelled";
+        /**
+         * @description A value of a property an item does not label, on which the arms differ:
+         *     a person grades it (a `grade` review item).
+         */
+        EvalExperimentUnlabeled: {
+            /** @description A's value, when A wrote one. */
+            a?: string | null;
+            /** @description B's value, when B wrote one. */
+            b?: string | null;
+            /** @description The item's name. */
+            item: string;
+            property: string;
+        };
+        /**
+         * @description The workflow both arms run, with its creation time: a workflow made
+         *     again under the name is another workflow.
+         */
+        EvalExperimentWorkflow: {
+            /** @description When the workflow was created, RFC 3339. */
+            created: string;
+            name: string;
         };
         /** @description One result of a query: a hit of a search, or a row of a SPARQL query. */
         EvalItem: {
@@ -21534,6 +21927,7 @@ export interface components {
              *     dollar.
              */
             estimate_micro_usd: number;
+            experiment?: null | components["schemas"]["WorkflowTestExperiment"];
             /**
              * @description A hash of the settings, the units of the properties, the models and
              *     the system prompt. A test and a run (`WorkflowRunSummary`) with the
@@ -21649,6 +22043,13 @@ export interface components {
             /** Format: int32 */
             sample?: number | null;
             workflow?: null | components["schemas"]["WorkflowTestWorkflow"];
+        };
+        /** @description The experiment a test is an arm of. */
+        WorkflowTestExperiment: {
+            /** @description `a` or `b`. */
+            arm: string;
+            /** @description `exp_…`. */
+            id: string;
         };
         /** @description One input of a test: an instance of the watched class. */
         WorkflowTestInput: {
@@ -35575,6 +35976,739 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["EvalDataset"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Rate limit exceeded */
+            429: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Service unavailable */
+            503: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+        };
+    };
+    get_v1_evals_experiments: {
+        parameters: {
+            query?: {
+                /** @description Graph name (default `main`) */
+                graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
+                /** @description only the experiments of this workflow */
+                workflow?: string;
+                /** @description only the experiments on this dataset */
+                dataset?: string;
+                /** @description queued, running, done, failed or cancelled */
+                status?: string;
+                /** @description experiments, 1 to 50; default 20 */
+                limit?: string;
+                /** @description the `next_cursor` of the previous page */
+                cursor?: string;
+            };
+            header?: {
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                "Lbb-Version"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EvalExperimentList"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Rate limit exceeded */
+            429: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Service unavailable */
+            503: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+        };
+    };
+    post_v1_evals_experiments: {
+        parameters: {
+            query?: {
+                /** @description Graph name (default `main`) */
+                graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
+            };
+            header?: {
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                "Lbb-Version"?: string;
+                /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
+                "Idempotency-Key"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EvalExperimentCreateRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EvalExperiment"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Rate limit exceeded */
+            429: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Service unavailable */
+            503: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+        };
+    };
+    post_v1_evals_experiments_cancel: {
+        parameters: {
+            query?: {
+                /** @description Graph name (default `main`) */
+                graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
+                /** @description the experiment's id */
+                id?: string;
+            };
+            header?: {
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                "Lbb-Version"?: string;
+                /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
+                "Idempotency-Key"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EvalExperiment"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Rate limit exceeded */
+            429: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Service unavailable */
+            503: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+        };
+    };
+    post_v1_evals_experiments_estimate: {
+        parameters: {
+            query?: {
+                /** @description Graph name (default `main`) */
+                graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
+            };
+            header?: {
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                "Lbb-Version"?: string;
+                /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
+                "Idempotency-Key"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EvalExperimentCreateRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EvalExperimentEstimate"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Rate limit exceeded */
+            429: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Service unavailable */
+            503: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+        };
+    };
+    get_v1_evals_experiments_get: {
+        parameters: {
+            query?: {
+                /** @description Graph name (default `main`) */
+                graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
+                /** @description the experiment's id */
+                id?: string;
+            };
+            header?: {
+                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                "Lbb-Version"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EvalExperiment"];
                 };
             };
             /** @description Bad request */

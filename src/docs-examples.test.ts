@@ -20,6 +20,7 @@ const PAGES = [
   "start/first-workflow.mdx",
   "guides/test-a-workflow.mdx",
   "guides/datasets.mdx",
+  "guides/experiments.mdx",
 ];
 
 const SDK_IMPORT = '"@littlebigbrain/client"';
