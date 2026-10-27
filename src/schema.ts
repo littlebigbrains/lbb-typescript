@@ -8804,6 +8804,14 @@ export interface components {
             /** Format: double */
             height: number;
             lines: components["schemas"]["FileLine"][];
+            /**
+             * @description The page has fewer than 16 characters of text (white space not
+             *     counted) and images that cover at least 40% of it: a scan, or a page
+             *     of pictures. The parse read almost no text from it, and OCR is not
+             *     built. Absent (false) for every other page, so the pages of a file
+             *     with a text layer keep their bytes.
+             */
+            ocr_required?: boolean;
             /** Format: int32 */
             page: number;
             /** Format: double */
@@ -8864,6 +8872,12 @@ export interface components {
         /** @description What the parse starter made of a file. */
         FileParse: {
             error?: string | null;
+            /**
+             * Format: int32
+             * @description The pages that need OCR (`ocr_required` is true on them). Absent
+             *     when none does, and for a parse that wrote no page flags.
+             */
+            ocr_pages?: number | null;
             /** Format: int32 */
             page_count?: number | null;
             /** @description RFC 3339. */

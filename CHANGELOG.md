@@ -4,6 +4,14 @@ All notable changes to the `@littlebigbrain/client` package are documented here.
 
 ## Unreleased
 
+- `FilePage` has `ocr_required` and `FileParse` has `ocr_pages`. A page with
+  fewer than 16 characters of text, whose images cover at least 40% of it,
+  reads `ocr_required: true` (a scan: OCR is not built). Absent means
+  false. The `documents-parse` template flags these pages as the server
+  does, adds the `ocr_pages` property to the properties it owns and stores
+  its pages under the parser id `poppler-<version>-scan1`. It needs
+  `pdfimages` beside `pdftotext` (`LBB_PDFIMAGES`).
+
 - `reason` takes the option `attempt` (1 to 10, type `ReasonOptions`). It says
   which attempt of one reading the call is. A workflow that retries a failed
   answer sends `2` on its retry, under its own `effectId`. The call log names
