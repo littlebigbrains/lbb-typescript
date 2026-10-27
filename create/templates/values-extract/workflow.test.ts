@@ -13,6 +13,7 @@ import {
   ENTITY_IRI_NAMESPACE,
   entityIdFromIri,
   entityRef,
+  LbbError,
   stableHashHex,
   type DecideAnswer,
   type Schemas,
@@ -33,9 +34,12 @@ import {
   createWorkflow,
   defaults,
   evidenceOf,
+  failedChecks,
   legacyValueKey,
+  mergeAttempts,
   ontology,
   quoteHolds,
+  REPAIR_NOTE,
   typed,
   unitOf,
   unitProblem,
@@ -238,6 +242,7 @@ test("the samples give the values of the answer key and none it leaves out", asy
     unknown_property: 0,
     duplicate: 0,
     failed: 0,
+    retried: 0,
     commits: 1,
     removed: 0,
   });
@@ -827,4 +832,284 @@ test("test:examples runs the workflow on chosen inputs and writes nothing", asyn
   const lines = report(results);
   assert.equal(lines[0], iris[0]);
   assert.ok(lines.some((line) => line.startsWith("  write   width_cm = 120 (support 0.92)")));
+});
+
+// ---- repair: one retry with the failed checks -----------------------------------------------
+
+const BENCH = {
+  name: "S 9.2",
+  text: "S 9.2 Bench of plastic. Width 70 cm, depth 40 cm.",
+};
+
+/** The first answer misquotes both values; a request with `failed_checks` gets the right quotes. */
+const misquoting = (again: "right" | "wrong" = "right") => ({
+  reason: (request: { prompt: string }) => {
+    const asked = JSON.parse(request.prompt) as { failed_checks?: unknown };
+    const quote = (text: string) => (asked.failed_checks && again === "right" ? text : `${text}!`);
+    return {
+      values: [
+        { property: "width_cm", value: "70", unit: "cm", quote: quote("Width 70 cm") },
+        { property: "depth_cm", value: "40", unit: "cm", quote: quote("depth 40 cm") },
+      ],
+    };
+  },
+});
+
+const reasonCalls = (lbb: MockActivities) => lbb.calls.filter((call) => call.kind === "reason");
+
+test("without repair a failed check is no reason to ask again, and the calls name no attempt", async () => {
+  const lbb = new MockActivities(rules([BENCH], misquoting()));
+  const { state } = await runMessage(
+    createWorkflow(lbb),
+    triggerMessage("values-extract", [iriOf(BENCH.name)]),
+  );
+  assert.deepEqual(written(lbb, BENCH.name), {});
+  assert.equal(state.quote_not_found, 2);
+  assert.equal(state.retried, 0);
+  const calls = reasonCalls(lbb);
+  assert.equal(calls.length, 1);
+  assert.equal("attempt" in calls[0]!, false);
+});
+
+test("with repair one retry gets the failed checks, and its values pass the same checks and gate", async () => {
+  const lbb = new MockActivities(rules([BENCH], misquoting()));
+  const requests: { failed_checks?: unknown[]; repair?: string; text: string }[] = [];
+  const reason = lbb.rules.reason!;
+  lbb.rules.reason = (request) => {
+    requests.push(JSON.parse(request.prompt));
+    return reason(request);
+  };
+  const { state } = await runMessage(
+    createWorkflow(lbb, { ...defaults, repair: 1 }),
+    triggerMessage("values-extract", [iriOf(BENCH.name)]),
+  );
+  // The retry's values are written like any value: through the decision
+  // call and the gate.
+  assert.deepEqual(written(lbb, BENCH.name), { width_cm: 70, depth_cm: 40 });
+  assert.equal(state.retried, 1);
+  assert.equal(state.written, 2);
+  assert.equal(state.quote_not_found, 2);
+  // Two reasoning calls under their own effect ids, and one decision call.
+  const calls = reasonCalls(lbb);
+  // Only the retry names its attempt; the first call reads as attempt 1.
+  assert.deepEqual(
+    calls.map((call) => call.attempt),
+    [undefined, 2],
+  );
+  assert.equal(calls[1]!.effectId, `${calls[0]!.effectId}.repair`);
+  assert.equal(lbb.calls.filter((call) => call.kind === "decide").length, 1);
+  // The retry asks the same input, plus the failed checks and nothing else.
+  assert.equal(requests.length, 2);
+  assert.equal(requests[0]!.failed_checks, undefined);
+  const { failed_checks, repair, ...same } = requests[1]!;
+  assert.deepEqual(same, requests[0]);
+  assert.equal(repair, REPAIR_NOTE);
+  assert.deepEqual(failed_checks, [
+    {
+      check: "quote_not_found",
+      property: "width_cm",
+      message: "the quote is not in the text",
+      value: "70",
+      quote: "Width 70 cm!",
+    },
+    {
+      check: "quote_not_found",
+      property: "depth_cm",
+      message: "the quote is not in the text",
+      value: "40",
+      quote: "depth 40 cm!",
+    },
+  ]);
+});
+
+test("an answer that passes its checks is not asked again, and a retry that fails leaves nothing", async () => {
+  const clean = new MockActivities(rules(RECORDS.slice(0, 1)));
+  await runMessage(
+    createWorkflow(clean, { ...defaults, repair: 1 }),
+    triggerMessage("values-extract", [iriOf(RECORDS[0]!.name)]),
+  );
+  assert.deepEqual(
+    reasonCalls(clean).map((call) => call.attempt),
+    [undefined],
+  );
+
+  const lbb = new MockActivities(rules([BENCH], misquoting("wrong")));
+  const { state } = await runMessage(
+    createWorkflow(lbb, { ...defaults, repair: 1 }),
+    triggerMessage("values-extract", [iriOf(BENCH.name)]),
+  );
+  // Both attempts ran, both failed their checks, and the graph holds nothing.
+  assert.deepEqual(
+    reasonCalls(lbb).map((call) => call.attempt),
+    [undefined, 2],
+  );
+  assert.deepEqual(written(lbb, BENCH.name), {});
+  assert.equal(state.quote_not_found, 4);
+  assert.equal(state.retried, 1);
+  assert.equal(lbb.calls.filter((call) => call.kind === "decide").length, 0);
+});
+
+test("a refused retry leaves the first answer, and a replay of the turn asks nothing again", async () => {
+  const lbb = new MockActivities(
+    rules([BENCH], {
+      ...misquoting(),
+      refuses: (kind, request) =>
+        kind === "reason" && JSON.stringify(request).includes("failed_checks"),
+    }),
+  );
+  const first = await runMessage(
+    createWorkflow(lbb, { ...defaults, repair: 1 }),
+    triggerMessage("values-extract", [iriOf(BENCH.name)]),
+  );
+  // The retry was refused: the instance is not failed, it has the first
+  // answer's outcomes.
+  assert.equal(first.state.failed, 0);
+  assert.equal(first.state.quote_not_found, 2);
+  assert.deepEqual(
+    reasonCalls(lbb).map((call) => [call.attempt, call.refused]),
+    [
+      [undefined, false],
+      [2, true],
+    ],
+  );
+});
+
+test("a repair keeps the values that passed and fills the failed ones", () => {
+  const properties = { width_cm: "f64", material: "text" } as const;
+  const text = "Waschtisch, width_cm: 55 cm, material: Keramik";
+  const first = check(
+    [
+      { property: "width_cm", value: "55", unit: "cm", quote: "width_cm: 55 cm" },
+      { property: "material", value: "Keramik", unit: "", quote: "material: Glas" },
+    ],
+    properties,
+    text,
+    { width_cm: "cm" },
+  );
+  const second = check(
+    [
+      { property: "width_cm", value: "56", unit: "cm", quote: "width_cm: 55 cm" },
+      { property: "material", value: "Keramik", unit: "", quote: "material: Keramik" },
+    ],
+    properties,
+    text,
+    { width_cm: "cm" },
+  );
+  const merged = mergeAttempts(first, second);
+  assert.deepEqual(
+    merged.map((v) => [v.property, v.value, v.outcome, v.attempt, v.typed !== undefined]),
+    [
+      ["width_cm", "55", "", undefined, true],
+      ["material", "Keramik", "quote_not_found", undefined, false],
+      ["width_cm", "56", "duplicate", 2, false],
+      ["material", "Keramik", "", 2, true],
+    ],
+  );
+  // A repair value for a property whose first value passed is a duplicate
+  // whatever its checks said, so the property counts once.
+  const failing = check(
+    [{ property: "width_cm", value: "wide", unit: "cm", quote: "width_cm: 55 cm" }],
+    properties,
+    text,
+    { width_cm: "cm" },
+  );
+  assert.deepEqual(
+    mergeAttempts(first, failing).map((v) => [v.property, v.outcome, v.attempt]),
+    [
+      ["width_cm", "", undefined],
+      ["material", "quote_not_found", undefined],
+      ["width_cm", "duplicate", 2],
+    ],
+  );
+});
+
+test("a retry that fails for another reason leaves the first answer, and only a spent budget stops it", async () => {
+  const failRetry = (error: LbbError) => {
+    const lbb = new MockActivities(rules([BENCH], misquoting()));
+    const reason = lbb.reason.bind(lbb);
+    lbb.reason = async (request, options) => {
+      if (request.prompt.includes("failed_checks")) throw error;
+      return reason(request, options);
+    };
+    return lbb;
+  };
+  // A provider that is busy or down.
+  const down = failRetry(
+    new LbbError(503, "{}", { code: "activity_model_unavailable", message: "down" }),
+  );
+  const { state } = await runMessage(
+    createWorkflow(down, { ...defaults, repair: 1 }),
+    triggerMessage("values-extract", [iriOf(BENCH.name)]),
+  );
+  assert.equal(state.failed, 0);
+  assert.equal(state.quote_not_found, 2);
+  assert.equal(state.retried, 1);
+  // A spent budget waits, as in any step.
+  const spent = failRetry(
+    new LbbError(429, "{}", { code: "workflow_budget_exceeded", message: "spent" }),
+  );
+  await assert.rejects(
+    runMessage(
+      createWorkflow(spent, { ...defaults, repair: 1 }),
+      triggerMessage("values-extract", [iriOf(BENCH.name)]),
+    ),
+    (error: unknown) => error instanceof LbbError && error.code === "workflow_budget_exceeded",
+  );
+});
+
+test("each failed check makes one diagnostic that holds the model's words and no label", () => {
+  const properties = { width_cm: "f64", material: "text" } as const;
+  const text = "Waschtisch, width_cm: 55 cm, material: Keramik";
+  const answer = (values: unknown[]) => {
+    const checked = check(values as never[], properties, text, { width_cm: "cm" });
+    return failedChecks({ values }, checked).map((f) => [f.check, f.property ?? null]);
+  };
+  assert.deepEqual(failedChecks({ items: [] }, []), [
+    { check: "answer_shape", message: "the answer is not a JSON object with a `values` list" },
+  ]);
+  assert.deepEqual(
+    failedChecks(null, []).map((f) => f.check),
+    ["answer_shape"],
+  );
+  assert.deepEqual(answer(["width"]), [["answer_shape", null]]);
+  assert.deepEqual(
+    answer([
+      { property: "material", value: "Keramik", unit: "" },
+      { property: "width_cm", value: 55, unit: "cm", quote: "width_cm: 55 cm" },
+    ]),
+    [
+      ["missing_field", "material"],
+      ["missing_field", "width_cm"],
+    ],
+  );
+  assert.deepEqual(
+    answer([
+      { property: "height_cm", value: "9", unit: "cm", quote: "height_cm: 9 cm" },
+      { property: "width_cm", value: "wide", unit: "cm", quote: "width_cm: 55 cm" },
+      { property: "material", value: "Keramik", unit: "", quote: "material: Glas" },
+    ]),
+    [
+      ["unknown_property", "height_cm"],
+      ["invalid_value", "width_cm"],
+      ["quote_not_found", "material"],
+    ],
+  );
+  // A unit of another kind is converted by LBB; here it goes to review, so
+  // it is no failed check. A second value of a property is none either.
+  assert.deepEqual(
+    answer([
+      { property: "material", value: "Keramik", unit: "", quote: "material: Keramik" },
+      { property: "material", value: "Glas", unit: "", quote: "material: Keramik" },
+    ]),
+    [],
+  );
+  const long = failedChecks(
+    { values: [{ property: "material", value: "Keramik", unit: "", quote: "x".repeat(400) }] },
+    check(
+      [{ property: "material", value: "Keramik", unit: "", quote: "x".repeat(400) }],
+      properties,
+      text,
+    ),
+  );
+  assert.equal(long[0]!.quote!.length, 200);
 });

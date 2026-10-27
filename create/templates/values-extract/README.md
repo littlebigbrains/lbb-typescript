@@ -91,11 +91,39 @@ a new turn (`ctx.continue`).
 | `context` | the samples' | One sentence about what the text is |
 | `gate` | 0.8 | The support a value needs to be written |
 | `units` | `width_cm`, `depth_cm`: `cm` | The unit of each number property; `ontology()` declares it on the property |
+| `repair` | `0` | `1` asks again once when the first answer fails a check (see [Repair](#repair)) |
 
 `trigger(settings)` names the triggered workflow `values-extract` and
 owns the class `ValueSource`, the relation `HAS_VALUE_SOURCE` and the
 properties. `ontology(settings)` adds the class, the properties and the
 relation.
+
+## Repair
+
+With `repair: 1`, an instance whose first answer fails a check is asked once
+more. The checks run without a model. A check fails for one of these reasons:
+
+- the answer has the wrong shape;
+- a `property`, `value` or `quote` is missing;
+- the property is unknown;
+- the value is outside its type or unit;
+- the quote is not in the text.
+
+The retry runs in the same step. It uses its own effect id
+(`<effectId>.repair`) and names `attempt: 2`. It sends the same input plus the
+failed checks (`failedChecks`). It never sends a label. The first call sends no
+`attempt`.
+
+A property whose first value passed keeps it. Every retry value for that
+property is a `duplicate`. Every other property takes the retry's value
+(`mergeAttempts`). The values then go through the support call and the gate.
+A repaired value waits for review as any value does.
+
+A retry that fails leaves the first answer. This covers a refusal and a
+provider that is busy or down. A spent budget waits as in any step. The state
+counts the instances asked again in `retried`. `repair: 0` (the default) makes
+the same calls as before. One thing changed in `check`. It reads a field that
+is no string as empty, as LBB does. Before, it threw.
 
 ## What the LBB-run version adds
 

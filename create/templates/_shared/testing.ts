@@ -20,6 +20,7 @@ import {
   type FilePages,
   type LbbActivities,
   type OwnedWrite,
+  type ReasonOptions,
   type ReasonRequest,
   type ReasonResult,
   type ReviewItemRequest,
@@ -163,6 +164,8 @@ export interface MockCall {
   kind: "reason" | "decide" | "embed";
   effectId?: string;
   label?: string;
+  /** The attempt a `reason` call names (`ReasonOptions.attempt`). */
+  attempt?: number;
   cached: boolean;
   refused: boolean;
 }
@@ -223,6 +226,9 @@ export class MockActivities implements LbbActivities {
       kind,
       effectId: options.effectId,
       label: options.label,
+      ...((options as ReasonOptions).attempt !== undefined
+        ? { attempt: (options as ReasonOptions).attempt }
+        : {}),
       cached: false,
       refused,
     });
@@ -235,7 +241,7 @@ export class MockActivities implements LbbActivities {
 
   async reason<T = unknown>(
     request: ReasonRequest,
-    options: ActivityOptions = {},
+    options: ReasonOptions = {},
   ): Promise<ReasonResult<T>> {
     const rule = this.rules.reason ?? (() => assertNever("reason"));
     return this.model("reason", request, options, () => ({

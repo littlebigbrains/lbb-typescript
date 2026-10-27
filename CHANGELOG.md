@@ -4,6 +4,14 @@ All notable changes to the `@littlebigbrain/client` package are documented here.
 
 ## Unreleased
 
+- `reason` takes the option `attempt` (1 to 10, type `ReasonOptions`). It says
+  which attempt of one reading the call is. A workflow that retries a failed
+  answer sends `2` on its retry, under its own `effectId`. The call log names
+  it (`attempt` on a `ModelCall` and its row). Send it only on a retry: an
+  older server refuses the field. A test value (`WorkflowTestValue`) names
+  `attempt` too (`2` for a value of the retry). `settings.repair` shows the
+  `repair` setting of a `values.extract` test. The `values-extract` template
+  takes `repair: 0 | 1` in its `Settings`.
 - `evals.experiments` compares two configurations of a workflow on a
   dataset: `create`, `estimate`, `list`, `all`, `get`, `cancel` and `wait`
   (`isEvalExperimentOpen`). B is the model of one use or a settings
