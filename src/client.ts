@@ -362,7 +362,7 @@ export class LbbClient {
     )
       throw new RangeError("expectedGraphEpoch must be a decimal epoch string");
     this.environment = environmentScope(options);
-    this.apiVersion = options.apiVersion ?? "2026-10-21";
+    this.apiVersion = options.apiVersion ?? "2026-10-27";
     this.maxRetries = options.maxRetries ?? 6;
     this.retryDelayMs = options.retryDelayMs ?? 100;
     this.retryBudgetMs = options.retryBudgetMs ?? 60_000;
@@ -1531,6 +1531,8 @@ export class LbbClient {
   /**
    * Compare champion and challenger retrieval over one pinned published
    * snapshot. The endpoint returns promotion evidence but never promotes.
+   * @deprecated Legacy semantic-search replay; inspect the legacy_model_consumers_deprecation_v1 capability and policy Link.
+   * Current managed model trials/Evals are separate. Execution is unchanged.
    */
   shadowEval(
     body: Schemas["ShadowEvalRequest"],
@@ -1552,8 +1554,10 @@ export class LbbClient {
    * synthetic pairs, or bring your own), search a bounded candidate space on
    * the train slice, gate the winner against the champion on the held-out
    * eval slice, record the run either way, and promote only when the gate
-   * passes. The same tick the `auto_train` cadence fires — always safe to
-   * call by hand.
+   * passes. The same tick the legacy `auto_train` cadence fires.
+   * @deprecated Legacy deterministic retrieval trainer, not class-declared search.
+   * Execution remains unchanged during the finite notice generation; inspect
+   * the linked legacy model-consumer policy before new adoption.
    */
   trainTick(
     body: Schemas["TrainModelRequest"],
@@ -1562,6 +1566,8 @@ export class LbbClient {
   }
 
   /**
+   * @deprecated Legacy deterministic trainer selection. Existing job/history
+   * reads remain supported; no automatic current-class-search equivalent.
    * Run {@link trainTick} as a durable background job and return its status
    * at once. The idempotency key names the job: submitting again with the
    * same key for the same graph returns the same `job_id`, so a caller that
@@ -1596,7 +1602,10 @@ export class LbbClient {
     return this.request("GET", "/v1/models/training-config", {});
   }
 
-  /** Set the automatic-training configuration (`auto_train` toggle + kinds). */
+  /**
+   * @deprecated Legacy deterministic trainer selection. Execution/config remain
+   * unchanged in the notice generation; auto_train=false remains the disable path.
+   */
   setTrainingConfig(
     body: Schemas["ModelTrainingConfig"],
   ): Promise<Schemas["ModelTrainingConfig"]> {
@@ -1968,7 +1977,7 @@ export class LbbClient {
   status(opts: {
     version: "status/1";
   }): Promise<Schemas["CurrentStatusResponse"]>;
-  /** Temporary legacy status compatibility. Omitted options preserve existing behavior. */
+  /** Omitted options follow the server default; pass legacy only for finite compatibility. */
   status(opts?: { version?: "legacy" }): Promise<unknown>;
   async status(
     opts: { version?: "status/1" | "legacy" } = {},

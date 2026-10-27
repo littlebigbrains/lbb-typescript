@@ -299,3 +299,36 @@ test("unsupported runtime status versions cannot be ignored by an older server",
     "unsupported version is refused before any request",
   );
 });
+
+test("prepared source API default and explicit older headers preserve diagnostic query selection", async () => {
+  for (const apiVersion of [undefined, "2026-10-21", "2026-10-27"]) {
+    for (const version of ["status/1", "legacy"] as const) {
+      const payload =
+        version === "status/1"
+          ? currentPayload()
+          : { ok: true, graph_status: {}, persisted_index: {} };
+      const seen: Array<{
+        header: string | undefined;
+        version: string | null;
+      }> = [];
+      const fetch: FetchLike = async (input, init) => {
+        seen.push({
+          header: init?.headers?.["lbb-version"],
+          version: new URL(input).searchParams.get("version"),
+        });
+        return new Response(JSON.stringify(payload));
+      };
+      const client = new LbbClient({
+        baseUrl: "http://h",
+        fetch,
+        ...(apiVersion ? { apiVersion } : {}),
+      });
+      const result =
+        version === "status/1"
+          ? await client.status({ version: "status/1" })
+          : await client.status({ version: "legacy" });
+      assert.deepEqual(result, payload);
+      assert.deepEqual(seen, [{ header: apiVersion ?? "2026-10-27", version }]);
+    }
+  }
+});

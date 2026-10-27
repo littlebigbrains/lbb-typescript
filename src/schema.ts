@@ -1259,7 +1259,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** version=demo/1: three exact RDF fixture checks on one epoch/commit, without models, durable writes or legacy search; temporary unversioned/legacy compatibility follows the finite release receipt */
+        /** Default demo/1: three exact RDF fixture checks on one epoch/commit, without models, durable writes or legacy search. Explicit version=legacy is deprecated for exactly the first unified API generation */
         post: operations["post_v1_demo_run"];
         delete?: never;
         options?: never;
@@ -2519,7 +2519,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Run a bounded champion/challenger evaluation on one published generation; returns typed unavailable until the generation-pinned evaluator artifact is enabled */
+        /**
+         * Run a bounded champion/challenger evaluation on one published generation; returns typed unavailable until the generation-pinned evaluator artifact is enabled
+         * @deprecated
+         */
         post: operations["post_v1_models_shadow_eval"];
         delete?: never;
         options?: never;
@@ -2640,7 +2643,10 @@ export interface paths {
         /** Read durable trainer job state, progress, terminal error, and the full gated training result */
         get: operations["get_v1_models_train_jobs"];
         put?: never;
-        /** Idempotently enqueue a durable background trainer job; reconnect through the returned stable job id */
+        /**
+         * Idempotently enqueue a durable background trainer job; reconnect through the returned stable job id
+         * @deprecated
+         */
         post: operations["post_v1_models_train_jobs"];
         delete?: never;
         options?: never;
@@ -2657,7 +2663,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** One deterministic trainer tick: probe set (synthetic or BYO) → bounded candidate search on the train slice → held-out eval gate → record run (held or promoted) → CAS promote only when the gate passes */
+        /**
+         * One deterministic trainer tick: probe set (synthetic or BYO) → bounded candidate search on the train slice → held-out eval gate → record run (held or promoted) → CAS promote only when the gate passes
+         * @deprecated
+         */
         post: operations["post_v1_models_train_tick"];
         delete?: never;
         options?: never;
@@ -2675,7 +2684,10 @@ export interface paths {
         /** The graph's automatic-training configuration (default: off) */
         get: operations["get_v1_models_training_config"];
         put?: never;
-        /** Set the automatic-training configuration (auto_train toggle + trainable kinds) */
+        /**
+         * Set the automatic-training configuration (auto_train toggle + trainable kinds)
+         * @deprecated
+         */
         post: operations["post_v1_models_training_config"];
         delete?: never;
         options?: never;
@@ -3723,7 +3735,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Server status; version=status/1 inspects bounded RDF publication and current class embeddings without legacy indexes. Unversioned/legacy compatibility is temporary; see the status response transition release gate */
+        /** Server status defaults to status/1: bounded RDF publication and current class embeddings without legacy indexes. Explicit version=legacy is deprecated for exactly the first unified API generation */
         get: operations["get_v1_status"];
         put?: never;
         post?: never;
@@ -19824,8 +19836,9 @@ export interface components {
          *     kind: build an execution-verified probe set, search a bounded candidate
          *     space on the train slice, gate challenger vs champion on the held-out
          *     eval slice, record the run in the WS9 registry either way, and promote
-         *     only when the gate passes. This is the same tick the auto-train cadence
-         *     fires; calling it by hand is always safe (bounded, snapshot-pinned).
+         *     only when the gate passes. This is the legacy auto-train tick, deprecated
+         *     for new adoption; it has no automatic current-class-search equivalent.
+         *     Execution stays unchanged during the finite notice generation.
          */
         TrainModelRequest: {
             /** @description Train even when the cadence says retraining is not yet due. */
@@ -22876,7 +22889,7 @@ export interface operations {
                 stack?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -23023,7 +23036,7 @@ export interface operations {
                 stack?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -23170,7 +23183,7 @@ export interface operations {
                 stack?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -23319,7 +23332,7 @@ export interface operations {
                 limit?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -23460,7 +23473,7 @@ export interface operations {
                 stack?: string;
             };
             header: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key": string;
@@ -23607,7 +23620,7 @@ export interface operations {
                 stack?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -23756,7 +23769,7 @@ export interface operations {
                 id?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -23903,7 +23916,7 @@ export interface operations {
                 limit?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -24044,7 +24057,7 @@ export interface operations {
                 stack?: string;
             };
             header: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key": string;
@@ -24193,7 +24206,7 @@ export interface operations {
                 path?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -24338,7 +24351,7 @@ export interface operations {
                 limit?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -24479,7 +24492,7 @@ export interface operations {
                 stack?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -24626,7 +24639,7 @@ export interface operations {
                 stack?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -24779,7 +24792,7 @@ export interface operations {
                 limit?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -24922,7 +24935,7 @@ export interface operations {
                 revision?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -25063,7 +25076,7 @@ export interface operations {
                 stack?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -25210,7 +25223,7 @@ export interface operations {
                 stack?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -25357,7 +25370,7 @@ export interface operations {
                 stack?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -25504,7 +25517,7 @@ export interface operations {
                 stack?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -25651,7 +25664,7 @@ export interface operations {
                 stack?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -25798,7 +25811,7 @@ export interface operations {
                 stack?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -25945,7 +25958,7 @@ export interface operations {
                 stack?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -26092,7 +26105,7 @@ export interface operations {
                 stack?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -26239,7 +26252,7 @@ export interface operations {
                 stack?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -26386,7 +26399,7 @@ export interface operations {
                 stack?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -26527,7 +26540,7 @@ export interface operations {
                 stack?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -26674,7 +26687,7 @@ export interface operations {
                 stack?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -26821,7 +26834,7 @@ export interface operations {
                 stack?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -26968,7 +26981,7 @@ export interface operations {
                 stack?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -27115,7 +27128,7 @@ export interface operations {
                 stack?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -27262,7 +27275,7 @@ export interface operations {
                 stack?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -27409,7 +27422,7 @@ export interface operations {
                 stack?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -27556,7 +27569,7 @@ export interface operations {
                 stack?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -27697,7 +27710,7 @@ export interface operations {
                 stack?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -27844,7 +27857,7 @@ export interface operations {
                 stack?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -27991,7 +28004,7 @@ export interface operations {
                 stack?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -28132,7 +28145,7 @@ export interface operations {
                 stack?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -28279,7 +28292,7 @@ export interface operations {
                 stack?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -28426,7 +28439,7 @@ export interface operations {
                 stack?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -28573,7 +28586,7 @@ export interface operations {
                 stack?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -28720,7 +28733,7 @@ export interface operations {
                 stack?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -28867,7 +28880,7 @@ export interface operations {
                 stack?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -29014,7 +29027,7 @@ export interface operations {
                 stack?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -29161,7 +29174,7 @@ export interface operations {
                 stack?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -29302,7 +29315,7 @@ export interface operations {
                 stack?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -29449,7 +29462,7 @@ export interface operations {
                 stack?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -29600,7 +29613,7 @@ export interface operations {
                 name: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -29741,7 +29754,7 @@ export interface operations {
                 stack?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -29901,7 +29914,7 @@ export interface operations {
                 stack?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -30042,7 +30055,7 @@ export interface operations {
                 stack?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -30189,7 +30202,7 @@ export interface operations {
                 connection_id: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -30330,7 +30343,7 @@ export interface operations {
                 connection_id: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -30477,7 +30490,7 @@ export interface operations {
                 connection_id: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -30624,7 +30637,7 @@ export interface operations {
                 connection_id: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -30771,7 +30784,7 @@ export interface operations {
                 connection_id: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -30918,7 +30931,7 @@ export interface operations {
                 connection_id: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -31065,7 +31078,7 @@ export interface operations {
                 connection_id: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -31208,7 +31221,7 @@ export interface operations {
                 connection_id?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -31357,7 +31370,7 @@ export interface operations {
                 connection_id?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -31506,7 +31519,7 @@ export interface operations {
                 connection_id?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -31655,7 +31668,7 @@ export interface operations {
                 connection_id?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -31804,7 +31817,7 @@ export interface operations {
                 connection_id?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -31953,7 +31966,7 @@ export interface operations {
                 connection_id?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -32102,7 +32115,7 @@ export interface operations {
                 connection_id?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -32251,7 +32264,7 @@ export interface operations {
                 connection_id?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -32394,7 +32407,7 @@ export interface operations {
                 connection_id?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -32543,7 +32556,7 @@ export interface operations {
                 connection_id?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -32692,7 +32705,7 @@ export interface operations {
                 connection_id?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -32841,7 +32854,7 @@ export interface operations {
                 connection_id?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -32984,7 +32997,7 @@ export interface operations {
                 connection_id?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -33133,7 +33146,7 @@ export interface operations {
                 connection_id?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -33278,7 +33291,7 @@ export interface operations {
                 connection_id?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -33427,7 +33440,7 @@ export interface operations {
                 connection_id?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -33568,7 +33581,7 @@ export interface operations {
                 stack?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -33709,7 +33722,7 @@ export interface operations {
                 stack?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -33852,7 +33865,7 @@ export interface operations {
                 dataset?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -33999,7 +34012,7 @@ export interface operations {
                 build?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -34142,7 +34155,7 @@ export interface operations {
                 stack?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -34283,11 +34296,11 @@ export interface operations {
                 stack?: string;
                 /** @description semantic_graph has three fixed current cases; other known datasets are unavailable */
                 dataset?: string;
-                /** @description demo/1 for the typed current response; legacy or absent retains the temporary compatibility response */
+                /** @description demo/1 or absent selects the typed current response; only explicit legacy retains the one-generation compatibility response */
                 version?: "demo/1" | "legacy";
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -34436,7 +34449,7 @@ export interface operations {
                 name?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -34577,7 +34590,7 @@ export interface operations {
                 stack?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -34726,7 +34739,7 @@ export interface operations {
                 confirm?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -34869,7 +34882,7 @@ export interface operations {
                 stack?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -35014,7 +35027,7 @@ export interface operations {
                 stack?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -35163,7 +35176,7 @@ export interface operations {
                 name?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -35306,7 +35319,7 @@ export interface operations {
                 stack?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -35451,7 +35464,7 @@ export interface operations {
                 cursor?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -35592,7 +35605,7 @@ export interface operations {
                 stack?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -35741,7 +35754,7 @@ export interface operations {
                 id?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -35886,7 +35899,7 @@ export interface operations {
                 id?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -36029,7 +36042,7 @@ export interface operations {
                 id?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -36170,7 +36183,7 @@ export interface operations {
                 stack?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -36327,7 +36340,7 @@ export interface operations {
                 cursor?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -36468,7 +36481,7 @@ export interface operations {
                 stack?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -36617,7 +36630,7 @@ export interface operations {
                 id?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -36760,7 +36773,7 @@ export interface operations {
                 stack?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -36909,7 +36922,7 @@ export interface operations {
                 id?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -37050,7 +37063,7 @@ export interface operations {
                 stack?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -37191,7 +37204,7 @@ export interface operations {
                 stack?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -37340,7 +37353,7 @@ export interface operations {
                 id?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -37487,7 +37500,7 @@ export interface operations {
                 consistency?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -37634,7 +37647,7 @@ export interface operations {
                 limit?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -37779,7 +37792,7 @@ export interface operations {
                 trace?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -37930,7 +37943,7 @@ export interface operations {
                 runner?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -38073,7 +38086,7 @@ export interface operations {
                 consistency?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -38218,7 +38231,7 @@ export interface operations {
                 consistency?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -38365,7 +38378,7 @@ export interface operations {
                 stack?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -38506,7 +38519,7 @@ export interface operations {
                 stack?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -38653,7 +38666,7 @@ export interface operations {
                 id?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -38798,7 +38811,7 @@ export interface operations {
                 unlabeled?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -38947,7 +38960,7 @@ export interface operations {
                 name?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -39094,7 +39107,7 @@ export interface operations {
                 schema?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -39248,7 +39261,7 @@ export interface operations {
                 purge?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -39395,7 +39408,7 @@ export interface operations {
                 deleted?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
                 /** @description One byte range: `bytes=a-b`, `bytes=a-` or `bytes=-n` (RFC 9110) */
                 Range?: string;
@@ -39574,7 +39587,7 @@ export interface operations {
                 sha256?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -39715,7 +39728,7 @@ export interface operations {
                 stack?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -39864,7 +39877,7 @@ export interface operations {
                 deleted?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -40009,7 +40022,7 @@ export interface operations {
                 parser?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -40158,7 +40171,7 @@ export interface operations {
                 deleted?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -40299,7 +40312,7 @@ export interface operations {
                 stack?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -40444,7 +40457,7 @@ export interface operations {
                 dry_run?: string;
             };
             header: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key": string;
@@ -40595,7 +40608,7 @@ export interface operations {
                 moment?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -40740,7 +40753,7 @@ export interface operations {
                 max_segments?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -40883,7 +40896,7 @@ export interface operations {
                 stack?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -41028,7 +41041,7 @@ export interface operations {
                 confirm?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -41203,7 +41216,7 @@ export interface operations {
                 evidence?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -41346,7 +41359,7 @@ export interface operations {
                 job_id?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -41489,7 +41502,7 @@ export interface operations {
                 as_of_commit_seq?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -41638,7 +41651,7 @@ export interface operations {
                 confirm?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -41789,7 +41802,7 @@ export interface operations {
                 observed_at?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -41934,7 +41947,7 @@ export interface operations {
                 job_id: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -42081,7 +42094,7 @@ export interface operations {
                 observed_at?: string;
             };
             header: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key": string;
@@ -42244,7 +42257,7 @@ export interface operations {
                 job_id: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -42407,7 +42420,7 @@ export interface operations {
                 build?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -42552,7 +42565,7 @@ export interface operations {
                 target?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -42693,7 +42706,7 @@ export interface operations {
                 stack?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -42842,7 +42855,7 @@ export interface operations {
                 job_id?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -42990,7 +43003,7 @@ export interface operations {
                 include_indexes?: boolean;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -43135,7 +43148,7 @@ export interface operations {
                 cursor?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -43276,7 +43289,7 @@ export interface operations {
                 stack?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -43417,7 +43430,7 @@ export interface operations {
                 stack?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -43566,7 +43579,7 @@ export interface operations {
                 observed_at?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -43711,7 +43724,7 @@ export interface operations {
                 expected_graph_epoch?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -43858,7 +43871,7 @@ export interface operations {
                 stack?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -43999,7 +44012,7 @@ export interface operations {
                 stack?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -44144,7 +44157,7 @@ export interface operations {
                 cursor?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -44285,7 +44298,7 @@ export interface operations {
                 stack?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -44428,7 +44441,7 @@ export interface operations {
                 month?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -44571,7 +44584,7 @@ export interface operations {
                 kind?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -44714,7 +44727,7 @@ export interface operations {
                 limit?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -44855,7 +44868,7 @@ export interface operations {
                 stack?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -45004,7 +45017,7 @@ export interface operations {
                 id?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -45153,7 +45166,7 @@ export interface operations {
                 id?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -45302,7 +45315,7 @@ export interface operations {
                 id?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -45453,7 +45466,7 @@ export interface operations {
                 limit?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -45596,7 +45609,7 @@ export interface operations {
                 id?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -45741,7 +45754,7 @@ export interface operations {
                 id?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -45894,7 +45907,7 @@ export interface operations {
                 limit?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -46039,7 +46052,7 @@ export interface operations {
                 month?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -46182,7 +46195,7 @@ export interface operations {
                 id?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -46331,7 +46344,7 @@ export interface operations {
                 month?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -46480,7 +46493,7 @@ export interface operations {
                 limit?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -46621,7 +46634,7 @@ export interface operations {
                 stack?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -46770,7 +46783,7 @@ export interface operations {
                 workflow?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -46917,7 +46930,7 @@ export interface operations {
                 split_seq?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -47062,7 +47075,7 @@ export interface operations {
                 run?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -47209,7 +47222,7 @@ export interface operations {
                 allow_regression?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -47352,7 +47365,7 @@ export interface operations {
                 stack?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -47501,7 +47514,7 @@ export interface operations {
                 kind?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -47646,7 +47659,7 @@ export interface operations {
                 keep?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -47789,7 +47802,7 @@ export interface operations {
                 stack?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -47806,8 +47819,12 @@ export interface operations {
             /** @description OK */
             200: {
                 headers: {
+                    /** @description Static finite legacy consumer notice; not disabled scheduling/execution, a job census or retirement completion. See the capability and linked operational transition. */
+                    "LBB-Legacy-Model-Policy"?: string;
                     /** @description API contract version used for the response */
                     "Lbb-Version"?: string;
+                    /** @description Deprecation policy; no fabricated Sunset date */
+                    Link?: string;
                     /** @description Request correlation id */
                     "X-Request-Id"?: string;
                     [name: string]: unknown;
@@ -47819,8 +47836,12 @@ export interface operations {
             /** @description Bad request */
             400: {
                 headers: {
+                    /** @description Static finite legacy consumer notice; not disabled scheduling/execution, a job census or retirement completion. See the capability and linked operational transition. */
+                    "LBB-Legacy-Model-Policy"?: string;
                     /** @description API contract version used for the response */
                     "Lbb-Version"?: string;
+                    /** @description Deprecation policy; no fabricated Sunset date */
+                    Link?: string;
                     /** @description Request correlation id */
                     "X-Request-Id"?: string;
                     [name: string]: unknown;
@@ -47832,8 +47853,12 @@ export interface operations {
             /** @description Unauthorized */
             401: {
                 headers: {
+                    /** @description Static finite legacy consumer notice; not disabled scheduling/execution, a job census or retirement completion. See the capability and linked operational transition. */
+                    "LBB-Legacy-Model-Policy"?: string;
                     /** @description API contract version used for the response */
                     "Lbb-Version"?: string;
+                    /** @description Deprecation policy; no fabricated Sunset date */
+                    Link?: string;
                     /** @description Request correlation id */
                     "X-Request-Id"?: string;
                     [name: string]: unknown;
@@ -47845,8 +47870,12 @@ export interface operations {
             /** @description Forbidden */
             403: {
                 headers: {
+                    /** @description Static finite legacy consumer notice; not disabled scheduling/execution, a job census or retirement completion. See the capability and linked operational transition. */
+                    "LBB-Legacy-Model-Policy"?: string;
                     /** @description API contract version used for the response */
                     "Lbb-Version"?: string;
+                    /** @description Deprecation policy; no fabricated Sunset date */
+                    Link?: string;
                     /** @description Request correlation id */
                     "X-Request-Id"?: string;
                     [name: string]: unknown;
@@ -47858,8 +47887,12 @@ export interface operations {
             /** @description Not found */
             404: {
                 headers: {
+                    /** @description Static finite legacy consumer notice; not disabled scheduling/execution, a job census or retirement completion. See the capability and linked operational transition. */
+                    "LBB-Legacy-Model-Policy"?: string;
                     /** @description API contract version used for the response */
                     "Lbb-Version"?: string;
+                    /** @description Deprecation policy; no fabricated Sunset date */
+                    Link?: string;
                     /** @description Request correlation id */
                     "X-Request-Id"?: string;
                     [name: string]: unknown;
@@ -47871,8 +47904,12 @@ export interface operations {
             /** @description Conflict */
             409: {
                 headers: {
+                    /** @description Static finite legacy consumer notice; not disabled scheduling/execution, a job census or retirement completion. See the capability and linked operational transition. */
+                    "LBB-Legacy-Model-Policy"?: string;
                     /** @description API contract version used for the response */
                     "Lbb-Version"?: string;
+                    /** @description Deprecation policy; no fabricated Sunset date */
+                    Link?: string;
                     /** @description Request correlation id */
                     "X-Request-Id"?: string;
                     [name: string]: unknown;
@@ -47884,8 +47921,12 @@ export interface operations {
             /** @description Rate limit exceeded */
             429: {
                 headers: {
+                    /** @description Static finite legacy consumer notice; not disabled scheduling/execution, a job census or retirement completion. See the capability and linked operational transition. */
+                    "LBB-Legacy-Model-Policy"?: string;
                     /** @description API contract version used for the response */
                     "Lbb-Version"?: string;
+                    /** @description Deprecation policy; no fabricated Sunset date */
+                    Link?: string;
                     /** @description Request correlation id */
                     "X-Request-Id"?: string;
                     [name: string]: unknown;
@@ -47897,8 +47938,12 @@ export interface operations {
             /** @description Internal server error */
             500: {
                 headers: {
+                    /** @description Static finite legacy consumer notice; not disabled scheduling/execution, a job census or retirement completion. See the capability and linked operational transition. */
+                    "LBB-Legacy-Model-Policy"?: string;
                     /** @description API contract version used for the response */
                     "Lbb-Version"?: string;
+                    /** @description Deprecation policy; no fabricated Sunset date */
+                    Link?: string;
                     /** @description Request correlation id */
                     "X-Request-Id"?: string;
                     [name: string]: unknown;
@@ -47910,8 +47955,12 @@ export interface operations {
             /** @description Service unavailable */
             503: {
                 headers: {
+                    /** @description Static finite legacy consumer notice; not disabled scheduling/execution, a job census or retirement completion. See the capability and linked operational transition. */
+                    "LBB-Legacy-Model-Policy"?: string;
                     /** @description API contract version used for the response */
                     "Lbb-Version"?: string;
+                    /** @description Deprecation policy; no fabricated Sunset date */
+                    Link?: string;
                     /** @description Request correlation id */
                     "X-Request-Id"?: string;
                     [name: string]: unknown;
@@ -47940,7 +47989,7 @@ export interface operations {
                 run?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -48085,7 +48134,7 @@ export interface operations {
                 split_seq?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -48226,7 +48275,7 @@ export interface operations {
                 stack?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -48367,7 +48416,7 @@ export interface operations {
                 stack?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -48516,7 +48565,7 @@ export interface operations {
                 job?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -48661,7 +48710,7 @@ export interface operations {
                 limit?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -48802,7 +48851,7 @@ export interface operations {
                 stack?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -48945,7 +48994,7 @@ export interface operations {
                 job_id?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -48956,8 +49005,12 @@ export interface operations {
             /** @description OK */
             200: {
                 headers: {
+                    /** @description Static finite legacy consumer notice; not disabled scheduling/execution, a job census or retirement completion. See the capability and linked operational transition. */
+                    "LBB-Legacy-Model-Policy"?: string;
                     /** @description API contract version used for the response */
                     "Lbb-Version"?: string;
+                    /** @description Deprecation policy; no fabricated Sunset date */
+                    Link?: string;
                     /** @description Request correlation id */
                     "X-Request-Id"?: string;
                     [name: string]: unknown;
@@ -48969,8 +49022,12 @@ export interface operations {
             /** @description Bad request */
             400: {
                 headers: {
+                    /** @description Static finite legacy consumer notice; not disabled scheduling/execution, a job census or retirement completion. See the capability and linked operational transition. */
+                    "LBB-Legacy-Model-Policy"?: string;
                     /** @description API contract version used for the response */
                     "Lbb-Version"?: string;
+                    /** @description Deprecation policy; no fabricated Sunset date */
+                    Link?: string;
                     /** @description Request correlation id */
                     "X-Request-Id"?: string;
                     [name: string]: unknown;
@@ -48982,8 +49039,12 @@ export interface operations {
             /** @description Unauthorized */
             401: {
                 headers: {
+                    /** @description Static finite legacy consumer notice; not disabled scheduling/execution, a job census or retirement completion. See the capability and linked operational transition. */
+                    "LBB-Legacy-Model-Policy"?: string;
                     /** @description API contract version used for the response */
                     "Lbb-Version"?: string;
+                    /** @description Deprecation policy; no fabricated Sunset date */
+                    Link?: string;
                     /** @description Request correlation id */
                     "X-Request-Id"?: string;
                     [name: string]: unknown;
@@ -48995,8 +49056,12 @@ export interface operations {
             /** @description Forbidden */
             403: {
                 headers: {
+                    /** @description Static finite legacy consumer notice; not disabled scheduling/execution, a job census or retirement completion. See the capability and linked operational transition. */
+                    "LBB-Legacy-Model-Policy"?: string;
                     /** @description API contract version used for the response */
                     "Lbb-Version"?: string;
+                    /** @description Deprecation policy; no fabricated Sunset date */
+                    Link?: string;
                     /** @description Request correlation id */
                     "X-Request-Id"?: string;
                     [name: string]: unknown;
@@ -49008,8 +49073,12 @@ export interface operations {
             /** @description Not found */
             404: {
                 headers: {
+                    /** @description Static finite legacy consumer notice; not disabled scheduling/execution, a job census or retirement completion. See the capability and linked operational transition. */
+                    "LBB-Legacy-Model-Policy"?: string;
                     /** @description API contract version used for the response */
                     "Lbb-Version"?: string;
+                    /** @description Deprecation policy; no fabricated Sunset date */
+                    Link?: string;
                     /** @description Request correlation id */
                     "X-Request-Id"?: string;
                     [name: string]: unknown;
@@ -49021,8 +49090,12 @@ export interface operations {
             /** @description Conflict */
             409: {
                 headers: {
+                    /** @description Static finite legacy consumer notice; not disabled scheduling/execution, a job census or retirement completion. See the capability and linked operational transition. */
+                    "LBB-Legacy-Model-Policy"?: string;
                     /** @description API contract version used for the response */
                     "Lbb-Version"?: string;
+                    /** @description Deprecation policy; no fabricated Sunset date */
+                    Link?: string;
                     /** @description Request correlation id */
                     "X-Request-Id"?: string;
                     [name: string]: unknown;
@@ -49034,8 +49107,12 @@ export interface operations {
             /** @description Rate limit exceeded */
             429: {
                 headers: {
+                    /** @description Static finite legacy consumer notice; not disabled scheduling/execution, a job census or retirement completion. See the capability and linked operational transition. */
+                    "LBB-Legacy-Model-Policy"?: string;
                     /** @description API contract version used for the response */
                     "Lbb-Version"?: string;
+                    /** @description Deprecation policy; no fabricated Sunset date */
+                    Link?: string;
                     /** @description Request correlation id */
                     "X-Request-Id"?: string;
                     [name: string]: unknown;
@@ -49047,8 +49124,12 @@ export interface operations {
             /** @description Internal server error */
             500: {
                 headers: {
+                    /** @description Static finite legacy consumer notice; not disabled scheduling/execution, a job census or retirement completion. See the capability and linked operational transition. */
+                    "LBB-Legacy-Model-Policy"?: string;
                     /** @description API contract version used for the response */
                     "Lbb-Version"?: string;
+                    /** @description Deprecation policy; no fabricated Sunset date */
+                    Link?: string;
                     /** @description Request correlation id */
                     "X-Request-Id"?: string;
                     [name: string]: unknown;
@@ -49060,8 +49141,12 @@ export interface operations {
             /** @description Service unavailable */
             503: {
                 headers: {
+                    /** @description Static finite legacy consumer notice; not disabled scheduling/execution, a job census or retirement completion. See the capability and linked operational transition. */
+                    "LBB-Legacy-Model-Policy"?: string;
                     /** @description API contract version used for the response */
                     "Lbb-Version"?: string;
+                    /** @description Deprecation policy; no fabricated Sunset date */
+                    Link?: string;
                     /** @description Request correlation id */
                     "X-Request-Id"?: string;
                     [name: string]: unknown;
@@ -49086,7 +49171,7 @@ export interface operations {
                 stack?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -49103,8 +49188,12 @@ export interface operations {
             /** @description OK */
             200: {
                 headers: {
+                    /** @description Static finite legacy consumer notice; not disabled scheduling/execution, a job census or retirement completion. See the capability and linked operational transition. */
+                    "LBB-Legacy-Model-Policy"?: string;
                     /** @description API contract version used for the response */
                     "Lbb-Version"?: string;
+                    /** @description Deprecation policy; no fabricated Sunset date */
+                    Link?: string;
                     /** @description Request correlation id */
                     "X-Request-Id"?: string;
                     [name: string]: unknown;
@@ -49116,8 +49205,12 @@ export interface operations {
             /** @description Bad request */
             400: {
                 headers: {
+                    /** @description Static finite legacy consumer notice; not disabled scheduling/execution, a job census or retirement completion. See the capability and linked operational transition. */
+                    "LBB-Legacy-Model-Policy"?: string;
                     /** @description API contract version used for the response */
                     "Lbb-Version"?: string;
+                    /** @description Deprecation policy; no fabricated Sunset date */
+                    Link?: string;
                     /** @description Request correlation id */
                     "X-Request-Id"?: string;
                     [name: string]: unknown;
@@ -49129,8 +49222,12 @@ export interface operations {
             /** @description Unauthorized */
             401: {
                 headers: {
+                    /** @description Static finite legacy consumer notice; not disabled scheduling/execution, a job census or retirement completion. See the capability and linked operational transition. */
+                    "LBB-Legacy-Model-Policy"?: string;
                     /** @description API contract version used for the response */
                     "Lbb-Version"?: string;
+                    /** @description Deprecation policy; no fabricated Sunset date */
+                    Link?: string;
                     /** @description Request correlation id */
                     "X-Request-Id"?: string;
                     [name: string]: unknown;
@@ -49142,8 +49239,12 @@ export interface operations {
             /** @description Forbidden */
             403: {
                 headers: {
+                    /** @description Static finite legacy consumer notice; not disabled scheduling/execution, a job census or retirement completion. See the capability and linked operational transition. */
+                    "LBB-Legacy-Model-Policy"?: string;
                     /** @description API contract version used for the response */
                     "Lbb-Version"?: string;
+                    /** @description Deprecation policy; no fabricated Sunset date */
+                    Link?: string;
                     /** @description Request correlation id */
                     "X-Request-Id"?: string;
                     [name: string]: unknown;
@@ -49155,8 +49256,12 @@ export interface operations {
             /** @description Not found */
             404: {
                 headers: {
+                    /** @description Static finite legacy consumer notice; not disabled scheduling/execution, a job census or retirement completion. See the capability and linked operational transition. */
+                    "LBB-Legacy-Model-Policy"?: string;
                     /** @description API contract version used for the response */
                     "Lbb-Version"?: string;
+                    /** @description Deprecation policy; no fabricated Sunset date */
+                    Link?: string;
                     /** @description Request correlation id */
                     "X-Request-Id"?: string;
                     [name: string]: unknown;
@@ -49168,8 +49273,12 @@ export interface operations {
             /** @description Conflict */
             409: {
                 headers: {
+                    /** @description Static finite legacy consumer notice; not disabled scheduling/execution, a job census or retirement completion. See the capability and linked operational transition. */
+                    "LBB-Legacy-Model-Policy"?: string;
                     /** @description API contract version used for the response */
                     "Lbb-Version"?: string;
+                    /** @description Deprecation policy; no fabricated Sunset date */
+                    Link?: string;
                     /** @description Request correlation id */
                     "X-Request-Id"?: string;
                     [name: string]: unknown;
@@ -49181,8 +49290,12 @@ export interface operations {
             /** @description Rate limit exceeded */
             429: {
                 headers: {
+                    /** @description Static finite legacy consumer notice; not disabled scheduling/execution, a job census or retirement completion. See the capability and linked operational transition. */
+                    "LBB-Legacy-Model-Policy"?: string;
                     /** @description API contract version used for the response */
                     "Lbb-Version"?: string;
+                    /** @description Deprecation policy; no fabricated Sunset date */
+                    Link?: string;
                     /** @description Request correlation id */
                     "X-Request-Id"?: string;
                     [name: string]: unknown;
@@ -49194,8 +49307,12 @@ export interface operations {
             /** @description Internal server error */
             500: {
                 headers: {
+                    /** @description Static finite legacy consumer notice; not disabled scheduling/execution, a job census or retirement completion. See the capability and linked operational transition. */
+                    "LBB-Legacy-Model-Policy"?: string;
                     /** @description API contract version used for the response */
                     "Lbb-Version"?: string;
+                    /** @description Deprecation policy; no fabricated Sunset date */
+                    Link?: string;
                     /** @description Request correlation id */
                     "X-Request-Id"?: string;
                     [name: string]: unknown;
@@ -49207,8 +49324,12 @@ export interface operations {
             /** @description Service unavailable */
             503: {
                 headers: {
+                    /** @description Static finite legacy consumer notice; not disabled scheduling/execution, a job census or retirement completion. See the capability and linked operational transition. */
+                    "LBB-Legacy-Model-Policy"?: string;
                     /** @description API contract version used for the response */
                     "Lbb-Version"?: string;
+                    /** @description Deprecation policy; no fabricated Sunset date */
+                    Link?: string;
                     /** @description Request correlation id */
                     "X-Request-Id"?: string;
                     [name: string]: unknown;
@@ -49233,7 +49354,7 @@ export interface operations {
                 stack?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -49250,8 +49371,12 @@ export interface operations {
             /** @description OK */
             200: {
                 headers: {
+                    /** @description Static finite legacy consumer notice; not disabled scheduling/execution, a job census or retirement completion. See the capability and linked operational transition. */
+                    "LBB-Legacy-Model-Policy"?: string;
                     /** @description API contract version used for the response */
                     "Lbb-Version"?: string;
+                    /** @description Deprecation policy; no fabricated Sunset date */
+                    Link?: string;
                     /** @description Request correlation id */
                     "X-Request-Id"?: string;
                     [name: string]: unknown;
@@ -49263,8 +49388,12 @@ export interface operations {
             /** @description Bad request */
             400: {
                 headers: {
+                    /** @description Static finite legacy consumer notice; not disabled scheduling/execution, a job census or retirement completion. See the capability and linked operational transition. */
+                    "LBB-Legacy-Model-Policy"?: string;
                     /** @description API contract version used for the response */
                     "Lbb-Version"?: string;
+                    /** @description Deprecation policy; no fabricated Sunset date */
+                    Link?: string;
                     /** @description Request correlation id */
                     "X-Request-Id"?: string;
                     [name: string]: unknown;
@@ -49276,8 +49405,12 @@ export interface operations {
             /** @description Unauthorized */
             401: {
                 headers: {
+                    /** @description Static finite legacy consumer notice; not disabled scheduling/execution, a job census or retirement completion. See the capability and linked operational transition. */
+                    "LBB-Legacy-Model-Policy"?: string;
                     /** @description API contract version used for the response */
                     "Lbb-Version"?: string;
+                    /** @description Deprecation policy; no fabricated Sunset date */
+                    Link?: string;
                     /** @description Request correlation id */
                     "X-Request-Id"?: string;
                     [name: string]: unknown;
@@ -49289,8 +49422,12 @@ export interface operations {
             /** @description Forbidden */
             403: {
                 headers: {
+                    /** @description Static finite legacy consumer notice; not disabled scheduling/execution, a job census or retirement completion. See the capability and linked operational transition. */
+                    "LBB-Legacy-Model-Policy"?: string;
                     /** @description API contract version used for the response */
                     "Lbb-Version"?: string;
+                    /** @description Deprecation policy; no fabricated Sunset date */
+                    Link?: string;
                     /** @description Request correlation id */
                     "X-Request-Id"?: string;
                     [name: string]: unknown;
@@ -49302,8 +49439,12 @@ export interface operations {
             /** @description Not found */
             404: {
                 headers: {
+                    /** @description Static finite legacy consumer notice; not disabled scheduling/execution, a job census or retirement completion. See the capability and linked operational transition. */
+                    "LBB-Legacy-Model-Policy"?: string;
                     /** @description API contract version used for the response */
                     "Lbb-Version"?: string;
+                    /** @description Deprecation policy; no fabricated Sunset date */
+                    Link?: string;
                     /** @description Request correlation id */
                     "X-Request-Id"?: string;
                     [name: string]: unknown;
@@ -49315,8 +49456,12 @@ export interface operations {
             /** @description Conflict */
             409: {
                 headers: {
+                    /** @description Static finite legacy consumer notice; not disabled scheduling/execution, a job census or retirement completion. See the capability and linked operational transition. */
+                    "LBB-Legacy-Model-Policy"?: string;
                     /** @description API contract version used for the response */
                     "Lbb-Version"?: string;
+                    /** @description Deprecation policy; no fabricated Sunset date */
+                    Link?: string;
                     /** @description Request correlation id */
                     "X-Request-Id"?: string;
                     [name: string]: unknown;
@@ -49328,8 +49473,12 @@ export interface operations {
             /** @description Rate limit exceeded */
             429: {
                 headers: {
+                    /** @description Static finite legacy consumer notice; not disabled scheduling/execution, a job census or retirement completion. See the capability and linked operational transition. */
+                    "LBB-Legacy-Model-Policy"?: string;
                     /** @description API contract version used for the response */
                     "Lbb-Version"?: string;
+                    /** @description Deprecation policy; no fabricated Sunset date */
+                    Link?: string;
                     /** @description Request correlation id */
                     "X-Request-Id"?: string;
                     [name: string]: unknown;
@@ -49341,8 +49490,12 @@ export interface operations {
             /** @description Internal server error */
             500: {
                 headers: {
+                    /** @description Static finite legacy consumer notice; not disabled scheduling/execution, a job census or retirement completion. See the capability and linked operational transition. */
+                    "LBB-Legacy-Model-Policy"?: string;
                     /** @description API contract version used for the response */
                     "Lbb-Version"?: string;
+                    /** @description Deprecation policy; no fabricated Sunset date */
+                    Link?: string;
                     /** @description Request correlation id */
                     "X-Request-Id"?: string;
                     [name: string]: unknown;
@@ -49354,8 +49507,12 @@ export interface operations {
             /** @description Service unavailable */
             503: {
                 headers: {
+                    /** @description Static finite legacy consumer notice; not disabled scheduling/execution, a job census or retirement completion. See the capability and linked operational transition. */
+                    "LBB-Legacy-Model-Policy"?: string;
                     /** @description API contract version used for the response */
                     "Lbb-Version"?: string;
+                    /** @description Deprecation policy; no fabricated Sunset date */
+                    Link?: string;
                     /** @description Request correlation id */
                     "X-Request-Id"?: string;
                     [name: string]: unknown;
@@ -49380,7 +49537,7 @@ export interface operations {
                 stack?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -49391,8 +49548,12 @@ export interface operations {
             /** @description OK */
             200: {
                 headers: {
+                    /** @description Static finite legacy consumer notice; not disabled scheduling/execution, a job census or retirement completion. See the capability and linked operational transition. */
+                    "LBB-Legacy-Model-Policy"?: string;
                     /** @description API contract version used for the response */
                     "Lbb-Version"?: string;
+                    /** @description Deprecation policy; no fabricated Sunset date */
+                    Link?: string;
                     /** @description Request correlation id */
                     "X-Request-Id"?: string;
                     [name: string]: unknown;
@@ -49404,8 +49565,12 @@ export interface operations {
             /** @description Bad request */
             400: {
                 headers: {
+                    /** @description Static finite legacy consumer notice; not disabled scheduling/execution, a job census or retirement completion. See the capability and linked operational transition. */
+                    "LBB-Legacy-Model-Policy"?: string;
                     /** @description API contract version used for the response */
                     "Lbb-Version"?: string;
+                    /** @description Deprecation policy; no fabricated Sunset date */
+                    Link?: string;
                     /** @description Request correlation id */
                     "X-Request-Id"?: string;
                     [name: string]: unknown;
@@ -49417,8 +49582,12 @@ export interface operations {
             /** @description Unauthorized */
             401: {
                 headers: {
+                    /** @description Static finite legacy consumer notice; not disabled scheduling/execution, a job census or retirement completion. See the capability and linked operational transition. */
+                    "LBB-Legacy-Model-Policy"?: string;
                     /** @description API contract version used for the response */
                     "Lbb-Version"?: string;
+                    /** @description Deprecation policy; no fabricated Sunset date */
+                    Link?: string;
                     /** @description Request correlation id */
                     "X-Request-Id"?: string;
                     [name: string]: unknown;
@@ -49430,8 +49599,12 @@ export interface operations {
             /** @description Forbidden */
             403: {
                 headers: {
+                    /** @description Static finite legacy consumer notice; not disabled scheduling/execution, a job census or retirement completion. See the capability and linked operational transition. */
+                    "LBB-Legacy-Model-Policy"?: string;
                     /** @description API contract version used for the response */
                     "Lbb-Version"?: string;
+                    /** @description Deprecation policy; no fabricated Sunset date */
+                    Link?: string;
                     /** @description Request correlation id */
                     "X-Request-Id"?: string;
                     [name: string]: unknown;
@@ -49443,8 +49616,12 @@ export interface operations {
             /** @description Not found */
             404: {
                 headers: {
+                    /** @description Static finite legacy consumer notice; not disabled scheduling/execution, a job census or retirement completion. See the capability and linked operational transition. */
+                    "LBB-Legacy-Model-Policy"?: string;
                     /** @description API contract version used for the response */
                     "Lbb-Version"?: string;
+                    /** @description Deprecation policy; no fabricated Sunset date */
+                    Link?: string;
                     /** @description Request correlation id */
                     "X-Request-Id"?: string;
                     [name: string]: unknown;
@@ -49456,8 +49633,12 @@ export interface operations {
             /** @description Conflict */
             409: {
                 headers: {
+                    /** @description Static finite legacy consumer notice; not disabled scheduling/execution, a job census or retirement completion. See the capability and linked operational transition. */
+                    "LBB-Legacy-Model-Policy"?: string;
                     /** @description API contract version used for the response */
                     "Lbb-Version"?: string;
+                    /** @description Deprecation policy; no fabricated Sunset date */
+                    Link?: string;
                     /** @description Request correlation id */
                     "X-Request-Id"?: string;
                     [name: string]: unknown;
@@ -49469,8 +49650,12 @@ export interface operations {
             /** @description Rate limit exceeded */
             429: {
                 headers: {
+                    /** @description Static finite legacy consumer notice; not disabled scheduling/execution, a job census or retirement completion. See the capability and linked operational transition. */
+                    "LBB-Legacy-Model-Policy"?: string;
                     /** @description API contract version used for the response */
                     "Lbb-Version"?: string;
+                    /** @description Deprecation policy; no fabricated Sunset date */
+                    Link?: string;
                     /** @description Request correlation id */
                     "X-Request-Id"?: string;
                     [name: string]: unknown;
@@ -49482,8 +49667,12 @@ export interface operations {
             /** @description Internal server error */
             500: {
                 headers: {
+                    /** @description Static finite legacy consumer notice; not disabled scheduling/execution, a job census or retirement completion. See the capability and linked operational transition. */
+                    "LBB-Legacy-Model-Policy"?: string;
                     /** @description API contract version used for the response */
                     "Lbb-Version"?: string;
+                    /** @description Deprecation policy; no fabricated Sunset date */
+                    Link?: string;
                     /** @description Request correlation id */
                     "X-Request-Id"?: string;
                     [name: string]: unknown;
@@ -49495,8 +49684,12 @@ export interface operations {
             /** @description Service unavailable */
             503: {
                 headers: {
+                    /** @description Static finite legacy consumer notice; not disabled scheduling/execution, a job census or retirement completion. See the capability and linked operational transition. */
+                    "LBB-Legacy-Model-Policy"?: string;
                     /** @description API contract version used for the response */
                     "Lbb-Version"?: string;
+                    /** @description Deprecation policy; no fabricated Sunset date */
+                    Link?: string;
                     /** @description Request correlation id */
                     "X-Request-Id"?: string;
                     [name: string]: unknown;
@@ -49521,7 +49714,7 @@ export interface operations {
                 stack?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -49538,8 +49731,12 @@ export interface operations {
             /** @description OK */
             200: {
                 headers: {
+                    /** @description Static finite legacy consumer notice; not disabled scheduling/execution, a job census or retirement completion. See the capability and linked operational transition. */
+                    "LBB-Legacy-Model-Policy"?: string;
                     /** @description API contract version used for the response */
                     "Lbb-Version"?: string;
+                    /** @description Deprecation policy; no fabricated Sunset date */
+                    Link?: string;
                     /** @description Request correlation id */
                     "X-Request-Id"?: string;
                     [name: string]: unknown;
@@ -49551,8 +49748,12 @@ export interface operations {
             /** @description Bad request */
             400: {
                 headers: {
+                    /** @description Static finite legacy consumer notice; not disabled scheduling/execution, a job census or retirement completion. See the capability and linked operational transition. */
+                    "LBB-Legacy-Model-Policy"?: string;
                     /** @description API contract version used for the response */
                     "Lbb-Version"?: string;
+                    /** @description Deprecation policy; no fabricated Sunset date */
+                    Link?: string;
                     /** @description Request correlation id */
                     "X-Request-Id"?: string;
                     [name: string]: unknown;
@@ -49564,8 +49765,12 @@ export interface operations {
             /** @description Unauthorized */
             401: {
                 headers: {
+                    /** @description Static finite legacy consumer notice; not disabled scheduling/execution, a job census or retirement completion. See the capability and linked operational transition. */
+                    "LBB-Legacy-Model-Policy"?: string;
                     /** @description API contract version used for the response */
                     "Lbb-Version"?: string;
+                    /** @description Deprecation policy; no fabricated Sunset date */
+                    Link?: string;
                     /** @description Request correlation id */
                     "X-Request-Id"?: string;
                     [name: string]: unknown;
@@ -49577,8 +49782,12 @@ export interface operations {
             /** @description Forbidden */
             403: {
                 headers: {
+                    /** @description Static finite legacy consumer notice; not disabled scheduling/execution, a job census or retirement completion. See the capability and linked operational transition. */
+                    "LBB-Legacy-Model-Policy"?: string;
                     /** @description API contract version used for the response */
                     "Lbb-Version"?: string;
+                    /** @description Deprecation policy; no fabricated Sunset date */
+                    Link?: string;
                     /** @description Request correlation id */
                     "X-Request-Id"?: string;
                     [name: string]: unknown;
@@ -49590,8 +49799,12 @@ export interface operations {
             /** @description Not found */
             404: {
                 headers: {
+                    /** @description Static finite legacy consumer notice; not disabled scheduling/execution, a job census or retirement completion. See the capability and linked operational transition. */
+                    "LBB-Legacy-Model-Policy"?: string;
                     /** @description API contract version used for the response */
                     "Lbb-Version"?: string;
+                    /** @description Deprecation policy; no fabricated Sunset date */
+                    Link?: string;
                     /** @description Request correlation id */
                     "X-Request-Id"?: string;
                     [name: string]: unknown;
@@ -49603,8 +49816,12 @@ export interface operations {
             /** @description Conflict */
             409: {
                 headers: {
+                    /** @description Static finite legacy consumer notice; not disabled scheduling/execution, a job census or retirement completion. See the capability and linked operational transition. */
+                    "LBB-Legacy-Model-Policy"?: string;
                     /** @description API contract version used for the response */
                     "Lbb-Version"?: string;
+                    /** @description Deprecation policy; no fabricated Sunset date */
+                    Link?: string;
                     /** @description Request correlation id */
                     "X-Request-Id"?: string;
                     [name: string]: unknown;
@@ -49616,8 +49833,12 @@ export interface operations {
             /** @description Rate limit exceeded */
             429: {
                 headers: {
+                    /** @description Static finite legacy consumer notice; not disabled scheduling/execution, a job census or retirement completion. See the capability and linked operational transition. */
+                    "LBB-Legacy-Model-Policy"?: string;
                     /** @description API contract version used for the response */
                     "Lbb-Version"?: string;
+                    /** @description Deprecation policy; no fabricated Sunset date */
+                    Link?: string;
                     /** @description Request correlation id */
                     "X-Request-Id"?: string;
                     [name: string]: unknown;
@@ -49629,8 +49850,12 @@ export interface operations {
             /** @description Internal server error */
             500: {
                 headers: {
+                    /** @description Static finite legacy consumer notice; not disabled scheduling/execution, a job census or retirement completion. See the capability and linked operational transition. */
+                    "LBB-Legacy-Model-Policy"?: string;
                     /** @description API contract version used for the response */
                     "Lbb-Version"?: string;
+                    /** @description Deprecation policy; no fabricated Sunset date */
+                    Link?: string;
                     /** @description Request correlation id */
                     "X-Request-Id"?: string;
                     [name: string]: unknown;
@@ -49642,8 +49867,12 @@ export interface operations {
             /** @description Service unavailable */
             503: {
                 headers: {
+                    /** @description Static finite legacy consumer notice; not disabled scheduling/execution, a job census or retirement completion. See the capability and linked operational transition. */
+                    "LBB-Legacy-Model-Policy"?: string;
                     /** @description API contract version used for the response */
                     "Lbb-Version"?: string;
+                    /** @description Deprecation policy; no fabricated Sunset date */
+                    Link?: string;
                     /** @description Request correlation id */
                     "X-Request-Id"?: string;
                     [name: string]: unknown;
@@ -49672,7 +49901,7 @@ export interface operations {
                 limit?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -49813,7 +50042,7 @@ export interface operations {
                 stack?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -49964,7 +50193,7 @@ export interface operations {
                 call?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -50107,7 +50336,7 @@ export interface operations {
                 id?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -50248,7 +50477,7 @@ export interface operations {
                 stack?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -50391,7 +50620,7 @@ export interface operations {
                 id?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -50536,7 +50765,7 @@ export interface operations {
                 expected_graph_epoch?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -50681,7 +50910,7 @@ export interface operations {
                 limit?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -50826,7 +51055,7 @@ export interface operations {
                 dry_run?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -50975,7 +51204,7 @@ export interface operations {
                 draft_id?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -51116,7 +51345,7 @@ export interface operations {
                 stack?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -51265,7 +51494,7 @@ export interface operations {
                 draft_id?: string;
             };
             header: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key": string;
@@ -51412,7 +51641,7 @@ export interface operations {
                 reason?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -51557,7 +51786,7 @@ export interface operations {
                 draft_id?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -51704,7 +51933,7 @@ export interface operations {
                 dry_run?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -51853,7 +52082,7 @@ export interface operations {
                 name?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -51994,7 +52223,7 @@ export interface operations {
                 stack?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -52143,7 +52372,7 @@ export interface operations {
                 confirm?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -52286,7 +52515,7 @@ export interface operations {
                 stack?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -52435,7 +52664,7 @@ export interface operations {
                 name?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -52578,7 +52807,7 @@ export interface operations {
                 stack?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -52725,7 +52954,7 @@ export interface operations {
                 stack?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -52872,7 +53101,7 @@ export interface operations {
                 stack?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -53021,7 +53250,7 @@ export interface operations {
                 expected_graph_epoch?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -53164,7 +53393,7 @@ export interface operations {
                 expected_graph_epoch?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -53315,7 +53544,7 @@ export interface operations {
                 starter?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -53456,7 +53685,7 @@ export interface operations {
                 stack?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -53617,7 +53846,7 @@ export interface operations {
                 limit?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -53760,7 +53989,7 @@ export interface operations {
                 expected_graph_epoch?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -53911,7 +54140,7 @@ export interface operations {
                 suggestion_id?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -54058,7 +54287,7 @@ export interface operations {
                 stack?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -54209,7 +54438,7 @@ export interface operations {
                 suggestion_id?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -54360,7 +54589,7 @@ export interface operations {
                 suggestion_id?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -54505,7 +54734,7 @@ export interface operations {
                 suggestion_id?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -54652,7 +54881,7 @@ export interface operations {
                 stack?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -54805,7 +55034,7 @@ export interface operations {
                 type?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -54950,7 +55179,7 @@ export interface operations {
                 suggestion_id?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -55101,7 +55330,7 @@ export interface operations {
                 suggestion_id?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -55246,7 +55475,7 @@ export interface operations {
                 consistency?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -55396,7 +55625,7 @@ export interface operations {
                 consistency?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -55545,7 +55774,7 @@ export interface operations {
                 expected_graph_epoch?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -55692,7 +55921,7 @@ export interface operations {
                 stack?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -55839,7 +56068,7 @@ export interface operations {
                 stack?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -55986,7 +56215,7 @@ export interface operations {
                 stack?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -56129,7 +56358,7 @@ export interface operations {
                 dry_run?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -56274,7 +56503,7 @@ export interface operations {
                 stack?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -56423,7 +56652,7 @@ export interface operations {
                 expected_graph_epoch?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -56616,7 +56845,7 @@ export interface operations {
                 eval_id?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -56757,7 +56986,7 @@ export interface operations {
                 stack?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -56906,7 +57135,7 @@ export interface operations {
                 id?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -57053,7 +57282,7 @@ export interface operations {
                 stack?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -57202,7 +57431,7 @@ export interface operations {
                 id?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -57351,7 +57580,7 @@ export interface operations {
                 id?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -57494,7 +57723,7 @@ export interface operations {
                 id?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -57643,7 +57872,7 @@ export interface operations {
                 eval_id?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -57786,7 +58015,7 @@ export interface operations {
                 id?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -57935,7 +58164,7 @@ export interface operations {
                 expected_graph_epoch?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -58080,7 +58309,7 @@ export interface operations {
                 dry_run?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -58227,7 +58456,7 @@ export interface operations {
                 stack?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -58374,7 +58603,7 @@ export interface operations {
                 stack?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -58521,7 +58750,7 @@ export interface operations {
                 stack?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -58662,7 +58891,7 @@ export interface operations {
                 stack?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -58803,7 +59032,7 @@ export interface operations {
                 stack?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -58944,7 +59173,7 @@ export interface operations {
                 stack?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -59091,7 +59320,7 @@ export interface operations {
                 limit?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -59232,7 +59461,7 @@ export interface operations {
                 stack?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -59381,7 +59610,7 @@ export interface operations {
                 id?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -59526,7 +59755,7 @@ export interface operations {
                 id?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -59673,7 +59902,7 @@ export interface operations {
                 limit?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -59814,7 +60043,7 @@ export interface operations {
                 stack?: string;
             };
             header: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key": string;
@@ -59959,11 +60188,11 @@ export interface operations {
                  * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
                  */
                 stack?: string;
-                /** @description status/1 for the typed current response; legacy or absent retains the compatibility response until the unified API release transition */
+                /** @description status/1 or absent selects the typed current response; explicit legacy retains the deprecated compatibility response for one unified API generation */
                 version?: components["schemas"]["StatusResponseSelector"];
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -60110,7 +60339,7 @@ export interface operations {
                 cursor?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -60257,7 +60486,7 @@ export interface operations {
                 limit?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -60400,7 +60629,7 @@ export interface operations {
                 expected_graph_epoch?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -60547,7 +60776,7 @@ export interface operations {
                 stack?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -60694,7 +60923,7 @@ export interface operations {
                 stack?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -60841,7 +61070,7 @@ export interface operations {
                 stack?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -60990,7 +61219,7 @@ export interface operations {
                 expected_graph_epoch?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -61137,7 +61366,7 @@ export interface operations {
                 key?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -61282,7 +61511,7 @@ export interface operations {
                 workflow_id?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -61434,7 +61663,7 @@ export interface operations {
                 id?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -61579,7 +61808,7 @@ export interface operations {
                 expected_graph_epoch?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -61728,7 +61957,7 @@ export interface operations {
                 expected_graph_epoch?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -61877,7 +62106,7 @@ export interface operations {
                 expected_graph_epoch?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -62026,7 +62255,7 @@ export interface operations {
                 expected_graph_epoch?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -62175,7 +62404,7 @@ export interface operations {
                 expected_graph_epoch?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -62332,7 +62561,7 @@ export interface operations {
                 limit?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -62479,7 +62708,7 @@ export interface operations {
                 limit?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -62622,7 +62851,7 @@ export interface operations {
                 expected_graph_epoch?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -62771,7 +63000,7 @@ export interface operations {
                 expected_graph_epoch?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -62920,7 +63149,7 @@ export interface operations {
                 expected_graph_epoch?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -63071,7 +63300,7 @@ export interface operations {
                 id?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -63220,7 +63449,7 @@ export interface operations {
                 limit?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -63371,7 +63600,7 @@ export interface operations {
                 payloads?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -63514,7 +63743,7 @@ export interface operations {
                 expected_graph_epoch?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -63669,7 +63898,7 @@ export interface operations {
                 outcome?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -63814,7 +64043,7 @@ export interface operations {
                 run?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -63959,7 +64188,7 @@ export interface operations {
                 hours?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -64106,7 +64335,7 @@ export interface operations {
                 turn?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -64253,7 +64482,7 @@ export interface operations {
                 cursor?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -64394,7 +64623,7 @@ export interface operations {
                 stack?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -64543,7 +64772,7 @@ export interface operations {
                 confirm?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -64696,7 +64925,7 @@ export interface operations {
                 limit?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -64839,7 +65068,7 @@ export interface operations {
                 name?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -64988,7 +65217,7 @@ export interface operations {
                 name?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -65143,7 +65372,7 @@ export interface operations {
                 limit?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -65286,7 +65515,7 @@ export interface operations {
                 name?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -65439,7 +65668,7 @@ export interface operations {
                 limit?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -65580,7 +65809,7 @@ export interface operations {
                 stack?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -65731,7 +65960,7 @@ export interface operations {
                 id?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -65874,7 +66103,7 @@ export interface operations {
                 name?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -66025,7 +66254,7 @@ export interface operations {
                 outcome?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -66170,7 +66399,7 @@ export interface operations {
                 run?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -66323,7 +66552,7 @@ export interface operations {
                 limit?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -66468,7 +66697,7 @@ export interface operations {
                 hours?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -66615,7 +66844,7 @@ export interface operations {
                 cursor?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -66756,7 +66985,7 @@ export interface operations {
                 stack?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -66903,7 +67132,7 @@ export interface operations {
                 stack?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -67052,7 +67281,7 @@ export interface operations {
                 id?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -67197,7 +67426,7 @@ export interface operations {
                 id?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -67342,7 +67571,7 @@ export interface operations {
                 id?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -67485,7 +67714,7 @@ export interface operations {
                 expected_graph_epoch?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -67628,7 +67857,7 @@ export interface operations {
                 expected_graph_epoch?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -67775,7 +68004,7 @@ export interface operations {
                 stack?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -67916,7 +68145,7 @@ export interface operations {
                 stack?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -68065,7 +68294,7 @@ export interface operations {
                 expected_graph_epoch?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -68212,7 +68441,7 @@ export interface operations {
                 details?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -68353,7 +68582,7 @@ export interface operations {
                 stack?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -68506,7 +68735,7 @@ export interface operations {
                 outputs?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -68651,7 +68880,7 @@ export interface operations {
                 include_batch?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -68792,7 +69021,7 @@ export interface operations {
                 stack?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -68951,7 +69180,7 @@ export interface operations {
                 limit?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -69096,7 +69325,7 @@ export interface operations {
                 name?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -69243,7 +69472,7 @@ export interface operations {
                 stack?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -69394,7 +69623,7 @@ export interface operations {
                 name?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -69547,7 +69776,7 @@ export interface operations {
                 outcome?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -69694,7 +69923,7 @@ export interface operations {
                 run?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -69841,7 +70070,7 @@ export interface operations {
                 hours?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
             };
             path?: never;
@@ -69984,7 +70213,7 @@ export interface operations {
                 expected_graph_epoch?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -70133,7 +70362,7 @@ export interface operations {
                 expected_graph_epoch?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -70282,7 +70511,7 @@ export interface operations {
                 expected_graph_epoch?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -70431,7 +70660,7 @@ export interface operations {
                 expected_graph_epoch?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -70580,7 +70809,7 @@ export interface operations {
                 expected_graph_epoch?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -70729,7 +70958,7 @@ export interface operations {
                 expected_graph_epoch?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -70878,7 +71107,7 @@ export interface operations {
                 expected_graph_epoch?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -71027,7 +71256,7 @@ export interface operations {
                 expected_graph_epoch?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -71176,7 +71405,7 @@ export interface operations {
                 expected_graph_epoch?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;
@@ -71325,7 +71554,7 @@ export interface operations {
                 expected_graph_epoch?: string;
             };
             header?: {
-                /** @description API contract version to pin: `2026-10-21` for this contract. An earlier date keeps the list shapes of the workflow routes it was written for; no header gets the current contract. */
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
                 "Lbb-Version"?: string;
                 /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
                 "Idempotency-Key"?: string;

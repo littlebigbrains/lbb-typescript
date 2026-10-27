@@ -215,7 +215,7 @@ test("askStream yields the events in order from a body split at any byte", async
   assert.equal(calls[0].init.headers?.accept, "text/event-stream");
   assert.equal(calls[0].init.headers?.authorization, "Bearer k");
   assert.equal(calls[0].init.headers?.["content-type"], "application/json");
-  assert.equal(calls[0].init.headers?.["lbb-version"], "2026-10-21");
+  assert.equal(calls[0].init.headers?.["lbb-version"], "2026-10-27");
   assert.deepEqual(JSON.parse(calls[0].init.body ?? "{}"), {
     question: "Which services exist?",
   });

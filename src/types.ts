@@ -342,7 +342,8 @@ export interface LbbClientOptions {
   fetch?: FetchLike;
   /**
    * The `Lbb-Version` header sent on every request. Defaults to
-   * `2026-10-21`, the contract of the list envelope.
+   * `2026-10-27`, the prepared current diagnostic-default contract. The
+   * workflow list-envelope threshold remains `2026-10-21`.
    */
   apiVersion?: string;
   /**

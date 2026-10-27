@@ -1075,7 +1075,7 @@ test("namespace facts.create injects auth, scope, version, and idempotency", asy
   assert.equal(call.init.method, "POST");
   assert.equal(call.init.headers?.authorization, "Bearer lbb_sk_test_client");
   assert.equal(call.init.headers?.["content-type"], "application/json");
-  assert.equal(call.init.headers?.["lbb-version"], "2026-10-21");
+  assert.equal(call.init.headers?.["lbb-version"], "2026-10-27");
   assert.equal(call.init.headers?.["idempotency-key"], "ik_test_1");
   assert.deepEqual(JSON.parse(stringBody(call.init.body)), { triplets: [] });
 });
