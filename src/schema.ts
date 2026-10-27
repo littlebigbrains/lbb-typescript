@@ -1781,7 +1781,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Commit triplets and optional entity embeddings; `replace_owned` replaces a writer's owned edges and fields on its subjects in the same commit. A commit of a workflow turn names `workflow_fence`: a repeat of its `Idempotency-Key` replays, and a new commit whose token no longer holds the turn answers `409 workflow_fence_lost` and writes nothing */
+        /** Commit using the existing legacy body, or explicit version=records/1 for exact records with a required Idempotency-Key. records_commit_v1 advertises strict protocol recognition, not graph activation: missing/unactivated graphs refuse without creation or conversion. Records requests reject dry_run and mixed legacy fields; replay returns the original receipt and does not promise publication or embeddings readiness. Legacy `replace_owned` replaces a writer's owned edges and fields on its subjects in the same commit. A commit of a workflow turn names `workflow_fence`: a repeat of its `Idempotency-Key` replays, and a new commit whose token no longer holds the turn answers `409 workflow_fence_lost` and writes nothing */
         post: operations["post_v1_graph_commit"];
         delete?: never;
         options?: never;
@@ -9779,6 +9779,8 @@ export interface components {
              */
             written_properties?: components["schemas"]["EntityFieldsWritten"][];
         };
+        /** @description An absent body version selects legacy. Explicit records/1 selects strict records; no fallback or graph activation. */
+        GraphCommitRequestBody: (components["schemas"]["TripletCommitFile"] & unknown) | components["schemas"]["RecordCommitRequest"];
         /**
          * @description How `GET /v1/graph/commit-at` placed the moment.
          * @enum {string}
@@ -9820,6 +9822,7 @@ export interface components {
              */
             written_properties?: components["schemas"]["EntityFieldsWritten"][];
         };
+        GraphCommitResponseBody: components["schemas"]["GraphCommitResponse"] | components["schemas"]["RecordCommitResult"];
         GraphDeleteResponse: {
             /**
              * Format: int64
@@ -15326,6 +15329,81 @@ export interface components {
             statements: components["schemas"]["RecordTriple"][];
         };
         /** @enum {string} */
+        RecordCommitObject: "record_commit";
+        /**
+         * @description Counts exact visible RDF statements,including scaffolding and metadata.
+         *     Independent support can change durably while both counts remain zero.
+         */
+        RecordCommitProjection: {
+            /** Format: int64 */
+            added: number;
+            /** Format: int64 */
+            removed: number;
+        };
+        /**
+         * @description Durable acceptance fields retained unchanged on idempotent replay.
+         *     Publication and embedding progress remain separate status resources.
+         */
+        RecordCommitReceipt: {
+            commit_seq: components["schemas"]["CommitSeq"];
+            epoch: string;
+            no_op: boolean;
+            projection: components["schemas"]["RecordCommitProjection"];
+            resolved_ids: components["schemas"]["RecordResolvedIds"];
+            schema_revision: string;
+            scope: components["schemas"]["RecordCommitScope"];
+            visibility_token: string;
+        };
+        RecordCommitRequest: {
+            conditions?: components["schemas"]["RecordMutationConditions"];
+            entities?: components["schemas"]["RecordEntityMutation"][];
+            /**
+             * @description Requested scope only. Current authenticated authority must approve it;
+             *     body text cannot grant a source owner or integration authority.
+             */
+            owner?: string;
+            relationships?: components["schemas"]["RecordRelationshipMutation"][];
+            /**
+             * @description Complete desired support. Relationship entries require full tuple and
+             *     explicit asserted; their set metadata is complete. Empty replacement
+             *     remains a valid source-scope clear.
+             */
+            replace_scope?: boolean;
+            schema_revision?: string;
+            scope?: string;
+            version: components["schemas"]["RecordsVersion"];
+        };
+        RecordCommitResult: {
+            idempotent_replay: boolean;
+            object: components["schemas"]["RecordCommitObject"];
+            receipt: components["schemas"]["RecordCommitReceipt"];
+            version: components["schemas"]["RecordsVersion"];
+        };
+        RecordCommitScope: {
+            owner: string;
+            scope: string;
+        };
+        RecordEntityMutation: {
+            add?: {
+                [key: string]: components["schemas"]["RecordWriteValues"];
+            };
+            /**
+             * @description Ordinary deletion affects only the authorized scope. It is not erasure
+             *     and grants no all-support administrative power.
+             */
+            delete?: boolean;
+            id?: string;
+            key?: string;
+            remove?: {
+                [key: string]: components["schemas"]["RecordWriteValues"];
+            };
+            set?: {
+                [key: string]: components["schemas"]["RecordWriteValues"];
+            };
+            type?: string;
+            unset?: string[];
+        };
+        /** @enum {string} */
         RecordIriSelectorKind: "iri";
         /** @enum {string} */
         RecordKeySelectorKind: "key";
@@ -15335,6 +15413,11 @@ export interface components {
             "@language"?: string | null;
             "@type"?: string | null;
             "@value": string;
+        };
+        RecordMutationConditions: {
+            absent?: components["schemas"]["RecordTriple"][];
+            expected_commit_seq?: components["schemas"]["CommitSeq"];
+            present?: components["schemas"]["RecordTriple"][];
         };
         /** @enum {string} */
         RecordNativeIdSelectorKind: "native_id";
@@ -15386,6 +15469,33 @@ export interface components {
         RecordReferenceTerm: {
             "@id": string;
         };
+        RecordRelationshipMutation: {
+            add?: {
+                [key: string]: components["schemas"]["RecordWriteValues"];
+            };
+            /**
+             * @description Omitted on ordinary patches preserves the selected support's state;
+             *     new support defaults true. Complete scope replacement requires this
+             *     explicitly alongside the full tuple, even for an existing claim.
+             */
+            asserted?: boolean;
+            delete?: boolean;
+            id: string;
+            remove?: {
+                [key: string]: components["schemas"]["RecordWriteValues"];
+            };
+            set?: {
+                [key: string]: components["schemas"]["RecordWriteValues"];
+            };
+            source?: components["schemas"]["RecordWriteReference"];
+            target?: components["schemas"]["RecordWriteReference"];
+            type?: string;
+            unset?: string[];
+        };
+        RecordResolvedIds: {
+            entities: string[];
+            relationships: string[];
+        };
         /** @enum {string} */
         RecordSchemaAvailability: "available" | "snapshot_unavailable";
         /**
@@ -15413,6 +15523,15 @@ export interface components {
             predicate: string;
             subject: components["schemas"]["RecordTerm"];
         };
+        RecordWriteKeyReference: {
+            key: string;
+            type: string;
+        };
+        /** @description Preserve integer versus floating JSON tokens. Schema-bound integer fields accept safe 53-bit integer tokens; exact large integers and decimals use the lexical RDF envelope. */
+        RecordWriteNumber: number;
+        RecordWriteReference: string | components["schemas"]["RecordWriteKeyReference"];
+        RecordWriteValue: components["schemas"]["RecordTerm"] | string | components["schemas"]["RecordWriteNumber"] | boolean;
+        RecordWriteValues: components["schemas"]["RecordReferenceTerm"] | components["schemas"]["RecordLiteralTerm"] | components["schemas"]["RecordQuotedTripleTerm"] | string | number | boolean | components["schemas"]["RecordWriteValue"][];
         /** @enum {string} */
         RecordsVersion: "records/1";
         ReferenceDatasetRequest: {
@@ -40335,7 +40454,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["TripletCommitFile"];
+                "application/json": components["schemas"]["GraphCommitRequestBody"];
             };
         };
         responses: {
@@ -40349,7 +40468,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["GraphCommitResponse"];
+                    "application/json": components["schemas"]["GraphCommitResponseBody"];
                 };
             };
             /** @description Bad request */

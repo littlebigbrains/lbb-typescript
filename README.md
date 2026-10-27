@@ -477,3 +477,50 @@ query. Upgrade servers before enabling this helper. Queries never automatically
 replay on 401/403 or fall back to the control bearer. The ordinary worker failure
 policy may retry a turn; only acknowledged checkpoints prevent redoing a step.
 Keep checkpoints below 64 KiB; a row LIMIT does not bound response bytes.
+
+## Versioned records commits
+
+`client.records.commit` and `client.graph("main").records.commit` send the strict
+`records/1` contract on the existing commit resource. The server must advertise
+`records_commit_v1`; an older or unknown server raises `LbbCapabilityError`
+before a mutation is sent. That marker means strict protocol recognition. It
+does not activate a graph, create a missing graph, convert existing RDF, or
+promise mixed first-write support. Graphs without qualified support return a
+typed server error. There is no activation option in this helper.
+
+On an existing support-enabled graph, full IRIs and explicit RDF values avoid
+implicit key or datatype conversion:
+
+```ts
+const result = await lbb.records.commit({
+  version: "records/1",
+  entities: [{
+    id: "https://example.org/service/auth",
+    set: {
+      "https://example.org/title": {
+        "@value": "Auth Service",
+        "@type": "http://www.w3.org/2001/XMLSchema#string",
+      },
+    },
+  }],
+}, { idempotencyKey: "auth-title:v1" });
+console.log(result.receipt.commit_seq, result.receipt.projection);
+```
+
+An explicit key is required. The helper snapshots the encoded body, key and
+options before capability lookup and reuses them for transport retries. Retain
+that original body and key for a later retry after a lost reply or timeout;
+a new key can accept a second operation. An exhausted POST transport failure or a legacy/malformed success raises
+`LbbRecordCommitOutcomeError` with the original `idempotencyKey`; it is an unknown
+outcome, not proof of no write. No request
+falls back to the legacy commit body. `expectedGraphEpoch` adds an incarnation
+guard; the epoch in the receipt remains an exact decimal string.
+
+`receipt` is the original acceptance on replay, including schema revision,
+resolved IDs and visible RDF statement counts; `idempotent_replay` describes
+this call. Support can change with zero visible additions/removals. Publication
+and class embedding readiness are separate observations. The helper refuses
+unsafe JavaScript receipt integers. Use explicit lexical RDF envelopes for
+large integers and decimals, and preserve returned IRIs unchanged. Friendly
+schema-bound scalars/keys require the explicit matching `schema_revision`.
+Existing `commit` and `facts.create` keep their legacy contract.

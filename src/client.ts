@@ -2,6 +2,7 @@ import { WorkflowNamespace } from "./workflows.js";
 import { checkedDemoRunResponse, checkedLegacyDemoRun } from "./demo.js";
 import { checkedCurrentStatus } from "./status.js";
 import { CdcNamespace } from "./cdc.js";
+import { RecordsNamespace } from "./records.js";
 import { FilesNamespace } from "./files.js";
 import { ReviewsNamespace } from "./reviews.js";
 import { AccessNamespace, CatalogNamespace } from "./catalog.js";
@@ -314,6 +315,7 @@ export class LbbClient {
 
   readonly search: SearchNamespace;
   readonly entities: EntityNamespace;
+  readonly records: RecordsNamespace;
   readonly schema: SchemaNamespace;
   readonly ontology: OntologyNamespace;
   readonly query: QueryNamespace;
@@ -390,6 +392,9 @@ export class LbbClient {
     this.fetchImpl = chosen;
     this.search = new SearchNamespace(this);
     this.entities = new EntityNamespace(this);
+    this.records = new RecordsNamespace(this, (capability) =>
+      this.requireCapability(capability),
+    );
     this.schema = new SchemaNamespace(this);
     this.ontology = new OntologyNamespace(this);
     this.query = new QueryNamespace(this);
@@ -1103,7 +1108,15 @@ export class LbbClient {
     this.capabilities ??= this.request<Schemas["VersionResponse"]>(
       "GET",
       "/version",
-    ).then((version) => new Set(version.capabilities));
+    ).then(
+      (version) =>
+        new Set(
+          Array.isArray(version?.capabilities) &&
+            version.capabilities.every((item) => typeof item === "string")
+            ? version.capabilities
+            : [],
+        ),
+    );
     if (!(await this.capabilities).has(capability)) {
       throw new LbbCapabilityError(capability);
     }
