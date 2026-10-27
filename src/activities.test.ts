@@ -118,6 +118,25 @@ test("reason sends the request with the step's effect id and returns the typed v
   });
 });
 
+test("reason names the attempt of a retry and sends it only then", async () => {
+  const answer = {
+    body: { value: {}, model: "claude-sonnet-5-5", ...USAGE, cached: false },
+  };
+  const { lbb, seen } = activities([answer, answer]);
+  const request = { prompt: "p", schema: { type: "object" } };
+  await lbb.reason(request, { effectId: "e/values" });
+  await lbb.reason(request, { effectId: "e/values.repair", attempt: 2 });
+
+  // The first call is a plain call: no field an older server would refuse.
+  assert.deepEqual(seen[0]?.body, { ...request, effect_id: "e/values" });
+  // The retry's own effect id, the same request, and its attempt.
+  assert.deepEqual(seen[1]?.body, {
+    ...request,
+    effect_id: "e/values.repair",
+    attempt: 2,
+  });
+});
+
 test("a call without an effect id sends neither effect_id nor label", async () => {
   const { lbb, seen } = activities([
     { body: { answers: {}, model: "jev", ...USAGE, cached: false } },

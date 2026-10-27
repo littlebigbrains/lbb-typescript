@@ -265,6 +265,7 @@ export type {
   EmbedRequest,
   EmbedResult,
   LbbActivities,
+  ReasonOptions,
   ReasonRequest,
   ReasonResult,
   ReviewItemRequest,

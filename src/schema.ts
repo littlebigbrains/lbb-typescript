@@ -11509,6 +11509,15 @@ export interface components {
              * @description When the call was made, in milliseconds since the Unix epoch.
              */
             at_ms: number;
+            /**
+             * Format: int32
+             * @description Which attempt of one reading made the call (added 2026-10-27): `2`
+             *     for the retry of the `repair` setting of `values.extract`, or of a
+             *     `reason` activity call that names it with its `attempt` option.
+             *     Absent for the first attempt and for a call that is not one of
+             *     several attempts.
+             */
+            attempt?: number | null;
             choice?: null | components["schemas"]["ModelCallChoice"];
             effort?: string | null;
             error?: string | null;
@@ -11673,6 +11682,11 @@ export interface components {
         ModelCallRow: {
             /** Format: int64 */
             at_ms: number;
+            /**
+             * Format: int32
+             * @description The call's attempt (`ModelCall::attempt`).
+             */
+            attempt?: number | null;
             check?: null | components["schemas"]["ModelCheckBrief"];
             choice?: null | components["schemas"]["ModelCallChoice"];
             /** @description Why the call failed, at most 160 characters. */
@@ -15220,6 +15234,16 @@ export interface components {
          *     `prompt` with JSON that follows `schema`.
          */
         ReasonActivityRequest: {
+            /**
+             * Format: int32
+             * @description Which attempt of one reading this call is, 1 to 10: the retry of a
+             *     workflow that repairs a failed answer sends `2`; the first call
+             *     sends nothing. The call log names it (`attempt`). It is a label only:
+             *     no part of the effect's request hash, so a step sends the retry under
+             *     another `effect_id`. Added 2026-10-27; an older server refuses the
+             *     field, so send it only for a retry.
+             */
+            attempt?: number | null;
             /**
              * @description The effect id of the workflow step that makes the call (`ctx.step`'s
              *     `effectId`): with one, the first answer is kept, and a repeat of the
@@ -22137,6 +22161,14 @@ export interface components {
              */
             gate: number;
             properties: components["schemas"]["WorkflowTestProperty"][];
+            /**
+             * Format: int32
+             * @description The workflow's `repair` setting, frozen with the rest: how many
+             *     times the reading of an input may be retried with the failed checks
+             *     (0 or 1). Absent for a test of a workflow that does not repair, and
+             *     for a test from before the setting.
+             */
+            repair?: number;
         };
         /**
          * @description Where a test stands. `queued` → `running` → `done`, `failed` or
@@ -22152,6 +22184,14 @@ export interface components {
          *     or the graph refused it, so it was not written again).
          */
         WorkflowTestValue: {
+            /**
+             * Format: int32
+             * @description The attempt that read the value: `2` for a value of the repair
+             *     attempt (`repair` setting), absent for the first. A value of the
+             *     first attempt that failed a check stays in the list beside the
+             *     repair's.
+             */
+            attempt?: number | null;
             detail?: string | null;
             /**
              * @description What the live workflow would do: `written` (at or above the gate),

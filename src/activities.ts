@@ -70,10 +70,22 @@ export interface ActivityOptions extends CallOptions {
   instance?: string;
 }
 
+/** The options of a `reason` call: those of every model activity, and the attempt. */
+export interface ReasonOptions extends ActivityOptions {
+  /**
+   * Which attempt of one reading this call is, 1 to 10: a workflow that
+   * retries a failed answer sends `2` for its retry, and the call log names
+   * it (`attempt`). It is a label only: send the retry under its own
+   * `effectId` (for example `${s.effectId}.repair`). Leave it out for a call
+   * that is not one of several attempts; an older server refuses the field.
+   */
+  attempt?: number;
+}
+
 /** A `reason` request: the prompt, an optional system prompt, the answer's JSON Schema. */
 export type ReasonRequest = Omit<
   Schemas["ReasonActivityRequest"],
-  "effect_id" | "label" | "workflow"
+  "effect_id" | "label" | "workflow" | "attempt"
 >;
 /** A `reason` answer: `value` (typed by the caller) and the usage. */
 export type ReasonResult<T> = Omit<
@@ -192,7 +204,7 @@ export interface LbbActivities {
    */
   reason<T = unknown>(
     request: ReasonRequest,
-    options?: ActivityOptions,
+    options?: ReasonOptions,
   ): Promise<ReasonResult<T>>;
   /**
    * The decision model answers each choice question about `state` with one
@@ -351,6 +363,7 @@ function activityCall<B extends object>(
     effect_id?: string;
     label?: string;
     workflow?: Schemas["ActivityWorkflow"];
+    attempt?: number;
   };
   call: CallOptions;
   turn: ActivityTurn | undefined;
@@ -439,9 +452,11 @@ export function lbbActivities(client: LbbClient): LbbActivities {
   const activities: LbbActivities = {
     reason<T = unknown>(
       request: ReasonRequest,
-      options: ActivityOptions = {},
+      options: ReasonOptions = {},
     ): Promise<ReasonResult<T>> {
-      const { body, call, turn } = activityCall(request, options);
+      const { attempt, ...rest } = options;
+      const { body, call, turn } = activityCall(request, rest);
+      if (attempt !== undefined) body.attempt = attempt;
       return counted(
         turn,
         client.request<ReasonResult<T>>(

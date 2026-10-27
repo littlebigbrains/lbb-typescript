@@ -34,6 +34,19 @@
 // one is written again, an open one stays the question, and a dismissed one
 // is a reject of its value.
 //
+// With `repair: 1` (off by default) a reading whose answer fails a check
+// without a model (its shape, a missing field, an unknown property, a value
+// outside its property's type or unit, a quote that is not in the text) is
+// asked for once more: the same input plus the failed checks, which the
+// workflow builds from its own checks and never from a label. A property
+// whose first value passed keeps it; every other property takes the retry's
+// value when it passes the same checks. The retry's values then go through
+// the one decision call and the gate, so a repaired value waits for a person
+// as any value does. Both calls are in the call log: the retry runs under
+// its own effect id and names `attempt: 2`. A retry that fails (a refusal, a
+// provider that is busy or down) leaves the first answer; a spent budget waits
+// as in any step.
+//
 // Every model call runs in a step with the step's effect id, so a turn that
 // runs again after a crash pays for nothing twice. The write's request id is
 // its step's effect id, which no other turn repeats: a value that changes
@@ -45,6 +58,7 @@ import {
   entityIdFromIri,
   entityRef,
   isActivityRefused,
+  LbbError,
   stableHashHex,
   triggeredWorkflow,
   type LbbActivities,
@@ -67,6 +81,11 @@ export interface Settings {
   gate: number;
   /** The unit of each number property (`cm`, `mm`, `kg`, `m2`, …), declared in the ontology by `ontology()`. */
   units?: Record<string, string>;
+  /**
+   * Retries after a failed check: 0 (the default) or 1. The retry sends the same input and the
+   * failed checks; its values pass the same checks and gate as any value.
+   */
+  repair?: 0 | 1;
 }
 
 /** The settings: edit them for your class. These fit the samples. */
@@ -147,6 +166,8 @@ export interface ValuesState {
   unknown_property: number;
   duplicate: number;
   failed: number;
+  /** Instances whose reading was asked again (`repair: 1`). */
+  retried: number;
   commits: number;
   removed: number;
 }
@@ -162,6 +183,7 @@ const ZERO: ValuesState = {
   unknown_property: 0,
   duplicate: 0,
   failed: 0,
+  retried: 0,
   commits: 0,
   removed: 0,
 };
@@ -183,6 +205,8 @@ export interface Checked {
    * names of a unit (`centimetres`) to its symbol too.
    */
   statedUnit?: string;
+  /** `2` for a value of the repair attempt; absent for the first. */
+  attempt?: number;
 }
 
 /** What a person's answer decides for a value. */
@@ -210,6 +234,8 @@ interface Read {
   missing?: boolean;
   /** A model call was refused: the instance goes back to the watch. */
   failed?: string;
+  /** The reading was asked again (`repair: 1`). */
+  retried?: boolean;
 }
 
 export const SYSTEM = `You read the text of one record of a knowledge graph and fill in property values the text states. Rules:
@@ -352,11 +378,14 @@ export function check(
   units: Record<string, string> = {},
 ): Checked[] {
   const seen = new Set<string>();
-  return values.map((item): Checked => {
-    const property = item.property ?? "";
-    let raw = item.value ?? "";
-    let stated = (item.unit ?? "").trim();
-    const quote = item.quote ?? "";
+  // A field that is no string reads as empty, as LBB reads it.
+  const str = (field: unknown) => (typeof field === "string" ? field : "");
+  return values.map((entry): Checked => {
+    const item: Record<string, unknown> = typeof entry === "object" && entry !== null ? entry : {};
+    const property = str(item.property);
+    let raw = str(item.value);
+    let stated = str(item.unit).trim();
+    const quote = str(item.quote);
     // A number given with its unit in `value` (`600 mm`), against the
     // rules: read the two apart.
     const split = stated ? undefined : splitNumberUnit(raw);
@@ -383,6 +412,97 @@ export function check(
       ...(stated ? { statedUnit: unitText(stated) } : {}),
     };
   });
+}
+
+/** The failed checks of an attempt that the retry is told: the check, the property, and the words of the failure. */
+export interface FailedCheck {
+  check:
+    "answer_shape" | "missing_field" | "unknown_property" | "invalid_value" | "quote_not_found";
+  property?: string;
+  message: string;
+  value?: string;
+  quote?: string;
+}
+
+const REQUIRED_FIELDS = ["property", "value", "quote"] as const;
+/** Failed checks the retry's request lists at most. */
+const FAILED_CHECKS_MAX = 8;
+
+/**
+ * What failed in an answer: its shape, then each value that failed a check of {@link check}
+ * (`checked` is `check`'s result for the answer's values). A second value of a property is no
+ * failure: the first one stands. The list holds the model's own words and the checks' messages,
+ * never a label.
+ */
+export function failedChecks(answer: unknown, checked: Checked[]): FailedCheck[] {
+  const items = (answer as { values?: unknown } | null | undefined)?.values;
+  if (!Array.isArray(items))
+    return [
+      { check: "answer_shape", message: "the answer is not a JSON object with a `values` list" },
+    ];
+  const cut = (text: string, n: number) => chars(text, n);
+  const out: FailedCheck[] = [];
+  for (const [i, item] of items.entries()) {
+    const c = checked[i];
+    if (!c || !["unknown_property", "invalid_value", "quote_not_found"].includes(c.outcome))
+      continue;
+    if (typeof item !== "object" || item === null || Array.isArray(item)) {
+      out.push({ check: "answer_shape", message: "a value of the answer is not an object" });
+      continue;
+    }
+    const property = c.property ? { property: cut(c.property, 80) } : {};
+    const missing = REQUIRED_FIELDS.filter(
+      (field) => typeof (item as Record<string, unknown>)[field] !== "string",
+    ).map((field) => `\`${field}\``);
+    if (missing.length) {
+      out.push({
+        check: "missing_field",
+        ...property,
+        message: `${missing.join(", ")} ${missing.length === 1 ? "is" : "are"} missing`,
+      });
+      continue;
+    }
+    out.push({
+      check: c.outcome as FailedCheck["check"],
+      ...property,
+      message:
+        c.outcome === "unknown_property"
+          ? `\`${c.property}\` is not one of the properties to fill`
+          : (c.detail ?? ""),
+      ...(c.value ? { value: cut(c.value, 120) } : {}),
+      ...(c.quote ? { quote: cut(c.quote, 200) } : {}),
+    });
+  }
+  return out;
+}
+
+/** What the retry's request tells the model, beside the failed checks. */
+export const REPAIR_NOTE =
+  "Your first answer failed the checks in `failed_checks`. Answer again with the rules above: for each property named there, copy the quote exactly from the text and give the value in the property's type and unit, or leave the property out when the text does not state it. When no property is named, answer for every property the text states.";
+
+/**
+ * The values of the first attempt and the repair attempt as one list. A property whose first
+ * value passed keeps it: every repair value for that property is a `duplicate`, whatever its
+ * checks said. Any other property takes the repair's value. The repair's values stay in the
+ * list, marked `attempt: 2`, with their outcome.
+ */
+export function mergeAttempts(first: Checked[], second: Checked[]): Checked[] {
+  const passed = new Set(first.filter((v) => v.typed !== undefined).map((v) => v.property));
+  const merged = [...first];
+  for (const v of second) {
+    const value: Checked = { ...v, attempt: 2 };
+    if (passed.has(v.property)) {
+      // Without `typed`, so the support call does not ask about it.
+      const duplicate: Checked = {
+        ...value,
+        outcome: "duplicate",
+        detail: "the first attempt's value of this property stands",
+      };
+      delete duplicate.typed;
+      merged.push(duplicate);
+    } else merged.push(value);
+  }
+  return merged;
 }
 
 /** The key of the value item of a property of an instance, as LBB's values.extract gives it. */
@@ -461,7 +581,7 @@ export function createWorkflow(lbb: LbbActivities, settings: Settings = defaults
           const record = (await texts())[iri];
           if (!record) return { values: [], missing: true };
           if (!record.text.trim() || !names.length) return { values: [] };
-          const prompt = JSON.stringify({
+          const request = {
             class: settings.className,
             instance: record.label,
             context: settings.context,
@@ -470,31 +590,65 @@ export function createWorkflow(lbb: LbbActivities, settings: Settings = defaults
               return { name, type: typeName(name), ...(unit ? { unit } : {}) };
             }),
             text: record.text,
-          });
-          try {
-            const answer = await lbb.reason<{
-              values?: { property?: string; value?: string; unit?: string; quote?: string }[];
-            }>(
+          };
+          type Answer = {
+            values?: { property?: string; value?: string; unit?: string; quote?: string }[];
+          };
+          const units = Object.fromEntries(
+            names.flatMap((name) => {
+              const unit = unitOf(settings, name);
+              return unit ? [[name, unit]] : [];
+            }),
+          );
+          const repair = settings.repair ?? 0;
+          // Only the retry names its attempt (2): the first call reads as attempt 1,
+          // and a server that does not know the field is never sent it by a workflow
+          // that does not retry.
+          const ask = (prompt: string, effectId: string, attempt: number, label: string) =>
+            lbb.reason<Answer>(
               { system: SYSTEM, prompt, schema, max_tokens: 8_000 },
-              { effectId: s.effectId, label: `${chars(record.label, 50)} values` },
+              { effectId, label, ...(attempt > 1 ? { attempt } : {}) },
             );
-            return {
-              values: check(
-                answer.value.values ?? [],
-                settings.properties,
-                record.text,
-                Object.fromEntries(
-                  names.flatMap((name) => {
-                    const unit = unitOf(settings, name);
-                    return unit ? [[name, unit]] : [];
-                  }),
-                ),
-              ),
-            };
+          const read = (answer: Answer) =>
+            check(answer?.values ?? [], settings.properties, record.text, units);
+          let first: { value: Answer };
+          try {
+            first = await ask(
+              JSON.stringify(request),
+              s.effectId,
+              1,
+              `${chars(record.label, 50)} values`,
+            );
           } catch (error) {
             if (!isActivityRefused(error)) throw error;
             return { values: [], failed: String((error as Error).message ?? error) };
           }
+          let values = read(first.value);
+          const problems = failedChecks(first.value, values);
+          if (repair > 0 && problems.length) {
+            // One more try: the same input and the failed checks. A refused
+            // retry leaves the first answer.
+            try {
+              const retry = await ask(
+                JSON.stringify({
+                  ...request,
+                  failed_checks: problems.slice(0, FAILED_CHECKS_MAX),
+                  repair: REPAIR_NOTE,
+                }),
+                `${s.effectId}.repair`,
+                2,
+                `${chars(record.label, 50)} values (repair)`,
+              );
+              values = mergeAttempts(values, read(retry.value));
+            } catch (error) {
+              // A spent budget waits as in any step. Any other failure of the retry
+              // (a refusal, a provider that is busy or down) leaves the first answer.
+              if (error instanceof LbbError && error.code === "workflow_budget_exceeded")
+                throw error;
+            }
+            return { values, retried: true };
+          }
+          return { values };
         });
         reads.push(
           await ctx.step(`support-${i}`, async (s): Promise<Read> => {
@@ -537,6 +691,7 @@ export function createWorkflow(lbb: LbbActivities, settings: Settings = defaults
               return { values: [], failed: String((error as Error).message ?? error) };
             }
             return {
+              ...(proposed.retried ? { retried: true } : {}),
               values: proposed.values.map((v, n): Checked => {
                 if (v.typed === undefined) return v;
                 const a = answers[`v${n}`];
@@ -807,6 +962,7 @@ export function createWorkflow(lbb: LbbActivities, settings: Settings = defaults
         if (read.missing) continue;
         tally.instances += 1;
         if (read.failed !== undefined) tally.failed += 1;
+        if (read.retried) tally.retried += 1;
         for (const v of read.values) {
           tally.values_proposed += 1;
           if (v.outcome) tally[v.outcome] += 1;
