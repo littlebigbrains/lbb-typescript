@@ -17,6 +17,11 @@ All notable changes to the `@littlebigbrain/client` package are documented here.
   (`isEvalExperimentOpen`). B is the model of one use or a settings
   revision. The report gives the difference with a 95% interval. Guide:
   [Compare two versions of a workflow](https://docs.littlebigbrain.com/guides/experiments/).
+- `WorkflowRevision.last_tested` (`WorkflowRevisionTested`: `test`,
+  `finished`, `counts`) says whether a workflow test read inputs with a
+  revision's settings: an object, `null` when the workflow has tests and no
+  test is recorded for them, and `undefined` when the server does not say. An experiment's arm
+  adds `experiment` (`id`, `arm`).
 - `models.choices.put` takes `experiment` (an `exp_…` id) with `workflow`, and
   `workflows.named.activateRevision` takes `{ experiment }`: the write applies
   that experiment's B. The server answers `409 experiment_outdated` when the

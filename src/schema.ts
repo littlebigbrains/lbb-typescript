@@ -21182,6 +21182,7 @@ export interface components {
             created: string;
             /** @description `wrev_` and 32 hex characters: the hash of `settings`. */
             id: string;
+            last_tested?: null | components["schemas"]["WorkflowRevisionTested"];
             /** @description `workflow_revision`. */
             object: string;
             /** @description The revision the activation replaced. */
@@ -21256,6 +21257,51 @@ export interface components {
         WorkflowRevisionRequest: {
             body: unknown;
             route: string;
+        };
+        /**
+         * @description The newest test that read inputs with a revision's settings: the fact,
+         *     with no verdict. The test (`GET /v1/workflows/named/tests/get?id=`) is the
+         *     record; the counts are those of the moment it ended.
+         */
+        WorkflowRevisionTested: {
+            counts: components["schemas"]["WorkflowRevisionTestedCounts"];
+            experiment?: null | components["schemas"]["WorkflowTestExperiment"];
+            /** @description When the test ended (RFC 3339). */
+            finished: string;
+            /** @description The workflow test (`wtest_…`). */
+            test: string;
+        };
+        /**
+         * @description What a workflow test read, by the checks of the live workflow: the names
+         *     of `WorkflowTestCounts` without `answered`, which goes stale when a
+         *     person answers later.
+         */
+        WorkflowRevisionTestedCounts: {
+            /**
+             * Format: int64
+             * @description Values a check dropped, and inputs the model did not answer.
+             */
+            failed: number;
+            /**
+             * Format: int64
+             * @description Inputs with a result.
+             */
+            inputs_done: number;
+            /**
+             * Format: int64
+             * @description Properties of a read input with no value.
+             */
+            no_value: number;
+            /**
+             * Format: int64
+             * @description Values at or above the gate, which the workflow writes.
+             */
+            passed: number;
+            /**
+             * Format: int64
+             * @description Values a person would review.
+             */
+            review: number;
         };
         WorkflowRun: {
             /** Format: int64 */
