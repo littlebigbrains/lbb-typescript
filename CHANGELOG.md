@@ -4,6 +4,8 @@ All notable changes to the `@littlebigbrain/client` package are documented here.
 
 ## Unreleased
 
+- Add explicit-key `client.records.commit` and graph-scoped records commits with strict `records/1` selection, capability preflight, fixed retry bytes and checked original receipts. Protocol recognition does not activate or convert a graph; existing commit helpers are unchanged.
+
 - `FilePage` has `ocr_required` and `FileParse` has `ocr_pages`. A page with
   fewer than 16 characters of text, whose images cover at least 40% of it,
   reads `ocr_required: true` (a scan: OCR is not built). Absent means

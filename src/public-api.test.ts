@@ -9,6 +9,7 @@ test("the runtime entrypoint exposes only the supported public values", () => {
     "LbbCapabilityError",
     "LbbClient",
     "LbbError",
+    "LbbRecordCommitOutcomeError",
     "WorkflowBlobsNamespace",
     "WorkflowError",
     "WorkflowExecutionError",

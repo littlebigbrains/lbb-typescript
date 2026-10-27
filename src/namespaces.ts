@@ -1,5 +1,6 @@
 import type { WorkflowNamespace } from "./workflows.js";
 import type { LbbClient } from "./client.js";
+import type { RecordsNamespace } from "./records.js";
 import type { FilesNamespace } from "./files.js";
 import { EvalDatasetsNamespace } from "./eval-datasets.js";
 import { EvalExperimentsNamespace } from "./eval-experiments.js";
@@ -66,6 +67,7 @@ function withProfile(
 export class GraphNamespace {
   readonly facts: FactsNamespace;
   readonly entities: EntityNamespace;
+  readonly records: RecordsNamespace;
   readonly ontology: OntologyNamespace;
   readonly query: QueryNamespace;
   readonly schema: SchemaNamespace;
@@ -83,6 +85,7 @@ export class GraphNamespace {
   constructor(private readonly client: LbbClient) {
     this.facts = new FactsNamespace(client);
     this.entities = client.entities;
+    this.records = client.records;
     this.ontology = client.ontology;
     this.query = client.query;
     this.schema = client.schema;
