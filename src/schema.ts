@@ -13954,8 +13954,8 @@ export interface components {
         /** @description Label-trigram sidecar coverage. */
         PlannerTrigram: {
             /**
-             * @description Label predicates in this generation that the sidecar serves. Empty
-             *     unless every PSO table carries a sidecar.
+             * @description Label predicates in this generation whose text filters read sidecar
+             *     candidates: a PSO table of their rows carries a sidecar.
              */
             predicates_covered: string[];
             /** Format: int64 */
