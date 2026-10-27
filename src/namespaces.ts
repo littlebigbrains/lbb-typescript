@@ -2,6 +2,7 @@ import type { WorkflowNamespace } from "./workflows.js";
 import type { LbbClient } from "./client.js";
 import type { FilesNamespace } from "./files.js";
 import { EvalDatasetsNamespace } from "./eval-datasets.js";
+import { EvalExperimentsNamespace } from "./eval-experiments.js";
 import type { ReviewsNamespace } from "./reviews.js";
 import {
   parseLbbError,
@@ -585,13 +586,16 @@ export class SearchTuningNamespace {
   }
 }
 
-/** Managed evals: traces, labels (thumbs up or down), goldens, runs, and datasets. */
+/** Managed evals: traces, labels (thumbs up or down), goldens, runs, datasets and experiments. */
 export class EvalsNamespace {
   /** Evals datasets: examples with the outputs a correct run gives. */
   readonly datasets: EvalDatasetsNamespace;
+  /** Evals experiments: two configurations of a workflow on one dataset. */
+  readonly experiments: EvalExperimentsNamespace;
 
   constructor(private readonly client: LbbClient) {
     this.datasets = new EvalDatasetsNamespace(client);
+    this.experiments = new EvalExperimentsNamespace(client);
   }
 
   /** Settings, golden counts, unlabeled traces, the latest run, and the score by commit. */

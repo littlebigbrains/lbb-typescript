@@ -99,6 +99,15 @@ export type {
   EvalDatasetsNamespace,
 } from "./eval-datasets.js";
 export type {
+  EvalExperiment,
+  EvalExperimentCreateRequest,
+  EvalExperimentEstimate,
+  EvalExperimentList,
+  EvalExperimentListOptions,
+  EvalExperimentsNamespace,
+  EvalExperimentWaitOptions,
+} from "./eval-experiments.js";
+export type {
   WorkflowRunInput,
   WorkflowRunResultCounts,
   WorkflowRunResultOutcome,
