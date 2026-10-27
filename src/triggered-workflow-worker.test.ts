@@ -287,7 +287,22 @@ test("workflows.named reads the settings history and activates a revision", asyn
       },
     },
     { body: { object: "list", data: [revision(first, 1)], has_more: false } },
-    { body: revision(first, 1) },
+    {
+      body: {
+        ...revision(first, 1),
+        last_tested: {
+          test: "wtest_1791967648726a1b2c3d4e5f6",
+          finished: "2026-10-27T09:12:44.120000Z",
+          counts: {
+            inputs_done: 6,
+            passed: 14,
+            review: 3,
+            no_value: 1,
+            failed: 0,
+          },
+        },
+      },
+    },
     {
       status: 503,
       body: { error: { code: "storage_degraded", message: "busy" } },
@@ -320,6 +335,9 @@ test("workflows.named reads the settings history and activates a revision", asyn
 
   assert.deepEqual(ids, [second, first]);
   assert.equal(one.activation, 1);
+  // What the workflow's tests read with these settings; `undefined` when the
+  // server does not say, `null` when no test is recorded.
+  assert.equal(one.last_tested?.counts.passed, 14);
   assert.equal(activated.active_revision, first);
   assert.equal(again.active_revision, first);
   assert.deepEqual(
