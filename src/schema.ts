@@ -1954,7 +1954,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Bulk-ingest N-Triples, Turtle, N-Quads, or TriG through the fixed RDF_TRIPLE relation; RDF terms and named-graph labels are preserved as edge metadata */
+        /** Import RDF: ordinary bulk statistics, or explicit epoch-bound atomic N-Triples acceptance on an existing support head */
         post: operations["post_v1_graph_import_rdf"];
         delete?: never;
         options?: never;
@@ -15205,6 +15205,30 @@ export interface components {
             };
             relation: components["schemas"]["RelationView"];
         };
+        /** @enum {string} */
+        RdfImportCommitObject: "rdf_import_commit";
+        RdfImportCommitProjection: {
+            /** Format: int64 */
+            added: number;
+            /** Format: int64 */
+            removed: number;
+        };
+        /** @description Original durable CoreV1 fields. Publication/follower state is read separately. */
+        RdfImportCommitReceipt: {
+            commit_seq: components["schemas"]["CommitSeq"];
+            epoch: string;
+            no_op: boolean;
+            projection: components["schemas"]["RdfImportCommitProjection"];
+            schema_revision: string;
+            visibility_token: string;
+        };
+        RdfImportCommitResult: {
+            idempotent_replay: boolean;
+            object: components["schemas"]["RdfImportCommitObject"];
+            receipt: components["schemas"]["RdfImportCommitReceipt"];
+        };
+        /** @description The existing route has disjoint ordinary-bulk and explicit bounded results. */
+        RdfImportResponse: components["schemas"]["GraphRdfImportResponse"] | components["schemas"]["RdfImportCommitResult"];
         /**
          * @description The RDF node kind of a bounded observed-schema statement object.
          * @enum {string}
@@ -42398,6 +42422,8 @@ export interface operations {
                  * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
                  */
                 stack?: string;
+                /** @description Presence selects the strict support binding: retain the original epoch and required Idempotency-Key on retry; application/n-triples only, fixed application/default scope, no bootstrap or legacy fallback. Returns rdf_import_commit with original acceptance fields, not bulk counts. Other bulk controls are unsupported in this binding. */
+                expected_graph_epoch?: string;
                 /** @description RDF statements per internal commit (default 1000000, the cap: one commit per fully-buffered request; clamped 1-1000000) */
                 batch?: string;
                 /** @description Abort on the first malformed RDF parse error instead of reporting it */
@@ -42440,7 +42466,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["GraphRdfImportResponse"];
+                    "application/json": components["schemas"]["RdfImportResponse"];
                 };
             };
             /** @description Bad request */
