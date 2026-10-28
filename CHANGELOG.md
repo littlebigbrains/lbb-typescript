@@ -4,6 +4,15 @@ All notable changes to the `@littlebigbrain/client` package are documented here.
 
 ## Unreleased
 
+- `ReviewEvalOrigin` has the kind `dataset` and the fields `item`, `property`,
+  `value` and `stated`. An experiment files these review items for the values
+  its arms differ on and the dataset does not label. Filter them with
+  `reviews.list({ originId: "evals:datasets", evalId })`. A label of a dataset
+  item (`EvalExpectedValue`) has an optional `source` (`EvalGradeSource`:
+  `kind` `test` or `review`, `id`, `at`). The client exports both types.
+  Send the `source` back as read, or leave it out. The server keeps the
+  latest answer of a person.
+
 - The OpenAPI contract names the response of `POST /v1/graph/import/rdf`
   `RdfImportResponse`. It is the ordinary bulk response
   (`GraphRdfImportResponse`) or, when a request carries

@@ -7824,6 +7824,7 @@ export interface components {
             quote?: string | null;
             /** @description Why a value is left out. */
             reason?: string | null;
+            source?: null | components["schemas"]["EvalGradeSource"];
             /**
              * @description The number and unit as the text states them, when the property holds
              *     another unit: `450 mm` for a `width_cm` of 45.
@@ -8111,7 +8112,10 @@ export interface components {
              * @description Items compared.
              */
             items: number;
-            /** @description The etag of the dataset's items it was scored with. */
+            /**
+             * @description What it was scored with: the etag of the dataset's items, `#g` and the
+             *     grader's version (`…#g2`). A change of either makes the report stale.
+             */
             labels_etag?: string | null;
             /**
              * @description `too_few` under 10 items, else `better`, `worse` or `same` by the
@@ -8160,6 +8164,21 @@ export interface components {
             created: string;
             name: string;
         };
+        /**
+         * @description The answer that gave a label: its kind, the test (`wtest_…`) or review
+         *     item (`rev_…`) it was given on, and the time of the answer.
+         */
+        EvalGradeSource: {
+            /** @description When the person answered, RFC 3339. */
+            at: string;
+            id: string;
+            kind: components["schemas"]["EvalGradeSourceKind"];
+        };
+        /**
+         * @description The kind of the answer that gave a label.
+         * @enum {string}
+         */
+        EvalGradeSourceKind: "test" | "review";
         /** @description One result of a query: a hit of a search, or a row of a SPARQL query. */
         EvalItem: {
             /**
@@ -16064,15 +16083,20 @@ export interface components {
             request_id?: string | null;
         };
         /**
-         * @description A model check, a calibration session, a golden query or a test that
-         *     filed an item: the record that holds the answer as a label.
+         * @description A model check, a calibration session, a golden query, a test or an
+         *     experiment that filed an item: the record that holds the answer as a
+         *     label.
          */
         ReviewEvalOrigin: {
-            /** @description The record: a check's call id, a session id, a golden id. */
+            /** @description The record: a check's call id, a session id, a golden id, a dataset id. */
             id: string;
+            /** @description A dataset item's name (`id` is the dataset). */
+            item?: string | null;
             /** @description A check's job (`rerank`, `route`, …). */
             job?: string | null;
             kind: components["schemas"]["ReviewEvalOriginKind"];
+            /** @description The property a dataset item grades a value of. */
+            property?: string | null;
             /** @description A calibration question's id in its session (`q3`). */
             question?: string | null;
             /**
@@ -16080,17 +16104,25 @@ export interface components {
              *     the question as a whole.
              */
             result?: string | null;
+            /** @description The value as the arm's text stated it (`600 mm`), when it differs. */
+            stated?: string | null;
             /**
              * @description A golden item's trace: the one it was filed from, which its label
              *     goes to.
              */
             trace?: string | null;
+            /**
+             * @description The value a dataset item grades in its canonical form: a number in
+             *     its shortest form, a boolean as `true` or `false`, text trimmed and
+             *     in lower case.
+             */
+            value?: string | null;
         };
         /**
          * @description What in Evals filed an item.
          * @enum {string}
          */
-        ReviewEvalOriginKind: "check" | "calibration" | "test" | "golden" | "unknown";
+        ReviewEvalOriginKind: "check" | "calibration" | "test" | "golden" | "dataset" | "unknown";
         /** @description A quote the producer read, and where it is. */
         ReviewEvidence: {
             /** Format: float */
