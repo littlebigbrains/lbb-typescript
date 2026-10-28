@@ -580,6 +580,7 @@ test("the conformance suite covers the named rules", () => {
     "timeout",
     "review",
     "captured",
+    "owns",
   ])
     assert.ok(
       files.some((name) => name.includes(rule)),
