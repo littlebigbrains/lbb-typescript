@@ -361,6 +361,82 @@ test("files.pages sends the range and checks it first", async () => {
   assert.equal(seen.length, 2, "a bad range sends nothing");
 });
 
+test("files.sheets reads the outline, or the rows of one sheet, and checks the rows first", async () => {
+  const outline = {
+    sha256: SHA,
+    parser: "xlsx-1",
+    date1904: false,
+    sheet_count: 1,
+    sheets: [
+      {
+        index: 0,
+        name: "Q3 Sales",
+        state: "visible",
+        row_count: 2,
+        column_count: 2,
+        cell_count: 3,
+      },
+    ],
+  };
+  const rows = {
+    ...outline,
+    from: 1,
+    to: 2,
+    sheets: [
+      {
+        ...outline.sheets[0],
+        rows: [
+          {
+            row: 1,
+            cells: [{ col: 1, ref: "A1", type: "text", value: "Region" }],
+          },
+          {
+            row: 2,
+            cells: [
+              {
+                col: 2,
+                ref: "B2",
+                type: "number",
+                value: "12.5",
+                formula: "SUM(B3:B9)",
+              },
+            ],
+          },
+        ],
+      },
+    ],
+  };
+  const { fetch, seen } = filesFetch([{ body: outline }, { body: rows }]);
+  const lbb = client(fetch);
+
+  const first = await lbb.files.sheets(SHA);
+  const second = await lbb.files.sheets(SHA, {
+    sheet: "Q3 Sales",
+    from: 1,
+    to: 2,
+  });
+
+  assert.equal(first.sheets[0]?.name, "Q3 Sales");
+  assert.equal(second.sheets[0]?.rows?.[1]?.cells[0]?.formula, "SUM(B3:B9)");
+  assert.equal(second.sheets[0]?.rows?.[1]?.cells[0]?.value, "12.5");
+  assert.deepEqual(
+    seen.map(({ url }) => url),
+    [
+      `http://h/v1/files/sheets?graph=docs&sha256=${SHA}`,
+      `http://h/v1/files/sheets?graph=docs&sha256=${SHA}&sheet=Q3%20Sales&from=1&to=2`,
+    ],
+  );
+  for (const bad of [
+    () => lbb.files.sheets("abc"),
+    () => lbb.files.sheets(SHA, { sheet: "A", from: 3, to: 1 }),
+    () => lbb.files.sheets(SHA, { sheet: "A", from: 0 }),
+    () => lbb.files.sheets(SHA, { sheet: "A", to: 1.5 }),
+    () => lbb.files.sheets(SHA, { from: 1 }),
+  ])
+    await assert.rejects(bad, (error: unknown) => error instanceof RangeError);
+  assert.equal(seen.length, 2, "a bad range sends nothing");
+});
+
 test("files.delete repeats the SHA-256 as confirm", async () => {
   const { fetch, seen } = filesFetch([
     { body: { deleted: true, sha256: SHA } },

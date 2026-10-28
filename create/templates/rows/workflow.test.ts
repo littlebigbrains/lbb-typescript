@@ -20,12 +20,15 @@ import {
   type MockFile,
 } from "../_shared/testing.js";
 import { csvRecords, normalizeName, readRecords, type ReadRange } from "./csv.js";
+import { XLSX_MEDIA_TYPE, isXlsx, rowFragment } from "./sheet.js";
 import {
+  MEDIA_TYPES,
   READ_FROM,
   createWorkflow,
   defaults,
   derivationKey,
   labelKey,
+  trigger,
   typed,
   type ReadOptions,
   type RowsState,
@@ -594,4 +597,278 @@ test("a row longer than the longest row stops the read: a quote that never close
     read.records.map((r) => [r.row, r.fields[0], r.fields[1]!.length]),
     [[2, "1", 504]],
   );
+});
+
+// ---- XLSX files ---------------------------------------------------------------------
+
+type Table = { name: string; state?: string; rows: Record<number, string[]> };
+
+/** `files.sheets` over tables, answering at most 3 rows a call so the paging shows. */
+function sheetsOver(tables: Table[], calls: unknown[] = []) {
+  const outline = (): Schemas["FileSheet"][] =>
+    tables.map((t, index) => {
+      const numbers = Object.keys(t.rows).map(Number);
+      return {
+        index,
+        name: t.name,
+        state: t.state ?? "visible",
+        row_count: Math.max(0, ...numbers),
+        column_count: Math.max(0, ...Object.values(t.rows).map((r) => r.length)),
+        cell_count: Object.values(t.rows).reduce((n, r) => n + r.filter((v) => v !== "").length, 0),
+      };
+    });
+  return async (sha256: string, options: { sheet?: string; from?: number; to?: number } = {}) => {
+    calls.push(options);
+    const base = { sha256, parser: "xlsx-1", date1904: false, sheet_count: tables.length };
+    if (options.sheet === undefined) return { ...base, sheets: outline() } as Schemas["FileSheets"];
+    const table = tables.find((t) => t.name === options.sheet);
+    const found = outline().find((s) => s.name === options.sheet);
+    if (!table || !found) throw new Error(`no sheet ${options.sheet}`);
+    const from = options.from ?? 1;
+    const to = Math.min(options.to ?? from + 99, from + 999);
+    const inRange = Object.keys(table.rows)
+      .map(Number)
+      .filter((r) => r >= from && r <= to)
+      .sort((a, b) => a - b);
+    const shown = inRange.slice(0, 3);
+    const cut = inRange.length > 3 ? inRange[3]! : null;
+    const servedTo = cut !== null ? cut - 1 : Math.min(to, found.row_count);
+    return {
+      ...base,
+      sheets: [
+        {
+          ...found,
+          rows: shown.map((row) => ({
+            row,
+            cells: table.rows[row]!.flatMap((value, i) =>
+              value === ""
+                ? []
+                : [{ col: i + 1, ref: `${"ABCDEFGH"[i]}${row}`, type: "text", value }],
+            ),
+          })),
+        },
+      ],
+      from,
+      to: servedTo,
+      ...(cut !== null ? { next: cut } : servedTo < found.row_count ? { next: servedTo + 1 } : {}),
+    } as Schemas["FileSheets"];
+  };
+}
+
+const HEADER = [
+  "Customer ID",
+  "Name",
+  "Email",
+  "Address",
+  "City",
+  "Customer since",
+  "Account manager",
+];
+const CUSTOMER_TABLE: Table[] = [
+  { name: "Archive", state: "hidden", rows: { 1: ["Customer ID"], 2: ["C-0001"] } },
+  {
+    name: "Customers",
+    rows: {
+      // The first row with cells is the header: row 1 is empty.
+      2: HEADER,
+      3: [
+        "C-1001",
+        "Harbor Lane Bakery",
+        "orders@harborlane.example",
+        "12 Quay Street",
+        "Lisbon",
+        "2021-03-14",
+        "R. Silva",
+      ],
+      4: [
+        "C-1002",
+        "Okafor, Ada",
+        "ada.okafor@mail.example",
+        "4 Palm Avenue",
+        "Lagos",
+        "2019-11-02",
+        "T. Bello",
+      ],
+      // A row without its key is left out; a gap is no row.
+      5: ["", "No Key Ltd", "", "", "", "", ""],
+      7: ["C-1004", "Delta Print", "", "", "Accra", "not a date", ""],
+      8: ["C-1005", "Ember Cafe", "", "", "Oslo", "2022-01-05", ""],
+    },
+  },
+];
+
+test("an XLSX file gives one instance per row of its first visible sheet, each READ_FROM its range", async () => {
+  const { lbb, content } = setup(defaults);
+  const calls: unknown[] = [];
+  const ports = {
+    files: { content: content.files.content, sheets: sheetsOver(CUSTOMER_TABLE, calls) },
+    workflows: content.workflows,
+  };
+  const workflow = createWorkflow(lbb, ports, {
+    ...defaults,
+    represents: undefined,
+    match: undefined,
+  });
+  const file = content.upload("q3-customers.xlsx", "PK-not-read", XLSX_MEDIA_TYPE);
+  const { state, turns } = await runMessage<RowsState>(workflow, contentMessage("rows", file));
+
+  const customers = instancesOf(lbb.graph, "Customer");
+  assert.deepEqual(
+    customers.map((c) => c.name),
+    ["Delta Print", "Ember Cafe", "Harbor Lane Bakery", "Okafor, Ada"],
+  );
+  const bakery = customers.find((c) => c.name === "Harbor Lane Bakery")!;
+  assert.deepEqual(bakery.properties, {
+    customer_id: "C-1001",
+    email: "orders@harborlane.example",
+    address: "12 Quay Street",
+    city: "Lisbon",
+    customer_since: "2021-03-14T00:00:00Z",
+  });
+  // A value that is not a date is left out and counted.
+  assert.deepEqual(customers.find((c) => c.name === "Delta Print")!.properties, {
+    customer_id: "C-1004",
+    city: "Accra",
+  });
+  // The evidence is the row's text, and its source the row as a range of the sheet.
+  const edge = lbb.graph.edges.find((e) => e.source === bakery.iri && e.relation === READ_FROM)!;
+  const evidence = edge.evidence as { text: string; source_id: string };
+  assert.equal(evidence.source_id, `${file.document}#Customers!A3:G3`);
+  assert.equal(
+    evidence.text,
+    [
+      "C-1001",
+      "Harbor Lane Bakery",
+      "orders@harborlane.example",
+      "12 Quay Street",
+      "Lisbon",
+      "2021-03-14",
+      "R. Silva",
+    ].join("\t"),
+  );
+  const delta = lbb.graph.edges.find(
+    (e) => e.source === customers.find((c) => c.name === "Delta Print")!.iri,
+  )!;
+  assert.equal(
+    (delta.evidence as { source_id: string }).source_id,
+    `${file.document}#Customers!A7:F7`,
+  );
+  // Rows count as the sheet counts them; the keyless row 5 is counted, not written.
+  assert.deepEqual(state, { contents: 1, skipped: 0, rows: 5, instances: 4, represents: 0 });
+  const outputs = [...content.recorded.values()][0]!.outputs as Record<string, unknown>;
+  assert.equal(outputs.rows, 5);
+  assert.equal(outputs.rows_without_key, 1);
+  assert.equal(outputs.values_left_out, 1);
+  // The server was asked for the outline, then for the rows, by A1 row.
+  assert.deepEqual(calls[0], {});
+  assert.ok(calls.slice(1).every((c) => (c as { sheet: string }).sheet === "Customers"));
+  assert.ok(turns.length >= 1);
+  assert.equal(content.reads, 0, "no byte of an XLSX file is read");
+});
+
+/**
+ * The files of a client are a class: `sheets` reads `this.inner`, and a call
+ * through a detached reference (`const read = ports.files.sheets`) has no `this`.
+ */
+class ClassFiles {
+  calls = 0;
+  constructor(
+    private readonly inner: {
+      content: ReturnType<typeof setup>["content"]["files"]["content"];
+      sheets: ReturnType<typeof sheetsOver>;
+    },
+  ) {}
+  content(sha256: string, options?: { range?: { start: number; end?: number } }) {
+    return this.inner.content(sha256, options);
+  }
+  async sheets(sha256: string, options?: { sheet?: string; from?: number; to?: number }) {
+    this.calls += 1;
+    return this.inner.sheets(sha256, options);
+  }
+}
+
+test("the template reads sheets through a client whose files are a class", async () => {
+  const { lbb, content } = setup(defaults);
+  const files = new ClassFiles({
+    content: content.files.content,
+    sheets: sheetsOver(CUSTOMER_TABLE),
+  });
+  const workflow = createWorkflow(
+    lbb,
+    { files, workflows: content.workflows },
+    { ...defaults, represents: undefined, match: undefined },
+  );
+  const file = content.upload("q3-customers.xlsx", "PK-not-read", XLSX_MEDIA_TYPE);
+  const { state } = await runMessage<RowsState>(workflow, contentMessage("rows", file));
+  assert.equal(state.instances, 4);
+  assert.ok(files.calls > 1, "the outline, then the rows");
+});
+
+test("an XLSX file goes on over turns from the A1 row where the last one stopped", async () => {
+  const { lbb, content } = setup(defaults);
+  const ports = {
+    files: { content: content.files.content, sheets: sheetsOver(CUSTOMER_TABLE) },
+    workflows: content.workflows,
+  };
+  const workflow = createWorkflow(lbb, ports, {
+    ...defaults,
+    represents: undefined,
+    match: undefined,
+    rowsPerTurn: 2,
+  });
+  const file = content.upload("q3-customers.xlsx", "PK-not-read", XLSX_MEDIA_TYPE);
+  const { state, turns } = await runMessage<RowsState>(workflow, contentMessage("rows", file));
+  assert.equal(instancesOf(lbb.graph, "Customer").length, 4);
+  assert.ok(turns.length > 1, "rowsPerTurn 2 needs more than one turn");
+  assert.equal(state.rows, 5);
+  assert.equal(state.contents, 1);
+});
+
+test("a settings sheet picks the sheet, and a workbook without it is skipped", async () => {
+  const { lbb, content } = setup(defaults);
+  const ports = {
+    files: { content: content.files.content, sheets: sheetsOver(CUSTOMER_TABLE) },
+    workflows: content.workflows,
+  };
+  const base = { ...defaults, represents: undefined, match: undefined };
+  const archive = createWorkflow(lbb, ports, { ...base, sheet: "Archive" });
+  const file = content.upload("q3-customers.xlsx", "PK-not-read", XLSX_MEDIA_TYPE);
+  const { state } = await runMessage<RowsState>(archive, contentMessage("rows", file));
+  assert.deepEqual(
+    instancesOf(lbb.graph, "Customer").map((c) => c.properties.customer_id),
+    ["C-0001"],
+  );
+  assert.equal(state.contents, 1);
+
+  const other = setup(defaults);
+  const missing = createWorkflow(
+    other.lbb,
+    {
+      files: { content: other.content.files.content, sheets: sheetsOver(CUSTOMER_TABLE) },
+      workflows: other.content.workflows,
+    },
+    { ...base, sheet: "Nope" },
+  );
+  const again = other.content.upload("q3-customers.xlsx", "PK-not-read", XLSX_MEDIA_TYPE);
+  const skipped = await runMessage<RowsState>(missing, contentMessage("rows", again));
+  assert.equal(skipped.state.skipped, 1);
+  assert.equal(instancesOf(other.lbb.graph, "Customer").length, 0);
+  assert.equal(other.content.recorded.size, 0, "a skipped workbook records no derivation");
+});
+
+test("a client without a sheets reader skips an XLSX file, and the trigger names its media type", async () => {
+  const { content, definition } = setup(defaults);
+  const file = content.upload("q3-customers.xlsx", "PK-not-read", XLSX_MEDIA_TYPE);
+  const { state } = await runMessage<RowsState>(definition, contentMessage("rows", file));
+  assert.equal(state.skipped, 1);
+  assert.ok(MEDIA_TYPES.includes(XLSX_MEDIA_TYPE));
+  assert.deepEqual(trigger().triggers?.[0]?.content?.media_types, MEDIA_TYPES);
+});
+
+test("a row of a sheet is named as a range of its cells", () => {
+  assert.equal(rowFragment("Customers", { row: 3, fields: ["a", "", "c"] }), "Customers!A3:C3");
+  assert.equal(rowFragment("Q3 Sales", { row: 12, fields: ["a"] }), "'Q3%20Sales'!A12");
+  assert.equal(isXlsx(XLSX_MEDIA_TYPE, "x.bin"), true);
+  assert.equal(isXlsx("application/zip", "Q3.XLSX"), true);
+  assert.equal(isXlsx("text/csv", "q3.xlsx"), false);
 });

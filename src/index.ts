@@ -62,9 +62,11 @@ export type {
   FilePages,
   FilePagesOptions,
   FileRecord,
+  FileSheetsOptions,
   FilesNamespace,
   FileUploadOptions,
 } from "./files.js";
+export * from "./spreadsheet.js";
 export * as googleDrive from "./google-drive.js";
 export type {
   StarterClassTerm,

@@ -128,6 +128,16 @@ export interface FilePagesOptions extends CallOptions {
   to?: number;
 }
 
+/** The row range of `files.sheets`: A1 rows, from 1, both ends included. */
+export interface FileSheetsOptions extends CallOptions {
+  /** The sheet's name. Without it, the outline of the workbook (every sheet, no rows). */
+  sheet?: string;
+  /** The first row. Default 1. */
+  from?: number;
+  /** The last row. Default `from + 99`; one call returns at most 1,000 rows and 20,000 cells. */
+  to?: number;
+}
+
 const SHA256 = /^[0-9a-f]{64}$/;
 
 /** A file's SHA-256 as the routes take it: 64 hexadecimal characters, lower case. */
@@ -166,6 +176,11 @@ function contentHeaders(
 ): Record<string, string> | undefined {
   if (range === undefined) return headers;
   return { ...headers, range: rangeHeader(range) };
+}
+
+function rowNumber(value: number | undefined, name: string): void {
+  if (value !== undefined && (!Number.isSafeInteger(value) || value < 1))
+    throw new RangeError(`${name} must be a row number (1 or more)`);
 }
 
 function pageIndex(value: number | undefined, name: string): void {
@@ -335,6 +350,35 @@ export class FilesNamespace {
       contentType: header("content-type") ?? "application/octet-stream",
       sha256: header("etag")?.replace(/^(W\/)?"|"$/g, "") || sha,
     };
+  }
+
+  /**
+   * The sheets of an XLSX workbook, or the rows of one sheet
+   * (`GET /v1/files/sheets`). Without `sheet`: every sheet with its name,
+   * state and size, and no rows. With `sheet`: that sheet's rows `from` to
+   * `to` (A1 rows, both included; `next` names the row to go on from). A
+   * cell has the `value` its file stores, as text, and its `formula` apart:
+   * LBB never calculates a formula. The first read of a workbook parses it
+   * in a bounded child process; a workbook past a limit answers `400
+   * xlsx_refused`, a file that is no workbook `400 file_not_spreadsheet`.
+   * The places in the answer are named in evidence by
+   * {@link spreadsheetFragment}.
+   */
+  async sheets(
+    sha256: string,
+    options: FileSheetsOptions = {},
+  ): Promise<Schemas["FileSheets"]> {
+    const { sheet, from, to, ...opts } = options;
+    rowNumber(from, "from");
+    rowNumber(to, "to");
+    if (from !== undefined && to !== undefined && to < from)
+      throw new RangeError("to must not be below from");
+    if (sheet === undefined && (from !== undefined || to !== undefined))
+      throw new RangeError("from and to need a sheet");
+    return this.client.request("GET", "/v1/files/sheets", {
+      ...opts,
+      query: { sha256: sha256Of(sha256), sheet, from, to },
+    });
   }
 
   /**

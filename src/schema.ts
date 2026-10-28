@@ -1755,6 +1755,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/files/sheets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The sheets of an XLSX workbook, or the rows of one sheet. Without `sheet`, every sheet with its name, state and size and no rows. With `sheet`, that sheet's rows `from` to `to` (A1 rows, inclusive; default 100, at most 1,000, at most 20,000 cells: `next` names the row to go on from). Each cell has its stored `value` as text and its `formula` apart; LBB never calculates a formula. The first read of a workbook parses it in a bounded child process (hard limits on bytes, sheets, rows, columns, cells and time) and stores the result; a workbook past a limit is 400 `xlsx_refused`. 400 `file_not_spreadsheet`, 404 `file_not_found`, 404 `sheet_not_found`, 503 `xlsx_busy`, 503 `parser_unavailable` */
+        get: operations["get_v1_files_sheets"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/graph/activity": {
         parameters: {
             query?: never;
@@ -8751,6 +8768,41 @@ export interface components {
             missing: number;
         };
         /**
+         * @description One cell of a sheet. `value` is what the workbook stores for the cell,
+         *     as text; `formula` is the cell's formula text, kept apart from it. LBB
+         *     never calculates a formula: a formula cell has the value its file stored,
+         *     or none.
+         */
+        FileCell: {
+            /**
+             * Format: int32
+             * @description The column, from 1 (`A` is 1).
+             */
+            col: number;
+            /** @description The cell's formula, without the leading `=`. */
+            formula?: string | null;
+            /**
+             * @description For a cell that shares the formula of another (`formula` is absent):
+             *     the shared formula's index in the file.
+             */
+            formula_shared?: string | null;
+            /** @description For a `date` cell: the serial number the file stores. */
+            raw?: string | null;
+            /** @description The cell's A1 reference (`B2`). */
+            ref: string;
+            /**
+             * @description `text`, `number`, `bool`, `date` or `error`. Absent for a formula
+             *     cell whose file stored no value.
+             */
+            type?: string | null;
+            /**
+             * @description The stored value as text: a number as the file writes it (`12.5`), a
+             *     bool as `true` or `false`, a date in ISO 8601, an error as its code
+             *     (`#DIV/0!`).
+             */
+            value?: string | null;
+        };
+        /**
          * @description One fact whose evidence names a file: the edge's statement node, the
          *     edge, and the evidence source (the file's `Document` IRI with the
          *     fragment of the place).
@@ -8956,6 +9008,81 @@ export interface components {
             sha256: string;
             /** @description RFC 3339 time of the first upload. */
             uploaded_at: string;
+        };
+        /** @description One sheet of a workbook. */
+        FileSheet: {
+            /**
+             * Format: int32
+             * @description The cells that hold a value or a formula.
+             */
+            cell_count: number;
+            /**
+             * Format: int32
+             * @description The last column with a cell.
+             */
+            column_count: number;
+            /**
+             * Format: int32
+             * @description The sheet's place in the workbook, from 0.
+             */
+            index: number;
+            name: string;
+            /**
+             * Format: int32
+             * @description The last A1 row with a cell.
+             */
+            row_count: number;
+            /** @description The rows asked for. Empty in the outline of a workbook. */
+            rows?: components["schemas"]["FileSheetRow"][];
+            /** @description `visible`, `hidden` or `veryHidden`. */
+            state: string;
+        };
+        /**
+         * @description One row of a sheet with at least one cell: its A1 row (from 1) and its
+         *     cells in column order.
+         */
+        FileSheetRow: {
+            cells: components["schemas"]["FileCell"][];
+            /** Format: int32 */
+            row: number;
+        };
+        /** @description A note about what the reader did not load. */
+        FileSheetWarning: {
+            code: string;
+            message: string;
+        };
+        /**
+         * @description `GET /v1/files/sheets`: the outline of an XLSX workbook, or the rows of
+         *     one sheet. The first read of a workbook parses it in a bounded child
+         *     process and stores the result under the file.
+         */
+        FileSheets: {
+            /** @description Whether the workbook counts dates from 1904. */
+            date1904: boolean;
+            /**
+             * Format: int32
+             * @description With `sheet`: the first and the last A1 row the answer covers.
+             */
+            from?: number | null;
+            /**
+             * Format: int32
+             * @description With `sheet`: the row to go on from (`from` of the next call). Absent
+             *     when the sheet ends at `to`.
+             */
+            next?: number | null;
+            /** @description The reader's id ([`FILE_SHEETS_PARSER`]). */
+            parser: string;
+            sha256: string;
+            /** Format: int32 */
+            sheet_count: number;
+            /**
+             * @description Without `sheet`: every sheet with no rows. With `sheet`: that sheet
+             *     with the rows from `from` to `to`.
+             */
+            sheets: components["schemas"]["FileSheet"][];
+            /** Format: int32 */
+            to?: number | null;
+            warnings?: components["schemas"]["FileSheetWarning"][];
         };
         /** @description `POST /v1/files`. */
         FileUploadResponse: {
@@ -40246,6 +40373,157 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["FileRecord"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Rate limit exceeded */
+            429: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Service unavailable */
+            503: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+        };
+    };
+    get_v1_files_sheets: {
+        parameters: {
+            query?: {
+                /** @description Graph name (default `main`) */
+                graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
+                /** @description the file's SHA-256, hex */
+                sha256?: string;
+                /** @description the sheet's name; without it, the outline of the workbook */
+                sheet?: string;
+                /** @description the first A1 row (default 1) */
+                from?: string;
+                /** @description the last A1 row (default from + 99) */
+                to?: string;
+                /** @description `true` also reads a deleted file whose content is not reclaimed yet */
+                deleted?: string;
+            };
+            header?: {
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
+                "Lbb-Version"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FileSheets"];
                 };
             };
             /** @description Bad request */

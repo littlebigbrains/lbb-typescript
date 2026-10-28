@@ -33,7 +33,7 @@ pytest
 | `documents-map` | Maps the links of `documents-link` into the graph's own ontology, as fact proposals |
 | `review` | Writes the fact proposals at or above a gate as facts and gives the others to a person |
 | `link` | Connects the mentions of one thing across the records of a graph into one thing, and proposes records of one thing as an identity |
-| `rows` | Reads each CSV or TSV file into one instance per row, each with an edge to the file whose evidence is the row |
+| `rows` | Reads each CSV, TSV or XLSX file into one instance per row, each with an edge to the file whose evidence is the row |
 | `sections` | Reads each Markdown file into its sections, each with an edge to its parent whose evidence is its lines |
 | `documents-check` | Checks PDFs against each other: SHACL rules over the values `values.extract` reads, and a review item with the quotes of both documents for each difference |
 

@@ -24,6 +24,15 @@ All notable changes to the `@littlebigbrain/client` package are documented here.
   returns the bulk response as before. No helper selects the new binding yet.
 
 - Add explicit-key `client.records.commit` and graph-scoped records commits with strict `records/1` selection, capability preflight, fixed retry bytes and checked original receipts. Protocol recognition does not activate or convert a graph; existing commit helpers are unchanged.
+- `client.files.sheets(sha256, { sheet, from, to })` reads an XLSX workbook
+  (`GET /v1/files/sheets`): the outline of its sheets, or the rows of one
+  sheet by A1 row. A cell has the `value` its file stores, as text, and its
+  `formula` apart; nothing is calculated. The first read of a workbook parses
+  it on the server, in a bounded child process.
+- `spreadsheetFragment`, `parseSpreadsheetFragment`, `parseSpreadsheetRange`,
+  `spreadsheetRange`, `cellRef`, `columnLetters` and `columnNumber` write and
+  read a place in a sheet for evidence: `Sales!B2:D9`, `'Q3%20Sales'!B2`.
+  The `rows` template writes `#Sales!A5:F5` for an XLSX file.
 
 - `FilePage` has `ocr_required` and `FileParse` has `ocr_pages`. A page with
   fewer than 16 characters of text, whose images cover at least 40% of it,
