@@ -4,6 +4,12 @@ All notable changes to the `@littlebigbrain/client` package are documented here.
 
 ## Unreleased
 
+- The server sends `X-Content-Type-Options: nosniff` and
+  `Content-Disposition: attachment` with the bytes of a file
+  (`files.content`, `files.contentStream` and `files.head`). The SDK reads
+  bytes and is not affected. A page of yours that shows a file in an iframe
+  or a link now downloads it.
+
 - `ReviewEvalOrigin` has the kind `dataset` and the fields `item`, `property`,
   `value` and `stated`. An experiment files these review items for the values
   its arms differ on and the dataset does not label. Filter them with
