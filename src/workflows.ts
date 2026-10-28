@@ -120,6 +120,14 @@ function waitOf(error: unknown): number | undefined {
 }
 
 /**
+ * A commit the server refused because it writes a property its workflow does
+ * not own (`403 write_outside_owns`). The same commit is refused again, so
+ * the turn fails for good instead of using every attempt.
+ */
+const writeOutsideOwns = (error: unknown): boolean =>
+  error instanceof LbbError && error.code === "write_outside_owns";
+
+/**
  * The code of a turn route's answer that this attempt's token no longer
  * holds its turn: another attempt holds it, its lease ended, or it finished.
  */
@@ -1357,7 +1365,8 @@ export class WorkflowWorker {
         non_retryable:
           retryAt === undefined &&
           (error instanceof WorkflowError ||
-            error instanceof WorkflowExecutionError),
+            error instanceof WorkflowExecutionError ||
+            writeOutsideOwns(error)),
         ...(retryAt !== undefined
           ? { retry_at_ms: Math.max(retryAt, Date.now() + MIN_WAIT_MS) }
           : {}),

@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { LbbClient, type FetchLike, type Schemas } from "./client.js";
+import { LbbError } from "./transport.js";
 import {
   fanInIdentity,
   isFanInIdentity,
@@ -153,6 +154,35 @@ test("changed step order is a permanent failure and cannot commit state", async 
     calls.some((c) => c.path.endsWith("/complete")),
     false,
   );
+});
+test("a commit refused as outside owns fails the turn for good; another 403 keeps its attempts", async () => {
+  const { client, calls } = setup([task(), task()]);
+  let refusal: LbbError = new LbbError(403, "{}", {
+    code: "write_outside_owns",
+    message: "the commit writes a property that its workflow does not own",
+  });
+  const counter = workflow({
+    name: "counter",
+    version: "v1",
+    initialState: 0,
+    async onMessage(ctx) {
+      await ctx.step("write", async () => {
+        throw refusal;
+      });
+      return { state: 1 };
+    },
+  });
+  const worker = new WorkflowWorker(client, [counter], { worker: "test" });
+  await worker.runOnce();
+  refusal = new LbbError(403, "{}", {
+    code: "owner_reserved",
+    message: "the owner is reserved",
+  });
+  await worker.runOnce();
+  const fails = calls.filter((c) => c.path.endsWith("/fail"));
+  assert.equal(fails.length, 2);
+  assert.equal(fails[0]?.body.non_retryable, true);
+  assert.equal(fails[1]?.body.non_retryable, false);
 });
 test("a value JSON cannot hold fails the turn for good and names where it is", async () => {
   const { client, calls } = setup([task(), task()]);
