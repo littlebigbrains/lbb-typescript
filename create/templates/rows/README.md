@@ -1,6 +1,6 @@
 # rows
 
-Reads each CSV or TSV file of a graph into one instance per row. A
+Reads each CSV, TSV or XLSX file of a graph into one instance per row. A
 customer list gives one `Customer` per row, with the values of its
 columns. Each instance has an edge `READ_FROM` to the file's `Document`.
 The edge's evidence is the row's text, and its source is the file's IRI
@@ -8,9 +8,9 @@ with the row: `https://littlebigbrain.com/e/41ab…#row=5`
 ([evidence.md](../../../docs/reference/evidence.md#evidence-from-a-file)).
 
 The template has no LBB-run version. It is a named workflow with a
-**content trigger**: LBB sends it each upload of `text/csv` or
-`text/tab-separated-values` within seconds, without a wait for a
-publication ([workflows.md](../../../docs/reference/workflows.md#content-triggers)).
+**content trigger**: LBB sends it each upload of `text/csv`,
+`text/tab-separated-values` or an XLSX workbook within seconds, without a
+wait for a publication ([workflows.md](../../../docs/reference/workflows.md#content-triggers)).
 
 ## How it runs
 
@@ -79,6 +79,32 @@ parser reads bytes: the delimiter, the quote and the line breaks are ASCII,
 so a window's edge inside a character of UTF-8 or between CR and LF changes
 no row.
 
+## XLSX files
+
+For an XLSX workbook the template reads one sheet: the setting `sheet`, else
+the first visible sheet. The server parses the workbook on its first read
+(`client.files.sheets`, [Spreadsheets](../../../docs/reference/files.md#spreadsheets))
+and serves the stored values of the sheet by A1 row, so the template reads no
+byte of the file. A cell is the value its file stores, as text. A formula
+cell is its stored value, and empty when the file stored none: nothing is
+calculated.
+
+The first row that holds a cell is the header (a sheet that starts at row 3
+has its header in row 3). A record is a row that holds a cell, and its row
+number is the A1 row, so a blank row between two rows is not a record and
+does not shift the numbers. The rest is as for CSV: the mapped columns, the
+key column, `represents`, the derivation and the turns (`rowsPerTurn`, with
+the next A1 row in the cursor instead of a byte offset).
+
+An instance has the edge `READ_FROM` to the `Document`, with the row's text
+as evidence and the row as a range of its sheet as source:
+`<Document IRI>#Sales!A5:F5` (cells A to the last cell of row 5; a sheet name
+with a space is quoted and percent encoded). The console opens the file at
+that range. A client without `files.sheets` skips XLSX files, and so does a
+workbook that has no sheet named in `sheet`. A workbook the server refuses
+(a limit, a macro, an encrypted file) fails the file's turn with the
+server's reason.
+
 ## Settings
 
 `defaults` in `workflow.ts`, which fit the samples:
@@ -91,6 +117,7 @@ no row.
 | `represents` | `{class: "Report"}` | Write `REPRESENTS` to the one instance of this class that the file's name names |
 | `match` | `customers` | A regular expression on the file's name. Without it, every CSV and TSV file |
 | `rowsPerTurn` | 5,000 | Rows one turn reads, 1 to 20,000 |
+| `sheet` | first visible sheet | For an XLSX file, the sheet to read. A workbook without it is skipped |
 
 `trigger(settings)` names the workflow `rows`, with the content trigger
 `rows` for the two media types. It owns the class, `READ_FROM`,

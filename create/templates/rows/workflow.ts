@@ -52,6 +52,14 @@ import {
   type RecordsRead,
   type WindowOptions,
 } from "./csv.js";
+import {
+  XLSX_MEDIA_TYPE,
+  chooseSheet,
+  isXlsx,
+  readSheetRecords,
+  rowFragment,
+  type ReadSheets,
+} from "./sheet.js";
 
 export type ValueType = "text" | "keyword" | "i64" | "f64" | "bool" | "date_time";
 
@@ -68,6 +76,8 @@ export interface Settings {
   match?: string;
   /** Rows one turn reads, 1 to 20,000. */
   rowsPerTurn: number;
+  /** For an XLSX file: the sheet to read. Default: the first visible sheet. The first row that holds a cell is the header. */
+  sheet?: string;
 }
 
 /** The settings: edit them for your files. These fit the samples. */
@@ -83,7 +93,7 @@ export const defaults: Settings = {
 export const workflowType = { workflow_type: "rows", version: "v1" };
 
 /** The media types the content trigger sends. */
-export const MEDIA_TYPES = ["text/csv", "text/tab-separated-values"];
+export const MEDIA_TYPES = ["text/csv", "text/tab-separated-values", XLSX_MEDIA_TYPE];
 
 /** The relation from each instance to the file it was read from. */
 export const READ_FROM = "READ_FROM";
@@ -128,6 +138,8 @@ export interface ContentPorts {
       sha256: string,
       options?: { range?: { start: number; end?: number } },
     ): Promise<Uint8Array>;
+    /** The sheets of an XLSX file, or the rows of one sheet (`client.files.sheets`). Without it, XLSX files are skipped. */
+    sheets?: ReadSheets;
   };
   workflows: {
     derivations: {
@@ -164,6 +176,8 @@ interface Plan {
   document: string;
   name: string;
   delimiter: string;
+  /** For an XLSX file: the sheet the rows are read from. */
+  sheet?: string;
   columns: Column[];
   /** The headers that fill no property, at most 100. */
   left: string[];
@@ -213,6 +227,9 @@ interface Checked {
 
 /** A trigger message; a file's later turns carry the cursor. */
 type RowsMessage = WorkflowTriggerMessage & { cursor?: Cursor };
+
+/** The rows of one turn: from bytes (`next` is a byte offset) or from a sheet (`next` is 0, `row` an A1 row). */
+type TurnRows = Pick<RecordsRead, "records" | "next" | "row" | "end">;
 
 /** Rows one owned write holds: a commit names at most 1,000 entities. */
 const PART = 400;
@@ -366,6 +383,9 @@ export function createWorkflow(
   if (!(Number.isSafeInteger(windows.maxRecord) && windows.maxRecord >= 1))
     throw new RangeError("maxRecord is a whole number of bytes from 1");
   const match = settings.match ? new RegExp(settings.match, "u") : null;
+  // `ports.files.sheets` called as a method of `ports.files`: a client is a class,
+  // and its `sheets` reads `this.client`.
+  const readSheets: ReadSheets = (sha256, options) => ports.files.sheets!(sha256, options);
 
   /** Bytes `start` to `end` of a content: none from its end on (the server answers 416 there). */
   const rangeOf =
@@ -409,8 +429,10 @@ export function createWorkflow(
             s.progress("checking the file", { done: 0, total: 1, unit: "documents" });
             const file = await readDocument(message, document);
             if (!file) return { skip: "no file" };
-            const named = /\.(csv|tsv)$/i.test(file.name);
+            const named = /\.(csv|tsv|xlsx)$/i.test(file.name);
             if (!MEDIA_TYPES.includes(file.mediaType) && !named) return { skip: "media type" };
+            if (isXlsx(file.mediaType, file.name) && !ports.files.sheets)
+              return { skip: "no sheets reader" };
             if (match && !match.test(file.name)) return { skip: "name" };
             const found = await ports.workflows.derivations.check(
               derivationKey(file.sha256, settings),
@@ -426,11 +448,31 @@ export function createWorkflow(
           const file = checked.file;
           const planned = await ctx.step("plan", async (s) => {
             s.progress("reading the header", { done: 0, total: 1, unit: "documents" });
+            if (isXlsx(file.mediaType, file.name)) {
+              // The sheet's first row with cells is its header.
+              const sheet = await chooseSheet(readSheets, file.sha256, settings.sheet);
+              if (sheet === null) return null;
+              const head = await readSheetRecords(readSheets, file.sha256, sheet, 1, 1);
+              return plan(
+                file,
+                "",
+                { records: head.records, next: 0, row: head.row },
+                checked.uploadedAt,
+                sheet,
+              );
+            }
             const delimiter = delimiterOf(file.mediaType, file.name);
             const header = await readRecords(rangeOf(file.sha256), delimiter, 0, 1, 1, windows);
             held = header.held;
-            return plan(file, delimiter, header, checked.uploadedAt);
+            return plan(
+              file,
+              delimiter,
+              { records: header.records, next: header.next, row: header.row },
+              checked.uploadedAt,
+            );
           });
+          // A workbook without the sheet the settings name is skipped.
+          if (planned === null) return rest({ ...state, skipped: state.skipped + 1 });
           const first: number[] = [];
           if (planned.plan.represents) {
             const written = await lbb.writeOwned(ctx, "represents", (s) => {
@@ -458,7 +500,7 @@ export function createWorkflow(
           }
           cursor = {
             byte: planned.at,
-            row: 2,
+            row: planned.row,
             plan: planned.plan,
             done: { rows: 0, instances: 0, keyless: 0, rejected: 0, commits: first },
           };
@@ -469,17 +511,25 @@ export function createWorkflow(
         // reads its rows again from the same offset.
         const from = cursor;
         const filePlan = from.plan;
-        let rows: Promise<RecordsRead> | undefined;
+        let rows: Promise<TurnRows> | undefined;
         const turnRows = () =>
-          (rows ??= readRecords(
-            rangeOf(filePlan.sha256),
-            filePlan.delimiter,
-            from.byte,
-            from.row,
-            settings.rowsPerTurn,
-            windows,
-            held,
-          ));
+          (rows ??= filePlan.sheet
+            ? readSheetRecords(
+                readSheets,
+                filePlan.sha256,
+                filePlan.sheet,
+                from.row,
+                settings.rowsPerTurn,
+              ).then((read) => ({ records: read.records, next: 0, row: read.row, end: read.end }))
+            : readRecords(
+                rangeOf(filePlan.sha256),
+                filePlan.delimiter,
+                from.byte,
+                from.row,
+                settings.rowsPerTurn,
+                windows,
+                held,
+              ));
         const windowRecords = async (): Promise<CsvRecord[]> => (await turnRows()).records;
         const window = await ctx.step("rows", async (s) => {
           s.progress("reading rows", { done: 0, unit: "rows" });
@@ -591,7 +641,13 @@ export function createWorkflow(
   }
 
   /** The plan of a file: its delimiter, the mapped columns, the key and label columns, what it represents, and its upload. */
-  async function plan(file: FileInfo, delimiter: string, read: RecordsRead, uploadedAt?: string) {
+  async function plan(
+    file: FileInfo,
+    delimiter: string,
+    read: Pick<RecordsRead, "records" | "next" | "row">,
+    uploadedAt?: string,
+    sheet?: string,
+  ) {
     const first = read.records[0];
     const header = first ? first.fields.map((h) => h.trim()) : [];
     const registry = header.length ? ((await lbb.ontology()).property_defs ?? []) : [];
@@ -602,12 +658,14 @@ export function createWorkflow(
     const found = settings.represents ? await representsOf(file.name) : null;
     return {
       at: read.next,
+      row: read.row,
       label: found?.label ?? null,
       plan: {
         sha256: file.sha256,
         document: file.document,
         name: file.name,
         delimiter,
+        ...(sheet !== undefined ? { sheet } : {}),
         columns: mapped.columns,
         left: mapped.left,
         key: key >= 0 ? key : null,
@@ -663,7 +721,7 @@ LIMIT 2`;
         confidence: 1,
         evidence: {
           text: record.text.slice(0, EVIDENCE_CHARS),
-          source_id: `${p.document}#row=${record.row}`,
+          source_id: `${p.document}#${p.sheet !== undefined ? rowFragment(p.sheet, record) : `row=${record.row}`}`,
         },
       },
     };
