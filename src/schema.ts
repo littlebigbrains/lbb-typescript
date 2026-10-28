@@ -3831,6 +3831,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/workflows/activities/ground": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Checks values a model proposes against the files they come from, without a model. Each item names a file (`sha256` and the `uploaded_at` the proposal read), a place in it (`page=N`, `line=a,b`, `row=a-b`), a property, a value and a quote. The answer holds one verdict per item, in item order: `upload_changed`, `locator_invalid` (with a `reason`), `quote_not_found`, `quote_too_short`, `unknown_property`, `invalid_value`, `unit_unconfirmed` or `scan_budget`, or `ok` with the typed value in the property's unit and the evidence of the quote. At most 16 items from 8 files; a request scans at most 4 MiB, an item at most 1 MiB of its file (`scan_budget`, final), and the request has 10 seconds (503 `ground_timeout`, retryable, no verdicts). No model call, no cost, no effect id, no call log. A body that names `workflow` is refused (400 `invalid_request`) */
+        post: operations["post_v1_workflows_activities_ground"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/workflows/activities/reason": {
         parameters: {
             query?: never;
@@ -10566,6 +10583,103 @@ export interface components {
              */
             pending: boolean;
             retains_source_terminals: boolean;
+        };
+        /** @description `POST /v1/workflows/activities/ground`: the proposals to check. */
+        GroundActivityRequest: {
+            /** @description 1 to 16 proposals, from at most 8 distinct files. */
+            items: components["schemas"]["GroundItem"][];
+        };
+        /** @description The verdicts of a ground request. */
+        GroundActivityResponse: {
+            /** @description One verdict per item, in the order of the items. */
+            results: components["schemas"]["GroundResult"][];
+        };
+        /**
+         * @description Why an item is not grounded: the first of the checks it fails.
+         * @enum {string}
+         */
+        GroundCode: "upload_changed" | "source_generated" | "locator_invalid" | "quote_not_found" | "quote_too_short" | "unknown_property" | "invalid_value" | "unit_unconfirmed" | "scan_budget";
+        /** @description What a verified quote shows of its file. */
+        GroundEvidence: {
+            /**
+             * @description The quote as the file holds it: white space folded to single spaces,
+             *     at most 600 characters.
+             */
+            quote: string;
+            region?: null | components["schemas"]["WorkflowTestRegion"];
+            /**
+             * @description The file's `Document` IRI with the fragment of the locator
+             *     (`…/e/41ab…#page=3`).
+             */
+            source_id: string;
+            /** @description The SHA-256 of the file the quote was verified in. */
+            source_sha256: string;
+            /** @description The `uploaded_at` the quote was verified at: the content stamp. */
+            uploaded_at: string;
+        };
+        /** @description The file of a proposal: its identity and the upload that was read. */
+        GroundFile: {
+            /** @description The SHA-256 of the bytes, 64 hexadecimal characters. */
+            sha256: string;
+            /**
+             * @description The `uploaded_at` of the file record the proposal read. A delete and
+             *     a new upload of the same bytes change it.
+             */
+            uploaded_at: string;
+        };
+        /** @description One value a model proposes, with the place in a file that states it. */
+        GroundItem: {
+            /** @description The file that states the value, and the upload the proposal read. */
+            file: components["schemas"]["GroundFile"];
+            /**
+             * @description The place in the file: `page=N` for a parsed PDF (from 1), `line=a,b`
+             *     for text and Markdown (RFC 5147: `line=39,44` is lines 40 to 44),
+             *     `row=a-b` or `row=n` for CSV and TSV (RFC 7111: from 1, the header is
+             *     row 1).
+             */
+            locator: string;
+            /** @description The IRI of the property (`https://littlebigbrain.com/p/width_cm`). */
+            property: string;
+            /** @description The words of the file at that place that state the value. */
+            quote: string;
+            /** @description The IRI of the entity the value belongs to. */
+            subject: string;
+            /**
+             * @description The unit the text states a number in, as a symbol or a name (`mm`).
+             *     At most 24 bytes. Empty or absent when the text states none or the
+             *     value is no number.
+             */
+            unit?: string | null;
+            /** @description The value, a number as the text states it (`600`). At most 100 bytes. */
+            value: string;
+        };
+        /**
+         * @description Why a locator is not valid (`locator_invalid`).
+         * @enum {string}
+         */
+        GroundReason: "malformed" | "unsupported_media_type" | "wrong_media_type" | "out_of_range" | "file_not_parsed";
+        /** @description The verdict on one item. */
+        GroundResult: {
+            code?: null | components["schemas"]["GroundCode"];
+            evidence?: null | components["schemas"]["GroundEvidence"];
+            /** @description What failed, in words, at most 200 bytes. Absent when `ok`. */
+            message?: string | null;
+            /** @description True when the item is grounded: every check passed. */
+            ok: boolean;
+            /**
+             * @description The quote result: true when the quote passed its check (it is in the
+             *     text at the locator, and has three words or holds the value), false
+             *     when it did not. Absent when a check before it failed
+             *     (`upload_changed`, `locator_invalid`, `scan_budget`).
+             */
+            quote_verified?: boolean | null;
+            reason?: null | components["schemas"]["GroundReason"];
+            /**
+             * @description The number and unit as the text states them (`600 mm`), when they
+             *     were converted to the property's unit.
+             */
+            stated?: string | null;
+            value?: null | components["schemas"]["PropertyValueInput"];
         };
         /** @enum {string} */
         GroundabilityRecommendation: "narrow+finetune" | "narrow" | "lexical-first";
@@ -61308,6 +61422,153 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["EmbedActivityResponse"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Rate limit exceeded */
+            429: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Service unavailable */
+            503: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+        };
+    };
+    post_v1_workflows_activities_ground: {
+        parameters: {
+            query?: {
+                /** @description Graph name (default `main`) */
+                graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
+            };
+            header?: {
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
+                "Lbb-Version"?: string;
+                /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
+                "Idempotency-Key"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GroundActivityRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GroundActivityResponse"];
                 };
             };
             /** @description Bad request */
