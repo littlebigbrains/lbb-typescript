@@ -14,6 +14,10 @@ import type { CallOptions } from "./transport.js";
 export type EvalDataset = Schemas["EvalDataset"];
 /** One example: a name, the input text, `values` and `leave_out`. */
 export type EvalDatasetItem = Schemas["EvalDatasetItem"];
+/** One label of an item: a value in `values`, or in `leave_out` one a correct run must not write. */
+export type EvalExpectedValue = Schemas["EvalExpectedValue"];
+/** Who gave a label: a person's answer on a test or a review item, `{ kind, id, at }`. */
+export type EvalGradeSource = Schemas["EvalGradeSource"];
 /** A dataset to create: items, or a `source` (a workflow test). */
 export type EvalDatasetCreateRequest = Schemas["EvalDatasetCreateRequest"];
 /** A dataset as a template's samples: `records` and `expected`. */

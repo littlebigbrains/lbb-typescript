@@ -99,6 +99,8 @@ export type {
   EvalDatasetList,
   EvalDatasetListOptions,
   EvalDatasetsNamespace,
+  EvalExpectedValue,
+  EvalGradeSource,
 } from "./eval-datasets.js";
 export type {
   EvalExperiment,
