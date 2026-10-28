@@ -4,6 +4,12 @@ All notable changes to the `@littlebigbrain/client` package are documented here.
 
 ## Unreleased
 
+- The generated schema adds `GroundActivityRequest`, `GroundItem`, `GroundFile`,
+  `GroundResult`, `GroundEvidence`, `GroundActivityResponse`, `GroundCode` and
+  `GroundReason`. They describe `POST /v1/workflows/activities/ground`, which
+  checks values that a model proposes against the files they come from. The
+  answer has one verdict per item. No helper calls the route yet.
+
 - The server sends `X-Content-Type-Options: nosniff` and
   `Content-Disposition: attachment` with the bytes of a file
   (`files.content`, `files.contentStream` and `files.head`). The SDK reads

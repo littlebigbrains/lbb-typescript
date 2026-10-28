@@ -266,7 +266,17 @@ const ENTITY_IRI = /^https:\/\/littlebigbrain\.com\/e\/[0-9a-fA-F]{32}$/;
 const LABEL = "http://www.w3.org/2000/01/rdf-schema#label";
 const P = "https://littlebigbrain.com/p/";
 const BOX = ["page", "x0", "y0", "x1", "y1"] as const;
-const normalize = (text: string) => text.split(/\s+/).filter(Boolean).join(" ");
+/**
+ * White space as Rust's `char::is_whitespace` has it (Unicode White_Space), which is what LBB's
+ * quote test folds: U+0085 is white space and U+FEFF is not. (JavaScript's `\s` is the other way
+ * round at those two.) The golden cases in `sdk/conformance/grounding.json` pin both.
+ */
+const WHITE_SPACE =
+  "\\t\\n\\v\\f\\r \\u0085\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000";
+const WHITE_SPACE_RUN = new RegExp(`[${WHITE_SPACE}]+`, "gu");
+const WHITE_SPACE_ENDS = new RegExp(`^[${WHITE_SPACE}]+|[${WHITE_SPACE}]+$`, "gu");
+const trim = (text: string) => text.replace(WHITE_SPACE_ENDS, "");
+const normalize = (text: string) => text.split(WHITE_SPACE_RUN).filter(Boolean).join(" ");
 /** The first `n` characters (code points, as Rust counts them). */
 const chars = (text: string, n: number) => [...text].slice(0, n).join("");
 const NUMBER = /^[+-]?(\d+(\.\d*)?|\.\d+)([eE][+-]?\d+)?$/;
@@ -277,9 +287,9 @@ export function coerce(
   raw: string,
   type: ValueType,
 ): { value: string | number | boolean } | { error: string } {
-  const text = raw.trim();
+  const text = trim(raw);
   if (!text) return { error: "the value is empty" };
-  const cleaned = text.replaceAll(",", ".").replace(/\s+/g, "");
+  const cleaned = text.replaceAll(",", ".").replace(WHITE_SPACE_RUN, "");
   const number = NUMBER.test(cleaned) ? Number(cleaned) : NaN;
   switch (type) {
     case "i64":
