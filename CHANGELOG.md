@@ -10,6 +10,13 @@ All notable changes to the `@littlebigbrain/client` package are documented here.
   bytes and is not affected. A page of yours that shows a file in an iframe
   or a link now downloads it.
 
+- `FileRecord` has the optional fields `origin` (`FileOrigin`: `workflow`,
+  `run`, `step`) and `expires_at`. `FileRecord.document` is now optional: a
+  file that a workflow run wrote has no `Document`, so the server leaves the
+  field out. Code that reads `file.document` as a string must handle
+  `undefined`. `FileUploadResponse` has the optional `collision`
+  (`FileCollision`: `retry` or `existing`). No route writes such a file yet.
+
 - `ReviewEvalOrigin` has the kind `dataset` and the fields `item`, `property`,
   `value` and `stated`. An experiment files these review items for the values
   its arms differ on and the dataset does not label. Filter them with

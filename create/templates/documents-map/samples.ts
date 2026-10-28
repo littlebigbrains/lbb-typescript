@@ -160,9 +160,13 @@ export async function loadSamples(client: LbbClient, dir: string): Promise<void>
   }
   for (let waited = 0; ; waited += 2) {
     const { files } = await client.files.list();
-    const parsed = files.filter((f) => names.includes(f.name) && f.parse?.status === "parsed");
+    const parsed = files.flatMap((f) =>
+      names.includes(f.name) && f.parse?.status === "parsed" && f.document
+        ? [{ name: f.name, iri: f.document, sha256: f.sha256 }]
+        : [],
+    );
     if (parsed.length === names.length) {
-      const documents = new Map(parsed.map((f) => [f.name, { iri: f.document, sha256: f.sha256 }]));
+      const documents = new Map(parsed.map((f) => [f.name, { iri: f.iri, sha256: f.sha256 }]));
       const trace = JSON.parse(await readFile(join(dir, "trace.json"), "utf8")) as SampleTrace;
       await client.ontology.evolve({ ops: [...traceOntology, ...sampleOntology] });
       await client.commit(traceCommit(trace, documents), {
