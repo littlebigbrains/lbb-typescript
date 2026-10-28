@@ -8817,6 +8817,11 @@ export interface components {
             subject: string;
         };
         /**
+         * @description What an upload of a generated file found.
+         * @enum {string}
+         */
+        FileCollision: "retry" | "existing";
+        /**
          * @description `GET /v1/files/counts`: the graph's files by parse status, counted over
          *     the `Document` entities of the published generation.
          */
@@ -8878,6 +8883,15 @@ export interface components {
              *     ended. A page can hold fewer than `limit` files while `next` is set.
              */
             next?: string | null;
+        };
+        /** @description The run that wrote a generated file. */
+        FileOrigin: {
+            /** @description The run (one attempt of a turn) that wrote it. */
+            run: string;
+            /** @description The step of the run that wrote it. */
+            step: string;
+            /** @description The workflow that wrote the file. */
+            workflow: string;
         };
         /**
          * @description One parsed page. `page` is the 0-based index (the `page` of a region
@@ -8989,8 +9003,16 @@ export interface components {
              *     files and leaves this out.
              */
             deleted_at?: string | null;
-            /** @description The IRI of its `Document` entity (key `file:<sha256>`). */
-            document: string;
+            /**
+             * @description The IRI of its `Document` entity (key `file:<sha256>`). Empty, and so
+             *     absent on the wire, for a generated file: it has no `Document`.
+             */
+            document?: string;
+            /**
+             * @description RFC 3339 time a generated file expires, on the store's clock. Absent
+             *     on a file that does not expire.
+             */
+            expires_at?: string | null;
             /**
              * @description The natural language of the content, a BCP 47 tag such as `en` or
              *     `de-CH`.
@@ -8998,6 +9020,7 @@ export interface components {
             language?: string | null;
             /** @description The name it was uploaded under (the last upload's). */
             name: string;
+            origin?: null | components["schemas"]["FileOrigin"];
             parse?: null | components["schemas"]["FileParse"];
             /**
              * @description The schema the content follows, as an upload stated it (a name or
@@ -9086,6 +9109,7 @@ export interface components {
         };
         /** @description `POST /v1/files`. */
         FileUploadResponse: {
+            collision?: null | components["schemas"]["FileCollision"];
             /**
              * Format: int64
              * @description The commit that wrote the `Document` entity (absent when nothing
