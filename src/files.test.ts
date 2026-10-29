@@ -459,6 +459,44 @@ test("files.delete repeats the SHA-256 as confirm", async () => {
   );
 });
 
+test("files.deleteExpiry keeps a generated file and repeats safely", async () => {
+  const generated = {
+    ...RECORD,
+    name: "report.md",
+    content_type: "text/markdown",
+    document: undefined,
+    origin: { workflow: "datasheets", run: "run_7c1", step: "agent.report" },
+  };
+  const { fetch, seen } = filesFetch([
+    { body: generated },
+    {
+      status: 503,
+      body: { error: { code: "storage_degraded", message: "slow" } },
+    },
+    { body: generated },
+  ]);
+  const lbb = client(fetch);
+
+  const kept = await lbb.files.deleteExpiry(` ${SHA.toUpperCase()} `);
+  assert.equal(kept.expires_at, undefined);
+  assert.equal(kept.origin?.step, "agent.report");
+  const again = await lbb.files.deleteExpiry(SHA);
+  assert.equal(again.name, "report.md");
+  assert.deepEqual(
+    seen.map(({ method, url }) => [method, url]),
+    [
+      ["DELETE", `http://h/v1/files/expiry?graph=docs&sha256=${SHA}`],
+      ["DELETE", `http://h/v1/files/expiry?graph=docs&sha256=${SHA}`],
+      ["DELETE", `http://h/v1/files/expiry?graph=docs&sha256=${SHA}`],
+    ],
+  );
+  await assert.rejects(
+    () => lbb.files.deleteExpiry("abc"),
+    (error: unknown) => error instanceof RangeError,
+  );
+  assert.equal(seen.length, 3, "a bad SHA-256 sends nothing");
+});
+
 test("files.get reads a deleted file with the facts that cite it", async () => {
   const citation = {
     statement: "https://littlebigbrain.com/s/9f3c",
