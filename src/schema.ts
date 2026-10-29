@@ -1676,9 +1676,9 @@ export interface paths {
         /** One page of the graph's files, newest upload first, with what the parse workflow (`documents.parse`) made of each. Without `limit`, the newest 1,000. `next` is the cursor of the next page; a page can hold fewer than `limit` files while `next` is set. With `parse_status` or `name`, one SPARQL read of the `Document` facts at the published generation finds the page, and `as_of_commit_seq` names the commit it read; a file whose record no longer matches (a rename or a parse since) is left out. 400 for an invalid `limit`, `after`, `parse_status` or `name` */
         get: operations["get_v1_files"];
         put?: never;
-        /** Upload a file: the raw request body is stored once under its SHA-256, and a `Document` entity (key `file:<sha256>`) is committed for it, with its `Content` (key `content:<sha256>`) and the edge `HAS_CONTENT`. `language` and `schema` are stored on the `Document` when given. A file holds at most 1 GiB by default (the server setting `LBB_FILES_MAX_BYTES`); a larger body is refused with 413 `file_too_large` before it is read. An empty body is an empty file. The same bytes under the same name change nothing. 429 `file_reclaim_in_progress` while a reclaim pass deletes the same bytes of a deleted file (seconds) */
+        /** Upload a file: the raw request body is stored once under its SHA-256, and a `Document` entity (key `file:<sha256>`) is committed for it, with its `Content` (key `content:<sha256>`) and the edge `HAS_CONTENT`. `language` and `schema` are stored on the `Document` when given. A file holds at most 1 GiB by default (the server setting `LBB_FILES_MAX_BYTES`); a larger body is refused with 413 `file_too_large` before it is read. An empty body is an empty file. The same bytes under the same name change nothing. 409 `file_generated` for the bytes of a generated file (one a workflow run wrote): delete that file first, then upload the bytes as a source. 429 `file_reclaim_in_progress` while a reclaim pass deletes the same bytes of a deleted file (seconds) */
         post: operations["post_v1_files"];
-        /** Remove a file from the list and retract its `Document` entity. The facts whose evidence names the file stay, and keep its content from the reclaim, which deletes a deleted file's bytes, pages and derivations after a grace (30 days by default). With `purge=true` the delete also retracts the edges whose evidence names the file (`purged_edges`, at most 10,000, found at the published generation); a deleted file can be purged. 429 `file_reclaim_in_progress` while a reclaim pass holds the content */
+        /** Remove a file from the list and retract its `Document` entity. The facts whose evidence names the file stay, and keep its content from the reclaim, which deletes a deleted file's bytes, pages and derivations after a grace (30 days by default). With `purge=true` the delete also retracts the edges whose evidence names the file (`purged_edges`, at most 10,000, found at the published generation); a deleted file can be purged. A generated file has no `Document`: its delete retracts nothing, and `purge` retracts no edge (`purged_edges` is 0). 429 `file_reclaim_in_progress` while a reclaim pass holds the content */
         delete: operations["delete_v1_files"];
         options?: never;
         head?: never;
@@ -1692,13 +1692,13 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** A file's bytes with its content type, streamed from storage. One `Range: bytes=a-b`, `bytes=a-` or `bytes=-n` answers 206 with `Content-Range`; a range with no byte of the file answers 416 `range_not_satisfiable` with `Content-Range: bytes *\/<length>`; several ranges answer the whole file. `ETag` is the SHA-256 in quotes; `Accept-Ranges: bytes`. 404 `file_not_found` */
+        /** A file's bytes with its content type, streamed from storage. One `Range: bytes=a-b`, `bytes=a-` or `bytes=-n` answers 206 with `Content-Range`; a range with no byte of the file answers 416 `range_not_satisfiable` with `Content-Range: bytes *\/<length>`; several ranges answer the whole file. `ETag` is the SHA-256 in quotes; `Accept-Ranges: bytes`. The answer sends `X-Content-Type-Options: nosniff` and `Content-Disposition: attachment` with the file name (`filename` and the RFC 8187 `filename*`), so a browser saves the bytes and does not run them; a generated file's `Content-Type` adds `charset=utf-8`. 404 `file_not_found` */
         get: operations["get_v1_files_content"];
         put?: never;
         post?: never;
         delete?: never;
         options?: never;
-        /** A file's length (`Content-Length`), content type and SHA-256 (`ETag`, in quotes), with no body. 404 `file_not_found` */
+        /** A file's length (`Content-Length`), content type and SHA-256 (`ETag`, in quotes), with no body, and the same `X-Content-Type-Options` and `Content-Disposition` headers as the `GET`. 404 `file_not_found` */
         head: operations["head_v1_files_content"];
         patch?: never;
         trace?: never;
@@ -1715,6 +1715,23 @@ export interface paths {
         put?: never;
         post?: never;
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/files/expiry": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Keep a generated file: remove its `expires_at`, so it stays until a person deletes it and shows in `GET /v1/files` from now on. A generated file is one a workflow run wrote (`origin`). A repeat answers the same record, so the call needs no `Idempotency-Key`, and the server ignores one. A live file without an expiry answers as it is. 404 `file_not_found` for no file, a deleted one and a reclaimed one */
+        delete: operations["delete_v1_files_expiry"];
         options?: never;
         head?: never;
         patch?: never;
@@ -40068,6 +40085,151 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["FileCounts"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Rate limit exceeded */
+            429: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Service unavailable */
+            503: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+        };
+    };
+    delete_v1_files_expiry: {
+        parameters: {
+            query?: {
+                /** @description Graph name (default `main`) */
+                graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
+                /** @description the file's SHA-256, hex */
+                sha256?: string;
+            };
+            header?: {
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
+                "Lbb-Version"?: string;
+                /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
+                "Idempotency-Key"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FileRecord"];
                 };
             };
             /** @description Bad request */

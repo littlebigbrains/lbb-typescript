@@ -449,4 +449,22 @@ export class FilesNamespace {
       query: { sha256: sha, confirm: sha, purge: purge ? true : undefined },
     });
   }
+
+  /**
+   * Keep a generated file (one a workflow run wrote, with an `origin`):
+   * remove its `expires_at`, so it stays until a person deletes it and shows
+   * in `list` from now on. Answers the record. A repeat answers the same
+   * record, and a file without an expiry answers as it is. `404
+   * file_not_found` for no file, a deleted one and a reclaimed one.
+   */
+  async deleteExpiry(
+    sha256: string,
+    options: CallOptions = {},
+  ): Promise<FileRecord> {
+    return this.client.request("DELETE", "/v1/files/expiry", {
+      ...options,
+      query: { sha256: sha256Of(sha256) },
+      retry: true,
+    });
+  }
 }
