@@ -346,8 +346,10 @@ export function unitOf(settings: Settings, property: string): string | undefined
   return type === "i64" || type === "f64" ? settings.units?.[property] : undefined;
 }
 
+// The spelling LBB's unit table compares: trimmed, no trailing dot, trimmed again, lower case,
+// `²` and `³` as `2` and `3`.
 const unitText = (text: string) =>
-  text.trim().replace(/\.+$/, "").toLowerCase().replace(/²/g, "2").replace(/³/g, "3");
+  trim(trim(text).replace(/\.+$/, "")).toLowerCase().replace(/²/g, "2").replace(/³/g, "3");
 
 /**
  * Why a number of a property that holds `unit` cannot be confirmed in that unit: the text states
@@ -358,7 +360,7 @@ export function unitProblem(unit: string, stated: string, quote: string): string
   const want = unitText(unit);
   const got = unitText(stated);
   if (!got) return `the text states no unit; the property holds ${unit}`;
-  if (got !== want) return `the text states ${stated.trim()}; the property holds ${unit}`;
+  if (got !== want) return `the text states ${trim(stated)}; the property holds ${unit}`;
   const token = want.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   return new RegExp(`(?<!\\p{L})${token}(?![\\p{L}\\p{N}])`, "u").test(unitText(quote))
     ? undefined
@@ -371,13 +373,24 @@ export function unitProblem(unit: string, stated: string, quote: string): string
  * no unit after it.
  */
 export function splitNumberUnit(text: string): { number: string; unit: string } | undefined {
-  const trimmed = text.trim();
+  const trimmed = trim(text);
   const end = [...trimmed].findIndex((c) => !/[0-9.,+\- ]/.test(c));
   if (end < 0) return undefined;
   const points = [...trimmed];
-  const number = points.slice(0, end).join("").trim();
-  const unit = points.slice(end).join("").trim();
+  const number = trim(points.slice(0, end).join(""));
+  const unit = trim(points.slice(end).join(""));
   return /[0-9]/.test(number) && unit ? { number, unit } : undefined;
+}
+
+/**
+ * A value and the unit a model gave with it, as LBB reads them (`read_value_unit`): the unit is
+ * trimmed; a number with its unit in `value` (`600 mm`), against the rules, is read apart when
+ * the unit is empty.
+ */
+export function readValueUnit(value: string, unit: string): { value: string; unit: string } {
+  const stated = trim(unit);
+  const split = stated ? undefined : splitNumberUnit(value);
+  return split ? { value: split.number, unit: split.unit } : { value, unit: stated };
 }
 
 /** The checks without a model, in the order of LBB's `values.extract`. */
@@ -393,13 +406,10 @@ export function check(
   return values.map((entry): Checked => {
     const item: Record<string, unknown> = typeof entry === "object" && entry !== null ? entry : {};
     const property = str(item.property);
-    let raw = str(item.value);
-    let stated = str(item.unit).trim();
-    const quote = str(item.quote);
     // A number given with its unit in `value` (`600 mm`), against the
-    // rules: read the two apart.
-    const split = stated ? undefined : splitNumberUnit(raw);
-    if (split) ({ number: raw, unit: stated } = split);
+    // rules, is read apart.
+    const { value: raw, unit: stated } = readValueUnit(str(item.value), str(item.unit));
+    const quote = str(item.quote);
     const out: Checked = { property, value: raw, quote, outcome: "" };
     const type = Object.hasOwn(properties, property) ? properties[property] : undefined;
     if (!type) return { ...out, outcome: "unknown_property" };
