@@ -1676,7 +1676,7 @@ export interface paths {
         /** One page of the graph's files, newest upload first, with what the parse workflow (`documents.parse`) made of each. Without `limit`, the newest 1,000. `next` is the cursor of the next page; a page can hold fewer than `limit` files while `next` is set. With `parse_status` or `name`, one SPARQL read of the `Document` facts at the published generation finds the page, and `as_of_commit_seq` names the commit it read; a file whose record no longer matches (a rename or a parse since) is left out. 400 for an invalid `limit`, `after`, `parse_status` or `name` */
         get: operations["get_v1_files"];
         put?: never;
-        /** Upload a file: the raw request body is stored once under its SHA-256, and a `Document` entity (key `file:<sha256>`) is committed for it, with its `Content` (key `content:<sha256>`) and the edge `HAS_CONTENT`. `language` and `schema` are stored on the `Document` when given. A file holds at most 1 GiB by default (the server setting `LBB_FILES_MAX_BYTES`); a larger body is refused with 413 `file_too_large` before it is read. An empty body is an empty file. The same bytes under the same name change nothing. 409 `file_generated` for the bytes of a generated file (one a workflow run wrote): delete that file first, then upload the bytes as a source. 429 `file_reclaim_in_progress` while a reclaim pass deletes the same bytes of a deleted file (seconds) */
+        /** Upload a file: the raw request body is stored once under its SHA-256, and a `Document` entity (key `file:<sha256>`) is committed for it, with its `Content` (key `content:<sha256>`) and the edge `HAS_CONTENT`. `language` and `schema` are stored on the `Document` when given. A file holds at most 1 GiB by default (the server setting `LBB_FILES_MAX_BYTES`); a larger body is refused with 413 `file_too_large` before it is read. An empty body is an empty file. The same bytes under the same name change nothing. 409 `file_generated` for the bytes of a generated file (one a workflow run wrote): delete that file first, then upload the bytes as a source. 429 `file_reclaim_in_progress` while a reclaim pass deletes the same bytes of a deleted file (seconds). Under a `file_write` execution credential (a turn of the hosted agent type; LBB's hosted workers only) the upload writes a generated file, an output: `step` is required, the server sets `origin.workflow` and `origin.run` from the credential, the file expires after `retain_days` (default 31), and no `Document`, `Content` or content log entry is written. The type is text/plain, text/markdown or application/json, the extension must match, the body holds at most 1 MiB, and one message writes at most 5 files and 4 MiB (415 `file_output_type`, 400 `file_output_content`, 403 `file_output_limit`). A file that already exists is answered with `created: false` and a `collision` (`retry` or `existing`). A person or a stack key that sends `step` or `retain_days` gets 400 */
         post: operations["post_v1_files"];
         /** Remove a file from the list and retract its `Document` entity. The facts whose evidence names the file stay, and keep its content from the reclaim, which deletes a deleted file's bytes, pages and derivations after a grace (30 days by default). With `purge=true` the delete also retracts the edges whose evidence names the file (`purged_edges`, at most 10,000, found at the published generation); a deleted file can be purged. A generated file has no `Document`: its delete retracts nothing, and `purge` retracts no edge (`purged_edges` is 0). 429 `file_reclaim_in_progress` while a reclaim pass holds the content */
         delete: operations["delete_v1_files"];
@@ -4891,7 +4891,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Issue or refresh one operation credential for the exact live turn attempt: SELECT/ASK (`sparql_read`, the default), or the grants of LBB's hosted workers (`file_read`, `owned_write`), which only LBB's work token is issued and only with LBB_WORKFLOW_EXECUTION_GRANTS (403 workflow_execution_scope or workflow_execution_disabled). Requires the original control credential and lease token; execution bearers cannot refresh or control workflows. */
+        /** Issue or refresh one operation credential for the exact live turn attempt: SELECT/ASK (`sparql_read`, the default), or the grants of LBB's hosted workers (`file_read`, `owned_write`, and for a turn of the hosted agent type `model_call`, `review`, `revision_read` and `file_write`), which only LBB's work token is issued and only with LBB_WORKFLOW_EXECUTION_GRANTS (403 workflow_execution_scope or workflow_execution_disabled). `file_write` also needs the file reclaim job in `apply` mode (LBB_FILE_RECLAIM). Requires the original control credential and lease token; execution bearers cannot refresh or control workflows. */
         post: operations["post_v1_workflows_turns_execution_credential"];
         delete?: never;
         options?: never;
@@ -20966,11 +20966,12 @@ export interface components {
         /**
          * @description One explicit operation of a workflow execution credential. Every
          *     operation but `sparql_read` is a grant of LBB's hosted workers: only LBB's
-         *     work token is issued them. `model_call`, `review` and `revision_read` are
-         *     for a turn of the hosted agent type (`HOSTED_AGENT_WORKFLOW_TYPE`).
+         *     work token is issued them. `model_call`, `review`, `revision_read` and
+         *     `file_write` are for a turn of the hosted agent type
+         *     (`HOSTED_AGENT_WORKFLOW_TYPE`).
          * @enum {string}
          */
-        WorkflowExecutionOperation: "sparql_read" | "file_read" | "owned_write" | "model_call" | "review" | "revision_read";
+        WorkflowExecutionOperation: "sparql_read" | "file_read" | "owned_write" | "model_call" | "review" | "revision_read" | "file_write";
         /**
          * @description A commit made from a workflow turn (`POST /v1/graph/commit`,
          *     `workflow_fence`): the server answers a repeat of the commit's request id
@@ -39490,6 +39491,10 @@ export interface operations {
                 language?: string;
                 /** @description the schema the content follows (a name or a URL), at most 256 characters */
                 schema?: string;
+                /** @description a `file_write` credential only, required: the step that wrote the file, 1 to 128 of A-Z a-z 0-9 _ . : - */
+                step?: string;
+                /** @description a `file_write` credential only: days until the file expires, 1 to 365 (default 31) */
+                retain_days?: string;
             };
             header?: {
                 /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
@@ -39500,7 +39505,7 @@ export interface operations {
             path?: never;
             cookie?: never;
         };
-        /** @description The file's bytes, at most 1 GiB by default (`LBB_FILES_MAX_BYTES`); an empty body is an empty file. `Content-Type` names its type; without one (or with `application/octet-stream`), the server detects PDF, PNG, JPEG, GIF and WebP by their bytes, `.xlsx`, `.docx` and `.pptx` files by the ZIP signature and the name, and UTF-8 text named `.csv`, `.tsv`, `.md`, `.json` or `.txt` by the name. */
+        /** @description The file's bytes, at most 1 GiB by default (`LBB_FILES_MAX_BYTES`), or at most 1 MiB under a `file_write` credential; an empty body is an empty file. `Content-Type` names its type; without one (or with `application/octet-stream`), the server detects PDF, PNG, JPEG, GIF and WebP by their bytes, `.xlsx`, `.docx` and `.pptx` files by the ZIP signature and the name, and UTF-8 text named `.csv`, `.tsv`, `.md`, `.json` or `.txt` by the name. */
         requestBody: {
             content: {
                 "application/octet-stream": string;
