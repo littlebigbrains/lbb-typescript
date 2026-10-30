@@ -16265,6 +16265,12 @@ export interface components {
             answer: components["schemas"]["ReviewAnswer"];
             /** @description Why the graph refused the answered value, when it did. */
             commit_error?: string | null;
+            /**
+             * @description The check that refused the value, when the server's own recheck
+             *     refused it, or `review_commit_gave_up` after the last try. See
+             *     `ReviewEffects::commit_error_code`.
+             */
+            commit_error_code?: string | null;
             commit_seq?: null | components["schemas"]["CommitSeq"];
             /** @description `rev_` and the record's hex. */
             id: string;
@@ -16347,6 +16353,15 @@ export interface components {
              */
             commit_error?: string | null;
             /**
+             * @description The check that refused the commit, when the server's own recheck
+             *     refused it: `review_upload_changed`, `review_source_generated`,
+             *     `review_quote_not_verified`, `review_evidence_mismatch` or
+             *     `review_property_not_owned`, or `review_commit_gave_up` after the last
+             *     try of a commit that kept failing. Absent for a refusal by the graph (a
+             *     value the property no longer takes), which `commit_error` words.
+             */
+            commit_error_code?: string | null;
+            /**
              * @description The idempotency key of that commit
              *     (`review:<suggestion id>:r<revision>:<hash>`).
              */
@@ -16416,6 +16431,19 @@ export interface components {
              *     `#line=39,44`), or a record's name.
              */
             source_id?: string | null;
+            /**
+             * @description The SHA-256 of the file the quote was verified in, 64 hexadecimal
+             *     characters. The server recomputes the `Document` IRI from it when the
+             *     item is filed and when its answer commits. An entry with a SHA-256 is
+             *     checked against the file at both times; an entry without one is not.
+             */
+            source_sha256?: string | null;
+            /**
+             * @description The `uploaded_at` of the file when the quote was verified in it: the
+             *     content stamp. A delete and a new upload of the same bytes change it.
+             *     Set with `source_sha256`.
+             */
+            uploaded_at?: string | null;
         };
         /**
          * @description A question for a person (`/v1/reviews`). A list holds each item without
@@ -57767,6 +57795,8 @@ export interface operations {
                  * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
                  */
                 stack?: string;
+                /** @description Optional decimal u64 graph incarnation from /v1/workflows/scope. A changed incarnation returns 409 graph_epoch_changed; a graph missing at admission returns 404. Synchronous writes and CAS retries cannot mutate a replacement incarnation; detached jobs are outside this precondition. */
+                expected_graph_epoch?: string;
                 /** @description Review item id (`rev_…`) */
                 id?: string;
             };
@@ -57916,6 +57946,8 @@ export interface operations {
                  * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
                  */
                 stack?: string;
+                /** @description Optional decimal u64 graph incarnation from /v1/workflows/scope. A changed incarnation returns 409 graph_epoch_changed; a graph missing at admission returns 404. Synchronous writes and CAS retries cannot mutate a replacement incarnation; detached jobs are outside this precondition. */
+                expected_graph_epoch?: string;
             };
             header?: {
                 /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
