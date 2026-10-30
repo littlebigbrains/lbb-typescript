@@ -2,7 +2,32 @@
 
 All notable changes to the `@littlebigbrain/client` package are documented here.
 
-## Unreleased
+## 0.32.0 (2026-10-30)
+
+- The client sends `Lbb-Version: 2026-10-27` by default (before:
+  `2026-10-21`). `status()` without `version` follows the server. A server
+  that has this release answers the current typed response. An older server
+  answers the earlier one. The answer is not checked. Send
+  `version: "status/1"` for a checked `CurrentStatusResponse`.
+
+- `shadowEval`, `trainTick`, `trainSubmit` and `setTrainingConfig` are
+  deprecated. They run the older semantic-search replay and the deterministic
+  retrieval trainer. Class-declared embedding search does not replace them
+  automatically. They work as before. A server with the capability
+  `legacy_model_consumers_deprecation_v1` adds the header
+  `LBB-Legacy-Model-Policy` and a deprecation `Link` to their answers.
+
+- The generated schema adds the optional field `commit_error_code` to
+  `ReviewEffects` and `ReviewAnsweredItem`. It names the check that refused a
+  review commit: `review_upload_changed`, `review_source_generated`,
+  `review_quote_not_verified`, `review_evidence_mismatch` or
+  `review_property_not_owned`, or `review_commit_gave_up` after the last try.
+  It is absent when the graph refused the value, which `commit_error` words.
+
+- The generated schema adds `GraphCommitRequestBody` and
+  `GraphCommitResponseBody`, the two kinds of body of `POST /v1/graph/commit`:
+  the ordinary one and `records/1` (`RecordCommitRequest`,
+  `RecordCommitResult`). Existing commit helpers are unchanged.
 
 - The generated schema adds the optional `workflow` field to
   `GroundActivityRequest`, the verdict `not_owned` to `GroundCode`, the optional
@@ -56,7 +81,7 @@ All notable changes to the `@littlebigbrain/client` package are documented here.
   `RdfImportCommitObject`. `importRdf` sends no `expected_graph_epoch` and
   returns the bulk response as before. No helper selects the new binding yet.
 
-- Add explicit-key `client.records.commit` and graph-scoped records commits with strict `records/1` selection, capability preflight, fixed retry bytes and checked original receipts. Protocol recognition does not activate or convert a graph; existing commit helpers are unchanged.
+- Add explicit-key `client.records.commit` and graph-scoped records commits with strict `records/1` selection, capability preflight, fixed retry bytes and checked original receipts. Protocol recognition does not activate or convert a graph; existing commit helpers are unchanged. A response that does not prove acceptance throws `LbbRecordCommitOutcomeError`: send the original body again with the same key.
 - `client.files.sheets(sha256, { sheet, from, to })` reads an XLSX workbook
   (`GET /v1/files/sheets`): the outline of its sheets, or the rows of one
   sheet by A1 row. A cell has the `value` its file stores, as text, and its

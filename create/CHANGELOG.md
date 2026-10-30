@@ -2,6 +2,22 @@
 
 All notable changes to the `@littlebigbrain/create` package are documented here.
 
+## 0.8.0 (2026-10-30)
+
+- A new project requires `@littlebigbrain/client` ^0.32.0, and a
+  `--lang python` project `littlebigbrain>=0.33.0`. These releases add
+  `files.sheets` and the `attempt` option of `reason`, which the templates
+  below use.
+- The new template `documents-check` checks PDFs against each other: SHACL
+  rules over the values `values.extract` reads, and a review item with the
+  quotes of both documents for each difference. The project holds its rules in
+  `src/shapes.ttl`. The template has no LBB-run version and no Python port.
+- The `rows` template reads XLSX files by sheet. The new setting `sheet` names
+  the sheet to read; the default is the first visible sheet.
+- The `values-extract` template takes `repair: 0 | 1` (`Settings(repair=1)`
+  in the Python port): `1` asks again once when the first answer fails a
+  check. The default `0` makes the same calls as before.
+
 ## 0.7.0 (2026-10-26)
 
 - A new project requires `@littlebigbrain/client` ^0.31.0, and a
