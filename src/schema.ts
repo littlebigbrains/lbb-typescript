@@ -8662,6 +8662,15 @@ export interface components {
             observation_id?: string | null;
             region?: null | components["schemas"]["RegionAnchorInput"];
             source_id?: string | null;
+            /**
+             * @description The SHA-256 of the file `source_id` cites (64 hexadecimal
+             *     characters). A commit under the `owned_write` grant of a hosted
+             *     agent carries it with every written value: the server recomputes
+             *     the `Document` IRI from it, reading no entity, and checks the
+             *     quote against the live file of that hash
+             *     (`docs/architecture/agent-step.md` 4.3). Other commits ignore it.
+             */
+            source_sha256?: string | null;
             text?: string | null;
         };
         /**
@@ -10605,6 +10614,15 @@ export interface components {
         GroundActivityRequest: {
             /** @description 1 to 16 proposals, from at most 8 distinct files. */
             items: components["schemas"]["GroundItem"][];
+            /**
+             * @description The named workflow whose `owns` check 6 reads: 1 to 64 characters of
+             *     `A-Z a-z 0-9 _ . -`. For a caller with a stack key only. Under an
+             *     execution credential the server takes the workflow from the credential
+             *     and a body that names it is refused (`400 invalid_request`). A stack
+             *     key can write anything, so its ownership verdict is advisory. Absent:
+             *     check 6 does not run.
+             */
+            workflow?: string | null;
         };
         /** @description The verdicts of a ground request. */
         GroundActivityResponse: {
@@ -10615,7 +10633,7 @@ export interface components {
          * @description Why an item is not grounded: the first of the checks it fails.
          * @enum {string}
          */
-        GroundCode: "upload_changed" | "source_generated" | "locator_invalid" | "quote_not_found" | "quote_too_short" | "unknown_property" | "invalid_value" | "unit_unconfirmed" | "scan_budget";
+        GroundCode: "upload_changed" | "source_generated" | "locator_invalid" | "quote_not_found" | "quote_too_short" | "unknown_property" | "invalid_value" | "unit_unconfirmed" | "scan_budget" | "not_owned";
         /** @description What a verified quote shows of its file. */
         GroundEvidence: {
             /**
@@ -20946,12 +20964,13 @@ export interface components {
             workflow_id: string;
         };
         /**
-         * @description One explicit operation of a workflow execution credential. `file_read`
-         *     and `owned_write` are the grants of LBB's hosted workers: only LBB's work
-         *     token is issued them.
+         * @description One explicit operation of a workflow execution credential. Every
+         *     operation but `sparql_read` is a grant of LBB's hosted workers: only LBB's
+         *     work token is issued them. `model_call`, `review` and `revision_read` are
+         *     for a turn of the hosted agent type (`HOSTED_AGENT_WORKFLOW_TYPE`).
          * @enum {string}
          */
-        WorkflowExecutionOperation: "sparql_read" | "file_read" | "owned_write";
+        WorkflowExecutionOperation: "sparql_read" | "file_read" | "owned_write" | "model_call" | "review" | "revision_read";
         /**
          * @description A commit made from a workflow turn (`POST /v1/graph/commit`,
          *     `workflow_fence`): the server answers a repeat of the commit's request id
