@@ -429,6 +429,11 @@ export class LbbClient {
    * Each instance is scoped to one graph, so use this to target another
    * scope (e.g. creating a fresh graph) without mutating the current client.
    */
+  /** The graph incarnation this client is fenced to, when explicitly scoped. */
+  get graphEpoch(): string | undefined {
+    return this.expectedGraphEpoch;
+  }
+
   withScope(scope: {
     graph?: string;
     environment?: string;

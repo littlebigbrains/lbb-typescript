@@ -53,7 +53,11 @@ import {
 } from "./agent-protocol.js";
 import { stableHashHex } from "./hash.js";
 import { nextPlace, placeCount, placeOf, readPlace } from "./locators.js";
-import { LbbError, type CallOptions } from "./transport.js";
+import {
+  LbbError,
+  observedActivityUsage,
+  type CallOptions,
+} from "./transport.js";
 import type { Schemas, SparqlResults } from "./types.js";
 import {
   turnRunOf,
@@ -1141,13 +1145,16 @@ async function decideStep(
       if (
         error instanceof LbbError &&
         error.code === "activity_request_refused"
-      )
+      ) {
+        const observed = observedActivityUsage(error);
         return {
           invalid: "the model gave no usable action",
-          tokensIn: 0,
-          tokensOut: 0,
-          costMicroUsd: 0,
+          ...(observed ? { model: observed.model } : {}),
+          tokensIn: observed?.tokens_in ?? 0,
+          tokensOut: observed?.tokens_out ?? 0,
+          costMicroUsd: observed?.cost_micro_usd ?? 0,
         };
+      }
       throw error;
     }
   }
@@ -1699,7 +1706,11 @@ async function commitPhase(input: PhaseInput): Promise<{ uncertain?: string }> {
     const pair = pairOf(p.subject, p.property);
     const answer = recheck.answered[pair];
     if (!answer) continue;
-    const judged = judgeAnswer(p, answer, evidenceHash(p, stamps));
+    const judged = judgeAnswer(
+      p,
+      answer,
+      evidenceHash(p, stamps, options.hosted),
+    );
     if (judged === "answered") p.disposition = "answered";
     else if (judged === "rejected") p.disposition = "rejected";
     else if (judged === "refused") p.disposition = "review";
@@ -2050,7 +2061,13 @@ async function supportStep(
 function evidenceHash(
   p: AgentProposal,
   stamps: ReadonlyMap<string, string>,
+  hosted = false,
 ): string {
+  // The hosted Review route owns this field and hashes the stamped claims.
+  // Compare answers with that exact server mark; stack-key items retain the
+  // developer protocol's existing mark.
+  if (hosted)
+    return stableHashHex([p.sha256, stamps.get(p.sha256) ?? "", p.quote]);
   return stableHashHex([
     "agent_evidence_v1",
     p.sha256,
@@ -2411,6 +2428,7 @@ function reviewBody(
   // A value with a verified quote shows it; any other value shows no quote:
   // the model's words are never evidence.
   const verified =
+    p.verdict.code === "grounded" ||
     p.verdict.code === "weak_support" ||
     p.verdict.code === "unit_unconfirmed" ||
     p.verdict.code === "commit_refused" ||
@@ -2459,7 +2477,7 @@ function reviewBody(
     },
     evidence,
     // An answer holds for this mark: other evidence with another value asks again.
-    evidence_hash: evidenceHash(p, stamps),
+    ...(options.hosted ? {} : { evidence_hash: evidenceHash(p, stamps) }),
     // Under a credential the server names the workflow, the run and the turn;
     // the body may carry the step only.
     workflow: options.hosted

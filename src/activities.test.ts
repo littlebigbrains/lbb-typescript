@@ -8,6 +8,7 @@ import {
   splitInHalves,
 } from "./activities.js";
 import { workflow, WorkflowWorker, type WorkflowContext } from "./workflows.js";
+import { observedActivityUsage } from "./transport.js";
 
 interface Seen {
   method: string;
@@ -243,6 +244,38 @@ test("isActivityRefused is false for other errors", () => {
     message: "another request",
   });
   assert.equal(isActivityRefused(conflict), false);
+});
+
+test("invalid error details never become observed activity usage", () => {
+  const valid = {
+    model: "provider-model",
+    tokens_in: 10,
+    tokens_out: 5,
+    cost_micro_usd: 70,
+  };
+  for (const changed of [
+    { model: "" },
+    { tokens_in: -1 },
+    { tokens_out: 1.5 },
+    { cost_micro_usd: Number.MAX_SAFE_INTEGER + 1 },
+    { cost_micro_usd: "70" },
+  ]) {
+    const error = new LbbError(422, "", {
+      code: "activity_request_refused",
+      details: { ...valid, ...changed },
+    });
+    assert.equal(observedActivityUsage(error), undefined);
+  }
+  assert.equal(
+    observedActivityUsage(
+      new LbbError(503, "", {
+        code: "activity_model_unavailable",
+        details: valid,
+      }),
+    ),
+    undefined,
+    "unknown provider failures are not priced from error metadata",
+  );
 });
 
 test("an effect conflict and a spent budget fail at once", async () => {

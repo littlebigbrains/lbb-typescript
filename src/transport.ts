@@ -77,6 +77,45 @@ export class LbbError extends Error {
   }
 }
 
+/** Provider-observed usage of an unusable reasoning reply. Absent metadata
+ * remains unknown; never infer tokens or price from the request or error. */
+export function observedActivityUsage(error: unknown):
+  | {
+      model: string;
+      tokens_in: number;
+      tokens_out: number;
+      cost_micro_usd: number;
+    }
+  | undefined {
+  if (
+    !(error instanceof LbbError) ||
+    error.status !== 422 ||
+    error.code !== "activity_request_refused"
+  )
+    return undefined;
+  const usage = error.details;
+  if (
+    !usage ||
+    typeof usage.model !== "string" ||
+    !usage.model.length ||
+    usage.model.length > 256
+  )
+    return undefined;
+  for (const key of ["tokens_in", "tokens_out", "cost_micro_usd"] as const)
+    if (
+      typeof usage[key] !== "number" ||
+      !Number.isSafeInteger(usage[key]) ||
+      usage[key] < 0
+    )
+      return undefined;
+  return {
+    model: usage.model,
+    tokens_in: usage.tokens_in as number,
+    tokens_out: usage.tokens_out as number,
+    cost_micro_usd: usage.cost_micro_usd as number,
+  };
+}
+
 /** Thrown when a server cannot supply a required additive capability. */
 export class LbbCapabilityError extends Error {
   constructor(readonly capability: string) {

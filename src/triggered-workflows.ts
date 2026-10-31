@@ -24,6 +24,8 @@ export interface TriggeredWorkflowRef {
 
 /** Paging and the filter of a workflow's runs (`runs`). */
 export interface WorkflowRunsOptions extends CallOptions {
+  /** Only attempts of this message work key. */
+  workKey?: string;
   /** The `next_cursor` of the previous page. */
   cursor?: string;
   /** @deprecated The earlier name of `cursor`. */
@@ -356,7 +358,7 @@ export class TriggeredWorkflowsNamespace {
     ref: TriggeredWorkflowRef,
     options: TriggeredWorkflowRunsOptions = {},
   ): Promise<Schemas["WorkflowRunList"]> {
-    const { cursor, before, limit, outcome, ...opts } = options;
+    const { cursor, before, limit, outcome, workKey, ...opts } = options;
     return listPage(
       this.client,
       "/v1/workflows/triggered/runs",
@@ -367,6 +369,7 @@ export class TriggeredWorkflowsNamespace {
         before,
         limit,
         outcome,
+        work_key: workKey,
       },
       opts,
       EARLIER_RUNS,
@@ -549,7 +552,7 @@ export class NamedWorkflowsNamespace {
    * retried.
    */
   put(
-    request: Schemas["NamedWorkflowRequest"],
+    request: Schemas["NamedWorkflowPutRequest"],
     opts: CallOptions = {},
   ): Promise<Schemas["NamedWorkflow"]> {
     return this.client.request("PUT", "/v1/workflows/named", {
@@ -567,11 +570,13 @@ export class NamedWorkflowsNamespace {
    */
   run(
     name: string,
-    opts: CallOptions = {},
+    opts: CallOptions & { inputs?: Schemas["WorkflowRunNowInput"][] } = {},
   ): Promise<Schemas["NamedWorkflowRunResponse"]> {
+    const { inputs, ...call } = opts;
     return this.client.request("POST", "/v1/workflows/named/run", {
-      ...opts,
+      ...call,
       query: { name },
+      ...(inputs ? { body: { inputs } } : {}),
     });
   }
 
@@ -675,11 +680,11 @@ export class NamedWorkflowsNamespace {
     name: string,
     options: WorkflowRunsOptions = {},
   ): Promise<Schemas["WorkflowRunList"]> {
-    const { cursor, before, limit, outcome, ...opts } = options;
+    const { cursor, before, limit, outcome, workKey, ...opts } = options;
     return listPage(
       this.client,
       "/v1/workflows/named/runs",
-      { name, cursor, before, limit, outcome },
+      { name, cursor, before, limit, outcome, work_key: workKey },
       opts,
       EARLIER_RUNS,
     );

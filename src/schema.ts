@@ -12956,6 +12956,20 @@ export interface components {
             /** @description Entity names sampled for the heuristic. */
             sampled: number;
         };
+        /**
+         * @description The hosted agent's named creation surface. `triggers` contains one class watch
+         *     or content trigger. The type is fixed to lbb.agent@v1; no editable code executes.
+         */
+        NamedAgentWorkflowRequest: {
+            /** Format: double */
+            budget_usd_per_month?: number | null;
+            gate?: null | components["schemas"]["WorkflowGate"];
+            name: string;
+            owns: components["schemas"]["WorkflowOwns"];
+            params: unknown;
+            starter: string;
+            triggers: components["schemas"]["WorkflowTrigger"][];
+        };
         NamedCount: {
             count: number;
             name: string;
@@ -13079,6 +13093,8 @@ export interface components {
         NamedWorkflowPauseRequest: {
             paused: boolean;
         };
+        /** @description Additive named creation forms: a developer workflow or the reviewed hosted agent. */
+        NamedWorkflowPutRequest: components["schemas"]["NamedAgentWorkflowRequest"] | components["schemas"]["NamedWorkflowRequest"];
         /**
          * @description `GET /v1/workflows/named/queue?name=&trigger=&cursor=&limit=`: what a
          *     watch has not sent yet, with origins, the pass in progress, and per
@@ -13185,6 +13201,10 @@ export interface components {
             window?: number | null;
             /** @description The workflow type and version that receive the messages. */
             workflow: components["schemas"]["WorkflowTypeRef"];
+        };
+        /** @description Optional body of POST /v1/workflows/named/run. An absent body keeps Run now. */
+        NamedWorkflowRunRequest: {
+            inputs?: components["schemas"]["WorkflowRunNowInput"][] | null;
         };
         /** @description `POST /v1/workflows/named/run`: run now. */
         NamedWorkflowRunResponse: {
@@ -20800,6 +20820,71 @@ export interface components {
         };
         /** @enum {string} */
         WorkerRole: "capture" | "apply";
+        WorkflowAgentProposalCounts: {
+            /** Format: int32 */
+            dropped: number;
+            /** Format: int32 */
+            failed: number;
+            /** Format: int32 */
+            review: number;
+            /** Format: int32 */
+            written: number;
+        };
+        /**
+         * @description What one agent step did, kept with its input for 30 days. No full proposal
+         *     array or duplicate transcript: the values hold proposals and history holds steps.
+         */
+        WorkflowAgentRecord: {
+            code?: string | null;
+            /** Format: int64 */
+            cost_micro_usd: number;
+            /** Format: int32 */
+            iterations: number;
+            limit?: string | null;
+            /** Format: int32 */
+            max_iterations: number;
+            model?: string | null;
+            /** @description finished, limit or failed. */
+            outcome: string;
+            pin: string;
+            proposals: components["schemas"]["WorkflowAgentProposalCounts"];
+            summary?: string;
+            tools: {
+                [key: string]: number;
+            };
+            trace?: components["schemas"]["WorkflowAgentTrace"][];
+            work_key: string;
+        };
+        /**
+         * @description Revision-pinned behavior of the hosted agent. The model remains a Models choice;
+         *     authority, input and ownership come from the workflow and its trigger.
+         */
+        WorkflowAgentSettings: {
+            instructions: string;
+            /** Format: int64 */
+            max_cost_micro_usd?: number | null;
+            /** Format: int32 */
+            max_iterations?: number | null;
+            /** Format: int32 */
+            max_proposals?: number | null;
+            /** Format: int64 */
+            max_read_ms?: number | null;
+            /** Format: int32 */
+            max_review_items?: number | null;
+            /** Format: int64 */
+            max_wall_ms?: number | null;
+            /** Format: int64 */
+            pin_wait_ms?: number | null;
+            tools?: string[] | null;
+        };
+        WorkflowAgentTrace: {
+            /** Format: int32 */
+            n: number;
+            /** @description Untrusted plain text, at most 160 UTF-8 bytes. */
+            note: string;
+            ok: boolean;
+            tool: string;
+        };
         /**
          * @description A blob of a workflow (`POST /v1/workflows/blobs?workflow_id=`): bytes a
          *     step stores beside the engine for a large output or a large shared read
@@ -21935,6 +22020,7 @@ export interface components {
          *     it, and its values in the shape of a test's (`WorkflowTestValue`).
          */
         WorkflowRunInput: {
+            agent?: null | components["schemas"]["WorkflowAgentRecord"];
             /**
              * Format: int64
              * @description The model cost of this input, in millionths of a US dollar, when the
@@ -21982,6 +22068,11 @@ export interface components {
              */
             repaired?: number;
         };
+        /** @description Inputs selected for Run again: exactly one of iri and sha256 per entry. */
+        WorkflowRunNowInput: {
+            iri?: string | null;
+            sha256?: string | null;
+        };
         /**
          * @description How a run ended.
          * @enum {string}
@@ -22008,6 +22099,7 @@ export interface components {
          *     and when the run recorded it.
          */
         WorkflowRunResult: {
+            agent?: null | components["schemas"]["WorkflowAgentRecord"];
             /** Format: int64 */
             cost_micro_usd?: number;
             /** @description When the run recorded it (the run's end), RFC 3339. */
@@ -22221,6 +22313,8 @@ export interface components {
              */
             v: number;
             version: string;
+            /** @description The stable work key of an engine message; absent on earlier summaries. */
+            work_key?: string | null;
             /**
              * @description The folder the run is kept in: the named workflow of the identity,
              *     else `instance:<identity>`.
@@ -22827,6 +22921,8 @@ export interface components {
              *     were converted to the property's unit.
              */
             stated?: string | null;
+            /** @description The proposed target IRI when the input is a source file. */
+            subject?: string | null;
             /**
              * Format: float
              * @description How well the quote supports the value, 0 to 1.
@@ -65500,7 +65596,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["NamedWorkflowRequest"];
+                "application/json": components["schemas"]["NamedWorkflowPutRequest"];
             };
         };
         responses: {
@@ -66980,7 +67076,11 @@ export interface operations {
             path?: never;
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["NamedWorkflowRunRequest"];
+            };
+        };
         responses: {
             /** @description OK */
             200: {
@@ -67115,6 +67215,8 @@ export interface operations {
                 stack?: string;
                 /** @description the workflow's name */
                 name?: string;
+                /** @description only attempts of this stable message work key (wk_ and 16 hex) */
+                work_key?: string;
                 /** @description the `next_cursor` of the previous page (`before` is its earlier name) */
                 cursor?: string;
                 /** @description runs, 1 to 200; default 50 */

@@ -304,3 +304,9 @@ export type {
   WorkflowReadOptions,
   WorkflowReadRequest,
 } from "./workflow-execution.js";
+
+export {
+  recordHostedAgentResult,
+  recordHostedAgentRemoval,
+  hostedAgentRecord,
+} from "./hosted-agent.js";

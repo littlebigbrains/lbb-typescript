@@ -81,10 +81,16 @@ export function lbbAgentHost(
       try {
         const meta = await client.metadata();
         const seq = meta.snapshot?.commit_seq;
-        return { commitSeq: typeof seq === "number" ? seq : null };
+        return {
+          commitSeq: typeof seq === "number" ? seq : null,
+          ...(options.hosted && client.graphEpoch
+            ? { graphEpoch: client.graphEpoch }
+            : {}),
+        };
       } catch (error) {
         // A server that cannot say reads at the head.
         if (
+          !options.hosted &&
           error instanceof LbbError &&
           error.status >= 400 &&
           error.status < 500
