@@ -1606,6 +1606,7 @@ test("entities namespace encodes detail lookups", async () => {
       current_state: [],
       outgoing: [],
       incoming: [],
+      history: [],
       observations: [],
     }),
   });

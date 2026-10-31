@@ -6834,6 +6834,27 @@ export interface components {
             };
         };
         EdgeEventId: string;
+        /**
+         * @deprecated
+         * @description Deprecated. Only the always-empty `EntityDetailResponse.history` holds this
+         *     type. It stays in the contract because every released SDK requires that
+         *     array; it leaves with the array, after a new SDK release and a notice period.
+         */
+        EdgeEventRow: {
+            /** Format: int64 */
+            commit_seq: number;
+            /** Format: float */
+            confidence: number;
+            edge_event_id: components["schemas"]["EdgeEventId"];
+            evidence: components["schemas"]["ObservationId"][];
+            op: string;
+            polarity: string;
+            relation: components["schemas"]["RelationView"];
+            source: components["schemas"]["EntityView"];
+            supersedes: components["schemas"]["EdgeEventId"][];
+            target: components["schemas"]["EntityView"];
+            valid_time: components["schemas"]["ValidTime"];
+        };
         /** @enum {string} */
         EdgeIdempotencyMode: "append" | "skip_unchanged";
         /**
@@ -7475,6 +7496,13 @@ export interface components {
             edge_properties?: null | components["schemas"]["EvidenceCompleteness"];
             entity: components["schemas"]["EntityView"];
             evidence?: null | components["schemas"]["EvidenceCompleteness"];
+            /**
+             * @description Deprecated. Always an empty array: the RDF read model holds no edge
+             *     events. Released SDKs require the field, so the server keeps sending it.
+             *     It is removed after a new SDK release and a notice period. Read a past
+             *     state with SPARQL and `as_of_commit_seq`.
+             */
+            history: components["schemas"]["EdgeEventRow"][];
             incoming: components["schemas"]["GraphEdgeRow"][];
             metadata: components["schemas"]["EntityMetadataResponse"];
             observations: components["schemas"]["ObservationRow"][];
