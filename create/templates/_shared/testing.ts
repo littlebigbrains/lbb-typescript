@@ -12,6 +12,7 @@ import {
   ENTITY_IRI_NAMESPACE,
   LbbError,
   type ActivityOptions,
+  type AgentResult,
   type DecideRequest,
   type DecideResult,
   type EmbedRequest,
@@ -540,6 +541,16 @@ export class MockActivities implements LbbActivities {
 
   async ontology(): Promise<Schemas["OntologyView"]> {
     return this.rules.ontology ?? assertNever("ontology");
+  }
+
+  /** The templates do not check values against files: the mock has no rule for it. */
+  async ground(): Promise<Schemas["GroundResult"][]> {
+    return assertNever("ground");
+  }
+
+  /** The templates run no agent step: the mock has no rule for it. */
+  async agent(): Promise<AgentResult> {
+    return assertNever("agent");
   }
 }
 

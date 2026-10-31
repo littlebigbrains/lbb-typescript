@@ -278,6 +278,22 @@ export type {
   ReviewRequest,
   ReviewWaitResult,
 } from "./activities.js";
+export type {
+  AgentDisposition,
+  AgentFailure,
+  AgentInput,
+  AgentLimit,
+  AgentOptions,
+  AgentOutcome,
+  AgentPlanAction,
+  AgentProposal,
+  AgentResult,
+  AgentSpec,
+  AgentToolName,
+  AgentTraceLine,
+  AgentVerdict,
+  AgentVerdictCode,
+} from "./agent.js";
 export type { ReviewListOptions, ReviewsNamespace } from "./reviews.js";
 
 export {

@@ -408,6 +408,13 @@ export interface OwnedWrite {
   relations?: string[];
   /** Owned property fields of the subjects. */
   properties?: string[];
+  /**
+   * Owned property fields per subject: each listed subject loses only its
+   * listed fields that this write does not set. A writer that proposes one
+   * field for each of several subjects uses it, so it removes no pair it did
+   * not propose. Exclusive with `properties`; each subject is one of `subjects`.
+   */
+  subject_properties?: Schemas["SubjectPropertiesInput"][];
   /** Entities the writer made and no longer makes. */
   retract_entities?: Schemas["NamedEntityInput"][];
   /** The owned edges to write now. */
@@ -472,6 +479,9 @@ export function ownedCommitBody(
             ...(write.relations?.length ? { relations: write.relations } : {}),
             ...(write.properties?.length
               ? { properties: write.properties }
+              : {}),
+            ...(write.subject_properties?.length
+              ? { subject_properties: write.subject_properties }
               : {}),
             ...(retract.length ? { retract_entities: retract } : {}),
           },

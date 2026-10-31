@@ -16096,6 +16096,14 @@ export interface components {
             relations?: string[];
             /** @description Entities the writer made and no longer makes. */
             retract_entities?: components["schemas"]["NamedEntityInput"][];
+            /**
+             * @description Owned property fields per subject. Each listed subject loses only its
+             *     listed fields that the commit does not set, so a writer that proposes
+             *     `width_cm` for one subject and `height_cm` for another removes no
+             *     pair it did not propose. When present, `properties` must be empty,
+             *     and each listed subject must be one of `subjects`.
+             */
+            subject_properties?: components["schemas"]["SubjectPropertiesInput"][];
             /** @description The instances this write is for. */
             subjects: components["schemas"]["NamedEntityInput"][];
         };
@@ -19651,6 +19659,13 @@ export interface components {
              * @description The HTTP status of the same error without a stream.
              */
             status: number;
+        };
+        /** @description The owned property fields of one subject of a `replace_owned`. */
+        SubjectPropertiesInput: {
+            /** @description The fields of that subject that the write owns. */
+            properties: string[];
+            /** @description The subject: one of `replace_owned.subjects`. */
+            subject: components["schemas"]["NamedEntityInput"];
         };
         /**
          * @description Endpoint types for [`SearchSuggestRequest::context`]. Both optional; supplying

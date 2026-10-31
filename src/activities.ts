@@ -11,6 +11,14 @@
 // its usage adds up for the turn's completion: the worker's code does
 // nothing for it. Reference:
 // `docs/reference/workflow-activities.md`.
+import { lbbAgentHost } from "./agent-host.js";
+import {
+  runAgent,
+  type AgentHost,
+  type AgentOptions,
+  type AgentResult,
+  type AgentSpec,
+} from "./agent.js";
 import type { LbbClient } from "./client.js";
 import type { FilePages } from "./files.js";
 import type { OntologySuggestionListOptions } from "./namespaces.js";
@@ -342,6 +350,34 @@ export interface LbbActivities {
   ): Promise<Schemas["OntologyEvolveResponse"]>;
   /** The graph's ontology: classes, relations and properties (`GET /v1/ontology`). */
   ontology(options?: CallOptions): Promise<Schemas["OntologyView"]>;
+  /**
+   * Check values a model proposes against the files they come from, without a
+   * model (`POST /v1/workflows/activities/ground`): one verdict per item, in
+   * item order. At most 16 items from 8 files. `workflow` names the workflow
+   * whose `owns` the check reads; give it for a stack key only, because under
+   * an execution credential the server takes the workflow from the credential
+   * and refuses a body that names it. No effect id: the check has no effect.
+   */
+  ground(
+    items: Schemas["GroundItem"][],
+    options?: CallOptions & { workflow?: string },
+  ): Promise<Schemas["GroundResult"][]>;
+  /**
+   * Run an agent step: a bounded loop of model decisions and tool calls
+   * that reads a file and the graph and proposes values, then writes the
+   * grounded ones once as an owned commit and files a Review item for the
+   * rest (`docs/reference/agent-step.md`). One turn is one run. The steps are
+   * `<key>.start`, `<key>.iNN.decide`, `<key>.iNN.tool` and the commit
+   * phase, so a turn that runs again continues where it stopped. A capture
+   * (`captureActivities`) keeps the commit and the Review items instead of
+   * writing them.
+   */
+  agent(
+    ctx: WorkflowContext,
+    key: string,
+    spec: AgentSpec,
+    options?: AgentOptions,
+  ): Promise<AgentResult>;
 }
 
 /** Output tokens of a `reason` call can take minutes: its default timeout. */
@@ -624,6 +660,27 @@ export function lbbActivities(client: LbbClient): LbbActivities {
     ontology(options = {}) {
       return client.request("GET", "/v1/ontology", options);
     },
+    agent(ctx, key, spec, options = {}) {
+      const workflow = spec.workflow ?? ctx.workflowName;
+      const host = lbbAgentHost(client, activities, {
+        ...(workflow ? { workflow } : {}),
+        hosted: options.hosted === true,
+      });
+      return runAgent(host, ctx, key, spec, options);
+    },
+    async ground(items, options = {}) {
+      const { workflow, ...call } = options;
+      const answer = await client.request<Schemas["GroundActivityResponse"]>(
+        "POST",
+        "/v1/workflows/activities/ground",
+        {
+          ...call,
+          body: { items, ...(workflow ? { workflow } : {}) },
+          retry: true,
+        },
+      );
+      return answer.results;
+    },
   };
   // `captureActivities` checks writes with this client.
   Object.defineProperty(activities, ACTIVITIES_CLIENT, { value: client });
@@ -770,6 +827,27 @@ function shapeErrors(body: Schemas["TripletCommitFile"]): string[] {
     owned.subjects?.forEach((subject, i) =>
       named(subject, `replace_owned.subjects[${i}]`),
     );
+    const perSubject = owned.subject_properties ?? [];
+    if (perSubject.length && owned.properties?.length)
+      errors.push(
+        "replace_owned.subject_properties and replace_owned.properties exclude each other",
+      );
+    perSubject.forEach((entry, i) => {
+      named(entry.subject, `replace_owned.subject_properties[${i}].subject`);
+      if (!entry.properties?.length)
+        errors.push(`replace_owned.subject_properties[${i}] names no property`);
+      if (
+        !owned.subjects?.some(
+          (subject) =>
+            subject.type === entry.subject.type &&
+            (subject.key ?? subject.name) ===
+              (entry.subject.key ?? entry.subject.name),
+        )
+      )
+        errors.push(
+          `replace_owned.subject_properties[${i}].subject is not one of replace_owned.subjects`,
+        );
+    });
     owned.retract_entities?.forEach((entity, i) =>
       named(entity, `replace_owned.retract_entities[${i}]`),
     );
@@ -980,6 +1058,40 @@ export function captureActivities(
       const input = reviewInput(request, item);
       if (input) results.add(input);
       return { answered: false, answer: null, item };
+    },
+    ground: (items, groundOptions) => activities.ground(items, groundOptions),
+    // The models and reads of the run are the live ones (they spend as a
+    // live run does); its commit is checked and kept, and its Review items
+    // are kept and filed nowhere.
+    agent(ctx, key, spec, agentOptions = {}) {
+      if (!client)
+        throw new WorkflowError(
+          "captureActivities needs a client to run an agent step: pass `client`, or make the activities with lbbActivities",
+        );
+      const workflow = spec.workflow ?? ctx.workflowName;
+      const base = lbbAgentHost(client, captured, {
+        ...(workflow ? { workflow } : {}),
+        hosted: agentOptions.hosted === true,
+      });
+      const host: AgentHost = {
+        ...base,
+        report: (input) => results.add(input),
+        async review(body) {
+          reviews.push({ request: body as unknown as ReviewItemRequest });
+          filed += 1;
+          return { id: `captured_${filed}`, status: "open" };
+        },
+        async commit(body, commitOptions) {
+          writes.push({
+            stepKey: commitOptions.idempotencyKey.split("/").pop() ?? key,
+            ...(commitOptions.graph ? { graph: commitOptions.graph } : {}),
+            body,
+            ...(await check(body, commitOptions.graph)),
+          });
+          return { commitSeq: null, replayed: false };
+        },
+      };
+      return runAgent(host, ctx, key, spec, agentOptions);
     },
     reviewItems: (keys, itemsOptions) =>
       activities.reviewItems(keys, itemsOptions),
