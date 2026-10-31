@@ -5264,8 +5264,11 @@ export interface components {
             /** @description Entity-type names allowed as the target (range). */
             range?: string[];
             /**
-             * @description State-reducer token (e.g. `append_only` (default), `latest_wins`,
-             *     `valid_time_latest_wins`).
+             * @description State-reducer token: `append_only` (default), `latest_wins`,
+             *     `single_active_value` or `multi_active_value`. The tokens
+             *     `valid_time_latest_wins`, `max_confidence`, `weighted_preference`
+             *     and `boolean_retraction` are retired: a new relation that names one
+             *     is refused with `reducer_token_retired`.
              */
             reducer?: string | null;
             /** @description Whether the relation is symmetric (default false). */
@@ -6831,21 +6834,6 @@ export interface components {
             };
         };
         EdgeEventId: string;
-        EdgeEventRow: {
-            /** Format: int64 */
-            commit_seq: number;
-            /** Format: float */
-            confidence: number;
-            edge_event_id: components["schemas"]["EdgeEventId"];
-            evidence: components["schemas"]["ObservationId"][];
-            op: string;
-            polarity: string;
-            relation: components["schemas"]["RelationView"];
-            source: components["schemas"]["EntityView"];
-            supersedes: components["schemas"]["EdgeEventId"][];
-            target: components["schemas"]["EntityView"];
-            valid_time: components["schemas"]["ValidTime"];
-        };
         /** @enum {string} */
         EdgeIdempotencyMode: "append" | "skip_unchanged";
         /**
@@ -7487,7 +7475,6 @@ export interface components {
             edge_properties?: null | components["schemas"]["EvidenceCompleteness"];
             entity: components["schemas"]["EntityView"];
             evidence?: null | components["schemas"]["EvidenceCompleteness"];
-            history: components["schemas"]["EdgeEventRow"][];
             incoming: components["schemas"]["GraphEdgeRow"][];
             metadata: components["schemas"]["EntityMetadataResponse"];
             observations: components["schemas"]["ObservationRow"][];
