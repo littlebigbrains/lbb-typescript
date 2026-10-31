@@ -46,6 +46,12 @@ export const TOOL_TIMEOUT_MS = 45_000;
 export const SAVED_BYTES_GUARD = 160 * 1_024;
 /** The factor that covers the engine's envelopes and JSON escaping. */
 export const SAVED_BYTES_FACTOR = 1.25;
+/** The server accepts at most 32 KiB in an operation's resume checkpoint. */
+export const SUPPORT_CONTEXT_BYTES = 32 * 1_024;
+/** JSON string-content bytes of a display name or class in that checkpoint. */
+export const SUPPORT_NAME_BYTES = 128;
+/** Bytes of each source window before fitting it in the checkpoint. */
+export const SUPPORT_SOURCE_EACH = 2_048;
 /** Two invalid actions in a row end the run. */
 export const INVALID_IN_A_ROW = 2;
 /** Value and unit of a proposal, as `ground` takes them. */
@@ -91,6 +97,69 @@ export function canonicalJson(value: unknown): string {
   }
   return JSON.stringify(value) ?? "null";
 }
+
+const PROPERTY_NAMESPACE = "https://littlebigbrain.com/p/";
+
+/** A set of owned property names: the representation both rendered and pinned. */
+export function canonicalOwns(properties: readonly string[]): string[] {
+  return [
+    ...new Set(
+      properties.map((property) =>
+        (property.startsWith(PROPERTY_NAMESPACE)
+          ? property.slice(PROPERTY_NAMESPACE.length)
+          : property
+        ).toLowerCase(),
+      ),
+    ),
+  ].sort();
+}
+
+/** One proposal's line in the prompt, derived from saved tool output. */
+export function proposalLine(p: {
+  property: string;
+  subject: string;
+  verdict: { code: string };
+}): string {
+  return `${p.property} of ${p.subject}: ${p.verdict.code}`;
+}
+
+/** What the model asked, as a bounded observation heading. */
+export function askedOf(action: {
+  tool: AgentToolName | "finish";
+  arguments: Record<string, unknown>;
+}): string {
+  const args = action.arguments;
+  const text =
+    action.tool === "graph.read"
+      ? String(args.query ?? "")
+      : action.tool === "files.read"
+        ? `${String(args.file ?? "")} ${String(args.locator ?? "")}`
+        : action.tool === "propose_write"
+          ? `${Array.isArray(args.proposals) ? args.proposals.length : 0} proposals`
+          : "";
+  return cutBytes(text.replace(/\s+/g, " ").trim(), 120);
+}
+
+/** An invalid decision's observation, derived from the saved refusal. */
+export function invalidObservation(n: number, message: string): Observation {
+  return {
+    n,
+    tool: "invalid_action",
+    asked: "",
+    summary: `invalid action: ${message}`,
+    result: JSON.stringify({ error: "invalid_action", message }),
+  };
+}
+
+function callLabel(text: string): string {
+  return text.length <= 64
+    ? text
+    : `${text.slice(0, 55)}~${stableHashHex([text]).slice(0, 8)}`;
+}
+export const decisionLabel = (key: string, n: number): string =>
+  callLabel(`${key} i${String(n).padStart(2, "0")} decide`);
+export const supportLabel = (workflow: string): string =>
+  callLabel(`${workflow} support`);
 
 // ---- JSON Schemas of the tools ------------------------------------------
 
@@ -460,7 +529,10 @@ export function supportQuestion(ask: SupportAsk): {
  * (`409 activity_effect_conflict`), so a deploy that changes the text must
  * change the pin.
  */
-export function scaffoldDigest(tools: readonly AgentToolName[]): string {
+export function scaffoldDigest(
+  tools: readonly AgentToolName[],
+  render = { proposalLine, askedOf },
+): string {
   const prompt = decisionPrompt(
     "<task>",
     tools,
@@ -470,7 +542,13 @@ export function scaffoldDigest(tools: readonly AgentToolName[]): string {
       files: [{ sha256: "<sha256>", uploadedAt: "<uploaded_at>" }],
       subjects: ["<subject>"],
       owns: ["<owned>"],
-      proposals: ["<proposal>"],
+      proposals: [
+        render.proposalLine({
+          property: "<property>",
+          subject: "<subject>",
+          verdict: { code: "<verdict>" },
+        }),
+      ],
       input: { file: "<file>" },
     },
     [
@@ -478,9 +556,27 @@ export function scaffoldDigest(tools: readonly AgentToolName[]): string {
         n: 1,
         tool: "<tool>",
         summary: "<summary>",
-        asked: "<asked>",
+        asked: render.askedOf({
+          tool: "graph.read",
+          arguments: { query: "<query>" },
+        }),
         result: "<result>",
       },
+      ...(["files.read", "propose_write", "finish"] as const).map((tool) => ({
+        n: 2,
+        tool,
+        summary: "<summary>",
+        result: "<result>",
+        asked: render.askedOf({
+          tool,
+          arguments: {
+            file: "<file>",
+            locator: "<locator>",
+            proposals: [{}, {}],
+          },
+        }),
+      })),
+      invalidObservation(3, "<invalid>"),
     ],
   );
   const support = supportQuestion({
@@ -494,6 +590,58 @@ export function scaffoldDigest(tools: readonly AgentToolName[]): string {
   return stableHashHex([
     "lbb.agent.scaffold",
     prompt,
+    decisionPrompt(
+      "<task>",
+      tools,
+      {
+        iteration: 1,
+        maxIterations: 1,
+        files: [],
+        subjects: [],
+        owns: [],
+        proposals: [],
+        input: null,
+      },
+      [],
+    ),
+    decisionPrompt(
+      "<task>",
+      tools,
+      {
+        iteration: 1,
+        maxIterations: 1,
+        files: [],
+        subjects: [],
+        owns: [],
+        proposals: [],
+        input: null,
+      },
+      [
+        {
+          n: 1,
+          tool: "<tool>",
+          summary: "<summary>",
+          asked: "<asked>",
+          result: "x".repeat(PROMPT_OBSERVATION_CHARS + 1),
+        },
+      ],
+    ),
+    render.askedOf({
+      tool: "graph.read",
+      arguments: { query: `  <query>\n${"x".repeat(140)}  ` },
+    }),
+    canonicalJson([
+      decisionLabel("<key>", 1),
+      decisionLabel("k".repeat(64), 12),
+      supportLabel("<workflow>"),
+      supportLabel("w".repeat(64)),
+    ]),
+    canonicalJson({
+      supportContext: 1,
+      SUPPORT_CONTEXT_BYTES,
+      SUPPORT_NAME_BYTES,
+      SUPPORT_SOURCE_EACH,
+    }),
     canonicalJson(
       tools.map((name) => [name, TOOL_DEFINITIONS[name].description]),
     ),
@@ -529,9 +677,7 @@ export function agentPin(spec: PinnedSpec): string {
     stableHashHex([AGENT_RULES, canonicalJson(FINISH_ARGUMENTS)]),
     stableHashHex([spec.instructions]),
     spec.scaffold ?? scaffoldDigest(spec.tools),
-    canonicalJson(
-      [...new Set(spec.owns.map((name) => name.toLowerCase()))].sort(),
-    ),
+    canonicalJson(canonicalOwns(spec.owns)),
     canonicalJson({
       maxIterations: spec.maxIterations,
       maxCostMicroUsd: spec.maxCostMicroUsd,

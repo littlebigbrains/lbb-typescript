@@ -26,11 +26,20 @@ import {
   RESULT_MAX_BYTES,
   SAVED_BYTES_FACTOR,
   SAVED_BYTES_GUARD,
+  SUPPORT_CONTEXT_BYTES,
+  SUPPORT_NAME_BYTES,
+  SUPPORT_SOURCE_EACH,
   TOOL_TIMEOUT_MS,
   TRACE_LINES,
   TRACE_NOTE_BYTES,
   actionSchema,
   agentPin,
+  askedOf,
+  canonicalOwns,
+  decisionLabel,
+  invalidObservation,
+  proposalLine,
+  supportLabel,
   supportQuestion,
   canonicalJson,
   cutBytes,
@@ -436,12 +445,6 @@ const CLAMP = { support: 1 };
 
 const pad = (n: number) => String(n).padStart(2, "0");
 
-/** A label of a model call is at most 64 characters: cut with a hash of the whole. */
-function label(text: string): string {
-  return text.length <= 64
-    ? text
-    : `${text.slice(0, 55)}~${stableHashHex([text]).slice(0, 8)}`;
-}
 const lower = (text: string) => text.toLowerCase();
 
 /** A property as a name: the last part of its IRI, else as given. */
@@ -522,7 +525,7 @@ export function resolveSpec(spec: AgentSpec): Resolved {
     !(typeof spec.gate === "number" && spec.gate >= 0 && spec.gate <= 1)
   )
     throw new WorkflowError("gate is a number from 0 to 1");
-  const owns = [...(spec.owns?.properties ?? [])];
+  const owns = canonicalOwns(spec.owns?.properties ?? []);
   if (!owns.length)
     throw new WorkflowError(
       "owns.properties names the properties the step may set",
@@ -560,7 +563,7 @@ export function specPin(spec: AgentSpec): string {
     maxReadMs: cfg.maxReadMs,
     maxProposals: cfg.maxProposals,
     maxReviewItems: cfg.maxReviewItems,
-    owns: cfg.owns.map(propertyName),
+    owns: cfg.owns,
     ...(cfg.gate !== undefined ? { gate: cfg.gate } : {}),
   });
 }
@@ -620,16 +623,7 @@ class Run {
     this.model = record.model ?? this.model;
     if (record.invalid !== undefined) {
       this.invalidInARow += 1;
-      this.observations.push({
-        n,
-        tool: "invalid_action",
-        asked: "",
-        summary: `invalid action: ${record.invalid}`,
-        result: JSON.stringify({
-          error: "invalid_action",
-          message: record.invalid,
-        }),
-      });
+      this.observations.push(invalidObservation(n, record.invalid));
       this.trace.push({
         n,
         tool: "invalid_action",
@@ -720,9 +714,7 @@ class Run {
       })),
       subjects: [...this.subjects].slice(0, 100),
       owns: this.cfg.owns,
-      proposals: [...this.proposals.values()].map(
-        (p) => `${p.property} of ${p.subject}: ${p.verdict.code}`,
-      ),
+      proposals: [...this.proposals.values()].map(proposalLine),
       input,
     };
   }
@@ -731,20 +723,6 @@ class Run {
 /** A line of the model's own words, cut to a trace note. */
 const noteOf = (text: string) =>
   cutBytes(text.replace(/\s+/g, " ").trim(), TRACE_NOTE_BYTES);
-
-/** What the model asked, in a short line. */
-function askedOf(action: NonNullable<DecisionRecord["action"]>): string {
-  const args = action.arguments;
-  const text =
-    action.tool === "graph.read"
-      ? String(args.query ?? "")
-      : action.tool === "files.read"
-        ? `${String(args.file ?? "")} ${String(args.locator ?? "")}`
-        : action.tool === "propose_write"
-          ? `${Array.isArray(args.proposals) ? args.proposals.length : 0} proposals`
-          : "";
-  return cutBytes(text.replace(/\s+/g, " ").trim(), 120);
-}
 
 /** The entity IRIs in the rows of a graph.read result. */
 function iris(result: Record<string, unknown>): string[] {
@@ -1148,7 +1126,7 @@ async function decideStep(
           schema: actionSchema(cfg.tools) as unknown as Record<string, unknown>,
           max_tokens: DECISION_MAX_TOKENS,
         },
-        { effectId: s.effectId, label: label(`${key} i${pad(n)} decide`) },
+        { effectId: s.effectId, label: decisionLabel(key, n) },
       );
       reply = answer.value;
       model = answer.model;
@@ -1807,10 +1785,6 @@ async function commitPhase(input: PhaseInput): Promise<{ uncertain?: string }> {
   return {};
 }
 
-/** Bytes of one source text a support question carries, and of all of them. */
-const SUPPORT_SOURCE_EACH = 2_048;
-const SUPPORT_SOURCE_ALL = 32 * 1_024;
-
 /** The text of a place of a file, or `undefined` when it cannot be read now. */
 async function placeTextOf(
   host: AgentHost,
@@ -1860,6 +1834,145 @@ function windowAround(text: string, quote: string, max: number): string {
   return cutBytes(text.slice(at < 0 ? 0 : Math.max(0, at - 200)), max);
 }
 
+/** External support inputs, saved before the model effect can begin. */
+interface SupportContext {
+  version: 1;
+  workflow: string;
+  label: string;
+  items: { label: string; type: string; source: string }[];
+  sources: Record<string, string>;
+}
+
+const supportSource = (p: AgentProposal) =>
+  `${p.sha256.slice(0, 8)}#${p.locator}`;
+
+/** A prefix whose JSON string content fits, including escaping and UTF-8. */
+function jsonTextPrefix(text: string, max: number): string {
+  let out = "";
+  let used = 0;
+  for (const char of text) {
+    const size = jsonSize(char) - 2;
+    if (used + size > max) break;
+    out += char;
+    used += size;
+  }
+  return out;
+}
+
+/** Refuse a malformed resume instead of rebuilding a begun effect from live data. */
+function savedSupportContext(
+  value: unknown,
+  grounded: readonly AgentProposal[],
+): SupportContext {
+  const bad = () =>
+    new WorkflowError("the agent support checkpoint is invalid");
+  if (
+    !value ||
+    typeof value !== "object" ||
+    jsonSize(value) > SUPPORT_CONTEXT_BYTES
+  )
+    throw bad();
+  const saved = value as SupportContext;
+  if (
+    saved.version !== 1 ||
+    typeof saved.workflow !== "string" ||
+    typeof saved.label !== "string" ||
+    saved.label.length > 64 ||
+    saved.label !== supportLabel(saved.workflow) ||
+    !Array.isArray(saved.items) ||
+    saved.items.length !== grounded.length ||
+    !saved.sources ||
+    typeof saved.sources !== "object" ||
+    Array.isArray(saved.sources)
+  )
+    throw bad();
+  const sources = new Set(grounded.map(supportSource));
+  if (
+    Object.keys(saved.sources).length !== sources.size ||
+    [...sources].some(
+      (source) =>
+        !Object.hasOwn(saved.sources, source) ||
+        typeof saved.sources[source] !== "string" ||
+        utf8(saved.sources[source]) > SUPPORT_SOURCE_EACH,
+    )
+  )
+    throw bad();
+  for (const [n, item] of saved.items.entries()) {
+    if (
+      !item ||
+      typeof item !== "object" ||
+      item.source !== supportSource(grounded[n]!) ||
+      typeof item.label !== "string" ||
+      typeof item.type !== "string" ||
+      jsonSize(item.label) - 2 > SUPPORT_NAME_BYTES ||
+      jsonSize(item.type) - 2 > SUPPORT_NAME_BYTES
+    )
+      throw bad();
+  }
+  return saved;
+}
+
+async function supportContext(
+  host: AgentHost,
+  s: WorkflowStepContext,
+  grounded: readonly AgentProposal[],
+  workflow: string,
+): Promise<SupportContext> {
+  if (s.checkpoint !== null && s.checkpoint !== undefined)
+    return savedSupportContext(s.checkpoint, grounded);
+  const described = await host.describe(
+    [...new Set(grounded.map((p) => p.subject))],
+    s.signal,
+  );
+  const context: SupportContext = {
+    version: 1,
+    workflow,
+    label: supportLabel(workflow),
+    items: grounded.map((p) => {
+      const found = described.get(p.subject);
+      return {
+        label: jsonTextPrefix(found?.name ?? p.subject, SUPPORT_NAME_BYTES),
+        type: jsonTextPrefix(found?.type ?? "item", SUPPORT_NAME_BYTES),
+        source: supportSource(p),
+      };
+    }),
+    sources: Object.fromEntries(grounded.map((p) => [supportSource(p), ""])),
+  };
+  // Reserve every key before allocating source windows. Escaped JSON, rather
+  // than raw text bytes, is the server's checkpoint limit. This transient
+  // checkpoint occupies the existing 32 KiB commit reserve and is removed
+  // when the support step's output is saved, before later commit steps run.
+  let room = SUPPORT_CONTEXT_BYTES - jsonSize(context);
+  if (room < 0)
+    throw new WorkflowError("the agent support context exceeds 32 KiB");
+  const read = new Set<string>();
+  for (const p of grounded) {
+    const source = supportSource(p);
+    if (read.has(source) || room === 0) continue;
+    read.add(source);
+    const text = await placeTextOf(host, p.sha256, p.locator, s.signal);
+    const shown =
+      text === undefined
+        ? ""
+        : jsonTextPrefix(
+            windowAround(text, p.quote, SUPPORT_SOURCE_EACH),
+            room,
+          );
+    context.sources[source] = shown;
+    room -= jsonSize(shown) - 2;
+  }
+  await s.heartbeat(
+    {
+      phase: "asking the decision model",
+      done: 0,
+      total: grounded.length,
+      unit: "proposals",
+    },
+    { checkpoint: context },
+  );
+  return context;
+}
+
 async function supportStep(
   host: AgentHost,
   s: WorkflowStepContext,
@@ -1881,39 +1994,35 @@ async function supportStep(
     total: grounded.length,
     unit: "proposals",
   });
-  // The decision model judges a quote for an item, so it gets the item's name
-  // and the text the quote came from, as `values.extract` sends the record's.
-  const described = await host.describe(
-    [...new Set(grounded.map((p) => p.subject))],
-    s.signal,
-  );
-  const sources: Record<string, string> = {};
-  let room = SUPPORT_SOURCE_ALL;
+  // Freeze every live input before calling the model. Replays reconstruct
+  // the same request from this checkpoint and the pinned, saved proposals.
+  const context = await supportContext(host, s, grounded, workflow);
   const questions: Record<string, ReturnType<typeof supportQuestion>> = {};
   for (const [n, p] of grounded.entries()) {
-    const source = `${p.sha256.slice(0, 8)}#${p.locator}`;
-    if (!(source in sources)) {
-      const text = await placeTextOf(host, p.sha256, p.locator, s.signal);
-      const shown =
-        text === undefined
-          ? ""
-          : windowAround(text, p.quote, Math.min(room, SUPPORT_SOURCE_EACH));
-      sources[source] = shown;
-      room -= utf8(shown);
-    }
-    const found = described.get(p.subject);
+    const item = context.items[n]!;
     questions[`v${n}`] = supportQuestion({
-      label: found?.name ?? p.subject,
-      type: found?.type ?? "item",
+      label: item.label,
+      type: item.type,
       property: p.property,
       value: p.verdict.stated ?? p.value,
-      source,
+      source: item.source,
       quote: p.quote,
     });
   }
   const answered = await host.decide(
-    { state: { task: cfg.instructions, workflow, sources }, questions },
-    { effectId: s.effectId, label: label(`${workflow} support`) },
+    {
+      state: {
+        task: cfg.instructions,
+        workflow: context.workflow,
+        sources: Object.fromEntries(
+          Object.entries(context.sources).sort(([a], [b]) =>
+            a < b ? -1 : a > b ? 1 : 0,
+          ),
+        ),
+      },
+      questions,
+    },
+    { effectId: s.effectId, label: context.label },
   );
   const support: Record<string, number> = {};
   for (const [n, p] of grounded.entries()) {
