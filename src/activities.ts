@@ -31,7 +31,11 @@ import {
   type OwnedWriteOptions,
   type OwnedWriteResult,
 } from "./triggered-workflow-worker.js";
-import { LbbError, type CallOptions } from "./transport.js";
+import {
+  LbbError,
+  observedActivityUsage,
+  type CallOptions,
+} from "./transport.js";
 import type {
   ReadConsistencyOptions,
   Schemas,
@@ -465,7 +469,11 @@ async function counted<T extends ActivityUsage>(
       error instanceof LbbError &&
       (error.status === 422 || error.status >= 500)
     )
-      addTurnUsage(turn, { calls: 1, errors: 1 });
+      addTurnUsage(turn, {
+        calls: 1,
+        errors: 1,
+        ...observedActivityUsage(error),
+      });
     throw error;
   }
 }

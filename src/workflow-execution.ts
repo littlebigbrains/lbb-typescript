@@ -1,4 +1,5 @@
 import type { LbbClient, Schemas } from "./client.js";
+import type { RequestOptions } from "./transport.js";
 
 /** Read fields only. No eval trace, routing hint, graph or credential override. */
 export type WorkflowReadRequest = Pick<
@@ -122,7 +123,8 @@ function optionsChecked(options: WorkflowReadOptions): void {
 interface Execution {
   method: "GET" | "POST" | "PUT";
   path: string;
-  query?: Record<string, string | number>;
+  query?: RequestOptions["query"];
+  headers?: Record<string, string>;
   body?: unknown;
   idempotencyKey?: string;
   responseType?: "json" | "bytes" | "stream";
@@ -182,6 +184,88 @@ export class WorkflowTurnReader {
     this.#signal = signal;
     this.#check = check;
   }
+  /** A client for the reviewed hosted agent template. Every request selects one
+   * operation credential of this attempt; the work token stays on engine routes. */
+  agentClient(): LbbClient {
+    const client = this.#control.withScope({
+      graph: this.#credential.graph_id,
+      expectedGraphEpoch: this.#credential.graph_epoch,
+    });
+    // Owned writes and activities clone clients for their graph scope. Keep
+    // this adapter on same-scope clones; never recover a work-token data client.
+    client.withScope = (
+      scope: Parameters<LbbClient["withScope"]>[0],
+    ): LbbClient => {
+      if (
+        (scope.graph !== undefined &&
+          scope.graph !== this.#credential.graph_id) ||
+        (scope.expectedGraphEpoch !== undefined &&
+          scope.expectedGraphEpoch !== this.#credential.graph_epoch) ||
+        scope.environment !== undefined ||
+        scope.stack !== undefined
+      )
+        return refuse(
+          "An agent execution client cannot change its graph or incarnation",
+        );
+      return client;
+    };
+    client.request = <T>(
+      method: string,
+      path: string,
+      options: RequestOptions = {},
+    ): Promise<T> => {
+      const operation = agentOperation(method, path);
+      if (!operation) return refuse("The hosted agent cannot call this route");
+      if (options.rawBody !== undefined)
+        return refuse("The hosted agent sends JSON only");
+      // lbbActivities binds the local turn for usage accounting. The server
+      // owns that identity under a model grant; only descriptive metadata goes
+      // on the wire. Keep the local binding intact for counted() and budgets.
+      let body = options.body;
+      if (
+        operation === "model_call" &&
+        body &&
+        typeof body === "object" &&
+        !Array.isArray(body)
+      ) {
+        const request = body as Record<string, unknown>;
+        const workflow = request.workflow;
+        if (
+          workflow &&
+          typeof workflow === "object" &&
+          !Array.isArray(workflow)
+        ) {
+          const named = workflow as Record<string, unknown>;
+          body = {
+            ...request,
+            workflow: Object.fromEntries(
+              ["step", "instance"]
+                .filter((field) => Object.hasOwn(named, field))
+                .map((field) => [field, named[field]]),
+            ),
+          };
+        }
+      }
+      return this.#execute<T>(
+        operation,
+        {
+          method: method as Execution["method"],
+          path,
+          query: options.query,
+          body,
+          idempotencyKey: options.idempotencyKey,
+          headers: options.headers,
+          responseType: options.responseType,
+        },
+        {
+          ...(options.signal ? { signal: options.signal } : {}),
+          ...(options.timeoutMs ? { timeoutMs: options.timeoutMs } : {}),
+        },
+      );
+    };
+    return client;
+  }
+
   async sparql(
     request: WorkflowReadRequest | string,
     options: WorkflowReadOptions = {},
@@ -331,7 +415,10 @@ export class WorkflowTurnReader {
     };
     try {
       check();
-      const budget = Math.min(options.timeoutMs ?? 30_000, 30_000);
+      const budget = Math.min(
+        options.timeoutMs ?? 30_000,
+        operation === "model_call" ? 55_000 : 30_000,
+      );
       let credential = this.#credentials.get(operation);
       let deadline = this.#deadlines.get(operation);
       if (
@@ -388,7 +475,10 @@ export class WorkflowTurnReader {
           maxRetries: 0,
           timeoutMs: Math.min(budget, remaining),
           ...(signals.length ? { signal: AbortSignal.any(signals) } : {}),
-          headers: { authorization: `Bearer ${credential.token}` },
+          headers: {
+            ...(call.headers ?? {}),
+            authorization: `Bearer ${credential.token}`,
+          },
         }) as T;
       }
       const result = await this.#control.request<T>(call.method, call.path, {
@@ -400,7 +490,10 @@ export class WorkflowTurnReader {
         maxRetries: 0,
         timeoutMs: Math.min(budget, remaining),
         signal: controller.signal,
-        headers: { authorization: `Bearer ${credential.token}` },
+        headers: {
+          ...(call.headers ?? {}),
+          authorization: `Bearer ${credential.token}`,
+        },
       });
       check();
       return result;
@@ -408,4 +501,36 @@ export class WorkflowTurnReader {
       for (const remove of listeners) remove();
     }
   }
+}
+
+/** Exact reviewed host route set; descendants and control routes have no grant. */
+function agentOperation(method: string, path: string): Operation | undefined {
+  if (
+    (method === "POST" && path === "/v1/query/sparql-text") ||
+    (method === "GET" &&
+      (path === "/v1/graph/metadata" || path === "/v1/ontology"))
+  )
+    return "sparql_read";
+  if (
+    (method === "GET" &&
+      ["/v1/files/record", "/v1/files/content", "/v1/files/pages"].includes(
+        path,
+      )) ||
+    (method === "POST" && path === "/v1/workflows/activities/ground")
+  )
+    return "file_read";
+  if (
+    method === "POST" &&
+    [
+      "/v1/workflows/activities/reason",
+      "/v1/workflows/activities/decide",
+    ].includes(path)
+  )
+    return "model_call";
+  if ((method === "POST" || method === "GET") && path === "/v1/reviews")
+    return "review";
+  if (method === "GET" && path === "/v1/workflows/named/revisions/get")
+    return "revision_read";
+  if (method === "POST" && path === "/v1/graph/commit") return "owned_write";
+  return undefined;
 }

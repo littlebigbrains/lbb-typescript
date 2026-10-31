@@ -179,7 +179,11 @@ export function mergeInputs(
   const values = [...(a.values ?? [])];
   const seen = new Set(values.map(valueKey));
   for (const value of b.values ?? []) {
-    if (values.length >= WORKFLOW_RUN_RESULT_VALUES_MAX) break;
+    if (
+      values.length >=
+      (a.agent || b.agent ? 64 : WORKFLOW_RUN_RESULT_VALUES_MAX)
+    )
+      break;
     const key = valueKey(value);
     if (!seen.has(key)) {
       seen.add(key);
@@ -192,6 +196,7 @@ export function mergeInputs(
     outcome: RANK[b.outcome] > RANK[a.outcome] ? b.outcome : a.outcome,
     label: a.label || b.label || "",
     values,
+    ...((a.agent ?? b.agent) ? { agent: b.agent ?? a.agent } : {}),
     ...((a.region ?? b.region) ? { region: a.region ?? b.region } : {}),
     ...((a.error ?? b.error) ? { error: a.error ?? b.error } : {}),
     ...(cost ? { cost_micro_usd: cost } : {}),
@@ -209,13 +214,14 @@ const clipped = <K extends string>(
 /** An input cut to its bounds: its values, and the length of each text. */
 function fitInput(input: WorkflowRunInput): WorkflowRunInput {
   const values = (input.values ?? [])
-    .slice(0, WORKFLOW_RUN_RESULT_VALUES_MAX)
+    .slice(0, input.agent ? 64 : WORKFLOW_RUN_RESULT_VALUES_MAX)
     .map((value) => ({
       ...value,
       property: clip(value.property, TEXT_MAX),
       value: clip(value.value, TEXT_MAX),
       quote: clip(value.quote, QUOTE_MAX),
       outcome: clip(value.outcome, OUTCOME_MAX),
+      ...clipped("subject", value.subject, IRI_MAX),
       ...clipped("detail", value.detail, TEXT_MAX),
       ...clipped("stated", value.stated, TEXT_MAX),
       ...clipped("unconfirmed", value.unconfirmed, TEXT_MAX),
@@ -309,7 +315,7 @@ export function stepOutputResults(saved: unknown): {
 }
 
 /** A property value as text: a number, a word, or the items of a list. */
-function valueText(value: unknown): string {
+export function valueText(value: unknown): string {
   if (value === null || value === undefined) return "";
   if (typeof value !== "object") return String(value);
   if (Array.isArray(value)) return value.map(valueText).join(", ");

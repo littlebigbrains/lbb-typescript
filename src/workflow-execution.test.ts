@@ -700,3 +700,46 @@ test("hosted grants: a file streams on its file_read bearer", async () => {
   );
   assert.equal(content?.url.searchParams.get("sha256"), "ab");
 });
+
+test("hosted agent scoped clones retain the owned-write execution bearer", async () => {
+  const { client, seen } = setup((call) => {
+    if (call.url.pathname.endsWith("/execution-credential")) {
+      const operation = call.body.operation ?? "sparql_read";
+      return {
+        ...credential(),
+        token: `lbb_wke_${operation}.signature`,
+        operations: [operation],
+      };
+    }
+    if (call.url.pathname.endsWith("/commit"))
+      return { commit_seq: 3, replayed: false };
+    if (call.url.pathname.endsWith("/ontology")) return {};
+    return {};
+  });
+  const scoped = new WorkflowTurnReader(client, task()).agentClient();
+  const { lbbAgentHost } = await import("./agent-host.js");
+  const { lbbActivities } = await import("./activities.js");
+  const host = lbbAgentHost(scoped, lbbActivities(scoped), { hosted: true });
+  await host.commit(
+    { triplets: [] },
+    { graph: "project", idempotencyKey: "stable-effect" },
+  );
+  const commit = seen.find((call) => call.url.pathname.endsWith("/commit"))!;
+  assert.equal(
+    commit.headers.authorization,
+    "Bearer lbb_wke_owned_write.signature",
+  );
+  assert.equal(commit.url.searchParams.get("expected_graph_epoch"), epoch);
+  assert.throws(
+    () => scoped.withScope({ graph: "other" }),
+    WorkflowExecutionError,
+  );
+  assert.throws(
+    () => scoped.withScope({ expectedGraphEpoch: "1" }),
+    WorkflowExecutionError,
+  );
+  assert.throws(
+    () => scoped.request("POST", "/v1/files", { rawBody: "output" }),
+    WorkflowExecutionError,
+  );
+});
