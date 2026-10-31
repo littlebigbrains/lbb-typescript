@@ -4,6 +4,25 @@ All notable changes to the `@littlebigbrain/client` package are documented here.
 
 ## Unreleased
 
+- `activities.agent(ctx, key, spec, options)` runs an agent step: a bounded
+  loop in which a model reads a file and the graph with three tools
+  (`graph.read`, `files.read`, `propose_write`), then the grounded values are
+  written once as one owned commit and the rest go to Review. Each step has a
+  fixed key, a pin of the code and the tools makes a changed resume wait, and a
+  turn that runs again continues from the saved steps. `captureActivities`
+  keeps the commit (after its dry run) and the Review items without writing
+  them. Types: `AgentSpec`, `AgentResult`, `AgentProposal`, `AgentVerdict`
+  and the related types.
+
+- `activities.ground(items, { workflow })` calls the ground check
+  (`POST /v1/workflows/activities/ground`) with no model: one verdict per
+  proposed value. Name `workflow` for a stack key only.
+
+- `OwnedWrite` has `subject_properties`, the owned fields of each subject on
+  its own, and the generated schema adds `SubjectPropertiesInput` and
+  `ReplaceOwnedInput.subject_properties`. A server that has the engine change
+  "Own different fields on different records" takes the field.
+
 - **Deprecation.** `EntityDetailResponse.history` and its row type
   `EdgeEventRow` (with `polarity` and `supersedes`) are deprecated. The entity
   read (`GET /v1/graph/entity`) sends `history` as an empty array, as before.

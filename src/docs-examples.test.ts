@@ -18,6 +18,7 @@ import ts from "typescript";
 
 const PAGES = [
   "start/first-workflow.mdx",
+  "guides/agent-step.md",
   "guides/test-a-workflow.mdx",
   "guides/datasets.mdx",
   "guides/experiments.mdx",
