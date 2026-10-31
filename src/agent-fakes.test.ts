@@ -190,6 +190,8 @@ export class FakeEngine {
   kill?: { at: number; phase: KillPhase };
   /** Run after a step's output is first saved. */
   onSaved?: (key: string) => void;
+  /** Run after a durable heartbeat, including one whose reply is lost. */
+  onHeartbeat?: (key: string) => void;
 
   constructor(
     readonly identity = "wf-1",
@@ -212,6 +214,10 @@ export class FakeEngine {
     let total = 0;
     for (const [key, value] of this.saved)
       total += new TextEncoder().encode(JSON.stringify({ key, value })).length;
+    for (const [key, checkpoint] of this.checkpoints)
+      total += new TextEncoder().encode(
+        JSON.stringify({ key, checkpoint }),
+      ).length;
     return total;
   }
 }
@@ -498,6 +504,7 @@ function makeContext(engine: FakeEngine): WorkflowContext {
         async heartbeat(_details, heartbeat) {
           if (heartbeat && "checkpoint" in heartbeat)
             engine.checkpoints.set(key, structuredClone(heartbeat.checkpoint));
+          engine.onHeartbeat?.(key);
         },
         progress() {},
       };
@@ -506,6 +513,7 @@ function makeContext(engine: FakeEngine): WorkflowContext {
         throw new Killed(index, "before_save");
       // The output is kept as JSON, as the turn record keeps it.
       engine.saved.set(key, JSON.parse(JSON.stringify(output ?? null)));
+      engine.checkpoints.delete(key);
       engine.kinds.set(key, options?.kind ?? "step");
       engine.order.push(key);
       engine.onSaved?.(key);
