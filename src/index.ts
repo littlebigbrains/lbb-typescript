@@ -128,6 +128,7 @@ export type {
   WorkflowTestsNamespace,
   WorkflowTestWaitOptions,
 } from "./workflow-tests.js";
+export { workflowTestAnswerKey } from "./workflow-tests.js";
 export type {
   DerivationKey,
   DerivationsNamespace,
@@ -310,3 +311,4 @@ export {
   recordHostedAgentRemoval,
   hostedAgentRecord,
 } from "./hosted-agent.js";
+export { runHostedAgentTest } from "./hosted-agent-test.js";

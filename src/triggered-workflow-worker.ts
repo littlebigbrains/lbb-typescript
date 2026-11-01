@@ -244,6 +244,13 @@ export function triggeredWorkflow<S = Record<string, unknown>, R = unknown>(
     initialState,
     async onMessage(ctx, saved, message) {
       const state = triggeredWorkflowState(initialState, saved);
+      if (
+        /^starter\.[^.]+\.test$/.test(ctx.workflowId) &&
+        (ctx.origin?.kind !== "test" || !ctx.origin.event?.startsWith("wtest_"))
+      )
+        throw new WorkflowError(
+          "A hidden test identity needs the server's test origin",
+        );
       if (isFanInIdentity(ctx.workflowId)) {
         if (!definition.onFanIn)
           throw new WorkflowError(

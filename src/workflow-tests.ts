@@ -21,6 +21,17 @@ export type WorkflowTestAnswerRequest = Schemas["WorkflowTestAnswerRequest"];
 /** One page of tests. */
 export type WorkflowTestList = Schemas["WorkflowTestList"];
 
+/** Key in a test result's answers for one target/property pair. Omit the
+ * target only for a legacy record test. Uses UTF-8 bytes to match the server. */
+export function workflowTestAnswerKey(
+  subject: string | null | undefined,
+  property: string,
+): string {
+  return subject == null
+    ? property
+    : `\0${new TextEncoder().encode(subject).length}:${subject}${property}`;
+}
+
 /** The filters and the page of {@link WorkflowTestsNamespace.list}. */
 export interface WorkflowTestListOptions extends CallOptions {
   /** The tests of the workflow of this name. */

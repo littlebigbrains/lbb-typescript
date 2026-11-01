@@ -7897,6 +7897,11 @@ export interface components {
              */
             stated?: string | null;
             /**
+             * @description Target entity of a value proposed from a source file. Absent for a
+             *     record's own values, preserving extraction datasets.
+             */
+            subject?: string | null;
+            /**
              * @description The value: numbers compare as numbers, text in lower case and trimmed
              *     against `accept`. In `leave_out`, null means no value at all for the
              *     property.
@@ -8010,6 +8015,7 @@ export interface components {
              * @description Items the arm did not answer.
              */
             failed: number;
+            measures?: null | components["schemas"]["WorkflowAgentMeasures"];
             /**
              * Format: double
              * @description Over every compared item, as the template grader computes it.
@@ -8173,6 +8179,8 @@ export interface components {
              * @description `b.score − a.score`.
              */
             delta: number;
+            /** @description Agent runs vary between attempts; an A/A comparison measures the noise. */
+            guidance?: string | null;
             /**
              * Format: int64
              * @description Items compared.
@@ -8220,6 +8228,7 @@ export interface components {
             /** @description The item's name. */
             item: string;
             property: string;
+            subject?: string | null;
         };
         /**
          * @description The workflow both arms run, with its creation time: a workflow made
@@ -16464,6 +16473,8 @@ export interface components {
             result?: string | null;
             /** @description The value as the arm's text stated it (`600 mm`), when it differs. */
             stated?: string | null;
+            /** @description Target entity of a dataset value read from a source file. */
+            subject?: string | null;
             /**
              * @description A golden item's trace: the one it was filed from, which its label
              *     goes to.
@@ -20820,6 +20831,26 @@ export interface components {
         };
         /** @enum {string} */
         WorkerRole: "capture" | "apply";
+        WorkflowAgentMeasures: {
+            /**
+             * Format: int64
+             * @description Total selected inputs; missing summaries remain explicit rather than
+             *     silently disappearing from the measurements.
+             */
+            inputs: number;
+            /** Format: double */
+            mean_cost_micro_usd?: number | null;
+            /**
+             * Format: double
+             * @description Means over the inputs with a reported summary; read `missing_inputs`
+             *     alongside them while a test is incomplete or an attempt failed.
+             */
+            mean_iterations?: number | null;
+            /** Format: double */
+            mean_tool_calls?: number | null;
+            /** Format: int64 */
+            missing_inputs: number;
+        };
         WorkflowAgentProposalCounts: {
             /** Format: int32 */
             dropped: number;
@@ -20876,6 +20907,25 @@ export interface components {
             /** Format: int64 */
             pin_wait_ms?: number | null;
             tools?: string[] | null;
+        };
+        /**
+         * @description One server-bound agent-test input, read through the revision grant. Text
+         *     stays in bounded test storage and never goes into a turn message.
+         */
+        WorkflowAgentTestInput: {
+            /** Format: int64 */
+            commit_seq: number;
+            content_type: string;
+            document: string;
+            iri: string;
+            label: string;
+            ontology: components["schemas"]["OntologyView"];
+            pages?: string[];
+            schema_validation: string;
+            sha256: string;
+            test: string;
+            text: string;
+            uploaded_at: string;
         };
         WorkflowAgentTrace: {
             /** Format: int32 */
@@ -21850,6 +21900,7 @@ export interface components {
              */
             starter: string;
             target?: null | components["schemas"]["WorkflowTypeRef"];
+            test_input?: null | components["schemas"]["WorkflowAgentTestInput"];
             /** @description The workflow's name. */
             workflow: string;
         };
@@ -22710,6 +22761,8 @@ export interface components {
             id: string;
             iri: string;
             property: string;
+            /** @description Target of a source-input proposal. Omit for a legacy record test. */
+            subject?: string | null;
         };
         /** @description The values of a test by what the live workflow would do with them. */
         WorkflowTestCounts: {
@@ -22826,6 +22879,7 @@ export interface components {
         };
         /** @description What a test read from one input. */
         WorkflowTestResult: {
+            agent?: null | components["schemas"]["WorkflowAgentRecord"];
             /**
              * @description A person's answer per property (`value` items of Review): to the
              *     value the workflow read, or, for a property without one, the value
@@ -22848,10 +22902,18 @@ export interface components {
             failed?: boolean;
             iri: string;
             region?: null | components["schemas"]["WorkflowTestRegion"];
+            /**
+             * @description `run` only when every attempted write preflight passed and has a durable
+             *     server audit receipt. `not_run` when no write was attempted or a preflight
+             *     was refused or unavailable, including RDF dry runs. Ownership and
+             *     grounding are checked independently.
+             */
+            schema_validation?: string | null;
             values?: components["schemas"]["WorkflowTestValue"][];
         };
         /** @description The settings a test runs with, frozen when it starts. */
         WorkflowTestSettings: {
+            agent?: null | components["schemas"]["WorkflowAgentSettings"];
             /** @description The watched class IRI. */
             class: string;
             context?: string | null;
@@ -22862,6 +22924,7 @@ export interface components {
              * @description The gate: a value with this support or more is written.
              */
             gate: number;
+            owns?: null | components["schemas"]["WorkflowOwns"];
             properties: components["schemas"]["WorkflowTestProperty"][];
             /**
              * Format: int32
