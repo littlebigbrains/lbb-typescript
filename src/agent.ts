@@ -2234,7 +2234,13 @@ async function writeStep(
       uncertain: "the request changed between attempts",
     };
   await s.heartbeat(
-    { phase: "commit", proposals: writing.length },
+    {
+      phase: "commit",
+      done: 0,
+      total: writing.length,
+      unit: "proposals",
+      proposals: writing.length,
+    },
     { checkpoint: { intent: "commit", request_hash: requestHash } },
   );
   try {
