@@ -40,6 +40,7 @@ test("the runtime entrypoint exposes only the supported public values", () => {
     "recordHostedAgentRemoval",
     "recordHostedAgentResult",
     "requeueFailed",
+    "runHostedAgentTest",
     "splitInHalves",
     "spreadsheetFragment",
     "spreadsheetRange",
@@ -48,6 +49,7 @@ test("the runtime entrypoint exposes only the supported public values", () => {
     "triggeredWorkflow",
     "workflow",
     "workflowOfIdentity",
+    "workflowTestAnswerKey",
     "writeOwned",
   ]);
 });

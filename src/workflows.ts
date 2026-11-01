@@ -164,14 +164,14 @@ export function workflowOfIdentity(id: string): string | undefined {
  * Send to it with a deterministic message id, so a repeat is admitted once.
  */
 export function fanInIdentity(name: string, fanIn: string): string {
-  if (!/^[a-z][a-z0-9-]{0,30}$/.test(fanIn))
+  if (fanIn === "test" || !/^[a-z][a-z0-9-]{0,30}$/.test(fanIn))
     throw new RangeError("a fan-in id matches [a-z][a-z0-9-]{0,30}");
   return `starter.${name}.${fanIn}`;
 }
 
 /** Whether `id` is a fan-in identity (`starter.<name>.<word>`). */
 export function isFanInIdentity(id: string): boolean {
-  return FAN_IN.test(id);
+  return !id.endsWith(".test") && FAN_IN.test(id);
 }
 export interface WorkflowResult<S, R = unknown, M = unknown> {
   state: S;

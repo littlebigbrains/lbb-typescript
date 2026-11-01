@@ -6,7 +6,7 @@ import {
   lbbActivities,
   type ReviewItemRequest,
 } from "./activities.js";
-import { isWorkflowTestOpen } from "./workflow-tests.js";
+import { isWorkflowTestOpen, workflowTestAnswerKey } from "./workflow-tests.js";
 import type { WorkflowContext } from "./workflows.js";
 
 interface Seen {
@@ -16,6 +16,17 @@ interface Seen {
   body: Record<string, unknown> | undefined;
   headers: Record<string, string>;
 }
+
+test("target answers retain the server's UTF-8 identity and legacy property keys", () => {
+  const answers = {
+    [workflowTestAnswerKey("urn:é🙂", "width")]: { decision: "accept" },
+    [workflowTestAnswerKey("urn:é", "🙂width")]: { decision: "reject" },
+    [workflowTestAnswerKey(undefined, "width")]: { decision: "cant_tell" },
+  };
+  assert.equal(Object.keys(answers).length, 3);
+  assert.deepEqual(answers["\0" + "10:urn:é🙂width"], { decision: "accept" });
+  assert.deepEqual(answers.width, { decision: "cant_tell" });
+});
 
 type Answer = { status?: number; body?: unknown };
 

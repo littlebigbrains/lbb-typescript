@@ -871,7 +871,13 @@ export async function runAgent(
   // bytes, so a message the spec leaves out still fits the 256 KiB record with
   // its envelopes (the largest record is tested in `lbb-workflows`).
   const baseBytes = jsonSize(spec.message ?? null);
-  const turnResults = turnRunOf(ctx)?.results;
+  // A hosted test keeps its values in the dedicated test receipt. Preserve
+  // this context's activity usage/fence identity while suppressing live run
+  // results from dry-run writes and captured Review items.
+  const turnResults =
+    options.hosted && ctx.origin?.kind === "test"
+      ? undefined
+      : turnRunOf(ctx)?.results;
   const report = (input: WorkflowRunInput): void => {
     turnResults?.add(input);
     host.report?.(input);
