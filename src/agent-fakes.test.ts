@@ -6,7 +6,7 @@
 // by idempotency key, Review items by key, model calls by effect id.
 // `sdk/conformance/agent-step` describes the same world in JSON.
 import { LbbError } from "./transport.js";
-import { agentValueKey, type AgentHost } from "./agent.js";
+import { agentValueKey, type AgentHost, type AgentOntology } from "./agent.js";
 import { placeKind, readPlace } from "./locators.js";
 import type { Schemas } from "./types.js";
 import type {
@@ -41,6 +41,10 @@ export interface WorldDef {
   epoch?: string;
   files?: Record<string, FileDef>;
   entities?: Record<string, { type: string; name: string }>;
+  /** The classes and the property types the host shows the prompt. Absent: the host has no `ontology`. */
+  ontology?: AgentOntology;
+  /** The class IRI and name of entities the host shows the prompt. Absent: the host has no `entities`. */
+  labels?: Record<string, { classIri?: string; name?: string }>;
   /** A read answers with the first entry whose `match` the query contains. */
   reads?: { match: string; vars?: string[]; rows: Record<string, string>[] }[];
   /** A quote one of these names gets its verdict; any other is read from the file. */
@@ -89,6 +93,8 @@ export interface Counters {
   reason: number;
   decide: number;
   describe: number;
+  ontology: number;
+  entities: number;
   reviewItems: number;
   review: number;
   commit: number;
@@ -116,6 +122,8 @@ export class FakeWorld {
     reason: 0,
     decide: 0,
     describe: 0,
+    ontology: 0,
+    entities: 0,
     reviewItems: 0,
     review: 0,
     commit: 0,
@@ -383,6 +391,30 @@ function makeHost(world: FakeWorld): AgentHost {
         pages: pages.slice(from, to).map((text) => ({ text })),
       };
     },
+    ...(def.ontology
+      ? {
+          async ontology() {
+            world.counters.ontology += 1;
+            return structuredClone(def.ontology!);
+          },
+        }
+      : {}),
+    ...(def.labels
+      ? {
+          async entities(iris: readonly string[]) {
+            world.counters.entities += 1;
+            const found = new Map<
+              string,
+              { classIri?: string; name?: string }
+            >();
+            for (const iri of iris) {
+              const label = def.labels![iri];
+              if (label) found.set(iri, label);
+            }
+            return found;
+          },
+        }
+      : {}),
     async describe(iris) {
       world.counters.describe += 1;
       const found = new Map<string, { type: string; name: string }>();

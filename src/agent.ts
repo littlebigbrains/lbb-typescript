@@ -36,9 +36,14 @@ import {
   agentPin,
   askedOf,
   canonicalOwns,
+  classLine,
   decisionLabel,
   invalidObservation,
+  moreClassesLine,
+  ownedLine,
   proposalLine,
+  PROMPT_BOUNDS,
+  subjectLine,
   supportLabel,
   supportQuestion,
   canonicalJson,
@@ -48,11 +53,22 @@ import {
   parseAction,
   utf8,
   type AgentToolName,
+  type EntityLabel,
   type Observation,
+  type OwnedType,
   type PromptState,
 } from "./agent-protocol.js";
 import { stableHashHex } from "./hash.js";
-import { nextPlace, placeCount, placeOf, readPlace } from "./locators.js";
+import {
+  lastPlace,
+  nextPlace,
+  placeCount,
+  placeKind,
+  placeOf,
+  readPlace,
+  readWindow,
+  type PlaceError,
+} from "./locators.js";
 import {
   LbbError,
   observedActivityUsage,
@@ -266,6 +282,14 @@ export interface AgentFileRecord {
   generated: boolean;
 }
 
+/** What the prompt shows of the ontology. */
+export interface AgentOntology {
+  /** Classes by their name and the IRI their instances carry as their type. */
+  classes: { name: string; iri: string }[];
+  /** Properties by name, with the value type the ontology declares. */
+  properties: { name: string; valueType: string; unit?: string }[];
+}
+
 /**
  * What the interpreter needs from the world: the models, the graph, the
  * files, the commit and the Review inbox. {@link lbbAgentHost} makes one
@@ -311,6 +335,22 @@ export interface AgentHost {
     to: number,
     signal?: AbortSignal,
   ): Promise<{ pageCount: number; pages: { text: string }[] }>;
+  /**
+   * The graph's classes and the declared type of its properties, for the
+   * prompt. Optional: a host without it shows the model no class list and no
+   * value types.
+   */
+  ontology?(signal?: AbortSignal): Promise<AgentOntology>;
+  /**
+   * The class IRI and the display name of entities, read at a commit, for the
+   * prompt. Optional, like {@link AgentHost.ontology}. An entity the graph
+   * does not describe is left out of the answer.
+   */
+  entities?(
+    iris: readonly string[],
+    asOfCommitSeq: number | undefined,
+    signal?: AbortSignal,
+  ): Promise<Map<string, { classIri?: string; name?: string }>>;
   /** The class (as an ontology name) and the display name of entities. */
   describe(
     iris: readonly string[],
@@ -356,6 +396,14 @@ interface StartRecord {
   instances: string[];
   /** Why the input cannot be read, when it cannot. */
   invalid?: string;
+  /** The graph's classes, for the prompt: at most {@link CLASSES_LISTED}. */
+  classes?: { name: string; iri: string }[];
+  /** How many classes the graph has beyond the ones listed. */
+  classesOmitted?: number;
+  /** The declared type of each owned property the ontology knows, by name. */
+  owned?: Record<string, OwnedType>;
+  /** The class and name of the instances and of the input file's Document. */
+  labels?: Record<string, EntityLabel>;
 }
 
 /** What a decision step saves: the validated action, never the raw reply. */
@@ -381,6 +429,8 @@ interface ToolRecord {
   result: Record<string, unknown>;
   /** The time a `graph.read` took. */
   elapsedMs?: number;
+  /** The class and name of the entities a `graph.read` returned for the first time. */
+  labels?: Record<string, EntityLabel>;
 }
 
 /** One verdict a `propose_write` result holds. */
@@ -441,6 +491,9 @@ interface ReviewRecord {
 }
 
 // ---- the loop's view of what is saved ----------------------------------------
+
+const { classesListed: CLASSES_LISTED, labelsPerRead: LABELS_PER_READ } =
+  PROMPT_BOUNDS;
 
 const ENTITY_IRI = /^https:\/\/littlebigbrain\.com\/e\/[0-9a-fA-F]{32}$/;
 const SHA256 = /^[0-9a-fA-F]{64}$/;
@@ -595,6 +648,8 @@ class Run {
   /** Files the run read: sha -> upload stamp. */
   readonly pinned = new Map<string, string>();
   readonly subjects = new Set<string>();
+  /** The class and name of subjects, where the run learned them. */
+  readonly labels = new Map<string, EntityLabel>();
   readonly proposals = new Map<string, AgentProposal>();
   costMicroUsd = 0;
   model: string | undefined;
@@ -612,6 +667,8 @@ class Run {
     this.savedBytes = baseBytes + jsonSize(start);
     if (start.file) this.pinned.set(start.file.sha256, start.file.uploadedAt);
     for (const iri of start.instances) this.subjects.add(iri);
+    for (const [iri, label] of Object.entries(start.labels ?? {}))
+      this.labels.set(iri, label);
   }
 
   /** The bytes the turn record would hold, with the factor. */
@@ -664,6 +721,8 @@ class Run {
       if (record.result.error === "snapshot_unavailable")
         this.snapshotGone = true;
       for (const iri of iris(record.result)) this.subjects.add(iri);
+      for (const [iri, label] of Object.entries(record.labels ?? {}))
+        this.labels.set(iri, label);
     }
     if (action.tool === "files.read" && record.ok) {
       const sha = record.result.sha256;
@@ -716,8 +775,23 @@ class Run {
         sha256,
         uploadedAt,
       })),
-      subjects: [...this.subjects].slice(0, 100),
-      owns: this.cfg.owns,
+      subjects: [...this.subjects]
+        .slice(0, 100)
+        .map((iri) => subjectLine(iri, this.labels.get(iri))),
+      owns: this.cfg.owns.map((name) =>
+        ownedLine(
+          name,
+          this.start.owned && Object.hasOwn(this.start.owned, name)
+            ? this.start.owned[name]
+            : undefined,
+        ),
+      ),
+      classes: [
+        ...(this.start.classes ?? []).map((c) => classLine(c.name, c.iri)),
+        ...(this.start.classesOmitted
+          ? [moreClassesLine(this.start.classesOmitted)]
+          : []),
+      ],
       proposals: [...this.proposals.values()].map(proposalLine),
       input,
     };
@@ -1085,7 +1159,112 @@ async function startStep(
       throw error;
     }
   }
+  await promptFacts(
+    host,
+    s.signal,
+    record,
+    canonicalOwns(spec.owns.properties),
+  );
   return record;
+}
+
+/**
+ * What the prompt shows beyond the task: the graph's classes, the declared
+ * type of each owned property and the class and name of the instances. They
+ * only help the model, so a graph that refuses the read (4xx) leaves them out.
+ * The start step saves them, so a replay shows the same prompt.
+ */
+async function promptFacts(
+  host: AgentHost,
+  signal: AbortSignal,
+  record: StartRecord,
+  owned: readonly string[],
+): Promise<void> {
+  const ontology = host.ontology
+    ? await advisory(signal, () => host.ontology!(signal))
+    : undefined;
+  const classNames = new Map<string, string>();
+  if (ontology) {
+    const classes = ontology.classes
+      .filter((c) => c.name && c.iri)
+      .sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
+    for (const c of classes) classNames.set(c.iri, c.name);
+    record.classes = classes.slice(0, CLASSES_LISTED).map((c) => ({
+      name: cutBytes(c.name, PROMPT_BOUNDS.savedClassName),
+      iri: cutBytes(c.iri, PROMPT_BOUNDS.savedClassIri),
+    }));
+    if (classes.length > CLASSES_LISTED)
+      record.classesOmitted = classes.length - CLASSES_LISTED;
+    const types = new Map(
+      ontology.properties.map((p) => [lower(p.name), p] as const),
+    );
+    // A Map first: a property may be named `constructor` or `__proto__`.
+    const typed = new Map<string, OwnedType>();
+    for (const name of owned) {
+      const found = types.get(name);
+      if (found)
+        typed.set(name, {
+          valueType: found.valueType,
+          ...(found.unit ? { unit: found.unit } : {}),
+        });
+    }
+    if (typed.size) record.owned = Object.fromEntries(typed);
+  }
+  if (host.entities && record.instances.length) {
+    const asked = record.instances.slice(0, LABELS_PER_READ);
+    const found = await advisory(signal, () =>
+      host.entities!(asked, record.commitSeq ?? undefined, signal),
+    );
+    const labels = found ? labelsOf(found, asked, classNames) : undefined;
+    if (labels && Object.keys(labels).length) record.labels = labels;
+  }
+}
+
+/** An advisory read: a refusal of the graph (4xx) is no answer, a fault is thrown. */
+async function advisory<T>(
+  signal: AbortSignal,
+  read: () => Promise<T>,
+): Promise<T | undefined> {
+  try {
+    return await read();
+  } catch (error) {
+    if (
+      !signal.aborted &&
+      error instanceof LbbError &&
+      error.status >= 400 &&
+      error.status < 500 &&
+      error.status !== 429
+    )
+      return undefined;
+    throw error;
+  }
+}
+
+/** The end of a class IRI: `…/class/product` is `product`. */
+const classTail = (iri: string) => iri.slice(iri.search(/[^/#]*$/));
+
+/** Labels for the prompt, from what the graph described of the entities asked. */
+function labelsOf(
+  found: ReadonlyMap<string, { classIri?: string; name?: string }>,
+  asked: readonly string[],
+  classNames: ReadonlyMap<string, string>,
+): Record<string, EntityLabel> {
+  const labels: Record<string, EntityLabel> = {};
+  for (const iri of asked) {
+    const entity = found.get(iri);
+    if (!entity) continue;
+    const c = entity.classIri
+      ? cutBytes(
+          classNames.get(entity.classIri) ?? classTail(entity.classIri),
+          PROMPT_BOUNDS.savedLabelClass,
+        )
+      : "";
+    const n = entity.name
+      ? cutBytes(entity.name, PROMPT_BOUNDS.savedLabelName)
+      : "";
+    if (c || n) labels[iri] = { ...(c ? { c } : {}), ...(n ? { n } : {}) };
+  }
+  return labels;
 }
 
 async function decideStep(
@@ -1249,7 +1428,7 @@ async function toolStep(
         timer.signal,
       );
     if (action.tool === "files.read")
-      return await filesRead(host, action.arguments, timer.signal);
+      return await filesRead(host, start, action.arguments, timer.signal);
     if (action.tool === "propose_write")
       return await proposeWrite(
         host,
@@ -1318,11 +1497,13 @@ async function graphRead(
       rows,
       ...(truncated ? { truncated: true } : {}),
     });
+    const labels = await labelsFor(host, run, start, result, signal);
     return {
       ok: true,
       note: `${rows.length} row${rows.length === 1 ? "" : "s"}${truncated || result.truncated ? " (cut)" : ""}`,
       result,
       elapsedMs,
+      ...(labels ? { labels } : {}),
     };
   } catch (error) {
     const elapsedMs = Date.now() - began;
@@ -1359,15 +1540,166 @@ async function graphRead(
   }
 }
 
+/** The time the labels of one read may take. */
+const LABEL_READ_MS = 5_000;
+
+/**
+ * The class and name of the entities a read returned for the first time, so
+ * the prompt can say what each subject is. The labels help the model and
+ * change nothing else: a read that fails leaves them out.
+ */
+async function labelsFor(
+  host: AgentHost,
+  run: Run,
+  start: StartRecord,
+  result: Record<string, unknown>,
+  signal: AbortSignal,
+): Promise<Record<string, EntityLabel> | undefined> {
+  if (!host.entities) return undefined;
+  const fresh = [...new Set(iris(result))]
+    .filter((iri) => !run.labels.has(iri))
+    .slice(0, LABELS_PER_READ);
+  if (!fresh.length) return undefined;
+  const timer = timed(signal, LABEL_READ_MS);
+  try {
+    const found = await host.entities(
+      fresh,
+      start.commitSeq ?? undefined,
+      timer.signal,
+    );
+    const labels = labelsOf(
+      found,
+      fresh,
+      new Map((start.classes ?? []).map((c) => [c.iri, c.name])),
+    );
+    return Object.keys(labels).length ? labels : undefined;
+  } catch (error) {
+    // The lease or the worker ended the step: that is no label to skip.
+    if (signal.aborted) throw error;
+    return undefined;
+  } finally {
+    timer.done();
+  }
+}
+
 const decoder = new TextDecoder("utf-8");
+
+/** How a place is written for a kind of file, in a refusal the model reads. */
+const PLACE_FORMS = {
+  line: "Use line=a,b: lines a+1 to b, so line=0,20 is the first 20 lines (a < b).",
+  row: "Use row=a-b or row=n: rows count from 1 and the header is row 1.",
+  page: "Use page=N: pages count from 1.",
+} as const;
+
+/** The size of a file, in the units of its places. */
+interface FileSize {
+  unit: "lines" | "rows" | "pages";
+  total: number;
+  /** The scan stopped at 1 MiB: the total is of the part scanned. */
+  partial: boolean;
+}
+
+/** The size in words: `4 lines`, `at least 209716 lines`. */
+const sizeWords = (size: FileSize) =>
+  `${size.partial ? "at least " : ""}${size.total} ${size.unit}`;
+
+/**
+ * The size of a file for the refusal of a place that names no part of it. The
+ * read costs one scan, which only a refusal pays. `undefined` for a file with
+ * no places.
+ */
+async function measure(
+  host: AgentHost,
+  sha: string,
+  media: string,
+  signal: AbortSignal,
+): Promise<FileSize | undefined> {
+  const kind = placeKind(media);
+  if (kind === null) return undefined;
+  if (kind === "page") {
+    const read = await host.filePages(sha, 0, 1, signal);
+    return { unit: "pages", total: read.pageCount, partial: false };
+  }
+  const bytes = await host.fileBytes(
+    sha,
+    { start: 0, end: FILE_READ_SCAN_BYTES },
+    signal,
+  );
+  return {
+    unit: kind === "line" ? "lines" : "rows",
+    total: placeCount(media, kind, decoder.decode(bytes)),
+    partial: bytes.length >= FILE_READ_SCAN_BYTES,
+  };
+}
+
+/** The refusal of a place the file cannot give, with what the model needs to ask again. */
+function refusedPlace(
+  reason: PlaceError,
+  media: string,
+  locator: string,
+  size?: FileSize,
+): ToolRecord {
+  const kind = placeKind(media);
+  const forms = kind ? ` ${PLACE_FORMS[kind]}` : "";
+  const has = size ? ` The file has ${sizeWords(size)}.` : "";
+  const extra: Record<string, unknown> = { reason };
+  if (size) {
+    extra[`total_${size.unit}`] = size.total;
+    if (size.partial) extra.total_is_partial = true;
+  }
+  if (reason === "unsupported_media_type")
+    return refused("locator_invalid", `${media} has no places to read`, {
+      ...extra,
+      media_type: media,
+    });
+  if (reason === "wrong_media_type")
+    return refused(
+      "locator_invalid",
+      `${locator} is a place of another kind of file. ${media} is read by ${kind}.${forms}${has}`,
+      { ...extra, media_type: media },
+    );
+  if (reason === "out_of_range" && size) {
+    // A scan that stopped at 1 MiB cannot name the last place of the file.
+    if (size.partial)
+      return refused(
+        "locator_invalid",
+        `${locator} is past the part of the file that can be read: the first 1 MiB holds ${sizeWords(size)}`,
+        extra,
+      );
+    const last =
+      kind === "page"
+        ? size.total > 0
+          ? `page=${size.total}`
+          : undefined
+        : kind
+          ? lastPlace(kind, size.total)
+          : undefined;
+    return refused(
+      "locator_invalid",
+      last
+        ? `${locator} is past the end: the file has ${sizeWords(size)}; the last place is ${last}`
+        : `${locator} is past the end: the file has no ${size.unit}`,
+      { ...extra, ...(last ? { last_place: last } : {}) },
+    );
+  }
+  return refused(
+    "locator_invalid",
+    `${locator} is not a place.${forms}${has}`,
+    extra,
+  );
+}
 
 async function filesRead(
   host: AgentHost,
+  start: StartRecord,
   args: Record<string, unknown>,
   signal: AbortSignal,
 ): Promise<ToolRecord> {
-  const file = String(args.file);
+  // The file defaults to the run's input file: the model need not name it.
+  const file = args.file === undefined ? start.file?.sha256 : String(args.file);
   const locator = String(args.locator);
+  if (file === undefined)
+    return refused("file_not_found", "name a file: the run has no input file");
   let sha: string | undefined;
   try {
     sha = SHA256.test(file)
@@ -1385,28 +1717,42 @@ async function filesRead(
         "the file is a generated output, not a source",
       );
     const checked = placeOf(info.contentType, locator);
-    if (!checked.ok)
-      return refused(
-        "locator_invalid",
-        checked.error,
+    if (!checked.ok) {
+      // The model asks again: tell it how long the file is, when that is known.
+      const known = sha;
+      const size =
         checked.error === "unsupported_media_type"
-          ? { media_type: info.contentType }
-          : {},
-      );
+          ? undefined
+          : await advisory(signal, () =>
+              measure(host, known, info.contentType, signal),
+            );
+      return refusedPlace(checked.error, info.contentType, locator, size);
+    }
     const place = checked.place;
     let text: string;
+    let read: string;
     let next: string | undefined;
+    // The size of the file, as the result names it: `total_lines`, `total_rows`
+    // or `total_pages`, and whether the scan saw all of it.
+    let size: FileSize;
+    let partial = false;
     if (place.kind === "page") {
-      const read = await host.filePages(
+      const pages = await host.filePages(
         sha,
         place.page - 1,
         place.page,
         signal,
       );
-      if (place.page > read.pageCount)
-        return refused("locator_invalid", "out_of_range");
-      text = read.pages.map((page) => page.text).join("\n");
-      next = nextPlace(place, read.pageCount);
+      if (place.page > pages.pageCount)
+        return refusedPlace("out_of_range", info.contentType, locator, {
+          unit: "pages",
+          total: pages.pageCount,
+          partial: false,
+        });
+      text = pages.pages.map((page) => page.text).join("\n");
+      read = locator;
+      next = nextPlace(place, pages.pageCount);
+      size = { unit: "pages", total: pages.pageCount, partial: false };
     } else {
       const bytes = await host.fileBytes(
         sha,
@@ -1414,21 +1760,44 @@ async function filesRead(
         signal,
       );
       const body = decoder.decode(bytes);
-      const read = readPlace(info.contentType, locator, body);
-      if (!read.ok) return refused("locator_invalid", read.error);
-      text = read.text;
-      next = nextPlace(place, placeCount(info.contentType, place.kind, body));
+      const window = readWindow(info.contentType, locator, body);
+      // The scan stops at 1 MiB: past it the count is of the part scanned.
+      partial = bytes.length >= FILE_READ_SCAN_BYTES;
+      if (!window.ok)
+        return refusedPlace(
+          window.error,
+          info.contentType,
+          locator,
+          window.total === undefined
+            ? undefined
+            : {
+                unit: place.kind === "line" ? "lines" : "rows",
+                total: window.total,
+                partial,
+              },
+        );
+      text = window.text;
+      read = window.locator;
+      next = nextPlace(window.place, window.total);
+      size = {
+        unit: place.kind === "line" ? "lines" : "rows",
+        total: window.total,
+        partial,
+      };
     }
     const cut = utf8(text) > FILE_READ_RETURN_BYTES;
     const shown = cut ? cutBytes(text, FILE_READ_RETURN_BYTES) : text;
     return {
       ok: true,
-      note: `${locator} of ${sha.slice(0, 8)}`,
+      note: `${read} of ${sha.slice(0, 8)} (${sizeWords(size)})`,
       result: boundedResult({
         sha256: sha,
         uploaded_at: info.uploadedAt,
         media_type: info.contentType,
-        locator,
+        locator: read,
+        ...(read !== locator ? { requested_locator: locator } : {}),
+        [`total_${size.unit}`]: size.total,
+        ...(partial ? { total_is_partial: true } : {}),
         text: shown,
         ...(cut ? { truncated: true, original_bytes: utf8(text) } : {}),
         ...(next ? { next } : {}),
@@ -2008,7 +2377,11 @@ async function supportStep(
     const support: Record<string, number> = {};
     for (const p of grounded)
       support[pairOf(p.subject, p.property)] =
-        typeof given === "number" ? given : (given[p.property] ?? 1);
+        typeof given === "number"
+          ? given
+          : Object.hasOwn(given, p.property)
+            ? given[p.property]!
+            : 1;
     return { support, costMicroUsd: 0 };
   }
   await s.heartbeat({
