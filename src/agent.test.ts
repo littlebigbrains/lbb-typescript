@@ -112,7 +112,7 @@ test("a spec outside its bounds is refused with the bound named", () => {
   );
   const resolved = resolveSpec(spec());
   assert.equal(resolved.maxIterations, 8);
-  assert.equal(resolved.maxCostMicroUsd, 200_000);
+  assert.equal(resolved.maxCostMicroUsd, 40_000);
   assert.equal(resolved.maxWallMs, 600_000);
   assert.equal(resolved.maxReadMs, 60_000);
   assert.equal(resolved.maxProposals, 64);
@@ -123,6 +123,19 @@ test("a spec outside its bounds is refused with the bound named", () => {
     "files.read",
     "propose_write",
   ]);
+});
+
+test("the default cost cap is 40,000 micro-USD, the measured p95 with headroom", () => {
+  // 25,766 (p95 cost of 30 qualification inputs) + 11,378 (the largest call)
+  // = 37,144, rounded up. docs/testing/performance-ledger.md, 2026-11-02.
+  assert.equal(resolveSpec(spec()).maxCostMicroUsd, 40_000);
+  assert.equal(resolveSpec(spec({ maxCostMicroUsd: 1 })).maxCostMicroUsd, 1);
+  assert.equal(
+    resolveSpec(spec({ maxCostMicroUsd: 2_000_000 })).maxCostMicroUsd,
+    2_000_000,
+  );
+  // The cap is part of the pin, so a spec that sets the old default differs.
+  assert.notEqual(specPin(spec()), specPin(spec({ maxCostMicroUsd: 200_000 })));
 });
 
 test("a step key outside letters, digits, _ and - is refused before any step", async () => {

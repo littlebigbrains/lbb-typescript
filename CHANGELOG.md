@@ -24,6 +24,14 @@ All notable changes to the `@littlebigbrain/client` package are documented here.
   each subject. This changes the pin of the agent step: a run that is half done
   during the deploy waits for its old code, as for any change of the tools.
 
+- The default `maxCostMicroUsd` of the agent step is 40,000 micro-USD. It was
+  200,000. It is the p95 cost of 30 measured runs of a real model (25,766)
+  plus the most expensive single call (11,378), rounded up. The sources were
+  small, so a task on long documents may need more. A spec that leaves the cap
+  out gets a new pin: a run that is half done during the deploy waits for its
+  old code, as for any change of the tools. A spec that sets the cap keeps its
+  value.
+
 - `activities.ground(items, { workflow })` calls the ground check
   (`POST /v1/workflows/activities/ground`) with no model: one verdict per
   proposed value. Name `workflow` for a stack key only.

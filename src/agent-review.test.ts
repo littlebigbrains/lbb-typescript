@@ -124,7 +124,7 @@ test("the pin follows the text the code builds for the models", async () => {
     tools,
     instructions: "Read the sizes.",
     maxIterations: 8,
-    maxCostMicroUsd: 200_000,
+    maxCostMicroUsd: 40_000,
     maxWallMs: 600_000,
     maxReadMs: 60_000,
     maxProposals: 64,

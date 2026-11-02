@@ -964,7 +964,7 @@ test("the pin follows each tool's wording and schema", () => {
       tools: TOOLS,
       instructions: "task",
       maxIterations: 8,
-      maxCostMicroUsd: 200_000,
+      maxCostMicroUsd: 40_000,
       maxWallMs: 600_000,
       maxReadMs: 60_000,
       maxProposals: 64,
