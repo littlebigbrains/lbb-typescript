@@ -162,7 +162,7 @@ test("support waits for the frozen context acknowledgement before calling the mo
   ]);
   const engine = new FakeEngine();
   engine.onHeartbeat = (key) => {
-    if (key === "agent.commit.support")
+    if (key === "agent.commit.support" && engine.checkpoints.has(key))
       throw new Error("lost checkpoint acknowledgement");
   };
   const { host } = withEffectIdentity(fake.host());

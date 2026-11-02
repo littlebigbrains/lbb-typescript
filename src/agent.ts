@@ -1103,11 +1103,15 @@ async function decideStep(
   // saved with the step and a replay does not ask the clock again.
   if (Date.now() - start.startedAtMs >= cfg.maxWallMs)
     return { stop: "wall", tokensIn: 0, tokensOut: 0, costMicroUsd: 0 };
-  s.progress(`iteration ${n} of ${cfg.maxIterations}`, {
+  // A phase write changes the lease source; finish it before execution reads.
+  await s.heartbeat({
+    phase: `iteration ${n} of ${cfg.maxIterations}`,
     done: n - 1,
     total: cfg.maxIterations,
     unit: "iterations",
   });
+  if (Date.now() - start.startedAtMs >= cfg.maxWallMs)
+    return { stop: "wall", tokensIn: 0, tokensOut: 0, costMicroUsd: 0 };
   let reply: unknown;
   let model: string | undefined;
   let usage = { tokensIn: 0, tokensOut: 0, costMicroUsd: 0 };
@@ -1227,7 +1231,8 @@ async function toolStep(
   start: StartRecord,
   owned: ReadonlySet<string>,
 ): Promise<ToolRecord> {
-  s.progress(`iteration ${n} of ${cfg.maxIterations}`, {
+  await s.heartbeat({
+    phase: `iteration ${n} of ${cfg.maxIterations}`,
     done: n,
     total: cfg.maxIterations,
     unit: "iterations",
@@ -2006,7 +2011,8 @@ async function supportStep(
         typeof given === "number" ? given : (given[p.property] ?? 1);
     return { support, costMicroUsd: 0 };
   }
-  s.progress("asking the decision model", {
+  await s.heartbeat({
+    phase: "asking the decision model",
     done: 0,
     total: grounded.length,
     unit: "proposals",
