@@ -2,7 +2,7 @@
 
 All notable changes to the `@littlebigbrain/client` package are documented here.
 
-## Unreleased
+## 0.33.0 (2026-11-02)
 
 - `activities.agent(ctx, key, spec, options)` runs an agent step: a bounded
   loop in which a model reads a file and the graph with three tools
@@ -57,6 +57,48 @@ All notable changes to the `@littlebigbrain/client` package are documented here.
   gives `PREFERS`, `AVOIDS` and `OPTIMIZES_FOR` the token `multi_active_value`,
   and `LOCATED_IN` and `WORKS_AT` the token `latest_wins`. A graph created
   before this change keeps the old tokens.
+
+- `workflows.named.run(name, { inputs })` runs chosen inputs of a hosted Agent
+  workflow again. `inputs` has 1 to 16 entries, each `{ iri }` or `{ sha256 }`.
+  The server sends each one as a new message of origin `manual`, with a new
+  work key, and reads no watch. Without `inputs` the call is the run now it
+  was. The generated schema adds `NamedWorkflowRunRequest` and
+  `WorkflowRunNowInput`.
+
+- `workflows.named.runs` and `workflows.triggered.runs` take `workKey`: only
+  the attempts of one message (`wk_` and 16 hex characters). A run summary has
+  the optional `work_key`. A run recorded before work keys has none.
+
+- The generated schema adds the hosted Agent types. `WorkflowAgentSettings` is
+  `params.agent`. `NamedAgentWorkflowRequest` creates an Agent with a content
+  trigger. `workflows.named.put` takes `NamedWorkflowPutRequest`, which is
+  that request or `NamedWorkflowRequest`. `WorkflowAgentRecord`, with
+  `WorkflowAgentTrace` and `WorkflowAgentProposalCounts`, is the optional
+  `agent` field of a run result and of a test result. `WorkflowAgentMeasures`
+  is the optional `measures` of an experiment arm report, and
+  `WorkflowAgentTestInput` serves Agent tests.
+
+- The optional field `subject`, the record a value fills, is on
+  `EvalExpectedValue`, `EvalExperimentUnlabeled`, `ReviewEvalOrigin`,
+  `WorkflowTestAnswerRequest` and `WorkflowTestValue`. `WorkflowTestResult` has
+  the optional `schema_validation`, and `EvalExperimentReport` the optional
+  `guidance`.
+
+- `workflowTestAnswerKey(subject, property)` gives the key of one target and
+  property pair in the answers of a test result. Leave the subject out only
+  for a record test.
+
+- **Behavior change.** The fan-in id `test` is reserved for the test identity
+  `starter.<name>.test`. `fanInIdentity(name, "test")` throws a `RangeError`,
+  and `isFanInIdentity` is false for an id that ends in `.test`. A workflow
+  built with `triggeredWorkflow` refuses a message for that identity unless it
+  has the server's test origin.
+
+- `LbbActivities` has two new methods, `ground` and `agent`. An object that
+  implements the interface, such as a test double, must add both.
+  `recordHostedAgentResult`, `recordHostedAgentRemoval`, `hostedAgentRecord`,
+  `runHostedAgentTest`, `WorkflowTurnReader.agentClient()` and
+  `LbbClient.graphEpoch` serve LBB's hosted Agent worker.
 
 ## 0.32.0 (2026-10-30)
 

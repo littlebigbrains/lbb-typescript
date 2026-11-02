@@ -2,6 +2,16 @@
 
 All notable changes to the `@littlebigbrain/create` package are documented here.
 
+## 0.9.0 (2026-11-02)
+
+- A new project requires `@littlebigbrain/client` ^0.33.0, and a
+  `--lang python` project `littlebigbrain>=0.34.0`. The client release adds
+  `ground` and `agent` to `LbbActivities`. The test double of the templates
+  (`MockActivities`) has both, and a template does not call either.
+- The Python port of `values-extract` sends `replace_owned` with the sample
+  records it loads, so the load works on a new graph, which stores RDF
+  natively.
+
 ## 0.8.0 (2026-10-30)
 
 - A new project requires `@littlebigbrain/client` ^0.32.0, and a
