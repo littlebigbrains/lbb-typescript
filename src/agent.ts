@@ -116,7 +116,7 @@ export interface AgentSpec {
   tools?: readonly AgentToolName[];
   /** Model decisions at most: 1 to 12. Default 8. */
   maxIterations?: number;
-  /** The run's model cost at most, in micro-USD: 1 to 2,000,000. Default 200,000. */
+  /** The run's model cost at most, in micro-USD: 1 to 2,000,000. Default 40,000. */
   maxCostMicroUsd?: number;
   /** The run's time at most: 10,000 to 1,800,000 ms. Default 600,000. */
   maxWallMs?: number;
@@ -594,7 +594,7 @@ export function resolveSpec(spec: AgentSpec): Resolved {
     maxCostMicroUsd: whole(
       "maxCostMicroUsd",
       spec.maxCostMicroUsd,
-      200_000,
+      40_000,
       1,
       2_000_000,
     ),
