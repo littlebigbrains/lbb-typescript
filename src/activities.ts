@@ -370,11 +370,11 @@ export interface LbbActivities {
    * Run an agent step: a bounded loop of model decisions and tool calls
    * that reads a file and the graph and proposes values, then writes the
    * grounded ones once as an owned commit and files a Review item for the
-   * rest (`docs/reference/agent-step.md`). One turn is one run. The steps are
-   * `<key>.start`, `<key>.iNN.decide`, `<key>.iNN.tool` and the commit
-   * phase, so a turn that runs again continues where it stopped. A capture
-   * (`captureActivities`) keeps the commit and the Review items instead of
-   * writing them.
+   * rest (the Agent guide: https://docs.littlebigbrain.com/guides/agent-step/).
+   * One turn is one run. The steps are `<key>.start`, `<key>.iNN.decide`,
+   * `<key>.iNN.tool` and the commit phase, so a turn that runs again
+   * continues where it stopped. A capture (`captureActivities`) keeps the
+   * commit and the Review items instead of writing them.
    */
   agent(
     ctx: WorkflowContext,
