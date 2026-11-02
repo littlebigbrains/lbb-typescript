@@ -243,3 +243,84 @@ export function placeCount(
     ? textLines(text).length
     : tableRows(text, separatorOf(media)).length;
 }
+
+/**
+ * What {@link readWindow} answers: the text of the part of the place that the
+ * file has, the locator of that part and the number of lines or rows the file
+ * has; or why there is no text, with the same number when the file was counted.
+ */
+export type PlaceWindow =
+  | {
+      ok: true;
+      text: string;
+      /** The place that was read: the one asked for, or its part that the file has. */
+      locator: string;
+      /** The place that was read, in parts. */
+      place: Place;
+      /** The place asked for ran past the end of the file. */
+      clamped: boolean;
+      /** The lines (`line=`) or rows (`row=`) of the file. */
+      total: number;
+    }
+  | { ok: false; error: PlaceError; total?: number };
+
+/**
+ * The text of the place `locator` in `text` for a reader that has to find its
+ * way: like {@link readPlace}, except that a place which starts inside the
+ * file and runs past its end answers the part the file has, with the locator
+ * of that part. A place that starts at or past the end answers `out_of_range`
+ * with the count. `ground` still tests a quote at the exact place, so a
+ * citation uses the locator of the part.
+ */
+export function readWindow(
+  media: string,
+  locator: string,
+  text: string,
+): PlaceWindow {
+  const checked = placeOf(media, locator);
+  if (!checked.ok || checked.place.kind === "page") {
+    return checked.ok
+      ? { ok: false, error: "unsupported_media_type" }
+      : { ok: false, error: checked.error };
+  }
+  const place = checked.place;
+  if (place.kind === "line") {
+    const lines = textLines(text);
+    const total = lines.length;
+    if (place.from >= total) return { ok: false, error: "out_of_range", total };
+    const to = Math.min(place.to, total);
+    return {
+      ok: true,
+      text: lines.slice(place.from, to).join("\n"),
+      locator: to === place.to ? locator : `line=${place.from},${to}`,
+      place: { kind: "line", from: place.from, to },
+      clamped: to !== place.to,
+      total,
+    };
+  }
+  const rows = tableRows(text, separatorOf(media));
+  const total = rows.length;
+  if (place.from > total) return { ok: false, error: "out_of_range", total };
+  const to = Math.min(place.to, total);
+  return {
+    ok: true,
+    text: rows.slice(place.from - 1, to).join("\n"),
+    locator: to === place.to ? locator : `row=${place.from}-${to}`,
+    place: { kind: "row", from: place.from, to },
+    clamped: to !== place.to,
+    total,
+  };
+}
+
+/**
+ * The last place of a text of `total` lines or rows: the last line is
+ * `line=<total - 1>,<total>`, the last row is `row=<total>`. `undefined` for a
+ * text with none.
+ */
+export function lastPlace(
+  kind: "line" | "row",
+  total: number,
+): string | undefined {
+  if (total < 1) return undefined;
+  return kind === "line" ? `line=${total - 1},${total}` : `row=${total}`;
+}

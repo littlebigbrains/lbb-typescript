@@ -234,10 +234,14 @@ test("a query that writes is refused by the tool and reaches no host", async () 
   assert.equal(result.trace[0]?.ok, false);
 });
 
-test("a file read that is out of range is a refusal in the trace, not a failure", async () => {
+test("a file read the file cannot give is a refusal in the trace, not a failure", async () => {
   const run = new FakeWorld(world(), [
+    // Past the end of a 4-line file: the part that exists, not a refusal
+    // (`agent-tools.test.ts`).
     reply("files.read", { file: A, locator: "line=0,99" }),
+    // A place of another kind of file, and a place wholly past the end.
     reply("files.read", { file: A, locator: "page=1" }),
+    reply("files.read", { file: A, locator: "line=9,12" }),
     reply("files.read", { file: A, locator: "line=1,2" }),
     reply("finish", { summary: "done" }),
   ]);
@@ -245,7 +249,7 @@ test("a file read that is out of range is a refusal in the trace, not a failure"
   const result = await runAgent(run.host(), engine.context(), "agent", spec());
   assert.deepEqual(
     result.trace.map((line) => line.ok),
-    [false, false, true, true].slice(0, result.trace.length),
+    [true, false, false, true],
   );
   assert.equal(result.outcome, "finished");
 });

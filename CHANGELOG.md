@@ -14,6 +14,16 @@ All notable changes to the `@littlebigbrain/client` package are documented here.
   them. Types: `AgentSpec`, `AgentResult`, `AgentProposal`, `AgentVerdict`
   and the related types.
 
+- The agent step's tools answer in terms a model can act on. `files.read` states
+  the size of the file in each result (`total_lines`, `total_rows` or
+  `total_pages`), returns the part of a range that exists when the range runs
+  past the end, names the last place when a range starts past it, and takes the
+  input file when `file` is left out. A proposal's `value` may be a JSON number;
+  the step keeps it as text. The prompt lists the value type of each owned
+  property, the classes of the graph with their IRIs, and the class and name of
+  each subject. This changes the pin of the agent step: a run that is half done
+  during the deploy waits for its old code, as for any change of the tools.
+
 - `activities.ground(items, { workflow })` calls the ground check
   (`POST /v1/workflows/activities/ground`) with no model: one verdict per
   proposed value. Name `workflow` for a stack key only.

@@ -142,6 +142,38 @@ export function lbbAgentHost(
         })),
       };
     },
+    async ontology(signal) {
+      const view = await activities.ontology(call(signal));
+      return {
+        classes: (view.entity_type_defs ?? []).flatMap((type) =>
+          type.iri ? [{ name: type.name, iri: type.iri }] : [],
+        ),
+        properties: (view.property_defs ?? []).map((property) => ({
+          name: property.name,
+          valueType: property.value_type,
+          ...(property.unit ? { unit: property.unit } : {}),
+        })),
+      };
+    },
+    async entities(iris, asOfCommitSeq, signal) {
+      const found = new Map<string, { classIri?: string; name?: string }>();
+      const valid = iris.filter((iri) => /^[^\s<>"{}|\\^`]+$/.test(iri));
+      if (!valid.length) return found;
+      const values = valid.map((iri) => `<${iri}>`).join(" ");
+      const answer = await select(
+        client,
+        `SELECT ?s ?label ?class WHERE { VALUES ?s { ${values} } OPTIONAL { ?s <${RDFS_LABEL}> ?label } OPTIONAL { ?s <${RDF_TYPE}> ?class } }`,
+        asOfCommitSeq,
+        signal,
+      );
+      for (const row of answer.rows)
+        if (row.s && !found.has(row.s))
+          found.set(row.s, {
+            ...(row.class ? { classIri: row.class } : {}),
+            ...(row.label ? { name: row.label } : {}),
+          });
+      return found;
+    },
     async describe(iris, signal) {
       const found = new Map<string, { type: string; name: string }>();
       if (!iris.length) return found;
