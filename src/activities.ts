@@ -933,7 +933,9 @@ function capturedSuggestion(
  * sends nothing back to the watch (it
  * answers `null`), and `evolve` runs as a dry run. The reads
  * (`reviewItems`, `listReviews`, `reviewItem`) run. On an RDF-native graph
- * the dry run refuses the write, as the commit would (`rdf_native_graph`).
+ * the dry run of a write without `replace_owned` previews the commit that
+ * owns nothing, and refuses what such a graph cannot take, as the commit
+ * would (`rdf_native_graph`).
  *
  * The `reason` and `decide` calls name the test (`test: { workflow }`, the
  * `workflow` option, default `test`): the call log shows them under
@@ -988,7 +990,7 @@ export function captureActivities(
       )
         throw error;
       // The dry run refuses what the commit refuses: on an RDF-native graph
-      // (`rdf_native_graph`) the commit of an owned write is refused too.
+      // (`rdf_native_graph`) that is client vectors and preconditions.
       return { check: "dry_run", errors: [error.message] };
     }
   }
