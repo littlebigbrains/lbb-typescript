@@ -2,7 +2,7 @@
 
 All notable changes to the `@littlebigbrain/client` package are documented here.
 
-## Unreleased
+## 0.33.1 (2026-11-03)
 
 - `commit`, `commitDryRun` and `graph(name).facts.create` work on a graph that
   stores RDF statements, as every new graph does. The server refuses a commit
