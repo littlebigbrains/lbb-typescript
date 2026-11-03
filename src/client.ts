@@ -47,7 +47,18 @@ import {
   type CallOptions,
   type RequestOptions,
 } from "./transport.js";
-import { LbbCapabilityError } from "./transport.js";
+import { LbbCapabilityError, type LbbError } from "./transport.js";
+import {
+  NativeGraphs,
+  PROBE_BODY,
+  importJobRefusal,
+  isRdfNativeRefusal,
+  nativeRetractPlan,
+  nativeRetractRefusal,
+  nativeRetractResponse,
+  ownedFormOfCommit,
+  ownedFormRefusal,
+} from "./rdf-native-writes.js";
 import {
   bodyChunkReader,
   ServerSentEventParser,
@@ -310,6 +321,8 @@ export class LbbClient {
   private readonly onResponse?: (event: LbbResponseEvent) => void;
   private readonly onRetry?: (event: LbbRetryEvent) => void;
   private capabilities?: Promise<ReadonlySet<string>>;
+  /** Graphs this client learned to be RDF-native, shared with its scopes. */
+  private readonly nativeGraphs: NativeGraphs;
   /** A5 default read consistency applied when a read omits its own value. */
   readonly defaultConsistency?: SearchConsistency;
 
@@ -342,7 +355,12 @@ export class LbbClient {
   /** Hosted integrations for your end customers, at `integrationsUrl`. */
   readonly integrations: IntegrationsNamespace;
 
-  constructor(options: LbbClientOptions) {
+  /** `shared` is internal: a scoped client passes what it shares with its parent. */
+  constructor(
+    options: LbbClientOptions,
+    shared?: { nativeGraphs: NativeGraphs },
+  ) {
+    this.nativeGraphs = shared?.nativeGraphs ?? new NativeGraphs();
     const baseUrl = options.baseUrl?.trim();
     if (!baseUrl) {
       throw new Error(
@@ -441,24 +459,27 @@ export class LbbClient {
     stack?: string;
     expectedGraphEpoch?: string;
   }): LbbClient {
-    return new LbbClient({
-      baseUrl: this.baseUrl,
-      integrationsUrl: this.integrationsUrl,
-      apiKey: this.apiKey,
-      graph: scope.graph ?? this.graphName,
-      expectedGraphEpoch: scope.expectedGraphEpoch ?? this.expectedGraphEpoch,
-      environment: environmentScope(scope) ?? this.environment,
-      fetch: this.fetchImpl,
-      apiVersion: this.apiVersion,
-      maxRetries: this.maxRetries,
-      retryDelayMs: this.retryDelayMs,
-      retryBudgetMs: this.retryBudgetMs,
-      timeoutMs: this.timeoutMs,
-      onRequest: this.onRequest,
-      onResponse: this.onResponse,
-      onRetry: this.onRetry,
-      defaultConsistency: this.defaultConsistency,
-    });
+    return new LbbClient(
+      {
+        baseUrl: this.baseUrl,
+        integrationsUrl: this.integrationsUrl,
+        apiKey: this.apiKey,
+        graph: scope.graph ?? this.graphName,
+        expectedGraphEpoch: scope.expectedGraphEpoch ?? this.expectedGraphEpoch,
+        environment: environmentScope(scope) ?? this.environment,
+        fetch: this.fetchImpl,
+        apiVersion: this.apiVersion,
+        maxRetries: this.maxRetries,
+        retryDelayMs: this.retryDelayMs,
+        retryBudgetMs: this.retryBudgetMs,
+        timeoutMs: this.timeoutMs,
+        onRequest: this.onRequest,
+        onResponse: this.onResponse,
+        onRetry: this.onRetry,
+        defaultConsistency: this.defaultConsistency,
+      },
+      { nativeGraphs: this.nativeGraphs },
+    );
   }
 
   /**
@@ -1129,20 +1150,83 @@ export class LbbClient {
 
   // --- writes ---
 
-  /** Commit triplets and optional entity embeddings. Prefer `client.graph("main").facts.create(...)`. */
+  /** The key of the scoped graph in the set of graphs known to be RDF-native. */
+  private nativeKey(): string {
+    return `${this.environment ?? ""}\u0000${this.graphName ?? ""}`;
+  }
+
+  /**
+   * Send facts to `POST /v1/graph/commit`, or its `dry_run`. A graph that
+   * stores RDF refuses a commit without `replace_owned` (`rdf_native_graph`).
+   * The same facts then go again, under the same key, in the form such a
+   * graph accepts: a `replace_owned` that owns nothing. The client remembers
+   * the graph and sends that form first from then on. A body that already
+   * carries `replace_owned` is sent as given.
+   *
+   * What the graph would drop or cannot take is never sent. A body of that
+   * kind still goes to the server once as it is, whatever the client
+   * remembers, so a graph that turns out to hold records is not refused by
+   * the client alone.
+   *
+   * @internal Shared by `commit`, `commitDryRun` and `graph(...).facts.create`.
+   */
+  async writeFacts(
+    body: Schemas["TripletCommitFile"],
+    opts: CallOptions & { dryRun?: boolean } = {},
+  ): Promise<Schemas["GraphCommitResponse"]> {
+    const { dryRun, ...call } = opts;
+    // One key for the whole call: the refused attempt wrote nothing, and the
+    // owned attempt must replay under the same key.
+    const idempotencyKey = dryRun
+      ? call.idempotencyKey
+      : (call.idempotencyKey ?? this.idempotencyKey("facts.create"));
+    const send = (facts: Schemas["TripletCommitFile"]) =>
+      this.request<Schemas["GraphCommitResponse"]>("POST", "/v1/graph/commit", {
+        ...call,
+        body: facts,
+        query: dryRun ? { dry_run: true } : undefined,
+        idempotencyKey,
+      });
+    if (body.replace_owned !== undefined && body.replace_owned !== null)
+      return send(body);
+    const key = this.nativeKey();
+    const known = this.nativeGraphs.has(key);
+    if (known && !ownedFormRefusal(body)) return send(ownedFormOfCommit(body));
+    try {
+      const response = await send(body);
+      // The server took a plain commit: the remembered graph is not RDF-native.
+      if (known) this.nativeGraphs.delete(key);
+      return response;
+    } catch (error) {
+      if (!isRdfNativeRefusal(error)) throw error;
+      this.nativeGraphs.add(key);
+      return send(ownedFormOfCommit(body, error));
+    }
+  }
+
+  /**
+   * Commit triplets and entity properties. Prefer `client.graph("main").facts.create(...)`.
+   *
+   * On a graph that stores RDF (every new graph) the commit adds the facts and
+   * replaces only what a commit on a graph of records replaces: the other
+   * values of a field it sets (whoever wrote them), the label of a record it
+   * names, the target of a relation that keeps one target and, with
+   * `property_merge: "replace"`, the other fields of the records it names. A
+   * record left with no field and no link by such a replacement loses its type
+   * and label. History stays readable with `as_of_commit_seq`. A link written
+   * twice is one statement. Confidence and valid time are stored on a link's
+   * evidence only, so a link with them and without evidence is refused before
+   * anything is sent. Writing the same evidence again with another confidence
+   * adds a second value to the evidence node. `entity_embeddings` and
+   * `preconditions` are refused, with the reason in the error.
+   */
   async commit(
     body: Schemas["TripletCommitFile"],
     opts: { idempotencyKey?: string } = {},
   ): Promise<Schemas["GraphCommitResponse"] & { commitSeq: number }> {
-    const response = await this.request<Schemas["GraphCommitResponse"]>(
-      "POST",
-      "/v1/graph/commit",
-      {
-        body,
-        idempotencyKey:
-          opts.idempotencyKey ?? this.idempotencyKey("facts.create"),
-      },
-    );
+    const response = await this.writeFacts(body, {
+      idempotencyKey: opts.idempotencyKey,
+    });
     // A5: surface the committed sequence as `commitSeq` so the write→floor→read
     // loop reads naturally: `const { commitSeq } = await client.commit(…)`.
     return { ...response, commitSeq: response.commit_seq };
@@ -1158,10 +1242,9 @@ export class LbbClient {
   commitDryRun(
     body: Schemas["TripletCommitFile"],
   ): Promise<Schemas["GraphCommitDryRunResponse"]> {
-    return this.request("POST", "/v1/graph/commit", {
-      body,
-      query: { dry_run: true },
-    });
+    return this.writeFacts(body, { dryRun: true }) as unknown as Promise<
+      Schemas["GraphCommitDryRunResponse"]
+    >;
   }
 
   /**
@@ -1233,6 +1316,14 @@ export class LbbClient {
       throw new TypeError("submitImport requires a non-empty idempotencyKey");
     }
     await this.requireCapability("durable_import_jobs_v1");
+    // Before the source is read, and the source is closed when the job is
+    // refused: nothing of it is consumed.
+    try {
+      await this.refuseImportJobOnRdfNative();
+    } catch (error) {
+      await durableImportIterator(lines).return?.();
+      throw error;
+    }
     const rawBody = await durableImportBody(lines);
     return this.request("POST", "/v1/graph/import-jobs", {
       rawBody,
@@ -1248,6 +1339,27 @@ export class LbbClient {
       retry: false,
       signal: opts.signal,
     });
+  }
+
+  /**
+   * An import job commits JSON records. A graph that stores RDF (every new
+   * graph) accepts the upload and then fails the job at its first commit, so
+   * the call stops before it reads the source. The check is a dry run that
+   * writes nothing, sent on every call; any answer but the refusal lets the
+   * job go ahead.
+   */
+  private async refuseImportJobOnRdfNative(): Promise<void> {
+    try {
+      await this.request("POST", "/v1/graph/commit", {
+        body: PROBE_BODY,
+        query: { dry_run: true },
+      });
+    } catch (error) {
+      if (isRdfNativeRefusal(error)) {
+        this.nativeGraphs.add(this.nativeKey());
+        throw importJobRefusal();
+      }
+    }
   }
 
   async getImportJob(jobId: string): Promise<Schemas["GraphImportJobStatus"]> {
@@ -1372,16 +1484,96 @@ export class LbbClient {
    * superseding retract events rather than deleting — history stays visible in an
    * `as_of` read before the retraction, but the edges drop out of current state.
    * The surgical alternative to {@link deleteGraph}.
+   *
+   * A graph that stores RDF (every new graph) has no state of links only, so
+   * `entities` there need `purge_entity_properties: true` and remove each record
+   * whole: its links, field values, type and label. A record that is left with
+   * no link and no field because of it loses its type and label too. History
+   * stays readable. Without the flag the call throws `rdf_native_graph` and
+   * removes nothing, and so does a call that names more than 1,000 records.
+   * `edges` retract exactly on both kinds of graph.
+   *
+   * With `edges` and `entities` together the call is two writes: the links
+   * first under the key `<key>:edges`, then the records under `<key>:rdf`. The
+   * records are checked first with a dry run, so an unknown type fails before
+   * anything changes. A failure after that (a concurrent change, a storage
+   * error, a `reject`-mode shape) leaves the links retracted. Repeat the call
+   * with the same key: both parts replay.
    */
   retract(
     body: Schemas["GraphRetractRequest"],
-    opts: { idempotencyKey?: string; expectedGraphEpoch?: string } = {},
+    opts: CallOptions & { expectedGraphEpoch?: string } = {},
   ): Promise<Schemas["GraphRetractResponse"]> {
-    return this.request("POST", "/v1/graph/retract", {
-      body,
-      query: { expected_graph_epoch: opts.expectedGraphEpoch },
-      idempotencyKey: opts.idempotencyKey ?? this.idempotencyKey("retract"),
-    });
+    return this.sendRetract(body, opts);
+  }
+
+  /** @internal Shared by `retract` and `graph(...).retract`. */
+  async sendRetract(
+    body: Schemas["GraphRetractRequest"],
+    opts: CallOptions & { expectedGraphEpoch?: string } = {},
+  ): Promise<Schemas["GraphRetractResponse"]> {
+    const { expectedGraphEpoch, ...call } = opts;
+    const idempotencyKey =
+      call.idempotencyKey ?? this.idempotencyKey("retract");
+    const query = { expected_graph_epoch: expectedGraphEpoch };
+    const post = <T>(path: string, payload: unknown, key: string) =>
+      this.request<T>("POST", path, {
+        ...call,
+        body: payload,
+        query,
+        idempotencyKey: key,
+      });
+    const plain = () =>
+      post<Schemas["GraphRetractResponse"]>(
+        "/v1/graph/retract",
+        body,
+        idempotencyKey,
+      );
+    const native = async (cause?: LbbError) => {
+      const plan = nativeRetractPlan(body, cause);
+      // Exact links retract on every graph. They go first, under a key of
+      // their own, so a retry of the whole call replays both parts. Before
+      // they change anything, the commit that removes the records is checked
+      // with a dry run, so a record of an unknown type fails while nothing
+      // has changed.
+      let edges: Schemas["GraphRetractResponse"] | undefined;
+      if (plan.edges.length) {
+        // A dry run carries no idempotency key.
+        const { idempotencyKey: _unused, ...preview } = call;
+        void _unused;
+        await this.request("POST", "/v1/graph/commit", {
+          ...preview,
+          body: plan.commit,
+          query: { ...query, dry_run: true },
+        });
+        edges = await post<Schemas["GraphRetractResponse"]>(
+          "/v1/graph/retract",
+          { edges: plan.edges, entities: [] },
+          `${idempotencyKey}:edges`,
+        );
+      }
+      const committed = await post<Schemas["GraphCommitResponse"]>(
+        "/v1/graph/commit",
+        plan.commit,
+        `${idempotencyKey}:rdf`,
+      );
+      return nativeRetractResponse(edges, committed);
+    };
+    if (!body.entities?.length) return plain();
+    const key = this.nativeKey();
+    const known = this.nativeGraphs.has(key);
+    // A remembered graph skips the plain request only when the native path
+    // will run. A refusal then comes from the server, not from the client alone.
+    if (known && !nativeRetractRefusal(body)) return native();
+    try {
+      const response = await plain();
+      if (known) this.nativeGraphs.delete(key);
+      return response;
+    } catch (error) {
+      if (!isRdfNativeRefusal(error)) throw error;
+      this.nativeGraphs.add(key);
+      return native(error);
+    }
   }
 
   /**

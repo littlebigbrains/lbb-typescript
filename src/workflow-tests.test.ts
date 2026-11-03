@@ -265,7 +265,7 @@ test("a capture checks owned writes with the dry run and keeps them, and keeps r
   assert.deepEqual(capture.result(), { writes: [], reviews: [], results: [] });
 });
 
-test("a capture checks a write's shape first, then the dry run, which an RDF-native graph refuses", async () => {
+test("a capture checks a write's shape first, then the dry run, which an RDF-native graph previews as an owned commit", async () => {
   const { client: lbb, seen } = client([
     {
       status: 400,
@@ -273,7 +273,7 @@ test("a capture checks a write's shape first, then the dry run, which an RDF-nat
         error: {
           code: "rdf_native_graph",
           message:
-            "an RDF-native graph refuses a triplet / property commit dry run",
+            "a triplet / property commit dry run is not available on this graph",
           type: "invalid_request_error",
         },
       },
@@ -305,12 +305,18 @@ test("a capture checks a write's shape first, then the dry run, which an RDF-nat
   assert.equal(plain?.check, "dry_run");
   assert.equal(again?.check, "dry_run");
   assert.deepEqual(again?.errors, []);
-  // The dry run's refusal is the commit's: the write cannot land there.
-  assert.equal(seen.length, 2);
-  assert.equal(
-    plain?.errors[0],
-    "an RDF-native graph refuses a triplet / property commit dry run",
-  );
+  // The graph refused the plain write's dry run, as it refuses the commit.
+  // The client sent the same facts again, owning nothing, as the commit goes
+  // there, and that preview passed.
+  assert.deepEqual(plain?.errors, []);
+  assert.equal(seen.length, 3);
+  assert.equal(seen[0]?.body?.replace_owned, undefined);
+  assert.equal(seen[1]?.query.get("dry_run"), "true");
+  assert.deepEqual(seen[1]?.body?.replace_owned, {
+    subjects: [{ type: "Fixture", name: "f1" }],
+    relations: [],
+    properties: [],
+  });
   // Without a client, the local check, with the commit's own limits.
   const offline = captureActivities({
     ...lbbActivities(lbb),

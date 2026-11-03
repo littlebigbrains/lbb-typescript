@@ -147,30 +147,19 @@ export class GraphNamespace {
     body: Schemas["GraphRetractRequest"],
     opts: CallOptions & { expectedGraphEpoch?: string } = {},
   ): Promise<Schemas["GraphRetractResponse"]> {
-    const { expectedGraphEpoch, ...request } = opts;
-    return this.client.request("POST", "/v1/graph/retract", {
-      ...request,
-      query: { expected_graph_epoch: expectedGraphEpoch },
-      idempotencyKey:
-        opts.idempotencyKey ?? this.client.idempotencyKey("retract"),
-      body,
-    });
+    return this.client.sendRetract(body, opts);
   }
 }
 
 export class FactsNamespace {
   constructor(private readonly client: LbbClient) {}
 
+  /** Commit facts. See {@link LbbClient.commit} for a graph that stores RDF. */
   create(
     body: Schemas["TripletCommitFile"],
     opts: CallOptions = {},
   ): Promise<Schemas["GraphCommitResponse"]> {
-    return this.client.request("POST", "/v1/graph/commit", {
-      ...opts,
-      body,
-      idempotencyKey:
-        opts.idempotencyKey ?? this.client.idempotencyKey("facts.create"),
-    });
+    return this.client.writeFacts(body, opts);
   }
 
   /** Bulk-load a dataset as NDJSON. See {@link LbbClient.import}. */

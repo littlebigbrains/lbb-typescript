@@ -2,6 +2,61 @@
 
 All notable changes to the `@littlebigbrain/client` package are documented here.
 
+## Unreleased
+
+- `commit`, `commitDryRun` and `graph(name).facts.create` work on a graph that
+  stores RDF statements, as every new graph does. The server refuses a commit
+  without `replace_owned` there (`400 rdf_native_graph`). The client sends the
+  same facts again, under the same key, with a `replace_owned` that has one
+  subject and no relations or properties. That commit owns nothing, so it
+  removes no link or field that it does not name. It replaces what a commit on
+  a graph of records replaces: the other values of a field it sets (whoever
+  wrote them), the label of a record it names, the target of a relation that
+  keeps one target and, with `property_merge: "replace"`, the other fields of
+  the records it names. A record left with no field and no link by such a
+  replacement loses its type and label. History stays readable. The client
+  remembers the graph (also for the clients made with `withScope` and
+  `graph(name)`) and sends that form first from then on. A link written twice
+  is one statement on such a graph. A body that carries `replace_owned` is sent
+  as given, and a graph of records gets the same single request as before.
+
+- Confidence and valid time are stored on a link's evidence only on a graph
+  that stores RDF. A link with `confidence` (other than 1) or `valid_time` and
+  no evidence, or any link without evidence when `observed_at` is set, throws
+  `rdf_native_graph` before anything is sent, with the way out in the message.
+  Writing the same evidence again with another confidence adds a second
+  `lbb:confidence` value to the evidence node.
+
+- `entity_embeddings` and `preconditions` in a commit throw `rdf_native_graph`
+  on a graph that stores RDF, with the reason and what to do instead in the
+  message: the platform embeds text with a managed model, so declare an
+  embedding on a class and search. A graph the client remembers is asked once
+  more before such a commit is refused.
+
+- `retract` (and `graph(name).retract`) take `entities` on a graph that stores
+  RDF only with `purge_entity_properties: true`, because a record there has no
+  state of links only. The call removes each record whole (links, field values,
+  type and label; the history stays readable) through
+  `replace_owned.retract_entities`, and answers with a `GraphRetractResponse`.
+  A record that was linked to a removed one and is left with no link and no
+  field loses its type and label too. Exact `edges` retract first, under their
+  own idempotency key, after a dry run of the records' commit, so a record of an
+  unknown type fails before anything changes. A failure after that (a concurrent
+  change, a storage error, a `reject`-mode shape) leaves the links retracted;
+  repeat the call with the same key and both parts replay. Without the flag, or
+  with more than 1,000 records, the call throws `rdf_native_graph` and removes
+  nothing. `retract` accepts the same call options as `graph(name).retract`.
+
+- `submitImport` throws `rdf_native_graph` before it uploads when the graph
+  stores RDF. The server accepts such a job and fails it at its first commit.
+  The check is one dry run of a commit that no graph accepts, sent on every
+  call before the source is read; it writes nothing, a graph of records lets the
+  job go ahead, and a refused job closes the source.
+
+- `captureActivities` previews a write without `replace_owned` on a graph that
+  stores RDF as the commit that owns nothing. It no longer reports the dry run
+  as refused there.
+
 ## 0.33.0 (2026-11-02)
 
 - `activities.agent(ctx, key, spec, options)` runs an agent step: a bounded

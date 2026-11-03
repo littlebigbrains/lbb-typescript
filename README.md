@@ -270,9 +270,20 @@ one into a new project.
 - [Work with JSON records](https://docs.littlebigbrain.com/guides/without-rdf/): define a schema and write records without writing RDF.
 - [Validate writes](https://docs.littlebigbrain.com/guides/sparql-and-shacl/): define constraints with the Shapes Constraint Language (SHACL).
 
-The RDF and JSON guides use different write workflows. Choose one when creating
-a graph; a graph first written through RDF import does not accept
-`facts.create` or JSON record imports.
+Every new graph stores RDF statements. `commit` and `facts.create` add facts to
+it: when the graph refuses a plain commit, the client sends the same facts again
+with a `replace_owned` that owns nothing. The commit removes no link or field
+that it does not name. It replaces the other values of a field it sets, the label
+of a record it names, the target of a relation that keeps one target and, with
+`property_merge: "replace"`, the other fields of the records it names. A record
+left with no field and no link by such a replacement loses its type and label.
+History stays readable. A link with `confidence` or `valid_time` needs an
+`evidence` entry, which stores them; without it the commit is refused before it
+is sent. `retract` with `entities` needs `purge_entity_properties: true` there
+and removes each record whole; a record left with no link and no field because
+of it loses its type and label too. `entity_embeddings` and `preconditions` are
+refused with the reason in the error. `facts.import` and `submitImport` need a
+graph that holds JSON records; `importRdf` loads RDF.
 
 ## Integrations for your customers
 

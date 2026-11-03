@@ -159,6 +159,17 @@ test("submitImport capability-gates and streams NDJSON without concatenation", a
     {
       body: JSON.stringify({ capabilities: ["durable_import_jobs_v1"] }),
     },
+    // The dry run that learns the kind of graph: a graph of records does not
+    // know the probe's type.
+    {
+      status: 400,
+      body: JSON.stringify({
+        error: {
+          code: "invalid_input",
+          message: "unknown entity type 'Probe'",
+        },
+      }),
+    },
     {
       status: 202,
       body: JSON.stringify({
@@ -188,14 +199,15 @@ test("submitImport capability-gates and streams NDJSON without concatenation", a
 
   assert.equal(accepted.job_id, "import:job-1");
   assert.equal(calls[0].input, "http://h/version?graph=main");
-  assert.equal(calls[1].init.duplex, "half");
-  assert.equal(calls[1].init.headers?.["idempotency-key"], "source-run:42");
-  assert.equal(calls[1].init.headers?.["content-type"], "application/x-ndjson");
+  assert.match(calls[1].input, /\/v1\/graph\/commit\?.*dry_run=true/);
+  assert.equal(calls[2].init.duplex, "half");
+  assert.equal(calls[2].init.headers?.["idempotency-key"], "source-run:42");
+  assert.equal(calls[2].init.headers?.["content-type"], "application/x-ndjson");
   assert.ok(
     produced <= 1,
     "the stream may prefetch one record but must not concatenate the source",
   );
-  const body = await streamedBody(calls[1].init.body);
+  const body = await streamedBody(calls[2].init.body);
   assert.equal(produced, 2);
   assert.equal(body.split("\n").filter(Boolean).length, 2);
 });
@@ -229,10 +241,11 @@ test("submitImport rejects an empty source before posting a job", async () => {
     client.submitImport([], { idempotencyKey: "source-run:empty" }),
     /requires at least one NDJSON record or byte chunk/,
   );
-  assert.deepEqual(
-    calls.map((call) => call.input),
-    ["http://h/version"],
-  );
+  // The capability check and the dry run that learns the kind of graph, which
+  // runs before the source is read. Nothing is posted as a job.
+  assert.equal(calls.length, 2);
+  assert.equal(calls[0]!.input, "http://h/version");
+  assert.match(calls[1]!.input, /\/v1\/graph\/commit\?.*dry_run=true/);
 });
 
 test("waitForImportJob polls until committed ingestion succeeds", async () => {
