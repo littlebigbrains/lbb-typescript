@@ -13,7 +13,8 @@
 //   LBB_LIVE_TEST=1 LBB_URL=http://127.0.0.1:7400 LBB_API_KEY=lbb_sk_test_local \
 //     npx tsx --test src/live.test.ts
 //
-// The project's `npm test` runs workflow.test.ts only.
+// The project's `npm test` runs every test file, this one too, and skips it without
+// LBB_LIVE_TEST=1.
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { join } from "node:path";

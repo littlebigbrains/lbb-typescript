@@ -2,9 +2,9 @@
 // instances with an edge to their parent whose evidence is their lines.
 //
 // A named workflow with a content trigger sends each upload of
-// `text/markdown` (and `text/plain` with a `.md` name) here within seconds,
-// one file per message, without a wait for a publication. For each file the
-// workflow:
+// `text/markdown` and `text/x-markdown` (and `text/plain` with a `.md` or
+// `.markdown` name) here within seconds, one file per message, without a
+// wait for a publication. For each file the workflow:
 //
 // 1. reads the file's name and checks its derivation: a file this version
 //    already read with these settings is skipped, so identical bytes under

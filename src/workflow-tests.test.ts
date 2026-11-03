@@ -239,7 +239,7 @@ test("a capture checks owned writes with the dry run and keeps them, and keeps r
   const filed = await capture.activities.review({
     workflow: "sinks",
     key: "starter:sinks:value:1:material",
-    title: "Set material of f1 to Keramik",
+    title: "Set material of f1 to Beech",
   });
   assert.equal(filed.status, "open");
   assert.deepEqual(filed.origin, { kind: "agent", id: "starter:sinks" });
@@ -249,10 +249,7 @@ test("a capture checks owned writes with the dry run and keeps them, and keeps r
   assert.equal(result.writes[0]?.check, "dry_run");
   assert.deepEqual(result.writes[0]?.errors, []);
   assert.equal(result.reviews.length, 1);
-  assert.equal(
-    result.reviews[0]?.request.title,
-    "Set material of f1 to Keramik",
-  );
+  assert.equal(result.reviews[0]?.request.title, "Set material of f1 to Beech");
   // What a live run would report: the write's subject with its field. The
   // review item names no subject, so it reports no input.
   assert.deepEqual(result.results, [

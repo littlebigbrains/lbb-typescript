@@ -375,10 +375,9 @@ const proposalRef = (proposal: Proposal, settings: Settings) =>
  * File the review item of one instance, as LBB's review files it: one status row per proposal
  * (`fact_status: accepted`) in the order a person reads them (the type, the label, values,
  * links, the trace), the type of a new instance and the trace required, one evidence sample per
- * fact, and LBB's key, title, rationale and summary. As the design of the workflows on the
- * fleet asks (G8), the item also holds each statement after the status rows, so its accept
- * commits the facts: each sample names the rows and triplets of its fact (`rows`, `triplets`),
- * and a person can leave facts out of the accept.
+ * fact, and LBB's key, title, rationale and summary. The item also holds each statement after
+ * the status rows, so its accept commits the facts: each sample names the rows and triplets of
+ * its fact (`rows`, `triplets`), and a person can leave facts out of the accept.
  */
 async function fileItem(
   lbb: LbbActivities,

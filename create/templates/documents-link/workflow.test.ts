@@ -30,7 +30,7 @@ import { createWorkflow, defaults, type Settings } from "./workflow.js";
 import * as link from "./link.js";
 
 const SAMPLES = samplesDir(import.meta.url, "documents-link");
-const FILES = ["ausstattungsliste", "baubeschreibung", "raumblaetter"];
+const FILES = ["parts-list", "service-manual", "station-sheets"];
 const PAGES = FILES.map((name) => readJson<FilePages>(join(SAMPLES, "pages", `${name}.json`)));
 
 interface Expected {
@@ -229,7 +229,7 @@ test("the samples give the 15 links of the answer key and no other", async () =>
   assert.equal(expectedLinks.length, 15);
   assert.equal(lbb.reviews.size, 0, "every link is at or above the gate");
   assert.deepEqual(state, { entries: 15, mentions: 21, links: 15, review: 0 });
-  // One turn per window: the two defining files, then the room sheets.
+  // One turn per window: the two defining files, then the station sheets.
   assert.deepEqual(
     turns.map((t) => (t.message as { cursor?: number }).cursor),
     [undefined, 1, 2],
@@ -303,7 +303,7 @@ test("a turn stopped part way resumes from its saved steps", async () => {
     "documents-link",
     docs.map((d) => d.iri),
   );
-  // The two defining windows, then the link window of the room sheets, stopped after 4 steps.
+  // The two defining windows, then the link window of the station sheets, stopped after 4 steps.
   for (let n = 0; n < 2; n++)
     message = (await runTurn(workflow, {}, message)).result.continuation!.message;
   const stopped = await runTurn(workflow, {}, message, { prefix: "t", crashAfter: 4 }).then(
@@ -330,7 +330,7 @@ test("a turn stopped part way resumes from its saved steps", async () => {
 });
 
 test("a long document is read in windows over several turns", async () => {
-  // 30 pages of room sheets: the two sample pages, alternately.
+  // 30 pages of station sheets: the two sample pages, alternately.
   const sheets = PAGES[2]!;
   const pages = Array.from({ length: 30 }, (_, n) => {
     const source = sheets.pages[n % 2]!;
@@ -339,11 +339,11 @@ test("a long document is read in windows over several turns", async () => {
   });
   const book: FilePages = { ...sheets, sha256: "cd".repeat(32), page_count: 30, to: 30, pages };
   const all = [PAGES[0]!, PAGES[1]!, book];
-  const docs = sampleDocs(all, ["ausstattungsliste.pdf", "baubeschreibung.pdf", "raumbuch.pdf"]);
+  const docs = sampleDocs(all, ["parts-list.pdf", "service-manual.pdf", "station-book.pdf"]);
   const lbb = new MockActivities(rules(docs, all));
   const workflow = createWorkflow(
     lbb,
-    settings({ roles: { ...EXPECTED.roles, "raumbuch.pdf": "refers" } as Settings["roles"] }),
+    settings({ roles: { ...EXPECTED.roles, "station-book.pdf": "refers" } as Settings["roles"] }),
   );
   const { turns, state } = await runMessage(
     workflow,
@@ -393,7 +393,7 @@ test("links below the gate go to review instead of the graph", async () => {
   );
   const reviewed = [...lbb.reviews.values()];
   const linked = reviewed.filter((r) => r.key!.includes(":link:"));
-  // One item per document, span and entry: S1.1 and S 2.1 are on both room sheets.
+  // One item per document, span and entry: S1.1 and S 2.1 are on both station sheets.
   assert.equal(linked.length, 13);
   const facts = linked.flatMap((r) => r.facts!.triplets!);
   assert.equal(facts.length, 15);
@@ -428,8 +428,8 @@ test("a document that leaves the graph loses its entries, and the links to them"
 
   const left = links(lbb.graph, docs);
   assert.deepEqual(left.map((l) => l.split(" -> ")[1]).sort(), [
-    "baubeschreibung.pdf|3.1",
-    "baubeschreibung.pdf|3.2",
+    "service-manual.pdf|3.1",
+    "service-manual.pdf|3.2",
   ]);
   assert.equal(lbb.graph.ofType("DocEntry").length, 3);
 });
@@ -464,7 +464,7 @@ test("a write of more than 900 entities goes in parts", () => {
 test("the link helpers match identifiers, words and confidences as the LBB link stage does", () => {
   assert.equal(link.identifierKey("S.4.1"), "s4.1");
   assert.equal(link.identifierKey("s 4.1"), "s4.1");
-  assert.equal(link.identifierKey("Pos.-Nr. 2.4"), "pos.-nr.2.4");
+  assert.equal(link.identifierKey("Ref.-No. 2.4"), "ref.-no.2.4");
   assert.ok(link.holdsAsWord("RB-Pos. 4.4.2) liegt", "4.4.2"));
   assert.ok(!link.holdsAsWord("RB-Pos. 4.4.2", "4.4"));
   assert.ok(!link.holdsAsWord("S11.1", "1.1"));
@@ -482,7 +482,7 @@ test("the link helpers match identifiers, words and confidences as the LBB link 
       confidence: 0.9,
     },
   );
-  const line = PAGES[2]!.pages[0]!.lines.find((l) => l.text.endsWith("Kap. 3.1"))!;
+  const line = PAGES[2]!.pages[0]!.lines.find((l) => l.text.endsWith("sec. 3.1"))!;
   assert.deepEqual(
     link.spanBox(line, "3.1"),
     line.words.at(-1)!.box,

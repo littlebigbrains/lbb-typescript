@@ -232,6 +232,9 @@ export async function create({ template, dir, lang = "ts", client, root = PACKAG
     await writeFile(join(src, file), text.replaceAll("__TEMPLATE__", template));
   }
 
+  // Every test file the template ships, not workflow.test.ts alone: the
+  // modules of `link` have tests of their own.
+  const tests = code.filter((file) => file.endsWith(".test.ts")).map((file) => `src/${file}`);
   const name = packageName(dir);
   const pkg = {
     name,
@@ -242,7 +245,7 @@ export async function create({ template, dir, lang = "ts", client, root = PACKAG
       start: "tsx src/worker.ts",
       setup: "tsx src/setup.ts",
       try: "tsx src/try.ts",
-      test: "tsx --test src/workflow.test.ts",
+      test: `tsx --test ${(tests.length ? tests : ["src/workflow.test.ts"]).join(" ")}`,
       typecheck: "tsc --noEmit",
       ...(code.includes("grade-run.ts") ? { grade: "tsx src/grade-run.ts" } : {}),
       ...(code.includes("test-examples.ts") ? { "test:examples": "tsx src/test-examples.ts" } : {}),
@@ -297,8 +300,9 @@ models.
 - \`src/workflow.ts\`: the workflow, its settings (\`defaults\`), the triggered
   workflow that sends it the instances (\`trigger()\`) and the ontology it
   writes (\`ontology()\`). Change it here.
-- \`src/workflow.test.ts\` and \`src/testing.ts\`: the test, and the mock of
-  the activities and the workflow engine it runs on.
+- \`src/workflow.test.ts\`, the other \`*.test.ts\` files of the template, and
+  \`src/testing.ts\`: the tests, and the mock of the activities and the workflow
+  engine they run on.
 - \`src/samples.ts\` and \`samples/\`: the samples and what \`npm run try\` does
   with them.
 - \`src/worker.ts\`, \`src/setup.ts\`, \`src/try.ts\`: the three commands.

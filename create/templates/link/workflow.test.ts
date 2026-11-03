@@ -441,7 +441,7 @@ test("a key that more than 200 mentions hold is a stop key: it finds nothing, an
   console.log(`storage of ${records.length} contacts: ${JSON.stringify(measure(run.lbb.graph))}`);
 });
 
-test("block keys as graph facts: keys, facts and bytes per mention on the samples (decision 6)", async () => {
+test("block keys as graph facts: keys, facts and bytes per mention on the samples", async () => {
   const run = newRun(RECORDS, models);
   await runAll(run, RECORDS, ORDER);
   const storage = measure(run.lbb.graph);

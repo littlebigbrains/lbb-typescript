@@ -548,7 +548,7 @@ export class MockActivities implements LbbActivities {
     return assertNever("ground");
   }
 
-  /** The templates run no agent step: the mock has no rule for it. */
+  /** The mock has no rule for an agent step: the `agent` template runs in LBB's hosted worker, and no test here calls it. */
   async agent(): Promise<AgentResult> {
     return assertNever("agent");
   }

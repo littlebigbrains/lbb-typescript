@@ -59,7 +59,7 @@ function activities(answers: Answer[]) {
   const { fetch, seen } = fakeFetch(answers);
   const client = new LbbClient({
     baseUrl: "http://h",
-    graph: "tender",
+    graph: "docs",
     fetch,
     retryDelayMs: 0,
     maxRetries: 2,
@@ -78,7 +78,7 @@ test("reason sends the request with the step's effect id and returns the typed v
   const { lbb, seen } = activities([
     {
       body: {
-        value: { code: "P3", description: "Waschtisch 55x45" },
+        value: { code: "P3", description: "Drip tray 55x45" },
         model: "claude-sonnet-5-5",
         ...USAGE,
         cached: false,
@@ -92,8 +92,8 @@ test("reason sends the request with the step's effect id and returns the typed v
   };
   const answer = await lbb.reason<{ code: string; description: string }>(
     {
-      prompt: 'Which code does this row define? "P3 Waschtisch 55x45"',
-      system: "You read equipment lists.",
+      prompt: 'Which code does this row define? "P3 Drip tray 55x45"',
+      system: "You read parts lists.",
       schema,
       max_tokens: 2_000,
     },
@@ -108,10 +108,10 @@ test("reason sends the request with the step's effect id and returns the typed v
   assert.equal(seen.length, 1);
   assert.equal(seen[0]?.method, "POST");
   assert.equal(seen[0]?.path, "/v1/workflows/activities/reason");
-  assert.equal(seen[0]?.query, "?graph=tender");
+  assert.equal(seen[0]?.query, "?graph=docs");
   assert.deepEqual(seen[0]?.body, {
-    prompt: 'Which code does this row define? "P3 Waschtisch 55x45"',
-    system: "You read equipment lists.",
+    prompt: 'Which code does this row define? "P3 Drip tray 55x45"',
+    system: "You read parts lists.",
     schema,
     max_tokens: 2_000,
     effect_id: "0f3c9a51e2d84b7aa1c6d2e9b0f47a13/define-p3",
@@ -201,7 +201,7 @@ test("decide and embed pass the effect id as it is, slash included", async () =>
     { effectId: "abc/triage" },
   );
   const embedded = await lbb.embed(
-    { texts: ["P3 Waschtisch 55x45"] },
+    { texts: ["P3 Drip tray 55x45"] },
     { effectId: "abc/triage", label: "fixtures" },
   );
 
@@ -211,7 +211,7 @@ test("decide and embed pass the effect id as it is, slash included", async () =>
   assert.equal(seen[0]?.body?.effect_id, "abc/triage");
   assert.equal(seen[1]?.path, "/v1/workflows/activities/embed");
   assert.deepEqual(seen[1]?.body, {
-    texts: ["P3 Waschtisch 55x45"],
+    texts: ["P3 Drip tray 55x45"],
     effect_id: "abc/triage",
     label: "fixtures",
   });
@@ -353,9 +353,9 @@ test("pages reads to the end of the file in calls of at most 50 pages", async ()
   assert.deepEqual(
     seen.map((s) => s.query),
     [
-      `?graph=tender&sha256=${sha}&from=0&to=50`,
-      `?graph=tender&sha256=${sha}&from=50&to=100`,
-      `?graph=tender&sha256=${sha}&from=100&to=120`,
+      `?graph=docs&sha256=${sha}&from=0&to=50`,
+      `?graph=docs&sha256=${sha}&from=50&to=100`,
+      `?graph=docs&sha256=${sha}&from=100&to=120`,
     ],
   );
 
@@ -363,7 +363,7 @@ test("pages reads to the end of the file in calls of at most 50 pages", async ()
   const window = await one.lbb.pages(sha, { from: 3, to: 5 });
   assert.equal(window.pages.length, 2);
   assert.equal(one.seen.length, 1);
-  assert.equal(one.seen[0]?.query, `?graph=tender&sha256=${sha}&from=3&to=5`);
+  assert.equal(one.seen[0]?.query, `?graph=docs&sha256=${sha}&from=3&to=5`);
 });
 
 test("sparql takes a query text or a request and returns rows", async () => {
@@ -462,7 +462,7 @@ test("review files a suggestion with facts and the workflow's agent origin", asy
   await lbb.review({
     workflow: "documents-link",
     key: "starter:documents-link:link:ab:s1.1",
-    title: 'Link "S1.1" in raumblaetter.pdf to S 1.1',
+    title: 'Link "S1.1" in station-sheets.pdf to S 1.1',
     rationale: "below the gate",
     facts,
   });
@@ -470,7 +470,7 @@ test("review files a suggestion with facts and the workflow's agent origin", asy
   assert.equal(seen[0]?.path, "/v1/ontology/suggestions");
   assert.deepEqual(seen[0]?.body, {
     key: "starter:documents-link:link:ab:s1.1",
-    title: 'Link "S1.1" in raumblaetter.pdf to S 1.1',
+    title: 'Link "S1.1" in station-sheets.pdf to S 1.1',
     rationale: "below the gate",
     facts,
     origin: { kind: "agent", id: "starter:documents-link" },
@@ -495,7 +495,7 @@ test("review files a value item with /v1/reviews and the workflow that asks", as
     title: "Is the area of R 1.04 12.5?",
     subject: { type: "Room", name: "R 1.04" },
     question: { property: "area", value: 12.5, confidence: 0.62 },
-    evidence: [{ quote: "Fläche 12,5 m²" }],
+    evidence: [{ quote: "Area 12.5 m²" }],
   });
 
   assert.equal(item.id, "rev_1");
@@ -506,7 +506,7 @@ test("review files a value item with /v1/reviews and the workflow that asks", as
     title: "Is the area of R 1.04 12.5?",
     subject: { type: "Room", name: "R 1.04" },
     question: { property: "area", value: 12.5, confidence: 0.62 },
-    evidence: [{ quote: "Fläche 12,5 m²" }],
+    evidence: [{ quote: "Area 12.5 m²" }],
     origin: { kind: "agent", id: "starter:areas" },
     workflow: { name: "areas", step: "review" },
   });
@@ -710,7 +710,7 @@ test("waitForReview takes an answer that came first, and refuses a trigger shard
 
 test("evolve sends the operations, and a dry run asks for one", async () => {
   const { lbb, seen } = activities([{ body: { no_op: true } }, { body: {} }]);
-  const ops = [{ op: "add_entity_type" as const, name: "Mangel" }];
+  const ops = [{ op: "add_entity_type" as const, name: "Issue" }];
   const preview = await lbb.evolve(ops, { dryRun: true });
   await lbb.evolve(ops);
 

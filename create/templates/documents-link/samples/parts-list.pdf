@@ -1,0 +1,76 @@
+%PDF-1.4
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [7 0 R] /Count 1 >>
+endobj
+3 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>
+endobj
+4 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>
+endobj
+5 0 obj
+<< /Title (Parts list) /Producer (make-samples.mjs) >>
+endobj
+6 0 obj
+<< /Length 2224 >>
+stream
+0.35 g BT /F1 8 Tf 1 0 0 1 72 806 Tm (Example Plant, bottling line) Tj ET 0 g
+0.6 G 0.5 w 72 798 m 523 798 l S 0 G
+BT /F2 16 Tf 1 0 0 1 72 760 Tm (Parts list) Tj ET
+BT /F1 10 Tf 1 0 0 1 72 740 Tm (Spare parts of the bottling line. The station sheets name the items of this list.) Tj ET
+BT /F2 10 Tf 1 0 0 1 74.79 712 Tm (Item) Tj ET
+BT /F2 10 Tf 1 0 0 1 101.35 712 Tm (Description) Tj ET
+0.6 G 0.5 w 72 707 m 523 707 l S 0 G
+BT /F2 10 Tf 1 0 0 1 101.35 690 Tm (Sensors) Tj ET
+BT /F1 10 Tf 1 0 0 1 72 675 Tm (S 1.1) Tj ET
+BT /F1 10 Tf 1 0 0 1 101.35 675 Tm (Temperature sensor, stainless steel, approx. 55x45 mm, with cable gland) Tj ET
+BT /F1 10 Tf 1 0 0 1 72 660 Tm (S 1.2) Tj ET
+BT /F1 10 Tf 1 0 0 1 101.35 660 Tm (Pressure sensor, flush-mounted, with display) Tj ET
+BT /F1 10 Tf 1 0 0 1 72 645 Tm (S 1.3) Tj ET
+BT /F1 10 Tf 1 0 0 1 101.35 645 Tm (Flow sensor, stainless steel, with pulse output) Tj ET
+BT /F1 10 Tf 1 0 0 1 72 630 Tm (S 2.1) Tj ET
+BT /F1 10 Tf 1 0 0 1 101.35 630 Tm (Level sensor, glass rod, 60x45 mm) Tj ET
+BT /F1 10 Tf 1 0 0 1 72 615 Tm (S 2.2) Tj ET
+BT /F1 10 Tf 1 0 0 1 101.35 615 Tm (Door switch, stainless steel, 500 mA) Tj ET
+BT /F2 10 Tf 1 0 0 1 101.35 594 Tm (Tubes) Tj ET
+BT /F1 10 Tf 1 0 0 1 80.9 579 Tm (T 1) Tj ET
+BT /F1 10 Tf 1 0 0 1 101.35 579 Tm (Silicone tube, 8 mm, food grade) Tj ET
+BT /F1 10 Tf 1 0 0 1 80.9 564 Tm (T 2) Tj ET
+BT /F1 10 Tf 1 0 0 1 101.35 564 Tm (PTFE tube, 12 mm) Tj ET
+BT /F1 10 Tf 1 0 0 1 80.9 549 Tm (T 3) Tj ET
+BT /F1 10 Tf 1 0 0 1 101.35 549 Tm (Tube clamp, plastic, size 5) Tj ET
+BT /F2 10 Tf 1 0 0 1 101.35 528 Tm (Lamps) Tj ET
+BT /F1 10 Tf 1 0 0 1 81.45 513 Tm (L 1) Tj ET
+BT /F1 10 Tf 1 0 0 1 101.35 513 Tm (Indicator lamp LED, 2 W) Tj ET
+BT /F1 10 Tf 1 0 0 1 81.45 498 Tm (L 2) Tj ET
+BT /F1 10 Tf 1 0 0 1 101.35 498 Tm (Work light LED, 36 W, dimmable) Tj ET
+BT /F1 10 Tf 1 0 0 1 81.45 483 Tm (L 3) Tj ET
+BT /F1 10 Tf 1 0 0 1 101.35 483 Tm (Warning beacon with own battery) Tj ET
+BT /F2 10 Tf 1 0 0 1 101.35 462 Tm (Wear parts) Tj ET
+BT /F1 10 Tf 1 0 0 1 77.57 447 Tm (W 1) Tj ET
+BT /F1 10 Tf 1 0 0 1 101.35 447 Tm (Wear strip, polyethylene, 200x100 mm) Tj ET
+0.6 G 0.5 w 72 52 m 523 52 l S 0 G
+0.35 g BT /F1 8 Tf 1 0 0 1 482.08 40 Tm (Page 1 of 1) Tj ET 0 g
+endstream
+endobj
+7 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> /Contents 6 0 R >>
+endobj
+xref
+0 8
+0000000000 65535 f 
+0000000009 00000 n 
+0000000058 00000 n 
+0000000115 00000 n 
+0000000212 00000 n 
+0000000314 00000 n 
+0000000384 00000 n 
+0000002659 00000 n 
+trailer
+<< /Size 8 /Root 1 0 R /Info 5 0 R /ID [<f252aed3fdcb2e6a0d7016424e2e9646> <f252aed3fdcb2e6a0d7016424e2e9646>] >>
+startxref
+2795
+%%EOF

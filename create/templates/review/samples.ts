@@ -1,7 +1,7 @@
-// The samples of review, for `npm run try`: a small graph of the invented school building (two
-// rooms and their equipment) and fourteen fact proposals about it (samples/proposals.json), one
+// The samples of review, for `npm run try`: a small graph of the invented bottling line (two
+// stations and their parts) and fourteen fact proposals about it (samples/proposals.json), one
 // for each case the review decides. This file commits the instances, reads their IRIs back, and
-// commits the proposals as a proposer would. samples/README.md in the repository describes them.
+// commits the proposals as a proposer would. `samples/expected.json` says what each proposal gets.
 import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
@@ -9,13 +9,13 @@ import { ENTITY_IRI_NAMESPACE, type LbbClient, type Schemas } from "@littlebigbr
 import * as review from "./decision.js";
 import { defaults } from "./workflow.js";
 
-/** The graph's own ontology: rooms, their equipment, and a room's area. */
+/** The graph's own ontology: stations, their parts, and a station's footprint. */
 export const sampleOntology: Schemas["OntologyEvolveOp"][] = [
-  { op: "add_entity_type", name: "Room" },
-  { op: "add_entity_type", name: "Equipment" },
+  { op: "add_entity_type", name: "Station" },
+  { op: "add_entity_type", name: "Part" },
   { op: "add_property", name: "identifier", value_type: "keyword" },
-  { op: "add_property", name: "area_m2", value_type: "f64" },
-  { op: "add_relation", name: "HAS_EQUIPMENT", domain: ["Room"], range: ["Equipment"] },
+  { op: "add_property", name: "footprint_m2", value_type: "f64" },
+  { op: "add_relation", name: "HAS_PART", domain: ["Station"], range: ["Part"] },
 ];
 
 /** The samples of proposals.json. */

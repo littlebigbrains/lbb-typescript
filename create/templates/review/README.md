@@ -39,7 +39,7 @@ proposal is decided once: one that has a `fact_status` already is skipped.
    - **refused** when the graph cannot hold the statement: a predicate that
      is no relation or property of the records ontology (nor `rdf:type` or
      `rdfs:label`), a value that does not take its property's type (LBB's
-     words: `` `vierzehn` is not a number``), an object that is no
+     words: `` `four` is not a number``), an object that is no
      instance, an instance without a class, an end its relation does not
      take, a second class, or a statement about a proposal;
    - **to a person** when a rule of `alwaysReview` names it (`new_instance`:
@@ -54,10 +54,10 @@ proposal is decided once: one that has a `fact_status` already is skipped.
      proposal of its instance that the turn sends to a person, in order: the
      type, the label, values, links, the trace (`fileItem`). The item is
      LBB's: its key (`starter:<workflow>:instance:<hash of the
-     instance>:<hash of its proposals>`, `itemKey`), its title (`New
-     Equipment M 7 Medienwagen`, or `Room Raum 0.12 Klassenraum: 1 fact to
-     check`), its rationale, its summary (`is a Equipment · label · M 7
-     Medienwagen · 1 link`), one status row per fact (the proposal's
+     instance>:<hash of its proposals>`, `itemKey`), its title (`New Part
+     M 7 Mixing valve`, or `Station Filler 0.12: 1 fact to check`), its
+     rationale, its summary (`is a Part · label · M 7 Mixing valve · 1
+     link`), one status row per fact (the proposal's
      `fact_status: accepted`) and one evidence sample per fact (what it
      states, its gate value, its line, the other new instance a link waits
      for). The type of a new instance is a required row: a person keeps it or
@@ -93,7 +93,7 @@ and `items`.
 | --- | --- | --- |
 | `className` | `FactProposal` | The class of the proposals |
 | `gate` | 0.8 | A proposal below this confidence goes to a person |
-| `alwaysReview` | `[]` | What goes to a person whatever its confidence: `new_instance`, and predicate IRIs (`https://littlebigbrain.com/r/has_equipment`). Empty: the gate decides everything, a new instance too |
+| `alwaysReview` | `[]` | What goes to a person whatever its confidence: `new_instance`, and predicate IRIs (`https://littlebigbrain.com/r/has_part`). Empty: the gate decides everything, a new instance too |
 
 With `["new_instance"]` every statement about a new instance goes to a
 person, whatever its confidence. That was the default of LBB's `review`
@@ -151,7 +151,7 @@ The template differs from it in two places, and its eval names both:
 
 - **Domain and range.** LBB's review leaves them to the commit, and a
   records graph commits such an edge, so it writes p11 of the samples (a
-  room as the equipment of a room). The template checks a relation's ends
+  station as the part of a station). The template checks a relation's ends
   against its domain and range, superclasses included, and refuses it, as
   the answer key says.
 - **What it reads.** The template reads the graph with the commits of its
@@ -162,16 +162,16 @@ The template differs from it in two places, and its eval names both:
 
 ## Samples and test
 
-`samples/proposals.json` holds a small invented graph (two rooms of the
-school building and five pieces of equipment, one `HAS_EQUIPMENT` edge) and
+`samples/proposals.json` holds a small invented graph (two stations of a
+bottling line and five parts, one `HAS_PART` edge) and
 14 proposals about it, one for each case; `samples/expected.json` gives the
 status each one gets with `alwaysReview` `["new_instance"]`, the facts the
 graph holds after the run, and the three review items with the proposals
 each one holds
 ([`../_samples/README.md`](../_samples/README.md)).
 
-`npm run try` adds the sample ontology (`Room`, `Equipment`,
-`HAS_EQUIPMENT`, `identifier`, `area_m2`), commits the instances, reads
+`npm run try` adds the sample ontology (`Station`, `Part`, `HAS_PART`,
+`identifier`, `footprint_m2`), commits the instances, reads
 their IRIs back, and commits the proposals as a proposer would
 (`proposed_by` is `samples/review`). This is the simplest input: the review
 calls no model and needs no proposer to run first. To review the proposals

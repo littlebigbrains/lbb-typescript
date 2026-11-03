@@ -130,8 +130,8 @@ classes `DocEntry` and `DocMention` and the relations `DEFINED_IN`,
 
 ## Samples and test
 
-`samples/` holds three invented PDFs of a school building tender and the
-answer key `expected.json` ([`../_samples/README.md`](../_samples/README.md)).
+`samples/` holds three invented PDFs of the maintenance papers of a bottling
+line and the answer key `expected.json` ([`../_samples/README.md`](../_samples/README.md)).
 `samples/pages/` holds their parsed pages, as `GET /v1/files/pages` returns
 them; `node sdk/templates/_samples/make-pages.mjs` makes them again with
 `pdftotext`.

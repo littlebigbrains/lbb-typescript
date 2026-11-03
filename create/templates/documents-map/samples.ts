@@ -1,19 +1,19 @@
-// The samples of documents-map, for `npm run try`: the three PDFs of the invented school building
-// tender of documents-link, and the trace a correct documents-link run writes on them
+// The samples of documents-map, for `npm run try`: the three PDFs of the invented bottling line
+// of documents-link, and the trace a correct documents-link run writes on them
 // (samples/trace.json: the entries, the mentions and their links). LBB's documents.parse reads the
 // PDFs, so the questions show the rows of each page. This file then commits the trace, so the map
-// runs on known links without a link run first. samples/README.md in the repository describes them.
+// runs on known links without a link run first. `samples/expected.json` is the answer key of the map.
 import { readdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { entityRef, type LbbClient, type Schemas } from "@littlebigbrain/client";
 
-/** The graph's own ontology before the run: rooms, their equipment, and the sections of the specification. */
+/** The graph's own ontology before the run: stations, their parts, and the sections of the manual. */
 export const sampleOntology: Schemas["OntologyEvolveOp"][] = [
-  { op: "add_entity_type", name: "Room" },
-  { op: "add_entity_type", name: "Equipment" },
-  { op: "add_entity_type", name: "SpecSection" },
-  { op: "add_relation", name: "HAS_EQUIPMENT", domain: ["Room"], range: ["Equipment"] },
-  { op: "add_relation", name: "SPECIFIED_IN", domain: ["Room"], range: ["SpecSection"] },
+  { op: "add_entity_type", name: "Station" },
+  { op: "add_entity_type", name: "Part" },
+  { op: "add_entity_type", name: "ManualSection" },
+  { op: "add_relation", name: "HAS_PART", domain: ["Station"], range: ["Part"] },
+  { op: "add_relation", name: "DESCRIBED_IN", domain: ["Station"], range: ["ManualSection"] },
 ];
 
 /** The classes, properties and relations of the trace, as documents-link adds them. */

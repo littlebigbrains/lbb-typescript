@@ -231,13 +231,13 @@ test("a documents-link project has the template, its samples and the three comma
     ".gitignore",
     "README.md",
     "package.json",
-    "samples/ausstattungsliste.pdf",
-    "samples/baubeschreibung.pdf",
     "samples/expected.json",
-    "samples/pages/ausstattungsliste.json",
-    "samples/pages/baubeschreibung.json",
-    "samples/pages/raumblaetter.json",
-    "samples/raumblaetter.pdf",
+    "samples/pages/parts-list.json",
+    "samples/pages/service-manual.json",
+    "samples/pages/station-sheets.json",
+    "samples/parts-list.pdf",
+    "samples/service-manual.pdf",
+    "samples/station-sheets.pdf",
     "src/link.ts",
     "src/samples.ts",
     "src/setup.ts",
@@ -255,6 +255,11 @@ test("a documents-link project has the template, its samples and the three comma
   assert.equal(pkg.dependencies["@littlebigbrain/client"], `^${clientVersion(templatesRoot())}`);
   assert.deepEqual(Object.keys(pkg.devDependencies).sort(), ["@types/node", "tsx", "typescript"]);
   assert.deepEqual(Object.keys(pkg.scripts).sort(), ["setup", "start", "test", "try", "typecheck"]);
+  assert.equal(
+    pkg.scripts.test,
+    "tsx --test src/workflow.test.ts",
+    "one test file: documents-link ships only workflow.test.ts",
+  );
   const tsconfig = JSON.parse(await readFile(join(dir, "tsconfig.json"), "utf8"));
   assert.equal(tsconfig.compilerOptions.module, "NodeNext");
   const test = await readFile(join(dir, "src", "workflow.test.ts"), "utf8");
@@ -284,6 +289,10 @@ test("a link project keeps the template's folders, its own commands and its grad
   assert.match(fixture, /from "\.\/testing\.js"/);
   const pkg = JSON.parse(await readFile(join(dir, "package.json"), "utf8"));
   assert.equal(pkg.scripts.grade, "tsx src/grade-run.ts");
+  // `npm test` runs every test file the template ships, not workflow.test.ts alone.
+  const tests = files.filter((file) => file.endsWith(".test.ts")).sort();
+  assert.ok(tests.length > 1, tests.join(", "));
+  assert.equal(pkg.scripts.test, `tsx --test ${tests.join(" ")}`);
   const other = JSON.parse(
     await readFile(
       join(
@@ -373,14 +382,19 @@ for (const template of TEMPLATES)
       // A test run inside a test run reports to its parent unless NODE_TEST_CONTEXT is cleared.
       const env = { ...process.env };
       delete env.NODE_TEST_CONTEXT;
-      const output = execFileSync(
-        process.execPath,
-        ["--test", "--test-reporter=tap", join(dir, "dist", "workflow.test.js")],
-        {
-          encoding: "utf8",
-          env,
-        },
-      );
+      // Every test file `npm test` runs: the project's script names them.
+      const pkg = JSON.parse(await readFile(join(dir, "package.json"), "utf8"));
+      /** @type {string} */
+      const script = pkg.scripts.test;
+      const tests = script
+        .split(" ")
+        .filter((word) => word.endsWith(".test.ts"))
+        .map((word) => join(dir, "dist", word.replace(/^src\//, "").replace(/\.ts$/, ".js")));
+      assert.ok(tests.length > 0, script);
+      const output = execFileSync(process.execPath, ["--test", "--test-reporter=tap", ...tests], {
+        encoding: "utf8",
+        env,
+      });
       assert.match(output, /# fail 0/);
       assert.doesNotMatch(output, /# pass 0\b/);
       await rm(dirname(dir), { recursive: true, force: true });

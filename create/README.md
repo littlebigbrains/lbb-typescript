@@ -47,7 +47,7 @@ A template id is the id of its starter workflow, with dashes for dots:
 | --- | --- |
 | `src/workflow.ts` | The workflow, its settings, the triggered workflow that sends it the instances (`trigger()`) and the ontology it writes (`ontology()`) |
 | `src/*.ts` | The template's helpers and `samples.ts`, which puts the samples on a graph |
-| `src/workflow.test.ts`, `src/testing.ts` | The workflow on its samples, with mock models and no server |
+| `src/workflow.test.ts` (and the other `*.test.ts` files of the template), `src/testing.ts` | The workflow on its samples, with mock models and no server. `npm test` runs every test file |
 | `src/worker.ts`, `src/setup.ts`, `src/try.ts` | `npm start`, `npm run setup` and `npm run try`; a template that has its own (`link`, `rows`, `sections`) keeps them |
 | `src/grade-run.ts` | `npm run grade`, in a template that grades a run against a gold file (`link`) |
 | `samples/` | The samples and their answer key |

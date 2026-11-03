@@ -53,8 +53,6 @@ export function keyWeight(key: string): KeyWeight | null {
   return kind ? KEY_KINDS[kind].weight : null;
 }
 
-export const isStrong = (key: string) => keyWeight(key) === "strong";
-
 // ---- case, width and diacritics ------------------------------------------------
 
 /** Letters that no Unicode decomposition maps to a base letter. */

@@ -1,9 +1,10 @@
-// rows: one instance per row of a CSV or TSV file, each with an edge to the
-// file whose evidence is the row.
+// rows: one instance per row of a CSV, TSV or XLSX file, each with an edge to
+// the file whose evidence is the row.
 //
-// A named workflow with a content trigger sends each upload of `text/csv` or
-// `text/tab-separated-values` here within seconds, one file per message,
-// without a wait for a publication. For each file the workflow:
+// A named workflow with a content trigger sends each upload of `text/csv`,
+// `text/tab-separated-values` or an XLSX workbook here within seconds, one
+// file per message, without a wait for a publication. For each file the
+// workflow:
 //
 // 1. reads the file's name and checks its derivation: a file this version
 //    already read with these settings is skipped, so identical bytes under

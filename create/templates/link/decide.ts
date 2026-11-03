@@ -3,7 +3,7 @@
 // the requests, the link rule, and the decision by keys and rules alone.
 //
 // Without model reads of record values (`modelsReadRecords: false`, the
-// default, decision 1) a strong key links at confidence 1, and every other
+// default) a strong key links at confidence 1, and every other
 // candidate goes to a person: the rules use the gate 1. With them, the
 // decision model answers a kind question and a names question per mention
 // and a same-record question per record pair; the confidence of a link is

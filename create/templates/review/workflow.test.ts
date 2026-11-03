@@ -178,15 +178,15 @@ test("the samples get the statuses and the facts of the answer key", async () =>
   for (const [id, want] of Object.entries(EXPECTED.statuses))
     assert.equal(statusOf(lbb.graph, proposals.get(id)!), want.status, id);
   const edges = lbb.graph
-    .edgesOf("HAS_EQUIPMENT")
+    .edgesOf("HAS_PART")
     .map((e) => `${e.source} ${e.target}`)
     .sort();
   const want = EXPECTED.facts
-    .filter((f) => f.predicate === "HAS_EQUIPMENT")
+    .filter((f) => f.predicate === "HAS_PART")
     .map((f) => `${iris.get(f.subject)} ${iris.get(String(f.object))}`)
     .sort();
   assert.deepEqual(edges, want);
-  assert.equal(lbb.graph.entities.get(iris.get("room-012")!)!.properties.area_m2, 62.4);
+  assert.equal(lbb.graph.entities.get(iris.get("station-012")!)!.properties.footprint_m2, 6);
   assert.equal(lbb.reviews.size, EXPECTED.review_items);
   // LBB's counters: written counts a statement the graph held already too.
   assert.deepEqual(state, {
@@ -216,24 +216,24 @@ test("a written fact names its proposal as evidence, a refusal and a review say 
     triggerMessage("review", [...proposals.values()]),
   );
   const edge = lbb.graph
-    .edgesOf("HAS_EQUIPMENT")
-    .find((e) => e.source === iris.get("room-012") && e.target === iris.get("t1"))!;
+    .edgesOf("HAS_PART")
+    .find((e) => e.source === iris.get("station-012") && e.target === iris.get("t1"))!;
   assert.deepEqual(edge.evidence, {
-    text: JSON.stringify({ sample: "p1", line: "T1 Einzeltisch, 28 Stück" }),
+    text: JSON.stringify({ sample: "p1", line: "T1 Silicone tube, 28 m" }),
     source_id: proposals.get("p1"),
   });
   assert.equal(edge.confidence, 0.95);
   // The names of the instances stay as they were.
-  assert.equal(lbb.graph.entities.get(iris.get("t1")!)!.name, "T 1 Einzeltisch");
+  assert.equal(lbb.graph.entities.get(iris.get("t1")!)!.name, "T 1 Silicone tube");
   const note = (id: string) =>
     lbb.graph.entities.get(proposals.get(id)!)!.properties.review_note as string;
-  assert.match(note("p6"), /vierzehn/);
-  assert.match(note("p11"), /points to Equipment/);
+  assert.match(note("p6"), /four/);
+  assert.match(note("p11"), /points to Part/);
   assert.match(note("p2"), /below the gate 0\.8/);
   assert.match(note("p7"), /rule new_instance/);
   assert.equal(note("p1"), undefined);
-  const item = [...lbb.reviews.values()].find((r) => r.title.includes("Raum 0.12"))!;
-  assert.equal(item.title, "Room Raum 0.12 Klassenraum: 1 fact to check");
+  const item = [...lbb.reviews.values()].find((r) => r.title.includes("Filler 0.12"))!;
+  assert.equal(item.title, "Station Filler 0.12: 1 fact to check");
   assert.equal(item.workflow, "review");
 });
 
@@ -246,21 +246,21 @@ test("one item per instance: a new instance's facts in order, its type required"
   const items = [...lbb.reviews.values()];
   const expected = EXPECTED.items.map((item) => item.title).sort();
   assert.deepEqual(items.map((item) => item.title).sort(), expected);
-  const m7 = items.find((item) => item.title === "New Equipment M 7 Medienwagen")!;
+  const m7 = items.find((item) => item.title === "New Part M 7 Mixing valve")!;
   const samples = m7.evidence!.samples as Record<string, unknown>[];
   assert.deepEqual(
     samples.map((sample) => [sample.kind, sample.fact]),
     [
-      ["type", "is a Equipment"],
-      ["label", "label · M 7 Medienwagen"],
-      ["link", "HAS_EQUIPMENT ← Raum 0.12 Klassenraum"],
+      ["type", "is a Part"],
+      ["label", "label · M 7 Mixing valve"],
+      ["link", "HAS_PART ← Filler 0.12"],
     ],
   );
   assert.deepEqual(
     samples.map((sample) => sample.proposal),
     ["p7", "p8", "p9"].map((id) => proposals.get(id)),
   );
-  assert.equal(samples[0]!.line, "M 7 Medienwagen, 1 Stück");
+  assert.equal(samples[0]!.line, "M 7 Mixing valve, 1 piece");
   // The type's status and its write are required; the link is not. The status rows come
   // first, one per fact, as in LBB's item; the statements after them.
   const required = (m7.facts as { required?: { row: number }[] }).required!.map((r) => r.row);
@@ -294,22 +294,22 @@ test("accepting a review item writes its statement and the proposal's accepted",
       iris,
     ).subject,
   )!;
-  assert.equal(m7.type, "Equipment");
-  assert.equal(m7.name, "M 7 Medienwagen");
+  assert.equal(m7.type, "Part");
+  assert.equal(m7.name, "M 7 Mixing valve");
   assert.equal(m7.properties.proposed_in, proposals.get("p7"));
   assert.ok(
     lbb.graph
-      .edgesOf("HAS_EQUIPMENT")
-      .some((e) => e.source === iris.get("room-012") && e.target === m7.iri),
+      .edgesOf("HAS_PART")
+      .some((e) => e.source === iris.get("station-012") && e.target === m7.iri),
   );
   for (const id of ["p2", "p7", "p8", "p9", "p12"])
     assert.equal(statusOf(lbb.graph, proposals.get(id)!), "accepted", id);
   // The label's item names s21 again (the server renames it; the graph in memory keeps names).
   const rename = [...lbb.reviews.values()].find((r) =>
-    r.title.startsWith("Equipment S 2.1 Spiegel"),
+    r.title.startsWith("Part S 2.1 Level sensor"),
   )!;
-  const renamed = rename.facts!.entity_properties!.find((row) => row.type === "Equipment")!;
-  assert.deepEqual(renamed.name, "S 2.1 Spiegel, Kristallglas");
+  const renamed = rename.facts!.entity_properties!.find((row) => row.type === "Part")!;
+  assert.deepEqual(renamed.name, "S 2.1 Level sensor, glass rod");
   assert.equal(renamed.key, `\u0000lbb-eid:${iris.get("s21")!.slice(-32)}`);
 });
 
@@ -323,8 +323,8 @@ test("by default the gate decides a new instance: written at the gate, an item b
       iris,
     ).subject,
   )!;
-  assert.equal(m7.type, "Equipment");
-  assert.equal(m7.name, "M 7 Medienwagen");
+  assert.equal(m7.type, "Part");
+  assert.equal(m7.name, "M 7 Mixing valve");
   for (const id of ["p7", "p8", "p9"])
     assert.equal(statusOf(lbb.graph, proposals.get(id)!), "written", id);
   const titles = [...lbb.reviews.values()].map((item) => item.title);
@@ -346,7 +346,7 @@ test("by default the gate decides a new instance: written at the gate, an item b
   for (const id of ["p7", "p8", "p9"])
     assert.equal(statusOf(below.lbb.graph, below.proposals.get(id)!), "in_review", id);
   const item = [...below.lbb.reviews.values()].find(
-    (r) => r.title === "New Equipment M 7 Medienwagen",
+    (r) => r.title === "New Part M 7 Mixing valve",
   )!;
   assert.equal((item.evidence!.samples as unknown[]).length, 3);
   const note = below.lbb.graph.entities.get(below.proposals.get("p7")!)!.properties
@@ -356,12 +356,12 @@ test("by default the gate decides a new instance: written at the gate, an item b
 
 test("a predicate rule sends its statements to a person whatever their confidence", async () => {
   const { lbb, proposals } = sampleGraph();
-  const settings: Settings = { ...defaults, alwaysReview: [review.relationIri("HAS_EQUIPMENT")] };
+  const settings: Settings = { ...defaults, alwaysReview: [review.relationIri("HAS_PART")] };
   await runMessage(
     createWorkflow(lbb, settings),
     triggerMessage("review", [...proposals.values()]),
   );
-  assert.equal(lbb.graph.edgesOf("HAS_EQUIPMENT").length, 1, "only the edge the graph held");
+  assert.equal(lbb.graph.edgesOf("HAS_PART").length, 1, "only the edge the graph held");
   assert.equal(statusOf(lbb.graph, proposals.get("p1")!), "in_review");
   assert.equal(statusOf(lbb.graph, proposals.get("p5")!), "written");
 });
@@ -385,12 +385,12 @@ test("a message of more proposals than a turn decides continues in a new turn", 
     ...DATA,
     proposals: Array.from({ length: 40 }, (_, n) => ({
       id: `q${n}`,
-      subject: n % 2 ? "room-012" : "room-014",
-      predicate: "area_m2",
+      subject: n % 2 ? "station-012" : "station-014",
+      predicate: "footprint_m2",
       object: `${10 + n}`,
       datatype: "http://www.w3.org/2001/XMLSchema#double",
       confidence: 0.9,
-      line: `Fläche ${10 + n} m²`,
+      line: `Area ${10 + n} m²`,
     })),
   };
   const { lbb, proposals } = sampleGraph(many);
@@ -400,7 +400,7 @@ test("a message of more proposals than a turn decides continues in a new turn", 
   );
   assert.equal(turns.length, 2);
   assert.ok(turns.every((t) => t.keys.length <= 64));
-  // The first value of each room is written; each later one would replace it, so it goes to a person.
+  // The first value of each station is written; each later one would replace it, so it goes to a person.
   assert.deepEqual(state, {
     proposals: 40,
     written: 2,
@@ -414,26 +414,26 @@ test("a message of more proposals than a turn decides continues in a new turn", 
 
 test("the decision reads the statement's terms as the LBB review does", () => {
   const ontology = review.readOntology(VIEW);
-  const room: review.Known = {
+  const station: review.Known = {
     iri: `https://littlebigbrain.com/e/${"a".repeat(32)}`,
-    class: "Room",
+    class: "Station",
     label: "R",
     exists: true,
   };
-  const seen = { entities: new Map([[room.iri, room]]) };
+  const seen = { entities: new Map([[station.iri, station]]) };
   const rules = { gate: 0.8, alwaysReview: [] };
   const terms = review.classify(
-    { subject: room.iri, predicate: review.propertyIri("area_m2"), object: "14.2" },
+    { subject: station.iri, predicate: review.propertyIri("footprint_m2"), object: "14.2" },
     ontology,
     { ...seen, current: ["15"] },
     "FactProposal",
   );
   assert.deepEqual(review.decide(terms, "", 0.99, rules), {
     status: "in_review",
-    why: "The subject's area_m2 is 15 already: writing 14.2 would replace it.",
+    why: "The subject's footprint_m2 is 15 already: writing 14.2 would replace it.",
   });
   const typed = review.classify(
-    { subject: room.iri, predicate: review.RDF_TYPE, object: review.classIri("Equipment") },
+    { subject: station.iri, predicate: review.RDF_TYPE, object: review.classIri("Part") },
     ontology,
     seen,
     "FactProposal",
@@ -441,7 +441,7 @@ test("the decision reads the statement's terms as the LBB review does", () => {
   assert.equal(typed.kind, "refused");
   // A label is a text: an IRI as a label is refused.
   const label = review.classify(
-    { subject: room.iri, predicate: review.RDFS_LABEL, object: room.iri },
+    { subject: station.iri, predicate: review.RDFS_LABEL, object: station.iri },
     ontology,
     seen,
     "FactProposal",
@@ -453,6 +453,6 @@ test("the decision reads the statement's terms as the LBB review does", () => {
   assert.equal(review.coerce("12", "i64"), 12);
   assert.equal(review.coerce("1.5", "i64"), null);
   assert.equal(review.coerce("true", "bool"), true);
-  assert.equal(review.isEntity(room.iri), true);
+  assert.equal(review.isEntity(station.iri), true);
   assert.equal(review.isEntity("https://example.org/x"), false);
 });

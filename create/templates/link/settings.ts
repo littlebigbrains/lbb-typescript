@@ -30,11 +30,11 @@ export interface Settings {
   gate: number;
   /**
    * Orders and groups the identity items only: a person accepts every
-   * identity (decision 2). An identity at or above it is marked `above_gate`.
+   * identity. An identity at or above it is marked `above_gate`.
    */
   identityGate: number;
   /**
-   * Whether the models may read record values (decision 1). Off: records
+   * Whether the models may read record values. Off: records
    * link by keys and rules alone; a strong key links at confidence 1, and
    * every other candidate goes to a person. On: the decision model reads the
    * names, keys and context fields of the records, and the reasoning model

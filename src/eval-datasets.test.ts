@@ -62,7 +62,7 @@ const DATASET = {
 
 const ITEM = {
   name: "S 1",
-  text: "S 1 Waschtisch, 60 cm breit.",
+  text: "S 1 Desk, 60 cm wide.",
   values: [{ property: "width_cm", value: 60, quote: "60 cm" }],
   leave_out: [],
 };
