@@ -2,7 +2,7 @@
 
 All notable changes to the `@littlebigbrain/create` package are documented here.
 
-## 0.9.1 (Unreleased)
+## 0.9.1 (2026-11-03)
 
 - The samples of the templates `documents-link`, `documents-map`, `review`,
   `ontology-fit` and `search-embed` change. They were German papers of a
