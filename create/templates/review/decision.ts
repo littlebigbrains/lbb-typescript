@@ -434,7 +434,7 @@ export function factsOf(
   }
 }
 
-/** The statement in words, for a review item: `R 0.12 · HAS_EQUIPMENT · T 1`. */
+/** The statement in words, for a review item: `Filler 0.12 · HAS_PART · T 1`. */
 export function shown(t: Terms, s: Statement): string {
   const name = (e: Known) => e.label?.trim() || e.iri.slice(e.iri.lastIndexOf("/") + 1);
   switch (t.kind) {
@@ -477,7 +477,7 @@ export function groupOf(t: Terms, s: Statement): string | null {
 export interface Shown {
   /** `type`, `label`, `value`, `link` or `source` (the trace). */
   kind: string;
-  /** The fact in words, seen from its instance: `is a Room`, `HAS_EQUIPMENT → T 1`. */
+  /** The fact in words, seen from its instance: `is a Station`, `HAS_PART → T 1`. */
   text: string;
   /** A link to an instance the graph does not have: its name. The link waits for that instance. */
   waitsFor?: string;

@@ -242,7 +242,7 @@ const lbb = lbbActivities(client);
 const answer = await ctx.step("define-p3", (s) =>
   lbb.reason<{ code: string; description: string }>(
     {
-      prompt: 'Which code does this row define? "P3 Waschtisch 55x45"',
+      prompt: 'Which code does this row define? "P3 Drip tray 55x45"',
       schema: {
         type: "object",
         properties: { code: { type: "string" }, description: { type: "string" } },

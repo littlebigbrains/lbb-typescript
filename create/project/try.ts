@@ -26,5 +26,5 @@ const created = await client.workflows.starters.use(trigger());
 console.log(`Created ${created.name} on the graph ${graph}: ${created.status.state}.`);
 console.log(`Serve it with LBB_GRAPH=${graph} npm start, and follow it with:`);
 console.log(
-  `  curl "$LBB_URL/v1/workflows/triggered?graph=${graph}&starter=workflow&name=${created.name}" -H "Authorization: Bearer $LBB_API_KEY"`,
+  `  curl "$LBB_URL/v1/workflows/named?graph=${graph}&name=${created.name}" -H "Authorization: Bearer $LBB_API_KEY"`,
 );

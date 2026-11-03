@@ -1,7 +1,8 @@
-// The samples of documents-link, for `npm run try`: three PDFs of an
-// invented school building tender (samples/README.md in the repository
-// describes them). LBB's own documents.parse workflow reads their text
-// layer; this file uploads them and waits for the parse.
+// The samples of documents-link, for `npm run try`: three PDFs of the
+// maintenance papers of an invented bottling line (`samples/expected.json` is
+// the answer key: the entries, the mentions and the link of each). LBB's own
+// documents.parse workflow reads their text layer; this file uploads them and
+// waits for the parse.
 import { readdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
 import type { LbbClient } from "@littlebigbrain/client";

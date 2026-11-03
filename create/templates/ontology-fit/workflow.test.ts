@@ -1,11 +1,10 @@
 // ontology-fit on its samples, with a mock reasoning model whose rules are
-// fixed: a sentence about a defect (`Mangel`) proposes the class `Mangel`,
-// `Frist`, `Status` and `Zuständig` propose its facts, a room in the same
-// text widens `betrifft_raum`, a list of who was present proposes the
-// relation `anwesend` the ontology has, and a text about the acceptance
-// (`Abnahme`) gets a quote that is not in the text. The mock decision model
-// finds every quote supports its change. The expected keys come from
-// samples/expected.md.
+// fixed: a sentence about an issue proposes the class `Issue`, "due",
+// "status" and "Assigned to" propose its facts, a room in the same text
+// widens `concerns_room`, a list of who was present proposes the relation
+// `attended_by` the ontology has, and a text about the inspection gets a
+// quote that is not in the text. The mock decision model finds every quote
+// supports its change. The expected keys come from samples/expected.md.
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
@@ -34,7 +33,7 @@ const EXPECTED_KEYS = [
     .matchAll(/`(fit:[^`]+)`/g),
 ].map((m) => m[1]!);
 
-const iriOf = (name: string) => ENTITY_IRI_NAMESPACE + mockId(`Baustellenbericht:${name}`);
+const iriOf = (name: string) => ENTITY_IRI_NAMESPACE + mockId(`FieldNote:${name}`);
 
 /** The ontology view of the graph before the run, built from the sample ontology. */
 function view(): Schemas["OntologyView"] {
@@ -111,68 +110,72 @@ function propose(text: string) {
   const sentences = text.split(/(?<=\.)\s+/);
   const find = (pattern: RegExp) => sentences.find((s) => pattern.test(s));
   const out = [];
-  const defect = find(/Mangel|Mängel/);
-  if (defect)
+  const issue = find(/\bissues?\b/i);
+  if (issue)
     out.push(
       proposal({
         kind: "add_class",
-        name: "Mangel",
-        quote: defect,
-        reason: "The texts follow defects.",
+        name: "Issue",
+        quote: issue,
+        reason: "The texts follow issues.",
       }),
     );
-  const deadline = find(/Frist/);
-  if (defect && deadline)
+  const deadline = find(/\bdue\b/);
+  if (issue && deadline)
     out.push(
       proposal({
         kind: "add_property",
-        name: "frist",
-        class: "Mangel",
+        name: "due_date",
+        class: "Issue",
         value_type: "date_time",
         quote: deadline,
       }),
     );
-  const status = find(/Status/);
-  if (defect && status)
+  const status = find(/\bstatus\b/i);
+  if (issue && status)
     out.push(
       proposal({
         kind: "add_property",
         name: "status",
-        class: "Mangel",
+        class: "Issue",
         value_type: "keyword",
         quote: status,
       }),
     );
-  const owner = find(/Zuständig/);
-  if (defect && owner)
+  const owner = find(/Assigned to/);
+  if (issue && owner)
     out.push(
       proposal({
         kind: "add_relation",
-        name: "zustaendig",
-        domain: "Mangel",
-        range: "Firma",
+        name: "assigned_to",
+        domain: "Issue",
+        range: "Vendor",
         quote: owner,
       }),
     );
-  const room = find(/Raum 0\.\d+/);
-  if (defect && room)
+  const room = find(/\broom 0\.\d+/);
+  if (issue && room)
     out.push(
-      proposal({ kind: "widen_relation", name: "betrifft_raum", domain: "Mangel", quote: room }),
+      proposal({ kind: "widen_relation", name: "concerns_room", domain: "Issue", quote: room }),
     );
-  const present = find(/Anwesend:|Teilnehmer:/);
+  const present = find(/Present:|Attendees:/);
   if (present)
     out.push(
       proposal({
         kind: "add_relation",
-        name: "anwesend",
-        domain: "Baustellenbericht",
-        range: "Firma",
+        name: "attended_by",
+        domain: "FieldNote",
+        range: "Vendor",
         quote: present,
       }),
     );
-  if (find(/Abnahme/))
+  if (find(/\binspection\b/i))
     out.push(
-      proposal({ kind: "add_class", name: "Abnahme", quote: "Die Abnahme findet morgen statt." }),
+      proposal({
+        kind: "add_class",
+        name: "Inspection",
+        quote: "The inspection takes place tomorrow.",
+      }),
     );
   return out;
 }
@@ -195,7 +198,7 @@ function rules(more: MockRules = {}): MockRules {
     sparql: (query) =>
       TEXTS.filter((t) => query.includes(iriOf(t.name))).map((t) => ({
         s: iriOf(t.name),
-        class: "Baustellenbericht",
+        class: "FieldNote",
         label: t.name,
         text: t.text,
       })),
@@ -208,7 +211,7 @@ test("the samples give the changes of expected.md, one review item per key", asy
   const { state, turns } = await runMessage(
     createWorkflow(lbb),
     triggerMessage(
-      "berichte",
+      "field-notes",
       TEXTS.map((t) => iriOf(t.name)),
     ),
   );
@@ -220,8 +223,8 @@ test("the samples give the changes of expected.md, one review item per key", asy
   );
   assert.equal(EXPECTED_KEYS.length, 5);
   assert.deepEqual([...lbb.reviews.keys()].sort(), [...EXPECTED_KEYS].sort());
-  // The counters of LBB's fit: the quote of Abnahme is not in its text, anwesend is covered
-  // (texts 1 and 2 list who was present).
+  // The counters of LBB's fit: the quote of Inspection is not in its text, attended_by is
+  // covered (texts 1 and 2 list who was present).
   assert.deepEqual(state, {
     instances: 5,
     chunks: 5,
@@ -237,10 +240,10 @@ test("the samples give the changes of expected.md, one review item per key", asy
     weak_support: 0,
     skipped: 0,
   });
-  const mangel = lbb.reviews.get("fit:berichte/add_class/mangel")!;
-  assert.equal(mangel.workflow, "berichte");
-  assert.deepEqual(mangel.change, [{ op: "add_entity_type", name: "Mangel" }]);
-  assert.equal(mangel.evidence!.records, 5);
+  const issue = lbb.reviews.get("fit:field-notes/add_class/issue")!;
+  assert.equal(issue.workflow, "field-notes");
+  assert.deepEqual(issue.change, [{ op: "add_entity_type", name: "Issue" }]);
+  assert.equal(issue.evidence!.records, 5);
 });
 
 test("a change names the classes it needs, and a widening keeps the relation's name", async () => {
@@ -248,33 +251,39 @@ test("a change names the classes it needs, and a widening keeps the relation's n
   await runMessage(
     createWorkflow(lbb),
     triggerMessage(
-      "berichte",
+      "field-notes",
       TEXTS.map((t) => iriOf(t.name)),
     ),
   );
 
-  assert.deepEqual(lbb.reviews.get("fit:berichte/add_relation/mangel/zustaendig/firma")!.change, [
-    { op: "add_entity_type", name: "Mangel" },
-    {
-      op: "add_relation",
-      name: "zustaendig",
-      domain: ["Mangel"],
-      range: ["Firma"],
-      cardinality: null,
-      temporal_semantics: null,
-      reducer: null,
-      inverse_name: null,
-      transitive: false,
-      symmetric: false,
-    },
-  ]);
-  assert.deepEqual(lbb.reviews.get("fit:berichte/widen_relation/betrifft-raum/mangel/x")!.change, [
-    { op: "add_entity_type", name: "Mangel" },
-    { op: "widen_relation", relation: "betrifft_raum", add_domain: ["Mangel"], add_range: [] },
-  ]);
+  assert.deepEqual(
+    lbb.reviews.get("fit:field-notes/add_relation/issue/assigned-to/vendor")!.change,
+    [
+      { op: "add_entity_type", name: "Issue" },
+      {
+        op: "add_relation",
+        name: "assigned_to",
+        domain: ["Issue"],
+        range: ["Vendor"],
+        cardinality: null,
+        temporal_semantics: null,
+        reducer: null,
+        inverse_name: null,
+        transitive: false,
+        symmetric: false,
+      },
+    ],
+  );
+  assert.deepEqual(
+    lbb.reviews.get("fit:field-notes/widen_relation/concerns-room/issue/x")!.change,
+    [
+      { op: "add_entity_type", name: "Issue" },
+      { op: "widen_relation", relation: "concerns_room", add_domain: ["Issue"], add_range: [] },
+    ],
+  );
   assert.equal(
-    lbb.reviews.get("fit:berichte/add_property/mangel/frist")!.title,
-    "Add property frist to Mangel",
+    lbb.reviews.get("fit:field-notes/add_property/issue/due-date")!.title,
+    "Add property due_date to Issue",
   );
 });
 
@@ -283,14 +292,14 @@ test("a change the ontology has, and a quote that is not in the text, are not fi
   await runMessage(
     createWorkflow(lbb),
     triggerMessage(
-      "berichte",
+      "field-notes",
       TEXTS.map((t) => iriOf(t.name)),
     ),
   );
   const keys = [...lbb.reviews.keys()];
 
-  assert.ok(!keys.some((k) => k.includes("anwesend")), "anwesend is already in the ontology");
-  assert.ok(!keys.some((k) => k.includes("abnahme")), "its quote is not in the text");
+  assert.ok(!keys.some((k) => k.includes("attended")), "attended_by is already in the ontology");
+  assert.ok(!keys.some((k) => k.includes("inspection")), "its quote is not in the text");
   for (const item of lbb.reviews.values())
     for (const sample of item.evidence!.samples! as { entity: string; quote: string }[]) {
       const text = TEXTS.find((t) => iriOf(t.name) === sample.entity)!.text;
@@ -299,23 +308,23 @@ test("a change the ontology has, and a quote that is not in the text, are not fi
 });
 
 test("keys keep lowercase ASCII letters and digits, other runs as one dash", () => {
-  assert.equal(keyPart("Mangel"), "mangel");
-  assert.equal(keyPart("betrifft_raum"), "betrifft-raum");
+  assert.equal(keyPart("Issue"), "issue");
+  assert.equal(keyPart("concerns_room"), "concerns-room");
   assert.equal(keyPart("-"), "x");
-  assert.equal(keyPart("zuständig"), "zust-ndig");
+  assert.equal(keyPart("façade"), "fa-ade");
 });
 
 test("a long text is read in chunks as LBB reads it, and a class name in its words", () => {
-  const sentence = "Der Mangel in Raum 0.12 ist behoben. ";
+  const sentence = "The issue in room 0.12 is resolved. ";
   const long = sentence.repeat(3_000);
   const chunks = chunkText(long);
   assert.equal(chunks.length, 3);
   assert.ok(chunks.every((c) => [...c].length <= 40_000));
   // Each chunk ends after a sentence and shares 1,000 characters with the next.
-  assert.ok(chunks[0]!.endsWith("behoben."));
+  assert.ok(chunks[0]!.endsWith("resolved."));
   assert.equal(chunks[1]!.slice(0, 1_000), chunks[0]!.slice(-1_000));
-  assert.deepEqual(chunkText("kurz"), ["kurz"]);
+  assert.deepEqual(chunkText("short"), ["short"]);
   assert.equal(displayName("customerIdentityData"), "customer identity data");
   assert.equal(displayName("depends_on"), "depends on");
-  assert.equal(displayName("baustellenbericht"), "baustellenbericht");
+  assert.equal(displayName("fieldnote"), "fieldnote");
 });

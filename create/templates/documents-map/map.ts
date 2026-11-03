@@ -90,7 +90,7 @@ const REQUEST_QUESTIONS = 32;
 const REQUEST_CHARS = 60_000;
 
 export const TYPING_TASK =
-  "Each question is about one link that a document linker found: a span on a line of a document names an entry of another document. The subject is the instance the line belongs to (the room of a room sheet, or the entry of the table row); the object is the instance of the linked entry. The question asks which statement, in the terms of the ontology below, the line makes about the two.";
+  "Each question is about one link that a document linker found: a span on a line of a document names an entry of another document. The subject is the instance the line belongs to (the station of a station sheet, or the entry of the table row); the object is the instance of the linked entry. The question asks which statement, in the terms of the ontology below, the line makes about the two.";
 const TYPING_GUIDE =
   " Choose a property by its meaning (its comment in the ontology), not by its name alone. Choose 'a property the ontology lacks' when the line relates the two but no property means that relation. Choose 'no fact' when the line does not relate the two, for example when the span is the subject's own number or the linked entry is not what the span names.";
 export const GROUND_TASK =
@@ -240,7 +240,7 @@ const FOLD: Record<string, string> = {
   Ÿ: "Y",
 };
 
-/** A word in upper case ASCII for a records name: `darüber` reads `DARUEBER`. */
+/** A word in upper case ASCII for a records name: `Größe` reads `GROESSE` and `Übersicht` reads `UEBERSICHT`. */
 function asciiUpper(word: string): string {
   return [...word.toUpperCase()].map((c) => FOLD[c] ?? (/^[A-Z0-9]$/.test(c) ? c : "")).join("");
 }
@@ -257,8 +257,8 @@ export const nameWords = (text: string) =>
 /**
  * The words next to a link's span on its line, which may say how the line relates the two ends:
  * the two nearest words before the span, else after it, made of letters only, at least three
- * long, and not in `skip` (the words of the two ends). `Sanitärobjekte siehe Baubeschreibung
- * Kap. 3.2`, span `3.2`, skipping the object's words, gives `siehe`, `Kap`.
+ * long, and not in `skip` (the words of the two ends). `Sensors see service manual sec. 3.2`,
+ * span `3.2`, skipping the object's words and its document's, gives `see`, `sec`.
  */
 export function spanPhrase(line: string, span: string, skip: Set<string>): string[] {
   const words = [...line.matchAll(/[\p{L}\p{N}]+/gu)].map((m) => ({
@@ -281,7 +281,7 @@ export function spanPhrase(line: string, span: string, skip: Set<string>): strin
 /**
  * A relation name for a property the ontology lacks, from the words next to the spans of its
  * lines: the phrase most lines share (the most probable line's first on a tie), in upper case
- * ASCII (`SIEHE_KAP`), with a number when the ontology has that name. `undefined` when no line
+ * ASCII (`SEE_SEC`), with a number when the ontology has that name. `undefined` when no line
  * has such words.
  */
 export function relationNameFromLines(phrases: string[][], taken: Set<string>): string | undefined {
@@ -784,7 +784,7 @@ export type Subject = { entry: string } | { mention: number } | null;
  * **A page head.** When the first mention of a page in reading order starts
  * in the page's head (the top 30%), lies below no entry the document defines
  * on the page, and is written unlike most of the page's other mentions (the
- * room number `0.12` above the codes `T1`, `S 1.1`), it names the page's
+ * station number `0.12` above the codes `T1`, `S 1.1`), it names the page's
  * subject: the entry it links to, or else a page entry of its own. Every
  * other mention of the page belongs to it, and a following page with neither
  * a head nor an anchor continues it.

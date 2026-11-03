@@ -2,7 +2,7 @@
 // an answer to each `# link:` query from that graph, mock ports and mock
 // models, a driver that runs the source and things turns in order, a
 // reviewer that decides the review items as a gold file says, and the
-// storage measurement of decision 6 (keys, facts and bytes per mention).
+// storage measurement (keys, facts and bytes per mention).
 import {
   LbbError,
   type DecideAnswer,
@@ -645,7 +645,7 @@ export async function reviewAsGold(run: LinkRun, gold: Gold): Promise<number> {
   return decided;
 }
 
-// ---- storage (decision 6) ---------------------------------------------------------------
+// ---- storage ---------------------------------------------------------------
 
 /** The statements of the graph in N-Triples, one per value and edge: how block keys cost. */
 export interface Storage {

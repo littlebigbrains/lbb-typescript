@@ -1,0 +1,54 @@
+%PDF-1.4
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [7 0 R] /Count 1 >>
+endobj
+3 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>
+endobj
+4 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>
+endobj
+5 0 obj
+<< /Title (Service manual) /Producer (make-samples.mjs) >>
+endobj
+6 0 obj
+<< /Length 1113 >>
+stream
+0.35 g BT /F1 8 Tf 1 0 0 1 72 806 Tm (Example Plant, bottling line) Tj ET 0 g
+0.6 G 0.5 w 72 798 m 523 798 l S 0 G
+BT /F2 16 Tf 1 0 0 1 72 760 Tm (Service manual) Tj ET
+BT /F2 12 Tf 1 0 0 1 72 730 Tm (3 Maintenance) Tj ET
+BT /F2 11 Tf 1 0 0 1 72 708 Tm (3.1 Cleaning) Tj ET
+BT /F1 10 Tf 1 0 0 1 72 692 Tm (Parts that touch the product are cleaned every day with a food-safe detergent and rinsed with drinking) Tj ET
+BT /F1 10 Tf 1 0 0 1 72 679 Tm (water. The outer surfaces are wiped once a week.) Tj ET
+BT /F2 11 Tf 1 0 0 1 72 654 Tm (3.2 Sensors) Tj ET
+BT /F1 10 Tf 1 0 0 1 72 638 Tm (Temperature, pressure, flow and level sensors are checked every month against a reference. The) Tj ET
+BT /F1 10 Tf 1 0 0 1 72 625 Tm (parts list names the single sensors.) Tj ET
+BT /F2 11 Tf 1 0 0 1 72 600 Tm (3.3 Lighting) Tj ET
+BT /F1 10 Tf 1 0 0 1 72 584 Tm (All stations have LED lamps. The work lights are dimmable, and each station has a warning beacon) Tj ET
+BT /F1 10 Tf 1 0 0 1 72 571 Tm (with its own battery.) Tj ET
+0.6 G 0.5 w 72 52 m 523 52 l S 0 G
+0.35 g BT /F1 8 Tf 1 0 0 1 482.08 40 Tm (Page 1 of 1) Tj ET 0 g
+endstream
+endobj
+7 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> /Contents 6 0 R >>
+endobj
+xref
+0 8
+0000000000 65535 f 
+0000000009 00000 n 
+0000000058 00000 n 
+0000000115 00000 n 
+0000000212 00000 n 
+0000000314 00000 n 
+0000000388 00000 n 
+0000001552 00000 n 
+trailer
+<< /Size 8 /Root 1 0 R /Info 5 0 R /ID [<0456c25d27759e0be6bbf34650b596b9> <0456c25d27759e0be6bbf34650b596b9>] >>
+startxref
+1688
+%%EOF

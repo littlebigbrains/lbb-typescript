@@ -976,11 +976,11 @@ test("a refused retry leaves the first answer, and a replay of the turn asks not
 
 test("a repair keeps the values that passed and fills the failed ones", () => {
   const properties = { width_cm: "f64", material: "text" } as const;
-  const text = "Waschtisch, width_cm: 55 cm, material: Keramik";
+  const text = "Desk, width_cm: 55 cm, material: Beech";
   const first = check(
     [
       { property: "width_cm", value: "55", unit: "cm", quote: "width_cm: 55 cm" },
-      { property: "material", value: "Keramik", unit: "", quote: "material: Glas" },
+      { property: "material", value: "Beech", unit: "", quote: "material: Glas" },
     ],
     properties,
     text,
@@ -989,7 +989,7 @@ test("a repair keeps the values that passed and fills the failed ones", () => {
   const second = check(
     [
       { property: "width_cm", value: "56", unit: "cm", quote: "width_cm: 55 cm" },
-      { property: "material", value: "Keramik", unit: "", quote: "material: Keramik" },
+      { property: "material", value: "Beech", unit: "", quote: "material: Beech" },
     ],
     properties,
     text,
@@ -1000,9 +1000,9 @@ test("a repair keeps the values that passed and fills the failed ones", () => {
     merged.map((v) => [v.property, v.value, v.outcome, v.attempt, v.typed !== undefined]),
     [
       ["width_cm", "55", "", undefined, true],
-      ["material", "Keramik", "quote_not_found", undefined, false],
+      ["material", "Beech", "quote_not_found", undefined, false],
       ["width_cm", "56", "duplicate", 2, false],
-      ["material", "Keramik", "", 2, true],
+      ["material", "Beech", "", 2, true],
     ],
   );
   // A repair value for a property whose first value passed is a duplicate
@@ -1059,7 +1059,7 @@ test("a retry that fails for another reason leaves the first answer, and only a 
 
 test("each failed check makes one diagnostic that holds the model's words and no label", () => {
   const properties = { width_cm: "f64", material: "text" } as const;
-  const text = "Waschtisch, width_cm: 55 cm, material: Keramik";
+  const text = "Desk, width_cm: 55 cm, material: Beech";
   const answer = (values: unknown[]) => {
     const checked = check(values as never[], properties, text, { width_cm: "cm" });
     return failedChecks({ values }, checked).map((f) => [f.check, f.property ?? null]);
@@ -1074,7 +1074,7 @@ test("each failed check makes one diagnostic that holds the model's words and no
   assert.deepEqual(answer(["width"]), [["answer_shape", null]]);
   assert.deepEqual(
     answer([
-      { property: "material", value: "Keramik", unit: "" },
+      { property: "material", value: "Beech", unit: "" },
       { property: "width_cm", value: 55, unit: "cm", quote: "width_cm: 55 cm" },
     ]),
     [
@@ -1086,7 +1086,7 @@ test("each failed check makes one diagnostic that holds the model's words and no
     answer([
       { property: "height_cm", value: "9", unit: "cm", quote: "height_cm: 9 cm" },
       { property: "width_cm", value: "wide", unit: "cm", quote: "width_cm: 55 cm" },
-      { property: "material", value: "Keramik", unit: "", quote: "material: Glas" },
+      { property: "material", value: "Beech", unit: "", quote: "material: Glas" },
     ]),
     [
       ["unknown_property", "height_cm"],
@@ -1098,15 +1098,15 @@ test("each failed check makes one diagnostic that holds the model's words and no
   // it is no failed check. A second value of a property is none either.
   assert.deepEqual(
     answer([
-      { property: "material", value: "Keramik", unit: "", quote: "material: Keramik" },
-      { property: "material", value: "Glas", unit: "", quote: "material: Keramik" },
+      { property: "material", value: "Beech", unit: "", quote: "material: Beech" },
+      { property: "material", value: "Glas", unit: "", quote: "material: Beech" },
     ]),
     [],
   );
   const long = failedChecks(
-    { values: [{ property: "material", value: "Keramik", unit: "", quote: "x".repeat(400) }] },
+    { values: [{ property: "material", value: "Beech", unit: "", quote: "x".repeat(400) }] },
     check(
-      [{ property: "material", value: "Keramik", unit: "", quote: "x".repeat(400) }],
+      [{ property: "material", value: "Beech", unit: "", quote: "x".repeat(400) }],
       properties,
       text,
     ),

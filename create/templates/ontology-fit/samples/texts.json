@@ -1,22 +1,22 @@
 [
   {
-    "name": "Baustellenbericht 12",
-    "text": "Baustellenbericht 12 vom 02.09.2026. Begehung des Erdgeschosses mit der Bauleitung. Anwesend: Fliesenbau Muster GmbH, Bodenbau Beispiel GmbH. In Raum 0.14 (WC Mädchen) sind zwei Bodenfliesen gerissen. Der Mangel wurde der Fliesenbau Muster GmbH gemeldet, die Frist zur Beseitigung endet am 16.09.2026. In Raum 0.12 ist der Estrich trocken; die Bodenbau Beispiel GmbH verlegt das Linoleum ab dem 07.09.2026."
+    "name": "Field note 12",
+    "text": "Field note 12, 2026-09-02. Walkthrough of the ground floor with the facilities manager. Present: Example Tiling Ltd, Sample Flooring Ltd. In room 0.14 (restroom) two floor tiles are cracked. The issue was reported to Example Tiling Ltd, and the repair is due on 2026-09-16. In room 0.12 the old carpet is removed; Sample Flooring Ltd lays the new vinyl floor from 2026-09-07."
   },
   {
-    "name": "Baubesprechung 05.09.2026",
-    "text": "Protokoll der Baubesprechung vom 05.09.2026. Teilnehmer: Bauleitung, Elektro Beispiel GmbH, Haustechnik Exempel KG. Die Elektro Beispiel GmbH meldet, dass die Deckenleuchten erst am 21.09.2026 geliefert werden. Die Haustechnik Exempel KG hat die Waschtische im Erdgeschoss montiert. Mangel: In Raum 0.12 fehlt der Spiegel über dem Waschtisch. Zuständig ist die Haustechnik Exempel KG, Frist 12.09.2026."
+    "name": "Team meeting 2026-09-05",
+    "text": "Minutes of the team meeting on 2026-09-05. Attendees: facilities manager, Sample Electric Ltd, Example Plumbing Ltd. Sample Electric Ltd reports that the replacement ceiling lights arrive on 2026-09-21. Example Plumbing Ltd has fitted the new washbasins on the ground floor. Issue: in room 0.12 the mirror above the washbasin is missing. Assigned to Example Plumbing Ltd, due 2026-09-12."
   },
   {
-    "name": "Baustellenbericht 13",
-    "text": "Baustellenbericht 13 vom 09.09.2026. Mängelbegehung in Raum 0.14: Die gerissenen Bodenfliesen sind ersetzt, der Mangel ist behoben. Neu festgestellt: Die Trennwand der WC-Kabine 2 in Raum 0.14 steht schief. Zuständig ist die Trockenbau Probe GmbH, Frist 23.09.2026, Status offen."
+    "name": "Field note 13",
+    "text": "Field note 13, 2026-09-09. Issue check in room 0.14: the cracked floor tiles are replaced, and the issue is resolved. New finding: the partition of stall 2 in room 0.14 is not straight. Assigned to Demo Partitions Ltd, due 2026-09-23, status open."
   },
   {
-    "name": "Baustellenbericht 14",
-    "text": "Baustellenbericht 14 vom 16.09.2026. In Raum 0.12 ist der Spiegel montiert, der Mangel ist behoben. Im Flur 0.10 hat das Linoleum an zwei Stellen tiefe Kratzer. Zuständig ist die Bodenbau Beispiel GmbH, Frist 30.09.2026, Status offen. Die Deckenleuchten sind geliefert und werden bis zum 25.09.2026 montiert."
+    "name": "Field note 14",
+    "text": "Field note 14, 2026-09-16. In room 0.12 the mirror is fitted, and the issue is resolved. In corridor 0.10 the vinyl floor has deep scratches in two places. Assigned to Sample Flooring Ltd, due 2026-09-30, status open. The ceiling lights have arrived and are installed by 2026-09-25."
   },
   {
-    "name": "Vorbegehung zur Abnahme",
-    "text": "Vorbegehung zur Abnahme am 28.09.2026 mit Bauherr und Bauleitung. Die Trennwand der Kabine 2 in Raum 0.14 ist ausgerichtet, der Mangel ist behoben. Offen bleiben die Kratzer im Flur 0.10; die Bauleitung stuft diesen Mangel als unwesentlich ein. Wesentliche Mängel liegen nicht vor. Die Abnahme ist für den 02.10.2026 geplant."
+    "name": "Walkthrough before the inspection",
+    "text": "Walkthrough on 2026-09-28 before the annual inspection, with the building owner and the facilities manager. The partition of stall 2 in room 0.14 is straightened, and the issue is resolved. The scratches in corridor 0.10 remain open; the facilities manager rates this issue as minor. There are no major issues. The inspection is planned for 2026-10-02."
   }
 ]

@@ -1,84 +1,85 @@
 # Fit from text samples: what a good run proposes
 
-The five texts in `texts.json` are invented site reports and meeting minutes
-of one project, Neubau Grundschule Musterstadt. They follow the defects found
-on site over four weeks: in which room, which company must fix each one, by
-when, and whether it is fixed. The graph has no class for a defect, so a fit
-run over these texts should propose one, with the facts the texts give about
-each defect. Texts are numbered 1 to 5 in the order of `texts.json`.
+The five texts in `texts.json` are invented field notes and meeting minutes
+of the facilities team of an office building. They follow the issues found
+in the building over four weeks: in which room, which vendor must fix each
+one, by when, and whether it is fixed. The graph has no class for an issue,
+so a fit run over these texts should propose one, with the facts the texts
+give about each issue. Texts are numbered 1 to 5 in the order of
+`texts.json`.
 
 ## The graph before the run
 
-Each text is an instance of `Baustellenbericht`: its name is the label, its
-text is the property `text`. The ontology holds:
+Each text is an instance of `FieldNote`: its name is the label, its text is
+the property `text`. The ontology holds:
 
 | Class | Properties |
 | --- | --- |
-| `Baustellenbericht` | `text` (text), `datum` (datetime) |
-| `Raum` | `nummer` (keyword), `bezeichnung` (text) |
-| `Firma` | `name` (text), `gewerk` (keyword) |
+| `FieldNote` | `text` (text), `date` (datetime) |
+| `Room` | `number` (keyword), `purpose` (text) |
+| `Vendor` | `name` (text), `trade` (keyword) |
 
 | Relation | From | To |
 | --- | --- | --- |
-| `betrifft_raum` | `Baustellenbericht` | `Raum` |
-| `anwesend` | `Baustellenbericht` | `Firma` |
+| `concerns_room` | `FieldNote` | `Room` |
+| `attended_by` | `FieldNote` | `Vendor` |
 
 The fit source:
 
 ```json
 {
-  "class": "Baustellenbericht",
-  "name": "berichte",
+  "class": "FieldNote",
+  "name": "field-notes",
   "from": ["text"],
-  "context": "Site reports and meeting minutes of a school building project, in German"
+  "context": "Field notes and meeting minutes of the facilities team of an office building"
 }
 ```
 
 ## Proposals a good run makes
 
-The names follow the ontology: lower snake_case in ASCII (`zustaendig` for
-"zuständig"). A run can spell a name another way with the same meaning. The
-keys hold for the names in this table (a suggestion key keeps lowercase ASCII
-letters and digits, and writes every other run of characters as one dash; a
-missing class in a widen key is `x`).
+The names follow the ontology: lower snake_case in ASCII (`assigned_to` for
+"Assigned to"). A run can spell a name another way with the same meaning.
+The keys hold for the names in this table (a suggestion key keeps lowercase
+ASCII letters and digits, and writes every other run of characters as one
+dash; a missing class in a widen key is `x`).
 
 | Change | Key | Texts | Quote (one of them) |
 | --- | --- | --- | --- |
-| Add class `Mangel` | `fit:berichte/add_class/mangel` | 1 to 5 | "Der Mangel wurde der Fliesenbau Muster GmbH gemeldet" |
-| Add property `frist` (datetime) to `Mangel` | `fit:berichte/add_property/mangel/frist` | 1 to 4 | "die Frist zur Beseitigung endet am 16.09.2026" |
-| Add property `status` (keyword: `offen`, `behoben`) to `Mangel` | `fit:berichte/add_property/mangel/status` | 3 to 5 | "Frist 23.09.2026, Status offen" |
-| Add relation `zustaendig` from `Mangel` to `Firma` | `fit:berichte/add_relation/mangel/zustaendig/firma` | 1 to 4 | "Zuständig ist die Trockenbau Probe GmbH" |
-| Let `betrifft_raum` start at `Mangel` | `fit:berichte/widen_relation/betrifft-raum/mangel/x` | 1 to 5 | "In Raum 0.12 fehlt der Spiegel über dem Waschtisch" |
+| Add class `Issue` | `fit:field-notes/add_class/issue` | 1 to 5 | "The issue was reported to Example Tiling Ltd" |
+| Add property `due_date` (datetime) to `Issue` | `fit:field-notes/add_property/issue/due-date` | 1 to 4 | "the repair is due on 2026-09-16" |
+| Add property `status` (keyword: `open`, `resolved`) to `Issue` | `fit:field-notes/add_property/issue/status` | 3 to 5 | "due 2026-09-23, status open" |
+| Add relation `assigned_to` from `Issue` to `Vendor` | `fit:field-notes/add_relation/issue/assigned-to/vendor` | 1 to 4 | "Assigned to Demo Partitions Ltd" |
+| Let `concerns_room` start at `Issue` | `fit:field-notes/widen_relation/concerns-room/issue/x` | 1 to 5 | "in room 0.12 the mirror above the washbasin is missing" |
 
-The last row tests reuse. Every defect names its room, and the ontology
-already has a relation to `Raum`, so a good run widens `betrifft_raum`. A new
-relation from `Mangel` to `Raum` with another name (`liegt_in`,
-`befindet_sich_in`) is a synonym of it.
+The last row tests reuse. Every issue names its room, and the ontology
+already has a relation to `Room`, so a good run widens `concerns_room`. A
+new relation from `Issue` to `Room` with another name (`located_in`,
+`found_in`) is a synonym of it.
 
 ## Proposals a good run may make
 
-- Add property `einstufung` (keyword: `wesentlich`, `unwesentlich`) to
-  `Mangel`. Only text 5 gives it: "die Bauleitung stuft diesen Mangel als
-  unwesentlich ein".
-- Add property `beschreibung` (text) to `Mangel`.
-- Add relation `stellt_fest` from `Baustellenbericht` to `Mangel`, for the
-  report that records a defect.
-- Add class `Bauteil`, for the part a defect concerns (Bodenfliesen, Spiegel,
-  Trennwand).
-- Add class `Abnahme` with a date. Only text 5 names it.
-- Add class `Lieferung` with a `liefertermin` (datetime). Texts 2 and 4 give
-  the delivery date of the ceiling lights.
+- Add property `severity` (keyword: `major`, `minor`) to `Issue`. Only
+  text 5 gives it: "the facilities manager rates this issue as minor".
+- Add property `description` (text) to `Issue`.
+- Add relation `records` from `FieldNote` to `Issue`, for the note that
+  records an issue.
+- Add class `Asset`, for the part an issue concerns (floor tiles, mirror,
+  partition).
+- Add class `Inspection` with a date. Only text 5 names it.
+- Add class `Delivery` with a `delivery_date` (datetime). Texts 2 and 4
+  follow the delivery of the ceiling lights.
 
 ## Proposals a good run does not make
 
-- A relation from `Baustellenbericht` to `Firma` for the companies present
-  ("Anwesend: …", "Teilnehmer: …"). `anwesend` holds it; the check drops
+- A relation from `FieldNote` to `Vendor` for the vendors present
+  ("Present: …", "Attendees: …"). `attended_by` holds it; the check drops
   such a change as `already_covered`.
-- A property for the date of a report. `datum` holds it.
-- A class for one company, one room or one defect (`Fliesenbau Muster GmbH`,
-  `Flur 0.10`, `Trennwand Kabine 2`). These are instances.
-- A second name for a change the run proposes: `Maengel` or `Defect` beside
-  `Mangel`, `deadline` beside `frist`, `verantwortlich` beside `zustaendig`.
+- A property for the date of a note. `date` holds it.
+- A class for one vendor, one room or one issue (`Example Tiling Ltd`,
+  `Corridor 0.10`, `Partition of stall 2`). These are instances.
+- A second name for a change the run proposes: `Issues` or `Defect` beside
+  `Issue`, `deadline` beside `due_date`, `responsible` beside
+  `assigned_to`.
 
 ## How to check a run
 

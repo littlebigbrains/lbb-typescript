@@ -1,7 +1,7 @@
 // documents-map on its samples, with mock models whose rules are fixed: the grounding question
 // picks the candidate whose label holds the entry's identifier, else a new instance; the class
-// question picks Room for the room sheets, SpecSection for a section of the specification and
-// Equipment for the rest; the typing question picks the relation whose range is the object's
+// question picks Station for the station sheets, ManualSection for a section of the manual and
+// Part for the rest; the typing question picks the relation whose range is the object's
 // class. The trace and the expected proposals come from samples/trace.json and expected.json.
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -32,7 +32,7 @@ import { createWorkflow, ontology, type Settings } from "./workflow.js";
 
 const SAMPLES = samplesDir(import.meta.url, "documents-map");
 const TRACE = readJson<SampleTrace>(join(SAMPLES, "trace.json"));
-const PAGES = readJson<FilePages>(join(SAMPLES, "pages", "raumblaetter.json"));
+const PAGES = readJson<FilePages>(join(SAMPLES, "pages", "station-sheets.json"));
 interface Expected {
   instances: { document: string; identifier: string; class: string }[];
   facts: { subject: string; predicate: string; object: string }[];
@@ -191,8 +191,8 @@ const answer = (choice: string, p: number, options: string[]): DecideAnswer => (
 
 /** The relation each object class takes in the samples' ontology. */
 const RELATION_TO: Record<string, string> = {
-  Equipment: "HAS_EQUIPMENT",
-  "Spec section": "SPECIFIED_IN",
+  Part: "HAS_PART",
+  "Manual section": "DESCRIBED_IN",
 };
 
 function decide(request: DecideRequest): Record<string, DecideAnswer> {
@@ -208,11 +208,11 @@ function decide(request: DecideRequest): Record<string, DecideAnswer> {
       out[id] = named ? answer(named, 0.93, options) : answer(map.NEW_INSTANCE, 0.9, options);
     } else if (id.startsWith("k")) {
       const [, identifier, document] = q.instructions.match(/entry "([^"]*)" of ([^,]+),/)!;
-      const wanted = document!.startsWith("raumblaetter")
-        ? "Room"
+      const wanted = document!.startsWith("station-sheets")
+        ? "Station"
         : /^\d+\.\d+$/.test(identifier!)
-          ? "SpecSection"
-          : "Equipment";
+          ? "ManualSection"
+          : "Part";
       out[id] = options.includes(wanted)
         ? answer(wanted, 0.88, options)
         : answer(map.NO_CLASS, 0.8, options);
@@ -329,44 +329,44 @@ test("each step reports its phase as the LBB-run documents.map words it", async 
     assert.equal(call.unit, "questions", call.step);
 });
 
-test("a fact's confidence is the link's times the typing answer's, a room's DENOTES starts at its mention", async () => {
+test("a fact's confidence is the link's times the typing answer's, a station's DENOTES starts at its mention", async () => {
   const lbb = new MockActivities(rules());
   await runMessage(createWorkflow(lbb), message());
   const all = proposals(lbb.graph);
   // T1 is linked to T 1 with 0.9 (another spelling), typed with 0.95.
-  assert.equal(all.find((p) => p.text === "0.12 has_equipment T 1")!.confidence, 0.855);
+  assert.equal(all.find((p) => p.text === "0.12 has_part T 1")!.confidence, 0.855);
   // A new instance's type: the grounding answer's 0.9 times the class answer's 0.88.
-  assert.equal(all.find((p) => p.text === "0.12 a room")!.confidence, 0.792);
-  const room = lbb.graph
+  assert.equal(all.find((p) => p.text === "0.12 a station")!.confidence, 0.792);
+  const station = lbb.graph
     .ofType(map.FACT_PROPOSAL)
     .find(
       (e) =>
-        e.properties.fact_object === minted("raumblaetter.pdf", "0.12") &&
+        e.properties.fact_object === minted("station-sheets.pdf", "0.12") &&
         e.properties.fact_predicate === map.relationIri(map.DENOTES),
     )!;
   const head = TRACE.mentions.find((m) => m.span === "0.12")!;
-  assert.equal(room.properties.fact_subject, mentionIri(head));
+  assert.equal(station.properties.fact_subject, mentionIri(head));
   const label = lbb.graph
     .ofType(map.FACT_PROPOSAL)
     .find(
       (e) =>
-        e.properties.fact_subject === minted("ausstattungsliste.pdf", "S 1.1") &&
+        e.properties.fact_subject === minted("parts-list.pdf", "S 1.1") &&
         e.properties.fact_predicate === map.RDFS_LABEL,
     )!;
   assert.equal(
     label.properties.fact_object,
-    "S 1.1 Waschtisch, Keramik, ca. 55x45 cm, mit Einhebelmischer",
+    "S 1.1 Temperature sensor, stainless steel, approx. 55x45 mm, with cable gland",
   );
   assert.equal(label.properties.fact_datatype, map.XSD_STRING);
-  // A page entry's description is its line without the span: the room is "0.12 Raum Klassenraum".
-  const roomLabel = lbb.graph
+  // A page entry's description is its line without the span: the station is "0.12 Station Filler".
+  const stationLabel = lbb.graph
     .ofType(map.FACT_PROPOSAL)
     .find(
       (e) =>
-        e.properties.fact_subject === minted("raumblaetter.pdf", "0.12") &&
+        e.properties.fact_subject === minted("station-sheets.pdf", "0.12") &&
         e.properties.fact_predicate === map.RDFS_LABEL,
     )!;
-  assert.equal(roomLabel.properties.fact_object, "0.12 Raum Klassenraum");
+  assert.equal(stationLabel.properties.fact_object, "0.12 Station Filler");
   // DENOTES is open on both sides: an entry or a page's head mention, any instance.
   assert.deepEqual(
     ontology().find((op) => op.op === "add_relation" && op.name === map.DENOTES),
@@ -406,8 +406,8 @@ test("a turn stopped part way runs again and pays for nothing twice", async () =
 test("an entry the graph holds is grounded to its instance: DENOTES, and no new instance", async () => {
   const s11: Instance = {
     iri: iri("instance:S 1.1"),
-    class: "Equipment",
-    label: "S 1.1 Waschtisch",
+    class: "Part",
+    label: "S 1.1 Temperature sensor",
     identifier: "S1.1",
   };
   const lbb = new MockActivities(rules({ instances: [s11] }));
@@ -416,25 +416,25 @@ test("an entry the graph holds is grounded to its instance: DENOTES, and no new 
   assert.ok(
     rows.some(
       (p) =>
-        p.fact_subject === entryIri("ausstattungsliste.pdf", "S 1.1") &&
+        p.fact_subject === entryIri("parts-list.pdf", "S 1.1") &&
         p.fact_predicate === map.relationIri(map.DENOTES) &&
         p.fact_object === s11.iri,
     ),
   );
-  assert.ok(!rows.some((p) => p.fact_subject === minted("ausstattungsliste.pdf", "S 1.1")));
+  assert.ok(!rows.some((p) => p.fact_subject === minted("parts-list.pdf", "S 1.1")));
   const facts = rows.filter(
-    (p) => p.fact_object === s11.iri && p.fact_predicate === map.relationIri("HAS_EQUIPMENT"),
+    (p) => p.fact_object === s11.iri && p.fact_predicate === map.relationIri("HAS_PART"),
   );
   assert.deepEqual(
     facts.map((p) => p.fact_subject).sort(),
-    [minted("raumblaetter.pdf", "0.12"), minted("raumblaetter.pdf", "0.14")].sort(),
+    [minted("station-sheets.pdf", "0.12"), minted("station-sheets.pdf", "0.14")].sort(),
   );
 });
 
 test("a class or a property the ontology lacks becomes one ontology suggestion per pattern", async () => {
-  // No SpecSection: the sections of the specification fit no class.
+  // No ManualSection: the sections of the manual fit no class.
   const noClass = sampleOntology.filter(
-    (op) => !("name" in op) || (op.name !== "SpecSection" && op.name !== "SPECIFIED_IN"),
+    (op) => !("name" in op) || (op.name !== "ManualSection" && op.name !== "DESCRIBED_IN"),
   );
   const first = new MockActivities(
     rules({ view: viewOf([...traceOntology, ...ontology(), ...noClass]) }),
@@ -448,24 +448,24 @@ test("a class or a property the ontology lacks becomes one ontology suggestion p
   const [item] = [...first.reviews.values()];
   // The title and the rationale name the entries, with what the model answered.
   assert.ok(
-    item!.title.startsWith("Add a class for 2 entries of baubeschreibung.pdf: 3.1 Bodenbeläge"),
+    item!.title.startsWith("Add a class for 2 entries of service-manual.pdf: 3.1 Cleaning"),
     item!.title,
   );
-  assert.ok(item!.title.includes(", 3.2 Sanitärobjekte"), item!.title);
+  assert.ok(item!.title.includes(", 3.2 Sensors"), item!.title);
   assert.ok(
     item!.rationale!.startsWith(
-      "The decision model found that no class of the ontology fits 2 entries of baubeschreibung.pdf (no class fits, up to 0.80): 3.1 Bodenbeläge",
+      "The decision model found that no class of the ontology fits 2 entries of service-manual.pdf (no class fits, up to 0.80): 3.1 Cleaning",
     ),
     item!.rationale,
   );
   assert.ok(item!.rationale!.includes("The classes the model weighed got at most:"));
-  assert.deepEqual(item!.change, [{ op: "add_entity_type", name: "BaubeschreibungItem" }]);
+  assert.deepEqual(item!.change, [{ op: "add_entity_type", name: "ServiceItem" }]);
   assert.equal(item!.evidence!.records, 2);
   assert.equal(item!.workflow, WORKFLOW);
   // Each sample is where its entry is, with the answer.
   const [sample] = item!.evidence!.samples as Record<string, unknown>[];
   assert.equal(sample!.kind, "entry");
-  assert.equal(sample!.document, "baubeschreibung.pdf");
+  assert.equal(sample!.document, "service-manual.pdf");
   assert.equal(sample!.page, 1);
   assert.equal(sample!.answer, "no class fits");
   assert.equal(sample!.probability, 0.8);
@@ -477,29 +477,29 @@ test("a class or a property the ontology lacks becomes one ontology suggestion p
       .ofType(map.FACT_PROPOSAL)
       .some(
         (e) =>
-          e.properties.fact_subject === minted("baubeschreibung.pdf", "3.1") ||
-          e.properties.fact_object === minted("baubeschreibung.pdf", "3.1"),
+          e.properties.fact_subject === minted("service-manual.pdf", "3.1") ||
+          e.properties.fact_object === minted("service-manual.pdf", "3.1"),
       ),
   );
   const waiting = state.unmappedLinks.filter((l) => l.outcome === "unclassed");
   assert.deepEqual(waiting.map((l) => l.object).sort(), ["3.1", "3.2"]);
   assert.ok(String(waiting[0]!.reason).includes("waits for the class suggestion"));
-  assert.equal(waiting[0]!.document, "raumblaetter.pdf");
-  // SpecSection without SPECIFIED_IN: no property relates a room to a section.
-  const noRelation = sampleOntology.filter((op) => !("name" in op) || op.name !== "SPECIFIED_IN");
+  assert.equal(waiting[0]!.document, "station-sheets.pdf");
+  // ManualSection without DESCRIBED_IN: no property relates a station to a section.
+  const noRelation = sampleOntology.filter((op) => !("name" in op) || op.name !== "DESCRIBED_IN");
   const second = new MockActivities(
     rules({ view: viewOf([...traceOntology, ...ontology(), ...noRelation]) }),
   );
   await runMessage(createWorkflow(second), message());
   const [relation] = [...second.reviews.values()];
-  // Named from the words next to the span: "… siehe Baubeschreibung Kap. 3.1".
-  assert.equal(relation!.title, "Add a relation from Room to SpecSection: SIEHE_KAP");
+  // Named from the words next to the span: "… see service manual sec. 3.1".
+  assert.equal(relation!.title, "Add a relation from Station to ManualSection: SEE_SEC");
   assert.deepEqual(relation!.change, [
-    { op: "add_relation", name: "SIEHE_KAP", domain: ["Room"], range: ["SpecSection"] },
+    { op: "add_relation", name: "SEE_SEC", domain: ["Station"], range: ["ManualSection"] },
   ]);
   assert.ok(
     relation!.rationale!.includes(
-      'p. 1, "Bodenbelag Linoleum, siehe Baubeschreibung Kap. 3.1" (0.12 → 3.1, 0.80)',
+      'p. 1, "Cleaning daily, see service manual sec. 3.1" (0.12 → 3.1, 0.80)',
     ),
     relation!.rationale,
   );
@@ -507,59 +507,59 @@ test("a class or a property the ontology lacks becomes one ontology suggestion p
   const [line] = relation!.evidence!.samples as Record<string, unknown>[];
   assert.equal(line!.kind, "link");
   assert.equal(line!.answer, "a property the ontology lacks");
-  assert.equal(line!.document, "raumblaetter.pdf");
+  assert.equal(line!.document, "station-sheets.pdf");
   assert.ok(!factsOf(second.graph).some((f) => f.includes("3.1") || f.includes("3.2")));
 });
 
 test("a relation an existing relation fits needs 2 lines or one at 0.8, and says why it does not fit", () => {
   const ontology = map.MapOntology.fromView(SAMPLE_VIEW);
-  const [room, equipment] = [map.classIri("Room"), map.classIri("Equipment")];
-  const has = map.relationIri("HAS_EQUIPMENT");
-  const line = "S1.1 Waschtisch, 1 Stück, darüber Spiegel S 2.1";
+  const [station, part] = [map.classIri("Station"), map.classIri("Part")];
+  const has = map.relationIri("HAS_PART");
+  const line = "S1.1 Temperature sensor, 1 piece, mounted beside level sensor S 2.1";
   const lack = (p: number, offered = true): map.Lack => ({
     kind: "property",
-    subjectClass: room,
-    objectClass: equipment,
-    document: "raumblaetter.pdf",
+    subjectClass: station,
+    objectClass: part,
+    document: "station-sheets.pdf",
     sample: { line, probability: p },
     p,
-    options: { HAS_EQUIPMENT: (1 - p) * 0.8, missing_property: p, no_fact: (1 - p) * 0.2 },
-    offered: offered ? { HAS_EQUIPMENT: has } : {},
-    phrase: map.spanPhrase(line, "S 2.1", map.nameWords("S 2.1 Spiegel")),
+    options: { HAS_PART: (1 - p) * 0.8, missing_property: p, no_fact: (1 - p) * 0.2 },
+    offered: offered ? { HAS_PART: has } : {},
+    phrase: map.spanPhrase(line, "S 2.1", map.nameWords("S 2.1 Level sensor")),
     quote: `p. 1, "${line}" (0.12 → S 2.1, ${p.toFixed(2)})`,
   });
   const draft = (members: map.Lack[]) =>
-    map.relationDraft(ontology, room, equipment, "raumblaetter.pdf", members);
+    map.relationDraft(ontology, station, part, "station-sheets.pdf", members);
   // One line at 0.59: nothing is filed; the line is unmapped, with the reason.
   const one = draft([lack(0.59)]);
   assert.ok("unmapped" in one);
   assert.equal(one.unmapped[0]!.outcome, "lacks");
-  assert.ok(String(one.unmapped[0]!.reason).includes("HAS_EQUIPMENT fits Room → Equipment"));
+  assert.ok(String(one.unmapped[0]!.reason).includes("HAS_PART fits Station → Part"));
   // One line at 0.85, or two lines: filed, named from the line, with the reason from the answer.
   const sure = draft([lack(0.85)]);
   assert.ok("draft" in sure);
-  assert.equal(sure.draft.title, "Add a relation from Room to Equipment: STUECK_DARUEBER");
+  assert.equal(sure.draft.title, "Add a relation from Station to Part: MOUNTED_BESIDE");
   assert.ok(
     sure.draft.rationale.includes(
-      "The ontology has HAS_EQUIPMENT (has equipment), which fits Room → Equipment. On these lines the model gave it 0.12 at most",
+      "The ontology has HAS_PART (has part), which fits Station → Part. On these lines the model gave it 0.12 at most",
     ),
     sure.draft.rationale,
   );
   assert.ok("draft" in draft([lack(0.6), lack(0.6)]));
-  // A line whose question did not offer HAS_EQUIPMENT does not back it.
+  // A line whose question did not offer HAS_PART does not back it.
   const unweighed = draft([lack(0.6), lack(0.95, false)]);
   assert.ok("unmapped" in unweighed);
-  assert.ok(String(unweighed.unmapped[1]!.reason).includes("did not offer HAS_EQUIPMENT"));
+  assert.ok(String(unweighed.unmapped[1]!.reason).includes("did not offer HAS_PART"));
 });
 
 test("a class suggestion names the entries of its document written alike that got a class", () => {
   const ontology = map.MapOntology.fromView(SAMPLE_VIEW);
   const entry = (id: string, description: string, p: number): map.Lack => ({
     kind: "class",
-    document: "baubeschreibung.pdf",
+    document: "service-manual.pdf",
     sample: { identifier: id },
     p,
-    options: { Equipment: 0.2, Room: 0.01, no_class: p },
+    options: { Part: 0.2, Station: 0.01, no_class: p },
     quote: `${id} ${description} (p. 1, ${p.toFixed(2)})`,
     entry: { name: map.newInstanceLabel(id, description), shape: map.codeShape(id) },
   });
@@ -567,40 +567,40 @@ test("a class suggestion names the entries of its document written alike that go
     document,
     shape: map.codeShape(id),
     name: map.newInstanceLabel(id, description),
-    classLabel: "Equipment",
+    classLabel: "Part",
     p,
   });
   const draft = map.classDraft(
     ontology,
-    "baubeschreibung.pdf",
-    [entry("3.1", "Bodenbeläge", 0.69)],
+    "service-manual.pdf",
+    [entry("3.1", "Cleaning", 0.69)],
     [
-      classed("baubeschreibung.pdf", "3.2", "Sanitärobjekte", 0.89),
-      classed("baubeschreibung.pdf", "3.3", "Beleuchtung", 0.92),
-      classed("baubeschreibung.pdf", "S 1.1", "Waschtisch", 0.95),
-      classed("raumblaetter.pdf", "3.4", "Türen", 0.9),
+      classed("service-manual.pdf", "3.2", "Sensors", 0.89),
+      classed("service-manual.pdf", "3.3", "Lighting", 0.92),
+      classed("service-manual.pdf", "S 1.1", "Temperature sensor", 0.95),
+      classed("station-sheets.pdf", "3.4", "Conveyors", 0.9),
     ],
   );
-  assert.equal(draft.title, "Add a class for 3.1 Bodenbeläge");
+  assert.equal(draft.title, "Add a class for 3.1 Cleaning");
   assert.ok(
     draft.rationale.includes(
-      "got a class of the ontology: 3.2 Sanitärobjekte (Equipment, 0.89), 3.3 Beleuchtung (Equipment, 0.92). When they belong to the new class too, dismiss their types in the review.",
+      "got a class of the ontology: 3.2 Sensors (Part, 0.89), 3.3 Lighting (Part, 0.92). When they belong to the new class too, dismiss their types in the review.",
     ),
     draft.rationale,
   );
   assert.ok(
-    draft.rationale.includes(
-      "The classes the model weighed got at most: Equipment 0.20, Room 0.01.",
-    ),
+    draft.rationale.includes("The classes the model weighed got at most: Part 0.20, Station 0.01."),
   );
-  assert.ok(!draft.rationale.includes("Waschtisch") && !draft.rationale.includes("Türen"));
+  assert.ok(
+    !draft.rationale.includes("Temperature sensor") && !draft.rationale.includes("Conveyors"),
+  );
 });
 
 test("a withdrawn link withdraws the proposals that only it made", async () => {
   const lbb = new MockActivities(rules());
   const workflow = createWorkflow(lbb);
   await runMessage(workflow, message());
-  // The room sheet no longer names W 1.
+  // The station sheet no longer names W 1.
   const without: SampleTrace = {
     ...TRACE,
     mentions: TRACE.mentions.map((m) => (m.span === "W 1" ? { ...m, link: null } : m)),
@@ -608,12 +608,12 @@ test("a withdrawn link withdraws the proposals that only it made", async () => {
   lbb.rules.sparql = (query, graph) => sparql(query, graph, without, []);
   await runMessage(workflow, message(without), { runs: 1 });
   const all = proposals(lbb.graph).map((p) => p.text);
-  assert.ok(!all.includes("0.12 has_equipment W 1"));
+  assert.ok(!all.includes("0.12 has_part W 1"));
   assert.ok(!all.some((t) => t.startsWith("W 1 ")));
   assert.equal(all.length, 75 - 5);
   assert.deepEqual(
     factsOf(lbb.graph),
-    expectedFacts.filter((f) => f !== "0.12 has_equipment W 1"),
+    expectedFacts.filter((f) => f !== "0.12 has_part W 1"),
   );
 });
 
@@ -636,9 +636,9 @@ test("a declared mapping types its links without a question", async () => {
   const settings: Settings = {
     mappings: [
       {
-        from: { entry_class: "Room" },
-        to: { entry_class: "Equipment" },
-        property: "HAS_EQUIPMENT",
+        from: { entry_class: "Station" },
+        to: { entry_class: "Part" },
+        property: "HAS_PART",
       },
     ],
   };
@@ -646,10 +646,7 @@ test("a declared mapping types its links without a question", async () => {
   await runMessage(createWorkflow(lbb, settings), message());
   assert.deepEqual(factsOf(lbb.graph), expectedFacts);
   // The fact keeps the link's confidence: T1 to T 1 at 0.9.
-  assert.equal(
-    proposals(lbb.graph).find((p) => p.text === "0.12 has_equipment T 1")!.confidence,
-    0.9,
-  );
+  assert.equal(proposals(lbb.graph).find((p) => p.text === "0.12 has_part T 1")!.confidence, 0.9);
   const typing = lbb.calls.filter((c) => c.label?.endsWith("links"));
   assert.equal(typing.length, 2, "one request per page, for the two sections");
 });
@@ -673,34 +670,34 @@ test("the subject of a mention: the anchor above it, or the page's head", () => 
     page,
     box: [x, y, x + 0.05, y + 0.01],
   });
-  // A room sheet's number top right with a code the sheet defines lower down; a bill whose
-  // positions run down the page, the last one onto the next page; a page with neither.
-  const bill = map.subjects(
+  // A station sheet's number top right with a code the sheet defines lower down; an order whose
+  // items run down the page, the last one onto the next page; a page with neither.
+  const order = map.subjects(
     [
-      own(0, 0.1, 0.7, "Pos.-Nr. 1.1"),
-      own(0, 0.5, 0.1, "IK 2.3"),
+      own(0, 0.1, 0.7, "Item no. 1.1"),
+      own(0, 0.5, 0.1, "PK 2.3"),
       own(1, 0.4, 0.1, "01.110"),
       own(1, 0.6, 0.1, "01.120"),
       own(2, 0.5, 0.1, "01.130"),
     ],
     [
-      mention(0, 0.1, 0.2, "Lernatelier"),
-      mention(0, 0.6, 0.3, "IK2.4"),
+      mention(0, 0.1, 0.2, "Workshop"),
+      mention(0, 0.6, 0.3, "PK2.4"),
       mention(1, 0.45, 0.3, "S 38"),
       mention(1, 0.65, 0.3, "S 39"),
       mention(2, 0.2, 0.3, "S 40"),
       mention(3, 0.2, 0.3, "S 41"),
     ],
   );
-  assert.deepEqual(bill, [
-    { entry: "Pos.-Nr. 1.1" },
-    { entry: "Pos.-Nr. 1.1" },
+  assert.deepEqual(order, [
+    { entry: "Item no. 1.1" },
+    { entry: "Item no. 1.1" },
     { entry: "01.110" },
     { entry: "01.120" },
     { entry: "01.120" },
     null,
   ]);
-  // Room sheets: the number in the head, linked to nothing on the first sheet and to a room
+  // Station sheets: the number in the head, linked to nothing on the first sheet and to a station
   // list's entry on the second, the codes below it (one of them an entry the sheet defines). A
   // third page continues the second. A page whose first mention is below an entry has no head.
   const sheets = map.subjects(
@@ -718,16 +715,16 @@ test("the subject of a mention: the anchor above it, or the page's head", () => 
       mention(3, 0.14, 0.1, "S 2.2"),
     ],
   );
-  const room = { entry: "0.14" };
+  const station = { entry: "0.14" };
   assert.deepEqual(sheets, [
     null,
     { mention: 0 },
     { mention: 0 },
     { mention: 0 },
     null,
-    room,
-    room,
-    room,
+    station,
+    station,
+    station,
     { entry: "S 1.1" },
     { entry: "S 1.1" },
   ]);
@@ -736,16 +733,16 @@ test("the subject of a mention: the anchor above it, or the page's head", () => 
 test("names, keys and shapes", () => {
   assert.equal(map.humanize("HAS_EQUIPMENT"), "has equipment");
   assert.equal(map.humanize("hasEquipment"), "has equipment");
-  assert.equal(map.classLabel("SpecSection"), "Spec section");
+  assert.equal(map.classLabel("ManualSection"), "Manual section");
   assert.equal(map.identifierKey("S.2.2"), map.identifierKey("S 2.2"));
   assert.equal(map.codeShape("S 1.1"), "a9.9");
   assert.equal(map.codeShape("0.12"), "9.9");
   assert.equal(map.codeShape("440 DPM 008"), "9a9");
   assert.deepEqual(map.identifierVariants("S 38"), ["S 38", "S38"]);
   assert.deepEqual(map.identifierVariants("S38"), ["S38", "S 38"]);
-  assert.equal(map.newInstanceLabel("F1", "Linoleum"), "F1 Linoleum");
+  assert.equal(map.newInstanceLabel("F1", "Filter"), "F1 Filter");
   assert.equal(map.newInstanceLabel("F1", ""), "F1");
-  assert.equal(map.pageEntryDescription("0.12", "Raum 0.12 Klassenraum"), "Raum Klassenraum");
+  assert.equal(map.pageEntryDescription("0.12", "Station 0.12 Filler"), "Station Filler");
   assert.equal(map.pageEntryDescription("0.12", "0.12"), "0.12");
   assert.equal(map.lackingRelationName("EquipmentType", new Set()), "HAS_EQUIPMENT_TYPE");
   // A taken name gets a number, whatever its case and separators.
@@ -759,12 +756,22 @@ test("names, keys and shapes", () => {
     "EquipmentItem2",
   );
   // A lacking relation is named from the words next to its span.
-  const skip = map.nameWords("3.2 Sanitärobjekte baubeschreibung.pdf");
-  const kap = map.spanPhrase("Sanitärobjekte siehe Baubeschreibung Kap. 3.2", "3.2", skip);
-  assert.deepEqual(kap, ["siehe", "Kap"]);
-  assert.deepEqual(map.spanPhrase("3.2 gilt für alle Räume", "3.2", new Set()), ["gilt", "für"]);
+  const skip = map.nameWords("3.2 Sensors service-manual.pdf");
+  const sec = map.spanPhrase("Sensors see service manual sec. 3.2", "3.2", skip);
+  assert.deepEqual(sec, ["see", "sec"]);
+  assert.deepEqual(map.spanPhrase("3.2 holds for all stations", "3.2", new Set()), [
+    "holds",
+    "for",
+  ]);
   assert.deepEqual(map.spanPhrase("S 2.1", "S 2.1", new Set()), []);
-  assert.equal(map.relationNameFromLines([kap, kap, ["darüber"]], new Set()), "SIEHE_KAP");
-  assert.equal(map.relationNameFromLines([["darüber"]], new Set()), "DARUEBER");
+  assert.equal(map.relationNameFromLines([sec, sec, ["beside"]], new Set()), "SEE_SEC");
+  // Umlauts fold to two letters and `ß` to `SS`: `Ä`, `Ö` and `Ü` read `AE`, `OE` and `UE`.
+  assert.equal(map.relationNameFromLines([["Änderung"]], new Set()), "AENDERUNG");
+  assert.equal(
+    map.relationNameFromLines([["Größe", "Übersicht"]], new Set()),
+    "GROESSE_UEBERSICHT",
+  );
+  assert.equal(map.relationNameFromLines([["Öl"]], new Set()), "OEL");
+  assert.equal(map.relationNameFromLines([["œuvre"]], new Set()), "OEUVRE");
   assert.equal(map.relationNameFromLines([[]], new Set()), undefined);
 });

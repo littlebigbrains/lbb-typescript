@@ -1,9 +1,9 @@
 # ontology-fit
 
 Reads the text of each new or changed instance of a class and proposes the
-ontology changes the text supports: a class `Mangel` for the defects a set
-of site reports follows, its properties `frist` and `status`, a relation
-`zustaendig` to `Firma`. Each change becomes a review item with its
+ontology changes the text supports: a class `Issue` for the issues a set
+of field notes follows, its properties `due_date` and `status`, a relation
+`assigned_to` to `Vendor`. Each change becomes a review item with its
 evolve operations and the quotes that support it; a person accepts it, and
 the ontology changes.
 
@@ -30,16 +30,16 @@ message, two steps:
    each with a sentence of the text as its quote. A chunk the model gives no
    usable answer for counts as failed, and the instance goes on. Then the
    checks without a model, in LBB's order: the shape (`shape`; a relation or
-   property name in the ontology's style, `ZUSTAENDIG` as `zustaendig`, and
+   property name in the ontology's style, `ASSIGNED_TO` as `assigned_to`, and
    a new relation with the name of an existing one widens it), one proposal
    per change, the quote in the text with at least three words, and a dry run
    (`lbb.evolve(change, { dryRun: true })`): a change the ontology has is
    `already_covered`. The decision model scores how well each quote supports
    its change; one below 0.5 is `weak_support`.
 2. **File.** Each kept change goes into the review item of its key:
-   `fit:<workflow name>/add_class/mangel`,
-   `fit:<workflow name>/add_relation/mangel/zustaendig/firma`,
-   `fit:<workflow name>/widen_relation/betrifft-raum/mangel/x`. The item
+   `fit:<workflow name>/add_class/issue`,
+   `fit:<workflow name>/add_relation/issue/assigned-to/vendor`,
+   `fit:<workflow name>/widen_relation/concerns-room/issue/x`. The item
    keeps the best supported samples of every text that supports it (at most
    20), and its rationale says how many instances support it. An item a
    person decided is left alone. The next instance's prompt lists the
@@ -56,11 +56,11 @@ texts; the rest goes to a new turn.
 
 | Setting | Default | Meaning |
 | --- | --- | --- |
-| `className` | `Baustellenbericht` | The class whose instances hold the text |
+| `className` | `FieldNote` | The class whose instances hold the text |
 | `textField` | `text` | The property that holds the text |
 | `context` | the samples' | One sentence about what the text is |
 
-`trigger(settings)` names the triggered workflow `berichte`; the name starts
+`trigger(settings)` names the triggered workflow `field-notes`; the name starts
 every key. The workflow writes no graph facts, so it owns nothing.
 
 ## What the LBB-run version adds
@@ -77,14 +77,14 @@ every key. The workflow writes no graph facts, so it owns nothing.
 
 ## Samples and test
 
-`samples/texts.json` holds five invented site reports and meeting minutes;
+`samples/texts.json` holds five invented field notes and meeting minutes;
 `samples/expected.md` describes the graph before the run, the proposals a
 good run makes with their keys, those it may make, and those it does not
 make. `samples.ts` sets up that graph for `npm run try`.
 
 `workflow.test.ts` runs the workflow with a mock reasoning model whose rules
-are fixed (a sentence about a `Mangel` proposes the class, `Frist`, `Status`
-and `Zuständig` its facts, a room widens `betrifft_raum`). The run files
-the five keys of `expected.md` and no other: the relation `anwesend`, which
-the ontology has, is dropped by the dry run, and a proposal whose quote is
-not in its text is dropped by the quote check.
+are fixed (a sentence about an issue proposes the class `Issue`; "due",
+"status" and "Assigned to" propose its facts; a room widens `concerns_room`).
+The run files the five keys of `expected.md` and no other: the relation
+`attended_by`, which the ontology has, is dropped by the dry run, and a
+proposal whose quote is not in its text is dropped by the quote check.

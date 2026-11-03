@@ -11,7 +11,7 @@ import { ENTITY_ID_KEY_SENTINEL, type ReviewRequest, type Schemas } from "@littl
 import { shortId, type Decision } from "./decide.js";
 import { hash, idOf, type IdentityProposal } from "./things.js";
 
-/** The producer id of the items: the catalog id of the workflow (general linking 12, decision 5). */
+/** The producer id of the items: the catalog id of the workflow. */
 export const PRODUCER = "link";
 
 /** Rows of one item, at most: its facts stay within the 200 rows and 64 KiB of a suggestion. */
@@ -187,7 +187,7 @@ export interface RecordView {
 
 /**
  * The identity item of one group of records: 2 to 10 records side by side,
- * with what matched. A person always accepts an identity (decision 2):
+ * with what matched. A person always accepts an identity:
  * `identityGate` only orders and groups the items (`mapping.identity.above_gate`).
  * Accepting it writes `SAME_AS` between the records, as an identity of an
  * integration does, and a `SAME_THING_AS` fact between their self mentions,

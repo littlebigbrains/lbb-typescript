@@ -87,7 +87,7 @@ and `object`, or `identifier` and `description` for an entry), with the
 answer: `choice`, `answer` in words, `probability` and every option's
 probability in `options`.
 
-- **A relation** (`Add a relation from Room to SpecSection: SIEHE_KAP`). Its
+- **A relation** (`Add a relation from Station to ManualSection: SEE_SEC`). Its
   name comes from the words next to the span on its lines: the two nearest
   words before the span (else after it) that are made of letters, at least
   three long, and not words of the two ends or of the object's document. The
@@ -100,8 +100,8 @@ probability in `options`.
   one at 0.8 or more (`OVERLAP_LINES`, `OVERLAP_ALONE_AT` in `map.ts`), and
   its rationale names the relation and the most probability the answers gave
   it. Otherwise nothing is filed, and the lines are unmapped links.
-- **A class** (`Add a class for 3.1 Bodenbeläge`, or `Add a class for 2
-  entries of baubeschreibung.pdf: 3.1 …, 3.2 …`). Its title and rationale
+- **A class** (`Add a class for 3.1 Cleaning`, or `Add a class for 2
+  entries of service-manual.pdf: 3.1 …, 3.2 …`). Its title and rationale
   name its entries; the rationale lists the classes the answers weighed and
   the entries of the same document, written the same way, that got a class
   of the ontology. A person who finds those belong to the new class too
@@ -183,7 +183,7 @@ LBB-run
 ## Samples and test
 
 `samples/` holds the three invented PDFs of `documents-link`, the parsed
-pages of the room sheets, `trace.json` (what a correct `documents-link` run
+pages of the station sheets, `trace.json` (what a correct `documents-link` run
 writes on them: 15 entries, 21 mentions, 15 links) and the answer key
 `expected.json` ([`../_samples/README.md`](../_samples/README.md)).
 `node sdk/templates/_samples/make-trace.mjs` writes `trace.json` and the
@@ -191,8 +191,8 @@ copies from the samples of `documents-link`.
 
 `npm run try` uploads the three PDFs and waits until LBB's
 `documents.parse` has read them, so the typing questions show the rows of
-each page. Then it adds the ontology of the samples (`Room`, `Equipment`,
-`SpecSection`, `HAS_EQUIPMENT`, `SPECIFIED_IN`) and commits the trace
+each page. Then it adds the ontology of the samples (`Station`, `Part`,
+`ManualSection`, `HAS_PART`, `DESCRIBED_IN`) and commits the trace
 itself. This is the simplest way to run the map on known links: a link run
 first would need its own models and give links that vary from run to run.
 On your graph, run `documents.link` (or the `documents-link` template)
@@ -200,8 +200,8 @@ first.
 
 `workflow.test.ts` runs the workflow on the trace with mock models: the
 grounding question picks a candidate whose label holds the identifier, else
-a new instance; the class question picks `Room` for the room sheets,
-`SpecSection` for a section and `Equipment` for the rest; the typing
+a new instance; the class question picks `Station` for the station sheets,
+`ManualSection` for a section and `Part` for the rest; the typing
 question picks the relation whose range is the object's class. The run makes
 the 15 facts of the answer key and the 60 statements of the 15 new
 instances, and nothing for `M 7`, `S 1.3` or `3.3`. The test also checks the

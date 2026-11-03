@@ -20,7 +20,7 @@
 // 3. asks the decision model (`decide`) how well each quote supports its
 //    change; a change below 0.5 is dropped (`weak_support`);
 // 4. merges the kept changes into the review items: one per change, keyed by
-//    it (`fit:<workflow>/add_class/mangel`), with the best supported samples
+//    it (`fit:<workflow>/add_class/issue`), with the best supported samples
 //    of every text that supports it.
 import {
   isActivityRefused,
@@ -42,9 +42,9 @@ export interface Settings {
 
 /** The settings: edit them for your class. These fit the samples. */
 export const defaults: Settings = {
-  className: "Baustellenbericht",
+  className: "FieldNote",
   textField: "text",
-  context: "Site reports and meeting minutes of a school building project, in German",
+  context: "Field notes and meeting minutes of the facilities team of an office building",
 };
 
 /** The workflow type and version the triggered workflow names. */
@@ -54,7 +54,7 @@ export const workflowType = { workflow_type: "ontology-fit", version: "v1" };
 export function trigger(settings: Settings = defaults): Schemas["TriggeredWorkflowRequest"] {
   return {
     starter: "workflow",
-    name: "berichte",
+    name: "field-notes",
     watch: { class: settings.className, fields: [settings.textField] },
     workflow: workflowType,
     batch: 8,

@@ -2,6 +2,25 @@
 
 All notable changes to the `@littlebigbrain/create` package are documented here.
 
+## 0.9.1 (Unreleased)
+
+- The samples of the templates `documents-link`, `documents-map`, `review`,
+  `ontology-fit` and `search-embed` change. They were German papers of a
+  building project. They are now invented English papers: the maintenance
+  papers of a bottling line (`parts-list.pdf`, `station-sheets.pdf` and
+  `service-manual.pdf`), field notes of a facilities team, and a home goods
+  catalogue. The answer keys, the default roles of `documents-link` and the
+  default class of `ontology-fit` (`FieldNote`) follow. A project created
+  before this release keeps its old samples.
+- The `documents-map` template sends a changed typing prompt. The example
+  "the room of a room sheet" is now "the station of a station sheet", the same
+  change as in the LBB-run `documents.map`. Both prompts go to the live
+  models, so answers on your documents can differ a little.
+- `npm test` in a new project runs every test file the template ships, not
+  `src/workflow.test.ts` alone. The `link` template has several.
+- The curl that `npm run try` prints reads the workflow from
+  `/v1/workflows/named`.
+
 ## 0.9.0 (2026-11-02)
 
 - A new project requires `@littlebigbrain/client` ^0.33.0, and a

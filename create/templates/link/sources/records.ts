@@ -10,7 +10,7 @@
 // keys. Only a field that opts in (`{ role: "text", extract: true }`), on a
 // workflow whose models may read record values, goes to the reasoning model.
 import type { ReasonRequest } from "@littlebigbrain/client";
-import { blockKeys, fold, keyWeight, looksLike, type SpanKind } from "../names.js";
+import { blockKeys, keyWeight, looksLike, type SpanKind } from "../names.js";
 
 /** The role of a field. `context` is read for the decisions and gives no mention. */
 export type FieldRole =
@@ -424,6 +424,3 @@ export function checkExtracted(
 }
 
 const escape = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-
-/** Two spans the same after folding: the gazetteer compares spans this way. */
-export const sameSpan = (a: string, b: string) => fold(a).trim() === fold(b).trim();

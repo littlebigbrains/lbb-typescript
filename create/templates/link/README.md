@@ -7,9 +7,10 @@ workflow groups those mentions into one `LinkedThing`. The links are
 references across the graph, and later checks compare what each source says
 about the thing.
 
-This is phase L1 of the design
-[general linking](../../../docs/architecture/general-linking.md): identities
-on records. Documents (pages) come in phase L2.
+It reads records. The design is in
+[general linking](../../../docs/architecture/general-linking.md). The
+mentions in the pages of PDF files are linked by
+[`documents-link`](../documents-link/README.md).
 
 ## What it writes
 
@@ -52,7 +53,7 @@ the thing that holds its members now.
 
 ## Model reads of record values
 
-`modelsReadRecords` is off by default (general linking 12, decision 1).
+`modelsReadRecords` is off by default.
 
 - **Off.** No model reads a record value. A strong key (an email, a web
   address, a phone number, a handle, a code) links at confidence 1. Every
@@ -61,8 +62,7 @@ the thing that holds its members now.
   the records. It answers a kind question and a names question per mention,
   and a same-record question per pair of records. A link at or above `gate`
   (0.8) is written; a link below it goes to a person. The reasoning model
-  reads only the text fields that opt in: `{ "role": "text", "extract": true }`
-  (decision 8).
+  reads only the text fields that opt in: `{ "role": "text", "extract": true }`.
 
 Every model call has an effect id made from its request. The same question
 gets its first answer from the effect cache, at no cost.
@@ -75,7 +75,7 @@ gets its first answer from the effect cache, at no cost.
 | No link (`starter:<name>:nolink:…`) | Thing of the best candidate | The kept rows: the model chose no thing, and a person disagrees. |
 | Identity (`starter:<name>:identity:…`) | Group of 2 to 10 records | `SAME_AS` between the records, and `SAME_THING_AS` between their names. |
 
-A person always accepts an identity (decision 2). The `identityGate` (0.99)
+A person always accepts an identity. The `identityGate` (0.99)
 only orders and groups the identity items (`mapping.identity.above_gate`).
 Each item has the origin `starter:<name>` with the label `link`, so the
 inbox labels and patterns of the producer `link` read it.
@@ -179,9 +179,9 @@ Brandt`), and company domains. `samples/gold.json` holds the gold groups.
 - A named workflow takes one watch trigger in this release, so each class is
   a named workflow of its own. All of them run the workflow type `link`.
 - The candidates by the name index and by meaning wait for work tokens that
-  reach those routes (N3). The keys and the neighbours find the candidates.
+  reach those routes. The keys and the neighbours find the candidates.
 - A source turn sends its decided pairs in messages of at most 24,000
-  bytes; a larger message goes in parts (`.1`, `.2`, …) until blobs (G11).
+  bytes; a larger message goes in parts (`.1`, `.2`, …).
 - The things identity is an engine identity that `npm run setup` creates.
   It reads the review items it filed to learn a person's decisions.
 

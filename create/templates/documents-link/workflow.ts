@@ -48,9 +48,9 @@ export interface Settings {
 export const defaults: Settings = {
   gate: 0.8,
   roles: {
-    "ausstattungsliste.pdf": "defines",
-    "baubeschreibung.pdf": "defines",
-    "raumblaetter.pdf": "refers",
+    "parts-list.pdf": "defines",
+    "service-manual.pdf": "defines",
+    "station-sheets.pdf": "refers",
   },
   pagesPerWindow: 12,
 };

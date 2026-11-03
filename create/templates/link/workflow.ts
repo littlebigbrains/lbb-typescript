@@ -1,5 +1,5 @@
 // link: connect the mentions of the same thing across the records of a
-// graph (general linking, phase L1: identities on records).
+// graph (general linking: identities on records).
 //
 // The workflow reads records of the classes its settings name (contacts,
 // leads, organizations, deals, notes). Each record's names and keys are its

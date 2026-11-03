@@ -1,5 +1,5 @@
 {
- "sha256": "ad840886f5b9f53c9670dbace9a12422ab3d6d93f3c8b3e774f2ad3fb914f43f",
+ "sha256": "f6007f4205163c68939c97a1e804e574f2b88248a6d0e1899ebaf25bd8f42444",
  "parser": "poppler-26.03.0-scan1",
  "page_count": 1,
  "from": 0,
@@ -12,38 +12,47 @@
    "lines": [
     {
      "id": "p1-l1",
-     "text": "Neubau Grundschule Musterstadt",
+     "text": "Example Plant, bottling line",
      "box": [
       0.121,
       0.0359,
-      0.322,
+      0.2832,
       0.0447
      ],
      "words": [
       {
-       "text": "Neubau",
+       "text": "Example",
        "box": [
         0.121,
         0.0359,
-        0.1681,
+        0.1733,
         0.0447
        ]
       },
       {
-       "text": "Grundschule",
+       "text": "Plant,",
        "box": [
-        0.1718,
+        0.177,
         0.0359,
-        0.2481,
+        0.2114,
         0.0447
        ]
       },
       {
-       "text": "Musterstadt",
+       "text": "bottling",
        "box": [
-        0.2518,
+        0.2152,
         0.0359,
-        0.322,
+        0.2585,
+        0.0447
+       ]
+      },
+      {
+       "text": "line",
+       "box": [
+        0.2623,
+        0.0359,
+        0.2832,
         0.0447
        ]
       }
@@ -51,20 +60,29 @@
     },
     {
      "id": "p1-l2",
-     "text": "Baubeschreibung",
+     "text": "Service manual",
      "box": [
       0.121,
       0.0837,
-      0.3481,
+      0.3183,
       0.1013
      ],
      "words": [
       {
-       "text": "Baubeschreibung",
+       "text": "Service",
        "box": [
         0.121,
         0.0837,
-        0.3481,
+        0.2167,
+        0.1013
+       ]
+      },
+      {
+       "text": "manual",
+       "box": [
+        0.2242,
+        0.0837,
+        0.3183,
         0.1013
        ]
       }
@@ -72,11 +90,11 @@
     },
     {
      "id": "p1-l3",
-     "text": "3 Ausbau",
+     "text": "3 Maintenance",
      "box": [
       0.121,
       0.1228,
-      0.2118,
+      0.26,
       0.136
      ],
      "words": [
@@ -90,11 +108,11 @@
        ]
       },
       {
-       "text": "Ausbau",
+       "text": "Maintenance",
        "box": [
         0.1378,
         0.1228,
-        0.2118,
+        0.26,
         0.136
        ]
       }
@@ -102,11 +120,11 @@
     },
     {
      "id": "p1-l4",
-     "text": "3.1 Bodenbeläge",
+     "text": "3.1 Cleaning",
      "box": [
       0.121,
       0.1498,
-      0.2679,
+      0.2299,
       0.1618
      ],
      "words": [
@@ -120,11 +138,11 @@
        ]
       },
       {
-       "text": "Bodenbeläge",
+       "text": "Cleaning",
        "box": [
         0.1518,
         0.1498,
-        0.2679,
+        0.2299,
         0.1618
        ]
       }
@@ -132,119 +150,164 @@
     },
     {
      "id": "p1-l5",
-     "text": "Klassenräume und Flure erhalten Linoleum, 2,5 mm, vollflächig auf schwimmendem Estrich geklebt.",
+     "text": "Parts that touch the product are cleaned every day with a food-safe detergent and rinsed with drinking",
      "box": [
       0.121,
       0.1696,
-      0.8645,
+      0.8777,
       0.1806
      ],
      "words": [
       {
-       "text": "Klassenräume",
+       "text": "Parts",
        "box": [
         0.121,
         0.1696,
-        0.2284,
+        0.1602,
         0.1806
        ]
       },
       {
-       "text": "und",
+       "text": "that",
        "box": [
-        0.2331,
+        0.1649,
         0.1696,
-        0.2611,
+        0.1929,
         0.1806
        ]
       },
       {
-       "text": "Flure",
+       "text": "touch",
        "box": [
-        0.2658,
+        0.1976,
         0.1696,
-        0.3041,
+        0.2387,
         0.1806
        ]
       },
       {
-       "text": "erhalten",
+       "text": "the",
        "box": [
-        0.3088,
+        0.2434,
         0.1696,
-        0.3695,
+        0.2668,
         0.1806
        ]
       },
       {
-       "text": "Linoleum,",
+       "text": "product",
        "box": [
-        0.3742,
+        0.2714,
         0.1696,
-        0.447,
+        0.3275,
         0.1806
        ]
       },
       {
-       "text": "2,5",
+       "text": "are",
        "box": [
-        0.4517,
+        0.3322,
         0.1696,
-        0.475,
+        0.3564,
         0.1806
        ]
       },
       {
-       "text": "mm,",
+       "text": "cleaned",
        "box": [
-        0.4797,
+        0.3611,
         0.1696,
-        0.5124,
+        0.42,
         0.1806
        ]
       },
       {
-       "text": "vollflächig",
+       "text": "every",
        "box": [
-        0.5171,
+        0.4246,
         0.1696,
-        0.5908,
+        0.4657,
         0.1806
        ]
       },
       {
-       "text": "auf",
+       "text": "day",
        "box": [
-        0.5955,
+        0.4704,
         0.1696,
-        0.6189,
+        0.4975,
         0.1806
        ]
       },
       {
-       "text": "schwimmendem",
+       "text": "with",
        "box": [
-        0.6235,
+        0.5022,
         0.1696,
-        0.7449,
+        0.5321,
         0.1806
        ]
       },
       {
-       "text": "Estrich",
+       "text": "a",
        "box": [
-        0.7496,
+        0.5367,
         0.1696,
-        0.801,
+        0.5461,
         0.1806
        ]
       },
       {
-       "text": "geklebt.",
+       "text": "food-safe",
        "box": [
-        0.8056,
+        0.5507,
         0.1696,
-        0.8645,
+        0.6208,
+        0.1806
+       ]
+      },
+      {
+       "text": "detergent",
+       "box": [
+        0.6255,
+        0.1696,
+        0.6965,
+        0.1806
+       ]
+      },
+      {
+       "text": "and",
+       "box": [
+        0.7012,
+        0.1696,
+        0.7292,
+        0.1806
+       ]
+      },
+      {
+       "text": "rinsed",
+       "box": [
+        0.7339,
+        0.1696,
+        0.7796,
+        0.1806
+       ]
+      },
+      {
+       "text": "with",
+       "box": [
+        0.7843,
+        0.1696,
+        0.8142,
+        0.1806
+       ]
+      },
+      {
+       "text": "drinking",
+       "box": [
+        0.8189,
+        0.1696,
+        0.8777,
         0.1806
        ]
       }
@@ -252,65 +315,92 @@
     },
     {
      "id": "p1-l6",
-     "text": "Sanitärräume erhalten rutschhemmende Bodenfliesen aus Feinsteinzeug.",
+     "text": "water. The outer surfaces are wiped once a week.",
      "box": [
       0.121,
       0.1851,
-      0.6693,
+      0.4928,
       0.196
      ],
      "words": [
       {
-       "text": "Sanitärräume",
+       "text": "water.",
        "box": [
         0.121,
         0.1851,
-        0.2219,
+        0.1668,
         0.196
        ]
       },
       {
-       "text": "erhalten",
+       "text": "The",
        "box": [
-        0.2266,
+        0.1714,
         0.1851,
-        0.2873,
+        0.2004,
         0.196
        ]
       },
       {
-       "text": "rutschhemmende",
+       "text": "outer",
        "box": [
-        0.2919,
+        0.2051,
         0.1851,
-        0.4218,
+        0.2434,
         0.196
        ]
       },
       {
-       "text": "Bodenfliesen",
+       "text": "surfaces",
        "box": [
-        0.4265,
+        0.2481,
         0.1851,
-        0.5236,
+        0.3116,
         0.196
        ]
       },
       {
-       "text": "aus",
+       "text": "are",
        "box": [
-        0.5283,
+        0.3162,
         0.1851,
-        0.5554,
+        0.3405,
         0.196
        ]
       },
       {
-       "text": "Feinsteinzeug.",
+       "text": "wiped",
        "box": [
-        0.5601,
+        0.3452,
         0.1851,
-        0.6693,
+        0.3891,
+        0.196
+       ]
+      },
+      {
+       "text": "once",
+       "box": [
+        0.3938,
+        0.1851,
+        0.4302,
+        0.196
+       ]
+      },
+      {
+       "text": "a",
+       "box": [
+        0.4349,
+        0.1851,
+        0.4442,
+        0.196
+       ]
+      },
+      {
+       "text": "week.",
+       "box": [
+        0.4489,
+        0.1851,
+        0.4928,
         0.196
        ]
       }
@@ -318,11 +408,11 @@
     },
     {
      "id": "p1-l7",
-     "text": "3.2 Sanitärobjekte",
+     "text": "3.2 Sensors",
      "box": [
       0.121,
       0.2139,
-      0.2792,
+      0.2248,
       0.226
      ],
      "words": [
@@ -336,11 +426,11 @@
        ]
       },
       {
-       "text": "Sanitärobjekte",
+       "text": "Sensors",
        "box": [
         0.1518,
         0.2139,
-        0.2792,
+        0.2248,
         0.226
        ]
       }
@@ -348,119 +438,137 @@
     },
     {
      "id": "p1-l8",
-     "text": "Waschtische, WCs und Urinale sind aus weißer Sanitärkeramik, die Armaturen sind wassersparend.",
+     "text": "Temperature, pressure, flow and level sensors are checked every month against a reference. The",
      "box": [
       0.121,
       0.2338,
-      0.8654,
+      0.8468,
       0.2447
      ],
      "words": [
       {
-       "text": "Waschtische,",
+       "text": "Temperature,",
        "box": [
         0.121,
         0.2338,
-        0.2209,
+        0.2219,
         0.2447
        ]
       },
       {
-       "text": "WCs",
+       "text": "pressure,",
        "box": [
-        0.2256,
+        0.2266,
         0.2338,
-        0.262,
+        0.2966,
         0.2447
        ]
       },
       {
-       "text": "und",
+       "text": "flow",
        "box": [
-        0.2667,
+        0.3013,
         0.2338,
-        0.2947,
+        0.3312,
         0.2447
        ]
       },
       {
-       "text": "Urinale",
+       "text": "and",
        "box": [
-        0.2994,
+        0.3358,
         0.2338,
-        0.3526,
+        0.3639,
         0.2447
        ]
       },
       {
-       "text": "sind",
+       "text": "level",
        "box": [
-        0.3573,
+        0.3685,
         0.2338,
-        0.3881,
+        0.4031,
         0.2447
        ]
       },
       {
-       "text": "aus",
+       "text": "sensors",
        "box": [
-        0.3928,
+        0.4078,
         0.2338,
-        0.4199,
+        0.4666,
         0.2447
        ]
       },
       {
-       "text": "weißer",
+       "text": "are",
        "box": [
-        0.4246,
+        0.4713,
         0.2338,
-        0.475,
+        0.4956,
         0.2447
        ]
       },
       {
-       "text": "Sanitärkeramik,",
+       "text": "checked",
        "box": [
-        0.4796,
+        0.5002,
         0.2338,
-        0.5964,
+        0.5628,
         0.2447
        ]
       },
       {
-       "text": "die",
+       "text": "every",
        "box": [
-        0.6011,
+        0.5675,
         0.2338,
-        0.6235,
+        0.6086,
         0.2447
        ]
       },
       {
-       "text": "Armaturen",
+       "text": "month",
        "box": [
-        0.6282,
+        0.6133,
         0.2338,
-        0.7066,
+        0.66,
         0.2447
        ]
       },
       {
-       "text": "sind",
+       "text": "against",
        "box": [
-        0.7113,
+        0.6646,
         0.2338,
-        0.7421,
+        0.7188,
         0.2447
        ]
       },
       {
-       "text": "wassersparend.",
+       "text": "a",
        "box": [
-        0.7468,
+        0.7235,
         0.2338,
-        0.8654,
+        0.7328,
+        0.2447
+       ]
+      },
+      {
+       "text": "reference.",
+       "box": [
+        0.7375,
+        0.2338,
+        0.8132,
+        0.2447
+       ]
+      },
+      {
+       "text": "The",
+       "box": [
+        0.8178,
+        0.2338,
+        0.8468,
         0.2447
        ]
       }
@@ -468,65 +576,65 @@
     },
     {
      "id": "p1-l9",
-     "text": "Die einzelnen Objekte nennt die Ausstattungsliste.",
+     "text": "parts list names the single sensors.",
      "box": [
       0.121,
       0.2492,
-      0.4956,
+      0.3835,
       0.2602
      ],
      "words": [
       {
-       "text": "Die",
+       "text": "parts",
        "box": [
         0.121,
         0.2492,
-        0.1462,
+        0.1584,
         0.2602
        ]
       },
       {
-       "text": "einzelnen",
+       "text": "list",
        "box": [
-        0.1509,
+        0.163,
         0.2492,
-        0.2228,
+        0.1836,
         0.2602
        ]
       },
       {
-       "text": "Objekte",
+       "text": "names",
        "box": [
-        0.2275,
+        0.1883,
         0.2492,
-        0.2854,
+        0.2387,
         0.2602
        ]
       },
       {
-       "text": "nennt",
+       "text": "the",
        "box": [
-        0.2901,
+        0.2434,
         0.2492,
-        0.3321,
+        0.2667,
         0.2602
        ]
       },
       {
-       "text": "die",
+       "text": "single",
        "box": [
-        0.3368,
+        0.2714,
         0.2492,
-        0.3592,
+        0.3153,
         0.2602
        ]
       },
       {
-       "text": "Ausstattungsliste.",
+       "text": "sensors.",
        "box": [
-        0.3639,
+        0.32,
         0.2492,
-        0.4956,
+        0.3835,
         0.2602
        ]
       }
@@ -534,11 +642,11 @@
     },
     {
      "id": "p1-l10",
-     "text": "3.3 Beleuchtung",
+     "text": "3.3 Lighting",
      "box": [
       0.121,
       0.278,
-      0.2638,
+      0.2248,
       0.2901
      ],
      "words": [
@@ -552,11 +660,11 @@
        ]
       },
       {
-       "text": "Beleuchtung",
+       "text": "Lighting",
        "box": [
         0.1518,
         0.278,
-        0.2638,
+        0.2248,
         0.2901
        ]
       }
@@ -564,101 +672,164 @@
     },
     {
      "id": "p1-l11",
-     "text": "Alle Räume erhalten LED-Leuchten. Die Leuchten der Klassenräume sind tageslichtabhängig",
+     "text": "All stations have LED lamps. The work lights are dimmable, and each station has a warning beacon",
      "box": [
       0.121,
       0.2979,
-      0.8151,
+      0.8608,
       0.3089
      ],
      "words": [
       {
-       "text": "Alle",
+       "text": "All",
        "box": [
         0.121,
         0.2979,
-        0.149,
+        0.1397,
         0.3089
        ]
       },
       {
-       "text": "Räume",
+       "text": "stations",
        "box": [
-        0.1537,
+        0.1444,
         0.2979,
-        0.2079,
+        0.2023,
         0.3089
        ]
       },
       {
-       "text": "erhalten",
+       "text": "have",
        "box": [
-        0.2125,
+        0.2069,
         0.2979,
-        0.2733,
+        0.2434,
         0.3089
        ]
       },
       {
-       "text": "LED-Leuchten.",
+       "text": "LED",
        "box": [
-        0.2779,
+        0.2481,
         0.2979,
-        0.39,
+        0.2807,
         0.3089
        ]
       },
       {
-       "text": "Die",
+       "text": "lamps.",
        "box": [
-        0.3947,
+        0.2854,
         0.2979,
-        0.4199,
+        0.3349,
         0.3089
        ]
       },
       {
-       "text": "Leuchten",
+       "text": "The",
        "box": [
-        0.4246,
+        0.3396,
         0.2979,
-        0.4937,
+        0.3685,
         0.3089
        ]
       },
       {
-       "text": "der",
+       "text": "work",
        "box": [
-        0.4984,
+        0.3732,
         0.2979,
-        0.5227,
+        0.4087,
         0.3089
        ]
       },
       {
-       "text": "Klassenräume",
+       "text": "lights",
        "box": [
-        0.5274,
+        0.4134,
         0.2979,
-        0.6348,
+        0.4526,
         0.3089
        ]
       },
       {
-       "text": "sind",
+       "text": "are",
        "box": [
-        0.6394,
+        0.4573,
         0.2979,
-        0.6703,
+        0.4815,
         0.3089
        ]
       },
       {
-       "text": "tageslichtabhängig",
+       "text": "dimmable,",
        "box": [
-        0.6749,
+        0.4862,
         0.2979,
-        0.8151,
+        0.5637,
+        0.3089
+       ]
+      },
+      {
+       "text": "and",
+       "box": [
+        0.5684,
+        0.2979,
+        0.5964,
+        0.3089
+       ]
+      },
+      {
+       "text": "each",
+       "box": [
+        0.6011,
+        0.2979,
+        0.6375,
+        0.3089
+       ]
+      },
+      {
+       "text": "station",
+       "box": [
+        0.6422,
+        0.2979,
+        0.6917,
+        0.3089
+       ]
+      },
+      {
+       "text": "has",
+       "box": [
+        0.6964,
+        0.2979,
+        0.7235,
+        0.3089
+       ]
+      },
+      {
+       "text": "a",
+       "box": [
+        0.7282,
+        0.2979,
+        0.7375,
+        0.3089
+       ]
+      },
+      {
+       "text": "warning",
+       "box": [
+        0.7422,
+        0.2979,
+        0.801,
+        0.3089
+       ]
+      },
+      {
+       "text": "beacon",
+       "box": [
+        0.8057,
+        0.2979,
+        0.8608,
         0.3089
        ]
       }
@@ -666,83 +837,47 @@
     },
     {
      "id": "p1-l12",
-     "text": "dimmbar, Flure und Treppen erhalten Sicherheitsleuchten mit Einzelbatterie.",
+     "text": "with its own battery.",
      "box": [
       0.121,
       0.3133,
-      0.6889,
+      0.2686,
       0.3243
      ],
      "words": [
       {
-       "text": "dimmbar,",
+       "text": "with",
        "box": [
         0.121,
         0.3133,
-        0.191,
+        0.1509,
         0.3243
        ]
       },
       {
-       "text": "Flure",
+       "text": "its",
        "box": [
-        0.1957,
+        0.1556,
         0.3133,
-        0.234,
+        0.1724,
         0.3243
        ]
       },
       {
-       "text": "und",
+       "text": "own",
        "box": [
-        0.2387,
+        0.177,
         0.3133,
-        0.2667,
+        0.2079,
         0.3243
        ]
       },
       {
-       "text": "Treppen",
+       "text": "battery.",
        "box": [
-        0.2714,
+        0.2125,
         0.3133,
-        0.334,
-        0.3243
-       ]
-      },
-      {
-       "text": "erhalten",
-       "box": [
-        0.3386,
-        0.3133,
-        0.3994,
-        0.3243
-       ]
-      },
-      {
-       "text": "Sicherheitsleuchten",
-       "box": [
-        0.404,
-        0.3133,
-        0.5507,
-        0.3243
-       ]
-      },
-      {
-       "text": "mit",
-       "box": [
-        0.5554,
-        0.3133,
-        0.5778,
-        0.3243
-       ]
-      },
-      {
-       "text": "Einzelbatterie.",
-       "box": [
-        0.5824,
-        0.3133,
-        0.6889,
+        0.2686,
         0.3243
        ]
       }
@@ -750,36 +885,36 @@
     },
     {
      "id": "p1-l13",
-     "text": "Seite 1 von 1",
+     "text": "Page 1 of 1",
      "box": [
-      0.8005,
+      0.8102,
       0.9457,
       0.879,
       0.9545
      ],
      "words": [
       {
-       "text": "Seite",
+       "text": "Page",
        "box": [
-        0.8005,
+        0.8102,
         0.9457,
-        0.8311,
+        0.8416,
         0.9545
        ]
       },
       {
        "text": "1",
        "box": [
-        0.8349,
+        0.8454,
         0.9457,
-        0.8424,
+        0.8528,
         0.9545
        ]
       },
       {
-       "text": "von",
+       "text": "of",
        "box": [
-        0.8461,
+        0.8566,
         0.9457,
         0.8678,
         0.9545
