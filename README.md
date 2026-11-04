@@ -132,7 +132,9 @@ trace of those rows, so you can label them. When the loop runs out of time,
 `chart` says how to draw `rows`, or is `null`: `kind` is `bar`, `line`,
 `scatter` or `table`, and `x`, `y` and `series` name columns of the rows. The
 server checked the hint: the columns exist, and `y` holds numbers for `bar`
-and `line` (`x` and `y` for `scatter`).
+and `line` (`x` and `y` for `scatter`). `title`, `x_label` and `y_label`, when
+present, are plain words for the reader, such as "Career h-index". Draw them
+instead of the column names.
 
 ```ts
 if (result.chart?.kind === "bar") {
