@@ -14558,6 +14558,14 @@ export interface components {
              *     in the rows the loop read; the server removes any other.
              */
             citations?: string[];
+            /**
+             * Format: float
+             * @description The model's probability, from 0 to 1, that the answer is right. At
+             *     most 0.4 when the rows measure a stand-in for what the question asks
+             *     (a broader group, a general score of the same entities): the answer
+             *     then says so first. Absent in answers stored before this field.
+             */
+            confidence?: number | null;
             /** @description A short answer in plain words. */
             text: string;
         };
@@ -14565,7 +14573,10 @@ export interface components {
          * @description A chart hint: which columns of the response's `result` an app can draw,
          *     and how. The server checked it against those rows: every column it
          *     names is a column of `result`, and `y` holds numbers for `bar` and
-         *     `line` (`x` and `y` for `scatter`).
+         *     `line` (`x` and `y` for `scatter`). The labels (`title`, `x_label`,
+         *     `y_label`) are plain words for a person to read. The server drops a
+         *     label that is a variable, an IRI, an identifier, shorter than three
+         *     letters or too long, and keeps the chart.
          */
         QueryAnswerChart: {
             kind: components["schemas"]["QueryAnswerChartKind"];
@@ -14575,16 +14586,34 @@ export interface components {
              */
             series?: string | null;
             /**
+             * @description A title for the chart in plain words, for example "Career h-index of
+             *     the researchers on this topic", at most 80 characters. Absent when
+             *     the model gave none or the server dropped it. An app words the chart
+             *     from the column names then.
+             */
+            title?: string | null;
+            /**
              * @description The column of the categories or of the x axis, a variable of
              *     `result` without its `?`. Always present for `bar`, `line` and
              *     `scatter`.
              */
             x?: string | null;
             /**
+             * @description The label of the x axis (or of the categories) in plain words, for
+             *     example "Researcher", at most 40 characters. Absent as `title` is. A
+             *     table has none.
+             */
+            x_label?: string | null;
+            /**
              * @description The column of the numbers. Always present for `bar`, `line` and
              *     `scatter`.
              */
             y?: string | null;
+            /**
+             * @description The label of the y axis in plain words, for example "Career h-index",
+             *     at most 40 characters. Absent as `title` is. A table has none.
+             */
+            y_label?: string | null;
         };
         /**
          * @description The kind of chart that fits the rows of an answer.
