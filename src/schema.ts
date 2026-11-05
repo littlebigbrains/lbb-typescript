@@ -2125,7 +2125,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Retract specific edges and/or every edge touching given entities; appends superseding retract events (history is kept for as_of reads) */
+        /** Retract specific edges and/or every edge touching given entities; appends superseding retract events (history is kept for as_of reads). On an RDF-native graph an entity loses every statement it is in (type, label, fields, edges with their evidence nodes); `?dry_run=true` answers a `GraphRetractDryRunResponse` with the counts and writes nothing */
         post: operations["post_v1_graph_retract"];
         delete?: never;
         options?: never;
@@ -3444,7 +3444,8 @@ export interface paths {
         put?: never;
         /** Ask a person: file a review item of kind value, choice, grade or answer, or update the one with the same key (a change is filed with POST /v1/ontology/suggestions). `wait` names the run that waits for the answer */
         post: operations["post_v1_reviews"];
-        delete?: never;
+        /** Delete a review item in any status as its producer: its question, evidence, answer and comments go with it. Facts an accepted answer committed stay in the graph. 409 `conflict` while the answer's commit is still to make; 404 `not_found` for an item that is gone */
+        delete: operations["delete_v1_reviews"];
         options?: never;
         head?: never;
         patch?: never;
@@ -3564,7 +3565,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Withdraw a review item as its producer */
+        /** Withdraw an open or rejected review item as its producer. An answered item cannot be withdrawn (400) */
         post: operations["post_v1_reviews_withdraw"];
         delete?: never;
         options?: never;
@@ -10542,6 +10543,27 @@ export interface components {
             removed_sample?: string[];
         };
         /**
+         * @description Outcome of `POST /v1/graph/retract?dry_run=true` on an RDF-native graph:
+         *     what the retract would remove, from the same planner as the live retract.
+         *     Nothing is written. On a graph with property-graph truth the dry run is
+         *     refused.
+         */
+        GraphRetractDryRunResponse: {
+            /** @description Always `true`. */
+            dry_run: boolean;
+            /** @description Field statements the retract would remove. */
+            fields_removed: number;
+            /** @description `retracted_entities` when `purge_entity_properties` is set, else zero. */
+            purged_entities: number;
+            /**
+             * @description Edge statements the retract would remove, the edges of retracted
+             *     entities included.
+             */
+            retracted_edges: number;
+            /** @description Entities (from `entities`) that have a statement to remove. */
+            retracted_entities: number;
+        };
+        /**
          * @description Retract specific edges and/or every edge touching given entities. Graph facts
          *     are append-only; a retraction does not erase events but appends a retracting
          *     event that supersedes the matched current edges, so they drop out of
@@ -16011,8 +16033,13 @@ export interface components {
          *     stored anchor; out-of-range, non-finite, or inverted boxes are rejected.
          */
         RegionAnchorInput: {
-            /** Format: double */
-            confidence: number;
+            /**
+             * Format: double
+             * @description Extraction confidence in `[0, 1]`. Defaults to `1.0` when absent: the
+             *     region `POST /v1/workflows/activities/ground` returns has none, and
+             *     its box is computed from the page's text lines, not guessed.
+             */
+            confidence?: number;
             /**
              * Format: int32
              * @description 0-based page index within the source document.
@@ -16627,6 +16654,16 @@ export interface components {
             title: string;
             wait?: null | components["schemas"]["ReviewWait"];
             workflow?: null | components["schemas"]["ReviewWorkflowOrigin"];
+        };
+        /**
+         * @description `DELETE /v1/reviews?id=…`: the producer deleted an item, in any status.
+         *     The item's question, evidence, answer and comments are gone with it.
+         */
+        ReviewItemDeleteResponse: {
+            /** @description Always `true`. */
+            deleted: boolean;
+            /** @description The deleted item (`rev_…`). */
+            id: string;
         };
         /**
          * @description The review part of a suggestion record. Absent on a plain suggestion,
@@ -44628,6 +44665,8 @@ export interface operations {
                 stack?: string;
                 /** @description Optional decimal u64 graph incarnation from /v1/workflows/scope. A changed incarnation returns 409 graph_epoch_changed; a graph missing at admission returns 404. Synchronous writes and CAS retries cannot mutate a replacement incarnation; detached jobs are outside this precondition. */
                 expected_graph_epoch?: string;
+                /** @description `true` reports what the retract would remove and writes nothing (RDF-native graphs only) */
+                dry_run?: string;
             };
             header?: {
                 /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
@@ -57917,6 +57956,151 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ReviewItem"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Rate limit exceeded */
+            429: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Service unavailable */
+            503: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+        };
+    };
+    delete_v1_reviews: {
+        parameters: {
+            query?: {
+                /** @description Graph name (default `main`) */
+                graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
+                /** @description Review item id (`rev_…`) */
+                id?: string;
+            };
+            header?: {
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
+                "Lbb-Version"?: string;
+                /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
+                "Idempotency-Key"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReviewItemDeleteResponse"];
                 };
             };
             /** @description Bad request */
