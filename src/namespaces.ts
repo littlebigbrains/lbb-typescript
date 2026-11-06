@@ -119,6 +119,57 @@ export class GraphNamespace {
     return this.client.plannerStats(opts);
   }
 
+  /**
+   * The plan of optional index upgrades the graph's published generation can
+   * take: per-table state against the server's baked recipe, and the bytes a
+   * build would add. `target` pins an older recipe to inspect it.
+   */
+  indexUpgradePlan(
+    opts: { target?: string } & CallOptions = {},
+  ): Promise<Schemas["IndexUpgradePlan"]> {
+    const { target, ...call } = opts;
+    return this.client.request("GET", "/v1/graph/index-upgrade", {
+      ...call,
+      query: { target },
+    });
+  }
+
+  /**
+   * Plan, or with `dryRun: false` queue, the durable maintenance work that
+   * builds the recipe's value-order and other tables. Read the queued job
+   * with {@link GraphNamespace.indexUpgradeJob}.
+   */
+  indexUpgrade(
+    opts: {
+      dryRun?: boolean;
+      target?: string;
+      retryId?: string;
+    } & CallOptions = {},
+  ): Promise<Schemas["IndexUpgradeResponse"]> {
+    const { dryRun, target, retryId, ...call } = opts;
+    return this.client.request("POST", "/v1/graph/index-upgrade", {
+      ...call,
+      retry: call.retry ?? true,
+      idempotencyKey:
+        call.idempotencyKey ??
+        this.client.idempotencyKey("graph.index-upgrade"),
+      body: { dry_run: dryRun, target, retry_id: retryId },
+    });
+  }
+
+  /** Poll the continuation of one queued index upgrade by job id. The
+   * progress fields are shaped by the version that runs; start from
+   * "Upgrade indexes on existing graphs" in the HTTP reference. */
+  indexUpgradeJob(
+    jobId: string,
+    opts: CallOptions = {},
+  ): Promise<Record<string, unknown>> {
+    return this.client.request("GET", "/v1/graph/index-upgrade/job", {
+      ...opts,
+      query: { job_id: jobId },
+    });
+  }
+
   /** Wait until this graph has an exact generation covering `targetSeq`. */
   waitForPublished(
     targetSeq: number,
@@ -1237,6 +1288,60 @@ export class ModelChoicesNamespace {
 }
 
 /**
+ * Calibration sessions: the server measures a threshold for one job (or a
+ * workflow's gate) against the graph's call log. Reading sessions and the
+ * thresholds in force works with an API key. Apply a session through
+ * `POST /v1/models/calibration/apply` with the same key. The separate
+ * inbox-gate proposal route, `POST /v1/workflows/triggered/calibration/apply`,
+ * requires a console session in SaaS mode.
+ */
+export class ModelCalibrationNamespace {
+  constructor(private readonly client: LbbClient) {}
+
+  /** The graph's calibration sessions, newest first; `limit` caps the page. */
+  list(
+    opts: { limit?: number } & CallOptions = {},
+  ): Promise<Schemas["ModelCalibrationListResponse"]> {
+    const { limit, ...call } = opts;
+    return this.client.request("GET", "/v1/models/calibration", {
+      ...call,
+      query: { limit },
+    });
+  }
+
+  /** One calibration session: options, judge calls, questions, report. */
+  get(
+    id: string,
+    opts: CallOptions = {},
+  ): Promise<Schemas["ModelCalibrationSession"]> {
+    return this.client.request("GET", "/v1/models/calibration/get", {
+      ...opts,
+      query: { id },
+    });
+  }
+
+  /**
+   * Start a session for one `job`. A `route` session is general; a session
+   * with `workflow` measures that workflow's gate (`resolve`, `infer` or
+   * `map`). The session spends the judge budget as it goes. By default only
+   * rate-limit responses are retried: a lost response may have started it.
+   */
+  start(
+    body: Schemas["ModelCalibrationStartRequest"],
+    opts: CallOptions = {},
+  ): Promise<Schemas["ModelCalibrationSession"]> {
+    return this.client.request("POST", "/v1/models/calibration", {
+      ...opts,
+      retry: opts.retry ?? "rate_limited",
+      idempotencyKey:
+        opts.idempotencyKey ??
+        this.client.idempotencyKey("models.calibration.start"),
+      body,
+    });
+  }
+}
+
+/**
  * The models of the graph's uses: trials of other models, switches, and
  * the model choices of the workflow uses.
  */
@@ -1244,11 +1349,21 @@ export class ModelsNamespace {
   readonly trials: ModelTrialsNamespace;
   readonly switches: ModelSwitchesNamespace;
   readonly choices: ModelChoicesNamespace;
+  /** Calibration sessions and the thresholds currently in force. */
+  readonly calibration: ModelCalibrationNamespace;
 
-  constructor(client: LbbClient) {
+  constructor(private readonly client: LbbClient) {
     this.trials = new ModelTrialsNamespace(client);
     this.switches = new ModelSwitchesNamespace(client);
     this.choices = new ModelChoicesNamespace(client);
+    this.calibration = new ModelCalibrationNamespace(client);
+  }
+
+  /** The applied thresholds of `route` and `fit`, and a workflow's applied gate. */
+  thresholds(
+    opts: CallOptions = {},
+  ): Promise<Schemas["ModelThresholdsResponse"]> {
+    return this.client.request("GET", "/v1/models/thresholds", opts);
   }
 }
 
@@ -1755,6 +1870,27 @@ export class OntologyNamespace {
         consistency: opts.consistency ?? this.client.defaultConsistency,
         ...(limit !== undefined ? { limit } : {}),
       },
+    });
+  }
+
+  /**
+   * Fit one text once: reads the pasted `text`, or the parsed pages of an
+   * uploaded `document` (its SHA-256), runs the fit models and checks, and
+   * files what it finds as ontology suggestions (nothing with `dry_run`).
+   * Ongoing sources read files wholesale with `client.ontology.fitSources`.
+   * By default only rate-limit responses are retried: a lost response may
+   * have already spent the model budget.
+   */
+  fitText(
+    body: Schemas["FitTextRequest"],
+    opts: CallOptions = {},
+  ): Promise<Schemas["FitTextResponse"]> {
+    return this.client.request("POST", "/v1/ontology/fit-text", {
+      ...opts,
+      retry: opts.retry ?? "rate_limited",
+      idempotencyKey:
+        opts.idempotencyKey ?? this.client.idempotencyKey("ontology.fit-text"),
+      body,
     });
   }
 

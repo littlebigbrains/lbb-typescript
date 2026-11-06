@@ -632,6 +632,25 @@ export class WorkflowNamespace {
       body: { workflow_id: id },
     });
   }
+  /**
+   * The workflow engine's state on this graph: enabled and its durability,
+   * the generation of the scheduling index (`local_sequence`), the
+   * unarchived count (always 0 on object-storage-native servers), and
+   * `active_runs`, the runs still going. Federation mirrors pass
+   * `expectedGraphEpoch` to fail fast on the wrong stack.
+   */
+  status(
+    options: { expectedGraphEpoch?: string } & CallOptions = {},
+  ): Promise<Schemas["WorkflowStatusResponse"]> {
+    const { expectedGraphEpoch, ...call } = options;
+    return this.client.request("GET", "/v1/workflows/status", {
+      ...call,
+      query:
+        expectedGraphEpoch !== undefined
+          ? { expected_graph_epoch: expectedGraphEpoch }
+          : undefined,
+    });
+  }
 }
 const suspended = Symbol("workflow sleep");
 

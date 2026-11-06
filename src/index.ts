@@ -81,6 +81,7 @@ export type {
   ModelCheckListOptions,
   ModelChoiceListOptions,
   ModelChoicesNamespace,
+  ModelCalibrationNamespace,
   ModelsNamespace,
   ModelSwitchesNamespace,
   ModelTrialListOptions,
