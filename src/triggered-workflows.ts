@@ -441,6 +441,24 @@ export class TriggeredWorkflowsNamespace {
   }
 
   /**
+   * The calibrations of the graph's triggered-workflow gates, measured from
+   * the review inbox's decisions: per workflow, its bands, their labels and
+   * a proposal, with the batch labels included (`includeBatch`) or left for
+   * the next read. The read is bounded like the inbox: at most 1,000 items,
+   * and `truncated` says when it was. Applying a proposal stays a console
+   * session.
+   */
+  calibration(
+    options: { includeBatch?: boolean } & CallOptions = {},
+  ): Promise<Schemas["WorkflowGateCalibrationReport"]> {
+    const { includeBatch, ...call } = options;
+    return this.client.request("GET", "/v1/workflows/triggered/calibration", {
+      ...call,
+      query: { include_batch: includeBatch },
+    });
+  }
+
+  /**
    * Delete a triggered workflow; the client repeats the name as `confirm`.
    * What it wrote stays. Deleting `search.embed` also removes the embedding
    * and its vectors; the suggestions an `ontology.fit` filed stay in the
