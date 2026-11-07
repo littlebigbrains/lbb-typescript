@@ -402,6 +402,15 @@ Capabilities describe support, not whether a deployment enabled the feature.
 Use `client.catalog` to create namespaces, adopt an existing graph at its exact
 `expected_graph_epoch`, page membership, and inspect or repair pending operations.
 Use `client.access.createReadToken` and `revokeToken` to manage delegated reads.
+`client.sparqlNamespace({ namespace_id, query })` selects every ready graph in a
+catalog namespace (descendants included by default), up to 256 sources. It
+requires environment credentials and the catalog/reference feature gates.
+`GRAPH ?project` exposes `urn:lbb:graph:<graph_id>` names; ordinary patterns read
+the RDF set union. An empty namespace stays empty. Source failures or limits
+refuse the whole request; `coverage` and exact `sources` describe each success.
+The client's graph and epoch do not scope this method. See
+[namespace queries](https://docs.littlebigbrain.com/guides/query-a-customer-namespace/).
+
 `client.sparqlDataset` takes the primary epoch and explicit references; its `sources`
 vector identifies the independently pinned versions. Epochs are decimal strings,
 not JavaScript numbers. Catalog pages can be empty with a non-null `next_cursor`;
