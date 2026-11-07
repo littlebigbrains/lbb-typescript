@@ -527,13 +527,18 @@ export class LbbClient {
       params.push(
         `${encodeURIComponent(key)}=${encodeURIComponent(String(value))}`,
       );
-    if (this.graphName !== undefined) push("graph", this.graphName);
+    // Namespace queries own their graph selection. A graph-scoped client must
+    // not leak its graph or epoch into this environment-scoped route.
+    const graphScoped = path !== "/v1/query/namespace";
+    if (graphScoped && this.graphName !== undefined)
+      push("graph", this.graphName);
     if (this.environment !== undefined) push("stack", this.environment);
-    if (this.expectedGraphEpoch !== undefined)
+    if (graphScoped && this.expectedGraphEpoch !== undefined)
       push("expected_graph_epoch", this.expectedGraphEpoch);
     for (const [key, value] of Object.entries(query ?? {})) {
       if (
         key === "expected_graph_epoch" &&
+        graphScoped &&
         this.expectedGraphEpoch !== undefined
       ) {
         if (value !== undefined && value !== this.expectedGraphEpoch)
@@ -2013,6 +2018,24 @@ export class LbbClient {
     opts: CallOptions = {},
   ): Promise<Schemas["ReferenceDatasetResponse"]> {
     return this.request("POST", "/v1/query/dataset", {
+      ...opts,
+      body,
+      retry: opts.retry ?? "rate_limited",
+    });
+  }
+
+  /**
+   * SELECT/ASK across a catalog namespace (including descendants by default).
+   * Environment credentials required. Every selected graph must be readable;
+   * limits and missing sources refuse the whole query. Default graph: RDF set
+   * union; GRAPH names are urn:lbb:graph:<graph_id>. No model-backed search.
+   * The client's graph and expectedGraphEpoch do not scope this operation.
+   */
+  sparqlNamespace(
+    body: Schemas["NamespaceQueryRequest"],
+    opts: CallOptions = {},
+  ): Promise<Schemas["NamespaceQueryResponse"]> {
+    return this.request("POST", "/v1/query/namespace", {
       ...opts,
       body,
       retry: opts.retry ?? "rate_limited",

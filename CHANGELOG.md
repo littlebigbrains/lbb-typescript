@@ -2,6 +2,19 @@
 
 All notable changes to the `@littlebigbrain/client` package are documented here.
 
+## 0.34.0 (2026-11-07)
+
+- `sparqlNamespace({ namespace_id, query })` runs SELECT or ASK across the
+  namespace's ready project graphs, including descendants by default, with an
+  RDF set-union default graph and deterministic `urn:lbb:graph:<graph_id>` names.
+  The deployment must support `namespace_dataset_reads_v1` and enable the
+  catalog and reference gates. This method requires environment credentials;
+  delegated read tokens do not authorize it. A source failure or a work limit
+  refuses the whole query; coverage, selection identity and independently
+  pinned source versions accompany each successful result. The client's graph
+  and graph epoch do not scope this environment operation. Automatic retries
+  are limited to pre-execution rate-limit refusals.
+
 ## 0.33.1 (2026-11-03)
 
 - `commit`, `commitDryRun` and `graph(name).facts.create` work on a graph that

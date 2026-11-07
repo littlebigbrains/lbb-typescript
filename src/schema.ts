@@ -3380,6 +3380,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/query/namespace": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** SELECT or ASK over every selected catalog graph in one namespace, up to 256 graphs; environment credentials only; union or empty default graph, independently pinned published versions, no partial success */
+        post: operations["post_v1_query_namespace"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/query/rewrite/profile": {
         parameters: {
             query?: never;
@@ -13276,6 +13293,35 @@ export interface components {
             window_full_since?: string | null;
             /** @description `starter.<name>` (shard 0) or `starter.<name>.<k>`. */
             workflow_id: string;
+        };
+        /** @enum {string} */
+        NamespaceDefaultGraph: "union" | "empty";
+        NamespaceQueryCoverage: {
+            /** @description A successful exact query always covers every selected source. */
+            complete: boolean;
+            queried_graphs: number;
+            selected_graphs: number;
+        };
+        NamespaceQueryRequest: {
+            default_graph?: components["schemas"]["NamespaceDefaultGraph"];
+            /** @description Include nested project namespaces. Defaults to true. */
+            include_descendants?: boolean;
+            /** @description Immutable catalog namespace ID, resolved inside the authenticated environment. */
+            namespace_id: string;
+            /** @description SELECT or ASK over asserted RDF; no FROM, SERVICE or model-backed search. */
+            query: string;
+        };
+        NamespaceQueryResponse: {
+            /** Format: int64 */
+            charged_read_bytes: number;
+            coverage: components["schemas"]["NamespaceQueryCoverage"];
+            namespace: components["schemas"]["CatalogNamespaceIdentity"];
+            /** @description SPARQL Results JSON serialized as a string, as in sparql-text. */
+            results: string;
+            /** @description Digest of the exact frozen graph IDs/epochs, not an atomic catalog snapshot. */
+            selection_token: string;
+            /** @description Every source has its deterministic urn:lbb:graph:<graph_id> GRAPH name. */
+            sources: components["schemas"]["ReferenceDatasetVersion"][];
         };
         /**
          * @description Remove entity types from a relation's domain and/or range (a subtractive
@@ -57132,6 +57178,151 @@ export interface operations {
                 };
             };
             /** @description Service unavailable */
+            503: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+        };
+    };
+    post_v1_query_namespace: {
+        parameters: {
+            query?: {
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
+            };
+            header?: {
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
+                "Lbb-Version"?: string;
+                /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
+                "Idempotency-Key"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NamespaceQueryRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NamespaceQueryResponse"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Rate limit exceeded */
+            429: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Service unavailable. On metered routes, application_usage_unavailable refuses admission before execution and is retryable. On writes, application_usage_handoff_unconfirmed means execution ran but its measurement was not durably confirmed: retryable is false and clients must inspect operation state before retrying. A saved measurement preserves success even if settlement needs recovery. Completed public reads preserve their response and hand reporting to a bounded background task; an unconfirmed handoff remains an explicit reporting gap. An original rejected request keeps its original status if its NoCharge acknowledgement fails. */
             503: {
                 headers: {
                     /** @description API contract version used for the response */
