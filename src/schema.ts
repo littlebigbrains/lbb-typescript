@@ -1988,7 +1988,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Import RDF: ordinary bulk statistics, or explicit epoch-bound atomic N-Triples acceptance on an existing support head */
+        /** Import RDF: bulk statistics, epoch-bound support acceptance, or bounded exact-head native append */
         post: operations["post_v1_graph_import_rdf"];
         delete?: never;
         options?: never;
@@ -15688,7 +15688,7 @@ export interface components {
             receipt: components["schemas"]["RdfImportCommitReceipt"];
         };
         /** @description The existing route has disjoint ordinary-bulk and explicit bounded results. */
-        RdfImportResponse: components["schemas"]["GraphRdfImportResponse"] | components["schemas"]["RdfImportCommitResult"];
+        RdfImportResponse: components["schemas"]["GraphRdfImportResponse"] | components["schemas"]["RdfImportCommitResult"] | components["schemas"]["CommitResponse"];
         /**
          * @description The RDF node kind of a bounded observed-schema statement object.
          * @enum {string}
@@ -43399,8 +43399,10 @@ export interface operations {
                  * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
                  */
                 stack?: string;
-                /** @description Presence selects the strict support binding: retain the original epoch and required Idempotency-Key on retry; application/n-triples only, fixed application/default scope, no bootstrap or legacy fallback. Returns rdf_import_commit with original acceptance fields, not bulk counts. Other bulk controls are unsupported in this binding. */
+                /** @description Without expected_head_commit_seq, presence selects the strict support binding: retain the original epoch and required Idempotency-Key on retry; application/n-triples only, fixed application/default scope, no bootstrap or legacy fallback. Returns rdf_import_commit with original acceptance fields, not bulk counts. Also required for exact-head native append. Other bulk controls are unsupported in either binding. */
                 expected_graph_epoch?: string;
+                /** @description Presence selects bounded append on an existing ordinary RDF-native head. Canonical unsigned decimal; requires expected_graph_epoch, Idempotency-Key and application/n-triples. At most 8 MiB and 20000 statements, one atomic SHACL-checked commit; returns CommitResponse. Retry with the original epoch/head/key/body. A retained key replays its original receipt without comparing or applying a changed payload; one key must always name one intent. Never creates a graph, activates support, or falls back to bulk import. Support-enabled heads and hosted owned-write grants are refused. */
+                expected_head_commit_seq?: string;
                 /** @description RDF statements per internal commit (default 1000000, the cap: one commit per fully-buffered request; clamped 1-1000000) */
                 batch?: string;
                 /** @description Abort on the first malformed RDF parse error instead of reporting it */
