@@ -13266,7 +13266,7 @@ export interface components {
          */
         NamedWorkflowShard: {
             in_flight?: null | components["schemas"]["WorkflowTriggerInFlight"];
-            /** @description The inbox was full (128 messages) at the last send, since this time. */
+            /** @description The workflow's inbox was full at the last send, since this time. */
             inbox_full_since?: string | null;
             /**
              * Format: int32
