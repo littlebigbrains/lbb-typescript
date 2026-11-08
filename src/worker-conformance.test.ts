@@ -63,7 +63,11 @@ interface Scenario {
     name: string;
     version: string;
     initial_state?: Json;
-    worker?: { progress_every_ms?: number; execution_reads?: boolean };
+    worker?: {
+      progress_every_ms?: number;
+      execution_reads?: boolean;
+      lbb_wait_budget_ms?: number;
+    };
   };
   handler?: Obj[];
   on_instances?: Obj[];
@@ -520,6 +524,9 @@ async function run(scenario: Scenario) {
       : {}),
     ...(options.execution_reads !== undefined
       ? { executionReads: options.execution_reads }
+      : {}),
+    ...(options.lbb_wait_budget_ms !== undefined
+      ? { lbbWaitBudgetMs: options.lbb_wait_budget_ms }
       : {}),
   });
   const outcomes: string[] = [];

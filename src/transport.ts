@@ -77,6 +77,33 @@ export class LbbError extends Error {
   }
 }
 
+const TRANSPORT_FAILURE = Symbol.for("lbb.transport_failure");
+
+/**
+ * Mark an error of a request to LBB that got no answer (the connection
+ * failed, or the attempt timed out), after the client's own retries. A
+ * workflow worker reads the mark: LBB was not there, so the turn waits.
+ */
+export function markTransportFailure<T>(error: T): T {
+  if (
+    error !== null &&
+    typeof error === "object" &&
+    Object.isExtensible(error) &&
+    !Object.prototype.hasOwnProperty.call(error, TRANSPORT_FAILURE)
+  )
+    Object.defineProperty(error, TRANSPORT_FAILURE, { value: true });
+  return error;
+}
+
+/** Whether a request to LBB failed with no answer ({@link markTransportFailure}). */
+export function isTransportFailure(error: unknown): boolean {
+  return (
+    error !== null &&
+    typeof error === "object" &&
+    (error as Record<symbol, unknown>)[TRANSPORT_FAILURE] === true
+  );
+}
+
 /** Provider-observed usage of an unusable reasoning reply. Absent metadata
  * remains unknown; never infer tokens or price from the request or error. */
 export function observedActivityUsage(error: unknown):
