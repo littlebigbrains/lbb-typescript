@@ -37,6 +37,7 @@ import {
   parseLbbError,
   parseNdjson,
   parseResponseJson,
+  markTransportFailure,
   retriesNetworkFailure,
   retriesStatus,
   retryAllowed,
@@ -712,7 +713,7 @@ export class LbbClient {
             continue;
           }
         }
-        throw requestError;
+        throw callerAborted ? requestError : markTransportFailure(requestError);
       } finally {
         if (timer !== undefined) clearTimeout(timer);
         opts.signal?.removeEventListener("abort", abortFromCaller);
@@ -1039,15 +1040,18 @@ export class LbbClient {
             continue;
           }
         }
-        throw controller?.signal.aborted && !callerAborted
-          ? Object.assign(
-              new Error(
-                `Little Big Brain request timed out after ${timeoutMs}ms`,
-                { cause: error },
-              ),
-              { name: "TimeoutError" },
-            )
-          : error;
+        if (callerAborted) throw error;
+        throw markTransportFailure(
+          controller?.signal.aborted
+            ? Object.assign(
+                new Error(
+                  `Little Big Brain request timed out after ${timeoutMs}ms`,
+                  { cause: error },
+                ),
+                { name: "TimeoutError" },
+              )
+            : error,
+        );
       } finally {
         // The answer started (or failed): the body has no timeout.
         if (timer !== undefined) clearTimeout(timer);

@@ -1,5 +1,5 @@
 import type { LbbClient, Schemas } from "./client.js";
-import { LbbError, type CallOptions } from "./transport.js";
+import { isTransportFailure, LbbError, type CallOptions } from "./transport.js";
 import {
   WorkflowExecutionError,
   WorkflowTurnReader,
@@ -117,6 +117,68 @@ function waitOf(error: unknown): number | undefined {
   )
     return error.retryAtMs;
   return undefined;
+}
+
+/** LBB answers that say LBB itself is unavailable or busy, not the request wrong. */
+const UNAVAILABLE_STATUSES = new Set([429, 502, 503, 504]);
+const UNAVAILABLE_CODES = new Set(["server_busy", "storage_degraded"]);
+/** The first wait of a turn that met LBB unavailable; each next one doubles. */
+const LBB_WAIT_FIRST_MS = 5_000;
+/** The longest such wait, before its jitter (up to a fifth more). */
+const LBB_WAIT_MAX_MS = 300_000;
+/** The longest `Retry-After` a wait honors. */
+const LBB_RETRY_AFTER_MAX_MS = 3_600_000;
+/** How long a turn waits for LBB in all before its failures count attempts. */
+const LBB_WAIT_BUDGET_MS = 86_400_000;
+/** The turns a worker remembers LBB waits of; the oldest goes first. */
+const LBB_WAIT_TURNS = 10_000;
+
+/**
+ * Whether a handler's error is LBB unavailable or busy: an `LbbError` of
+ * status 429, 502, 503 or 504 (or code `server_busy`, `storage_degraded`)
+ * that the server did not mark `retryable: false`, or a request to LBB that
+ * got no answer (a timeout, a failed connection). It looks through `cause`.
+ * A `WorkflowError` is the handler's own verdict, so it is never one.
+ * The answer is the server's `Retry-After` in ms, or 0.
+ */
+export function lbbUnavailable(error: unknown): number | undefined {
+  let current = error;
+  for (let depth = 0; depth < 8 && current; depth += 1) {
+    if (current instanceof WorkflowError) return undefined;
+    if (current instanceof LbbError) {
+      if (
+        current.retryable === false ||
+        !(
+          UNAVAILABLE_STATUSES.has(current.status) ||
+          UNAVAILABLE_CODES.has(current.code ?? "")
+        )
+      )
+        return undefined;
+      const seconds = current.retryAfterSeconds;
+      return typeof seconds === "number" && Number.isFinite(seconds)
+        ? Math.min(Math.max(0, seconds * 1000), LBB_RETRY_AFTER_MAX_MS)
+        : 0;
+    }
+    if (isTransportFailure(current)) return 0;
+    current =
+      typeof current === "object"
+        ? (current as { cause?: unknown }).cause
+        : undefined;
+  }
+  return undefined;
+}
+
+/**
+ * The wait before a turn that met LBB unavailable runs again: 5 s, doubling
+ * to 5 min, plus up to a fifth (so the workers of an outage do not come back
+ * at once), and never less than the server's `Retry-After`.
+ */
+export function lbbWaitMs(waits: number, retryAfterMs = 0): number {
+  const backoff = Math.min(
+    LBB_WAIT_MAX_MS,
+    LBB_WAIT_FIRST_MS * 2 ** Math.min(Math.max(0, waits), 16),
+  );
+  return Math.max(retryAfterMs, Math.round(backoff * (1 + Math.random() / 5)));
 }
 
 /**
@@ -859,11 +921,49 @@ export class WorkflowWorker {
       executionReads?: boolean;
       /** A step's `progress` writes at most this often (default 3000 ms). */
       progressEveryMs?: number;
+      /**
+       * How long a turn whose handler met LBB unavailable or busy waits in
+       * all, without counting attempts, before its failures count attempts
+       * again (default one day; 0 counts them at once). The worker keeps
+       * the time in memory: a restarted worker starts it again.
+       */
+      lbbWaitBudgetMs?: number;
     },
   ) {
     const keys = definitions.map((d) => `${d.name}/${d.version}`);
     if (!keys.length || new Set(keys).size !== keys.length)
       throw new WorkflowError("Register distinct workflow name/version pairs");
+  }
+  /** Per turn, when it first waited for LBB and how many waits since. */
+  private readonly lbbWaits = new Map<
+    string,
+    { since: number; waits: number }
+  >();
+  /**
+   * The time a turn that failed with `error` waits until, when the error is
+   * LBB unavailable and the turn's wait budget is not spent. A spent budget
+   * stays spent until the turn completes or fails for another reason.
+   */
+  private lbbWaitUntil(key: string, error: unknown): number | undefined {
+    const retryAfterMs = lbbUnavailable(error);
+    if (retryAfterMs === undefined) {
+      this.lbbWaits.delete(key);
+      return undefined;
+    }
+    const budget = this.options.lbbWaitBudgetMs ?? LBB_WAIT_BUDGET_MS;
+    const now = Date.now();
+    const seen = this.lbbWaits.get(key) ?? { since: now, waits: 0 };
+    this.lbbWaits.delete(key);
+    this.lbbWaits.set(key, seen);
+    if (this.lbbWaits.size > LBB_WAIT_TURNS)
+      this.lbbWaits.delete(this.lbbWaits.keys().next().value as string);
+    if (!(budget > 0) || now - seen.since >= budget) {
+      seen.since = -Infinity;
+      return undefined;
+    }
+    const at = now + lbbWaitMs(seen.waits, retryAfterMs);
+    seen.waits += 1;
+    return at;
   }
   async run(options: { signal: AbortSignal }): Promise<void> {
     while (!options.signal.aborted) {
@@ -916,6 +1016,7 @@ export class WorkflowWorker {
       turn: task.turn.number,
       token: task.token,
     };
+    const waitKey = `${task.turn.workflow_id}\u0000${task.turn.number}`;
     const turnGraph = this.client.graphName;
     // The run of this attempt: the activity calls of its steps name it,
     // and their usage goes with the completion.
@@ -1358,6 +1459,7 @@ export class WorkflowWorker {
       );
       // Serialize completion retries exactly; a lost response must not rerun effects.
       stopHeartbeat();
+      this.lbbWaits.delete(waitKey);
       try {
         await turnRequest("complete", { ...body, ...results });
       } catch (error) {
@@ -1376,11 +1478,18 @@ export class WorkflowWorker {
       if (error instanceof LbbError && error.code === "workflow_fence_lost")
         return;
       stopHeartbeat();
-      // A wait for a cause outside the turn counts no attempt.
-      const retryAt = waitOf(error);
+      // A wait for a cause outside the turn counts no attempt. LBB itself
+      // unavailable or busy is such a cause: the turn waits for it.
+      let retryAt = waitOf(error);
+      const lbbWait =
+        retryAt === undefined ? this.lbbWaitUntil(waitKey, error) : undefined;
+      retryAt ??= lbbWait;
       const failBody = {
         ...lease,
-        error: String(error).slice(0, 1000),
+        error: (lbbWait !== undefined
+          ? `LBB was unavailable, the turn waits: ${String(error)}`
+          : String(error)
+        ).slice(0, 1000),
         non_retryable:
           retryAt === undefined &&
           (error instanceof WorkflowError ||

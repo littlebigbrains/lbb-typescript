@@ -2,6 +2,19 @@
 
 All notable changes to the `@littlebigbrain/client` package are documented here.
 
+## Unreleased
+
+- `WorkflowWorker` waits when LBB itself is unavailable or busy, and counts
+  no attempt. An LBB outage no longer uses up a turn's attempts and blocks
+  its instance. A handler error that is, or has as its `cause`, an
+  `LbbError` of status 429, 502, 503 or 504 (or code `server_busy`,
+  `storage_degraded`) fails the turn with `retry_at_ms`. So does a request
+  to LBB that timed out or got no connection: the client now marks such an
+  error after its retries. The waits start at 5 s and double to 5 min, with
+  jitter, and honor `Retry-After`. After `lbbWaitBudgetMs` of waits for a
+  turn (default one day; `0` turns them off), its failures count attempts
+  again. A `WorkflowError` never waits.
+
 ## 0.34.0 (2026-11-07)
 
 - `sparqlNamespace({ namespace_id, query })` runs SELECT or ASK across the

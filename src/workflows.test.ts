@@ -1,10 +1,13 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { LbbClient, type FetchLike, type Schemas } from "./client.js";
-import { LbbError } from "./transport.js";
+import { LbbError, markTransportFailure } from "./transport.js";
 import {
   fanInIdentity,
   isFanInIdentity,
+  lbbUnavailable,
+  lbbWaitMs,
+  WorkflowError,
   workflow,
   workflowOfIdentity,
   WorkflowWorker,
@@ -864,4 +867,127 @@ test("the identities of a named workflow: shards and the fan-in identity", () =>
   assert.ok(isFanInIdentity("starter.rooms.things"));
   assert.ok(!isFanInIdentity("starter.rooms.3"));
   assert.throws(() => fanInIdentity("rooms", "3things"), RangeError);
+});
+
+const lbbError = (status: number, error: Record<string, unknown> = {}) =>
+  new LbbError(status, "", {
+    type: "api_error",
+    code: "n",
+    message: "m",
+    ...error,
+  } as never);
+
+test("LBB unavailable is a busy status or a request with no answer, also wrapped", () => {
+  assert.equal(lbbUnavailable(lbbError(503)), 0);
+  assert.equal(lbbUnavailable(lbbError(429)), 0);
+  // A full inbox of another instance drains as its turns finish.
+  assert.equal(
+    lbbUnavailable(
+      lbbError(429, {
+        type: "rate_limit_error",
+        code: "workflow_inbox_full",
+        retry_after_seconds: 5,
+      }),
+    ),
+    5_000,
+  );
+  assert.equal(lbbUnavailable(lbbError(502)), 0);
+  assert.equal(lbbUnavailable(lbbError(504)), 0);
+  assert.equal(lbbUnavailable(lbbError(500, { code: "server_busy" })), 0);
+  assert.equal(
+    lbbUnavailable(lbbError(503, { retry_after_seconds: 30 })),
+    30_000,
+  );
+  assert.equal(
+    lbbUnavailable(lbbError(503, { retry_after_seconds: 86_400 })),
+    3_600_000,
+    "a Retry-After of more than an hour waits an hour",
+  );
+  // Wrapped by the handler's own error.
+  assert.equal(
+    lbbUnavailable(new Error("lookup failed", { cause: lbbError(503) })),
+    0,
+  );
+  assert.equal(
+    lbbUnavailable(markTransportFailure(new TypeError("fetch failed"))),
+    0,
+  );
+  // Not LBB unavailable.
+  assert.equal(lbbUnavailable(lbbError(500)), undefined);
+  assert.equal(lbbUnavailable(lbbError(400)), undefined);
+  assert.equal(lbbUnavailable(lbbError(409)), undefined);
+  assert.equal(
+    lbbUnavailable(lbbError(429, { retryable: false })),
+    undefined,
+    "a refusal the server marks final is not a wait",
+  );
+  assert.equal(
+    lbbUnavailable(new TypeError("fetch failed")),
+    undefined,
+    "a failed request to another service is the handler's own error",
+  );
+  assert.equal(lbbUnavailable(new Error("boom")), undefined);
+  assert.equal(
+    lbbUnavailable(new WorkflowError("give up", { cause: lbbError(503) })),
+    undefined,
+    "a WorkflowError is the handler's verdict",
+  );
+});
+
+test("LBB waits back off from 5 s to 5 min with jitter and honor Retry-After", () => {
+  for (let i = 0; i < 50; i++) {
+    const first = lbbWaitMs(0);
+    assert.ok(first >= 5_000 && first <= 6_000, `first wait ${first}`);
+    const second = lbbWaitMs(1);
+    assert.ok(second >= 10_000 && second <= 12_000, `second wait ${second}`);
+    const late = lbbWaitMs(40);
+    assert.ok(late >= 300_000 && late <= 360_000, `late wait ${late}`);
+  }
+  assert.ok(lbbWaitMs(0, 120_000) >= 120_000);
+});
+
+test("a turn waits for LBB without an attempt until its wait budget is spent", async (t) => {
+  const tasks = [task(), task(), task(), task(), task()];
+  const { client, calls } = setup(tasks);
+  let clock = 1_000_000;
+  t.mock.method(Date, "now", () => clock);
+  let fail: unknown = lbbError(503, { retry_after_seconds: 60 });
+  const counter = workflow({
+    name: "counter",
+    version: "v1",
+    initialState: { count: 0 },
+    async onMessage() {
+      throw fail;
+    },
+  });
+  const worker = new WorkflowWorker(client, [counter], {
+    worker: "test",
+    lbbWaitBudgetMs: 3_600_000,
+  });
+  const failures = () =>
+    calls.filter((c) => c.path.endsWith("/turns/fail")).map((c) => c.body);
+  await worker.runOnce();
+  let sent = failures().at(-1)!;
+  assert.ok(Number(sent.retry_at_ms) >= clock + 60_000, "honors Retry-After");
+  assert.equal(sent.non_retryable, false);
+  assert.match(String(sent.error), /^LBB was unavailable, the turn waits: /);
+  clock += 3_599_000;
+  await worker.runOnce();
+  assert.ok(failures().at(-1)!.retry_at_ms, "still within the budget");
+  clock += 1_000;
+  await worker.runOnce();
+  sent = failures().at(-1)!;
+  assert.equal(
+    sent.retry_at_ms,
+    undefined,
+    "the spent budget counts an attempt",
+  );
+  assert.doesNotMatch(String(sent.error), /^LBB was unavailable/);
+  // Another kind of failure clears the turn's budget.
+  fail = new Error("boom");
+  await worker.runOnce();
+  assert.equal(failures().at(-1)!.retry_at_ms, undefined);
+  fail = lbbError(503);
+  await worker.runOnce();
+  assert.ok(failures().at(-1)!.retry_at_ms, "a new budget starts");
 });
