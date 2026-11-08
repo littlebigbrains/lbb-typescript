@@ -184,6 +184,7 @@ export type {
   IntegrationConnectSessionInput,
   IntegrationCreateAnswer,
   IntegrationCreateInput,
+  IntegrationRecordTriple,
   IntegrationCredentialField,
   IntegrationCredentials,
   IntegrationDeleteAnswer,
