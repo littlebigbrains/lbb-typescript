@@ -208,6 +208,9 @@ test("create sends every option the caller sets, in the contract's names", async
     config: { teams: ["ENG"] },
     everyMs: null,
     ontologyMode: "review",
+    recordTriples: [
+      { predicate: "https://kontor.example/ns#scope", literal: "acme" },
+    ],
     starter: "skip",
     start: false,
   });
@@ -219,6 +222,9 @@ test("create sends every option the caller sets, in the contract's names", async
     config: { teams: ["ENG"] },
     everyMs: null,
     ontologyMode: "review",
+    recordTriples: [
+      { predicate: "https://kontor.example/ns#scope", literal: "acme" },
+    ],
     starter: "skip",
     start: false,
   });
@@ -678,6 +684,7 @@ test("every integrations route matches contracts/integrations-openapi.json", asy
     config: {},
     everyMs: 3_600_000,
     ontologyMode: "auto",
+    recordTriples: [],
     starter: "apply",
     start: true,
   });
@@ -687,7 +694,11 @@ test("every integrations route matches contracts/integrations-openapi.json", asy
     graph: GRAPH,
     credentials: { HUBSPOT_TOKEN: "x" },
   });
-  await api.setSettings("hubspot", { graph: GRAPH, config: {} });
+  await api.setSettings("hubspot", {
+    graph: GRAPH,
+    config: {},
+    recordTriples: [],
+  });
   await api.sync("hubspot", { graph: GRAPH, full: false });
   await api.pause("hubspot", { graph: GRAPH });
   await api.resume("hubspot", { graph: GRAPH });

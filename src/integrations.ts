@@ -435,6 +435,30 @@ export interface IntegrationCdcCancelDiscoveryOptions extends IntegrationGraphOp
   expectedRevision: number;
 }
 
+/**
+ * One statement added to each record of a connection. The object is exactly
+ * one of `iri` and `literal`, a constant or a template with `{id}`, `{key}`,
+ * `{connection}`, `{stream}`, `{url}` or `{field:<name>}`.
+ */
+export interface IntegrationRecordTriple {
+  /** The streams whose records get it; every stream when absent. */
+  streams?: string[];
+  /** An absolute IRI. */
+  predicate: string;
+  iri?: string;
+  literal?: string;
+  /** The literal's datatype IRI; `xsd:string` by default. */
+  datatype?: string;
+  /** The literal's language tag. */
+  language?: string;
+  /**
+   * `replace` (default): the record's values of `predicate` are this write's,
+   * and none when the record has no value. `add`: only added. `rdf:type` is
+   * always `add`.
+   */
+  mode?: "replace" | "add";
+}
+
 /** The body of {@link IntegrationsNamespace.create}. */
 export interface IntegrationCreateInput extends IntegrationGraphOptions {
   /** The connection id: 1 to 128 letters, digits, `_`, `-` or `.`. */
@@ -447,6 +471,12 @@ export interface IntegrationCreateInput extends IntegrationGraphOptions {
   everyMs?: number | null;
   /** Default: the stack's `integrations-api.ontology_mode`, else `auto`. */
   ontologyMode?: "auto" | "review";
+  /**
+   * RDF-native graphs only: statements the graph owner adds to each record,
+   * in the record's own commit, on the record's entity. A property graph
+   * refuses the create.
+   */
+  recordTriples?: IntegrationRecordTriple[];
   /** Apply the connector's starter ontology first. Default `apply`. */
   starter?: "apply" | "skip";
   /** Send the first sync. Default true. */
@@ -752,6 +782,7 @@ export class IntegrationsNamespace {
       config,
       everyMs,
       ontologyMode,
+      recordTriples,
       starter,
       start,
       ...opts
@@ -767,6 +798,7 @@ export class IntegrationsNamespace {
         ...(config !== undefined ? { config } : {}),
         ...(everyMs !== undefined ? { everyMs } : {}),
         ...(ontologyMode !== undefined ? { ontologyMode } : {}),
+        ...(recordTriples !== undefined ? { recordTriples } : {}),
         ...(starter !== undefined ? { starter } : {}),
         ...(start !== undefined ? { start } : {}),
       },
@@ -817,16 +849,24 @@ export class IntegrationsNamespace {
    */
   setSettings(
     id: string,
-    options: IntegrationGraphOptions & { config: IntegrationConfig },
+    options: IntegrationGraphOptions & {
+      config?: IntegrationConfig;
+      /** Replaces the record triples; `null` or `[]` removes them. */
+      recordTriples?: IntegrationRecordTriple[] | null;
+    },
   ): Promise<IntegrationRefAnswer> {
-    const { graph, config, ...opts } = options;
+    const { graph, config, recordTriples, ...opts } = options;
     return this.client.integrationsRequest(
       "PUT",
       `${connectionPath(id)}/settings`,
       {
         ...opts,
         retry: opts.retry ?? "rate_limited",
-        body: { graph, config },
+        body: {
+          graph,
+          ...(config !== undefined ? { config } : {}),
+          ...(recordTriples !== undefined ? { recordTriples } : {}),
+        },
       },
     );
   }
