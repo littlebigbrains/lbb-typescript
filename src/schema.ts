@@ -17073,6 +17073,8 @@ export interface components {
             ontology_version: number;
             /** Format: int64 */
             shapes_version?: number | null;
+            /** @description The shape set was already active; nothing was written. */
+            unchanged?: boolean;
             write_enforcement?: null | components["schemas"]["SchemaWriteEnforcement"];
         };
         SchemaRelationView: {
