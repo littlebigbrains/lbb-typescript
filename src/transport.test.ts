@@ -29,19 +29,36 @@ test("Retry-After supports delta seconds, dates, malformed values, and a safety 
   assert.equal(parseRetryAfterMs("not-a-date"), undefined);
 });
 
-test("retryDelayMs prefers the header, then the body hint, then jitter", () => {
-  // 1. Retry-After header wins.
-  assert.equal(retryDelayMs(100, 2, { retryAfterHeader: "1" }), 1_000);
-  // 2. No header: the server's body retry_after_seconds hint is used.
-  assert.equal(
-    retryDelayMs(100, 2, {
-      body: JSON.stringify({ error: { retry_after_seconds: 4 } }),
-    }),
-    4_000,
-  );
+test("retryDelayMs uses the header, then the body hint, as a floor with jitter", () => {
+  const low = () => 0;
+  const high = () => 1;
+  // 1. Retry-After header is the floor; jitter adds up to the same again.
+  assert.equal(retryDelayMs(100, 2, { retryAfterHeader: "1" }, low), 1_000);
+  assert.equal(retryDelayMs(100, 2, { retryAfterHeader: "1" }, high), 2_000);
+  // 2. No header: the body retry_after_seconds hint is used the same way.
+  const body = JSON.stringify({ error: { retry_after_seconds: 4 } });
+  assert.equal(retryDelayMs(100, 2, { body }, low), 4_000);
+  assert.equal(retryDelayMs(100, 2, { body }, high), 8_000);
   // 3. Neither: full-jitter exponential, bounded by base * 2**attempt.
-  const rng = () => 1; // upper bound of the jitter window
-  assert.equal(retryDelayMs(100, 3, {}, rng), 800);
+  assert.equal(retryDelayMs(100, 3, {}, high), 800);
+});
+
+test("Retry-After jitter spreads clients but never goes below the floor or above the cap", () => {
+  const seen = new Set<number>();
+  for (let i = 0; i < 200; i += 1) {
+    const delay = retryDelayMs(100, 0, { retryAfterHeader: "1" });
+    assert.ok(delay >= 1_000 && delay <= 2_000, `delay ${delay}`);
+    seen.add(delay);
+  }
+  assert.ok(seen.size > 100, "delays are spread, not constant");
+  assert.equal(
+    retryDelayMs(100, 0, { retryAfterHeader: "999" }, () => 1),
+    60_000,
+  );
+  assert.equal(
+    retryDelayMs(100, 0, { retryAfterHeader: "0" }, () => 1),
+    0,
+  );
 });
 
 test("full-jitter backoff stays within [0, base * 2**attempt] and caps at 60s", () => {

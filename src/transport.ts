@@ -307,9 +307,21 @@ export function bodyMarksTerminal(body: string): boolean {
 }
 
 /**
+ * Treat a server hint as a floor and add bounded full jitter on top:
+ * `uniform(hint, 2 * hint)`, never above the one-minute cap. A constant
+ * `Retry-After: 1` would otherwise make every client retry in lockstep.
+ */
+export function jitterAboveFloorMs(
+  floorMs: number,
+  rng: () => number = Math.random,
+): number {
+  return Math.min(floorMs + rng() * floorMs, MAX_RETRY_AFTER_MS);
+}
+
+/**
  * The backoff (ms) before the next attempt: the `Retry-After` header, else the
- * server's body `retry_after_seconds` hint, else full-jitter exponential
- * backoff.
+ * server's body `retry_after_seconds` hint (both used as a floor with bounded
+ * jitter above it), else full-jitter exponential backoff.
  */
 export function retryDelayMs(
   baseDelayMs: number,
@@ -318,10 +330,10 @@ export function retryDelayMs(
   rng: () => number = Math.random,
 ): number {
   const header = parseRetryAfterMs(opts.retryAfterHeader);
-  if (header !== undefined) return header;
+  if (header !== undefined) return jitterAboveFloorMs(header, rng);
   const bodyHint =
     opts.body !== undefined ? retryAfterFromBodyMs(opts.body) : undefined;
-  if (bodyHint !== undefined) return bodyHint;
+  if (bodyHint !== undefined) return jitterAboveFloorMs(bodyHint, rng);
   return fullJitterBackoffMs(baseDelayMs, attempt, rng);
 }
 
