@@ -1055,6 +1055,17 @@ test("a retry that fails for another reason leaves the first answer, and only a 
     ),
     (error: unknown) => error instanceof LbbError && error.code === "workflow_budget_exceeded",
   );
+  // The environment's budget has its own code. It waits the same way.
+  const spentEnvironment = failRetry(
+    new LbbError(429, "{}", { code: "model_budget_exceeded", message: "spent" }),
+  );
+  await assert.rejects(
+    runMessage(
+      createWorkflow(spentEnvironment, { ...defaults, repair: 1 }),
+      triggerMessage("values-extract", [iriOf(BENCH.name)]),
+    ),
+    (error: unknown) => error instanceof LbbError && error.code === "model_budget_exceeded",
+  );
 });
 
 test("each failed check makes one diagnostic that holds the model's words and no label", () => {

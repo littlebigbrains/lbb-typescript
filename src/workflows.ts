@@ -89,7 +89,8 @@ export class WorkflowError extends Error {}
  * not there yet, a spent budget) and count no attempt: the worker fails
  * the turn with `retry_at_ms`, and the turn runs again at `retryAtMs`, or
  * at once on a resume or a run now. Its steps are kept. A step that meets
- * `429 workflow_budget_exceeded` waits this way by itself.
+ * `429 model_budget_exceeded` or `429 workflow_budget_exceeded` waits this way
+ * by itself.
  */
 export class WorkflowWait extends Error {
   constructor(
@@ -107,12 +108,22 @@ export class WorkflowWait extends Error {
  */
 const MIN_WAIT_MS = 1_000;
 
+/**
+ * The codes of a spent model budget: `model_budget_exceeded` (the
+ * environment's) and `workflow_budget_exceeded` (one workflow's own, and the
+ * environment's too, from a server that does not produce the first yet).
+ */
+const BUDGET_CODES: ReadonlySet<string> = new Set([
+  "model_budget_exceeded",
+  "workflow_budget_exceeded",
+]);
+
 /** The wait of a thrown error: a {@link WorkflowWait}, or a spent budget. */
 function waitOf(error: unknown): number | undefined {
   if (error instanceof WorkflowWait) return error.retryAtMs;
   if (
     error instanceof LbbError &&
-    error.code === "workflow_budget_exceeded" &&
+    BUDGET_CODES.has(error.code ?? "") &&
     typeof error.retryAtMs === "number"
   )
     return error.retryAtMs;
