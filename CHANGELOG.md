@@ -4,6 +4,9 @@ All notable changes to the `@littlebigbrain/client` package are documented here.
 
 ## Unreleased
 
+- `endpointHint` is set for the codes `environment_endpoint_required` and
+  `environment_endpoint_mismatch`, as it is for `stack_endpoint_required` and
+  `stack_endpoint_mismatch`. A server may send either code.
 - Retry waits treat `Retry-After` (and the body `retry_after_seconds` hint) as a
   floor and add bounded jitter above it, `uniform(ra, 2 * ra)` up to 60 s. Clients
   no longer retry in lockstep after a constant `Retry-After: 1`. Attempt limits

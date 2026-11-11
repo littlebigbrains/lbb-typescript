@@ -20,6 +20,7 @@ test("the runtime entrypoint exposes only the supported public values", () => {
     "WorkflowTurnReader",
     "WorkflowWait",
     "WorkflowWorker",
+    "baseTerms",
     "captureActivities",
     "cellRef",
     "columnLetters",

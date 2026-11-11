@@ -2041,6 +2041,8 @@ test("composite-endpoint 421/403 are terminal — the hint is never masked by re
   for (const { status, code } of [
     { status: 421, code: "stack_endpoint_required" },
     { status: 403, code: "stack_endpoint_mismatch" },
+    { status: 421, code: "environment_endpoint_required" },
+    { status: 403, code: "environment_endpoint_mismatch" },
   ]) {
     const { fetch, calls } = recordingFetch({
       status,
