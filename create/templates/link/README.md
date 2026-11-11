@@ -115,7 +115,7 @@ Any other field is a property of the record.
 npm create @littlebigbrain -- --template link my-links
 cd my-links && npm install
 npm test                                           # the workflow on the samples, with mock models
-LBB_GRAPH=try-link npm run try                     # the samples on a graph of your stack
+LBB_GRAPH=try-link npm run try                     # the samples on a graph of your environment
 LBB_GRAPH=try-link npm start                       # serve it
 LBB_GRAPH=try-link npm run grade -- --gold samples/gold.json
 LBB_GRAPH=crm npm run setup && npm start           # your graph

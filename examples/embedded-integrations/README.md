@@ -1,12 +1,12 @@
 # Embedded integrations example
 
 A small local product with Connect, connection status and Disconnect. Its Node
-backend keeps the stack API key and chooses one fixed demo customer graph. The
-browser never receives stack keys or provider credentials.
+backend keeps the environment API key and chooses one fixed demo customer graph. The
+browser never receives environment keys or provider credentials.
 
 ## Set up
 
-1. Use a test stack with developer integrations enabled. Developer-owned
+1. Use a test environment with developer integrations enabled. Developer-owned
    Notion, GitHub and Slack apps also require the operator's
    `LBB_PROVIDER_APPS_ENABLED=1` opt-in and a shared explicit
    `LBB_CREDENTIALS_KEY` on the SaaS API and worker. This is a beta flow;
@@ -30,7 +30,7 @@ browser never receives stack keys or provider credentials.
 5. Put these values in your shell environment or secret manager, then start:
 
    ```sh
-   export LBB_STACK_URL='https://YOUR-STACK.db.eu.littlebigbrain.com'
+   export LBB_STACK_URL='https://YOUR-ENVIRONMENT.db.eu.littlebigbrain.com'
    export LBB_STACK_API_KEY='YOUR_TEST_STACK_KEY'
    export DEMO_CUSTOMER_GRAPH='demo_customer'
    node sdk/typescript/examples/embedded-integrations/server.mjs
@@ -53,7 +53,7 @@ only this product's return origin. It does not change either LBB URL.
 
 - This server binds to loopback and has no customer login. Before using this
   pattern in a product, authenticate each request and derive the graph from
-  that customer's server-side record. Stack keys can access all stack graphs.
+  that customer's server-side record. Environment keys can access all environment graphs.
 - Connect-session links are short-lived bearer capabilities. Do not log,
   cache or send them to analytics. Creation is not automatically retried;
   request a fresh link after an unknown outcome or expiry.

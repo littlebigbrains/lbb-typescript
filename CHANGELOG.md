@@ -119,7 +119,7 @@ All notable changes to the `@littlebigbrain/client` package are documented here.
 
 - `activities.ground(items, { workflow })` calls the ground check
   (`POST /v1/workflows/activities/ground`) with no model: one verdict per
-  proposed value. Name `workflow` for a stack key only.
+  proposed value. Name `workflow` for an environment key only.
 
 - `OwnedWrite` has `subject_properties`, the owned fields of each subject on
   its own, and the generated schema adds `SubjectPropertiesInput` and
@@ -1036,7 +1036,7 @@ customers, one graph per customer, with Google Drive among the connectors.
   without `idempotencyKey` it makes one per call, so its retries queue one
   sync.
 - Add `integrations.suggestions()`, `accept()` and `dismiss()` for a
-  connection's ontology suggestions on the stack endpoint. `accept()` with
+  connection's ontology suggestions on the environment endpoint. `accept()` with
   `sync: true` then sends the connection a sync under the message id
   `sync-after-<suggestion id>`.
 - `LbbError` reads the integrations API's error body: `code`, the message and
@@ -1076,7 +1076,7 @@ removed from the server.
   `signal "<name>"` or `step "<key>"`, with the path to the field, such as
   `continuation.message.full is undefined`.
 - Add `modelActivity({ month })` for `GET /v1/models/activity`. It reads what
-  each managed model did for the stack in one month (`yyyy-mm`, UTC; the
+  each managed model did for the environment in one month (`yyyy-mm`, UTC; the
   current month by default). The answer holds totals, rows by day and rows
   by graph per feature and model, the months with activity, and the model
   each feature uses now. Add the generated `ModelActivityResponse` types.
@@ -1340,15 +1340,15 @@ new `minIndexedSeq` floor below.**
 
 ## 0.6.1
 
-Composite stack endpoints: hosted stacks are addressed by their own
+Composite environment endpoints: hosted environments are addressed by their own
 `endpoint_url`, and a misroute is surfaced with actionable guidance instead of
 being retried away.
 
 ### Endpoints
 
 - **`baseUrl` is required.** For hosted use it must be the exact `endpoint_url`
-  shown on the stack's Connect page
-  (`https://<tenant-short-id>--<stack-slug>.db.eu.littlebigbrain.com`). Graph and
+  shown on the environment's Connect page
+  (`https://<tenant-short-id>--<environment-slug>.db.eu.littlebigbrain.com`). Graph and
   branch stay client scope parameters; they are not encoded in the hostname. An
   empty `baseUrl` now throws at construction instead of silently defaulting.
 - **Actionable routing hints.** `LbbError.endpointHint` carries copy-paste
