@@ -48,7 +48,8 @@ export class LbbError extends Error {
   readonly retryAfterSeconds?: number;
   /**
    * When a spent monthly budget is whole again, in milliseconds since the
-   * Unix epoch (`429 workflow_budget_exceeded`). A workflow step that meets
+   * Unix epoch (`429 model_budget_exceeded` or `429 workflow_budget_exceeded`).
+   * A workflow step that meets
    * it waits until then and counts no attempt.
    */
   readonly retryAtMs?: number;

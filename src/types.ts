@@ -440,8 +440,8 @@ export interface LbbErrorPayload {
   retryable?: boolean;
   retry_after_seconds?: number;
   /**
-   * When a spent monthly budget is whole again (`429
-   * workflow_budget_exceeded`): RFC 3339, and in milliseconds.
+   * When a spent monthly budget is whole again (`429 model_budget_exceeded`
+   * or `429 workflow_budget_exceeded`): RFC 3339, and in milliseconds.
    */
   retry_at?: string;
   retry_at_ms?: number;

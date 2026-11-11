@@ -1369,6 +1369,28 @@ test("a spent budget fails the turn with retry_at_ms and counts no attempt", asy
   assert.equal(failed?.body.non_retryable, false);
 });
 
+test("a spent environment budget waits too, under its own code", async () => {
+  const { client, calls } = worker([task(MESSAGE)]);
+  const retryAt = Date.now() + 20 * 86_400_000;
+  const notes = triggeredWorkflow({
+    name: "word-count",
+    version: "v1",
+    async onInstances(ctx) {
+      await ctx.step("count", async () => {
+        throw new LbbError(429, "{}", {
+          code: "model_budget_exceeded",
+          message: "the environment spent its model budget",
+          retry_at_ms: retryAt,
+        });
+      });
+    },
+  });
+  await new WorkflowWorker(client, [notes], { worker: "w" }).runOnce();
+  const failed = calls.find((c) => c.path === "/v1/workflows/turns/fail");
+  assert.equal(failed?.body.retry_at_ms, retryAt);
+  assert.equal(failed?.body.non_retryable, false);
+});
+
 test("a thrown WorkflowWait waits until its time; a WorkflowError stays final", async () => {
   const { client, calls } = worker([task(MESSAGE), task(MESSAGE)]);
   let n = 0;

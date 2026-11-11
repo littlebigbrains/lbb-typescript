@@ -663,7 +663,11 @@ export function createWorkflow(lbb: LbbActivities, settings: Settings = defaults
             } catch (error) {
               // A spent budget waits as in any step. Any other failure of the retry
               // (a refusal, a provider that is busy or down) leaves the first answer.
-              if (error instanceof LbbError && error.code === "workflow_budget_exceeded")
+              if (
+                error instanceof LbbError &&
+                (error.code === "model_budget_exceeded" ||
+                  error.code === "workflow_budget_exceeded")
+              )
                 throw error;
             }
             return { values, retried: true };

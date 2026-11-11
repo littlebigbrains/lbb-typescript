@@ -4,6 +4,9 @@ All notable changes to the `@littlebigbrain/client` package are documented here.
 
 ## Unreleased
 
+- A step that meets `429 model_budget_exceeded` waits for the reset the same way
+  as one that meets `429 workflow_budget_exceeded`. The server produces the new
+  code for the environment's model budget from a later release. Handle both.
 - `dailyActivity({ month, onlyGraph, onlyNamespace })` reads the queries and the
   facts written of the environment per day and per graph
   (`GET /v1/activity/daily`).
