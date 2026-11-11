@@ -4,6 +4,9 @@ All notable changes to the `@littlebigbrain/client` package are documented here.
 
 ## Unreleased
 
+- `dailyActivity({ month, onlyGraph, onlyNamespace })` reads the queries and the
+  facts written of the environment per day and per graph
+  (`GET /v1/activity/daily`).
 - `endpointHint` is set for the codes `environment_endpoint_required` and
   `environment_endpoint_mismatch`, as it is for `stack_endpoint_required` and
   `stack_endpoint_mismatch`. A server may send either code.
