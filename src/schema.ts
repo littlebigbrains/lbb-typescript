@@ -38,6 +38,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/activity/daily": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The queries and the facts written of the environment in one month, per day and per graph: a query is a SPARQL read or a query over a namespace or a dataset, and a fact is a statement a commit added. Narrow it to one graph (`only_graph`) or to the graphs of one catalog namespace (`only_namespace`). An environment read; the answering node adds the counts it has not written to the record yet */
+        get: operations["get_v1_activity_daily"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/catalog/graph": {
         parameters: {
             query?: never;
@@ -6474,6 +6491,120 @@ export interface components {
             kind: "exclude";
             relation: string;
         };
+        /** @description The counts of one row. A count that never happened is 0. */
+        DailyActivityCounts: {
+            /**
+             * Format: int64
+             * @description Statements added by commits (the added statements of the commit's
+             *     delta). A replay adds 0.
+             */
+            facts_added: number;
+            /**
+             * Format: int64
+             * @description Statements removed by commits and retractions. A retraction never
+             *     lowers `facts_added`.
+             */
+            facts_removed: number;
+            /**
+             * Format: int64
+             * @description The last time a count of this row grew, in milliseconds since the Unix
+             *     epoch.
+             */
+            last_at_ms: number;
+            /**
+             * Format: int64
+             * @description Queries run: SPARQL reads and queries over a namespace or a dataset.
+             *     A query that failed counts here and in `query_errors`.
+             */
+            queries: number;
+            /**
+             * Format: int64
+             * @description Queries that ended with a status of 400 or more.
+             */
+            query_errors: number;
+        };
+        /** @description One day (UTC) of the whole scope. */
+        DailyActivityDay: {
+            /** @description `yyyy-mm-dd`. */
+            day: string;
+            /** Format: int64 */
+            facts_added: number;
+            /** Format: int64 */
+            facts_removed: number;
+            /** Format: int64 */
+            last_at_ms: number;
+            /** Format: int64 */
+            queries: number;
+            /** Format: int64 */
+            query_errors: number;
+        };
+        /**
+         * @description One graph on one day. `graph` is `*` for the graphs past the bound of the
+         *     day.
+         */
+        DailyActivityDayGraph: {
+            /** @description `yyyy-mm-dd`. */
+            day: string;
+            /** Format: int64 */
+            facts_added: number;
+            /** Format: int64 */
+            facts_removed: number;
+            graph: string;
+            /** Format: int64 */
+            last_at_ms: number;
+            /** Format: int64 */
+            queries: number;
+            /** Format: int64 */
+            query_errors: number;
+        };
+        /** @description One graph over the month. `graph` is `*` for the graphs past the bound. */
+        DailyActivityGraph: {
+            /** Format: int64 */
+            facts_added: number;
+            /** Format: int64 */
+            facts_removed: number;
+            graph: string;
+            /** Format: int64 */
+            last_at_ms: number;
+            /** Format: int64 */
+            queries: number;
+            /** Format: int64 */
+            query_errors: number;
+        };
+        /** @description `GET /v1/activity/daily`. */
+        DailyActivityResponse: {
+            /** @description One row per day with counts, oldest first. */
+            by_day: components["schemas"]["DailyActivityDay"][];
+            /** @description One row per day and graph, by day then by graph. */
+            by_day_graph: components["schemas"]["DailyActivityDayGraph"][];
+            /**
+             * @description The graphs with the most work first (queries plus facts added), at
+             *     most 100, then `*`.
+             */
+            by_graph: components["schemas"]["DailyActivityGraph"][];
+            /** @description The graph of a `graph` scope. */
+            graph?: string | null;
+            /** @description `yyyy-mm` (UTC). */
+            month: string;
+            /** @description The months with counts, oldest first. */
+            months: string[];
+            /** @description The namespace of a `namespace` scope. */
+            namespace?: string | null;
+            /**
+             * @description True when a bound hid graph names: the `*` rows hold counts of graphs
+             *     the rows cannot name. For a `namespace` scope those counts are not in
+             *     the answer at all.
+             */
+            other_graphs: boolean;
+            scope: components["schemas"]["DailyActivityScope"];
+            /** @description The sum of every row of the scope. */
+            totals: components["schemas"]["DailyActivityCounts"];
+        };
+        /**
+         * @description What a read of the daily counts covers.
+         * @enum {string}
+         */
+        DailyActivityScope: "environment" | "graph" | "namespace";
         /**
          * @description The calendar unit a [`SparqlGroupKey::DateBucket`] truncates a datetime to.
          *     Truncation is in UTC; the label is the bucket's start as a sortable string.
@@ -23898,6 +24029,153 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ScopedTokenRevokeResponse"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Rate limit exceeded */
+            429: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Service unavailable */
+            503: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+        };
+    };
+    get_v1_activity_daily: {
+        parameters: {
+            query?: {
+                /** @description Graph name (default `main`) */
+                graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
+                /** @description yyyy-mm (UTC); default: the current month */
+                month?: string;
+                /** @description one graph id; not with `only_namespace` */
+                only_graph?: string;
+                /** @description one catalog namespace id: its graphs and the namespaces below it; not with `only_graph`; needs the application catalog */
+                only_namespace?: string;
+            };
+            header?: {
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
+                "Lbb-Version"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DailyActivityResponse"];
                 };
             };
             /** @description Bad request */

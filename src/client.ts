@@ -2275,6 +2275,24 @@ export class LbbClient {
     });
   }
 
+  /** The queries and the facts written of the environment in one month, per
+   * day and per graph. A query is a SPARQL read or a query over a namespace
+   * or a dataset (a failed one counts, with `query_errors`); a fact is a
+   * statement a commit added. `onlyGraph` narrows the answer to one graph and
+   * `onlyNamespace` to the graphs of one catalog namespace and below it, not
+   * both. An environment read: the client's graph scope is not used. */
+  dailyActivity(
+    opts: { month?: string; onlyGraph?: string; onlyNamespace?: string } = {},
+  ): Promise<Schemas["DailyActivityResponse"]> {
+    return this.request("GET", "/v1/activity/daily", {
+      query: {
+        month: opts.month,
+        only_graph: opts.onlyGraph,
+        only_namespace: opts.onlyNamespace,
+      },
+    });
+  }
+
   /** Wait until background reconciliation folds `targetSeq` into the RDF base. */
   async waitForPublished(
     targetSeq: number,

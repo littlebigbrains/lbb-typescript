@@ -497,6 +497,47 @@ test("modelActivity reads one month of the stack's model activity", async () => 
   assert.equal(second.searchParams.has("month"), false);
 });
 
+test("dailyActivity reads the queries and the facts written per day and graph", async () => {
+  const counts = {
+    queries: 5,
+    query_errors: 1,
+    facts_added: 30,
+    facts_removed: 2,
+    last_at_ms: 1_790_000_000_000,
+  };
+  const answer: Schemas["DailyActivityResponse"] = {
+    month: "2026-11",
+    months: ["2026-10", "2026-11"],
+    scope: "graph",
+    graph: "crm",
+    other_graphs: false,
+    totals: counts,
+    by_day: [{ ...counts, day: "2026-11-10" }],
+    by_graph: [{ ...counts, graph: "crm" }],
+    by_day_graph: [{ ...counts, day: "2026-11-10", graph: "crm" }],
+  };
+  const { fetch, calls } = recordingFetch([
+    { body: JSON.stringify(answer) },
+    { body: JSON.stringify({ ...answer, scope: "environment" }) },
+  ]);
+  const client = new LbbClient({ baseUrl: "http://h", fetch });
+  const one = await client.dailyActivity({
+    month: "2026-11",
+    onlyGraph: "crm",
+  });
+  assert.equal(one.totals.queries, 5);
+  assert.equal(one.by_day_graph[0]?.graph, "crm");
+  await client.dailyActivity();
+  const [first, second] = calls.map((call) => new URL(call.input));
+  assert.equal(calls[0].init.method, "GET");
+  assert.equal(first.pathname, "/v1/activity/daily");
+  assert.equal(first.searchParams.get("month"), "2026-11");
+  assert.equal(first.searchParams.get("only_graph"), "crm");
+  assert.equal(second.searchParams.has("month"), false);
+  assert.equal(second.searchParams.has("only_graph"), false);
+  assert.equal(second.searchParams.has("only_namespace"), false);
+});
+
 test("search reranks on request and reads and writes the graph's search settings", async () => {
   const settings: Schemas["SearchSettings"] = {
     rerank: true,
