@@ -37,6 +37,7 @@ export type {
 } from "./client.js";
 export type { components, paths, operations } from "./schema.js";
 export * as starters from "./starters.js";
+export { baseTerms } from "./bases.js";
 export type { CdcNamespace } from "./cdc.js";
 export type { RecordsNamespace, RecordCommitOptions } from "./records.js";
 export { LbbRecordCommitOutcomeError } from "./records.js";

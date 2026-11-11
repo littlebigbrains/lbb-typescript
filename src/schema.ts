@@ -14038,8 +14038,16 @@ export interface components {
              * @description Refuse with `409 conflict` when the graph's ontology version differs.
              */
             expected_ontology_version?: number | null;
-            /** @description The starter id, for example `crm`. */
+            /**
+             * @description The starter id, for example `crm`, or the id of a base of the
+             *     environment.
+             */
             starter: string;
+            /**
+             * @description The version to apply. Omitted, a base's highest version; a built-in
+             *     starter has one version, and another answers `starter_version_not_found`.
+             */
+            version?: string | null;
         };
         /** @description The result of applying a starter. */
         OntologyStarterApplyResponse: {
@@ -14177,6 +14185,11 @@ export interface components {
             ontology_version?: number | null;
             starters: components["schemas"]["OntologyStarterSummary"][];
         };
+        /**
+         * @description Where a starter comes from.
+         * @enum {string}
+         */
+        OntologyStarterOrigin: "built_in" | "environment";
         /** @description How many of a starter's terms the graph holds. */
         OntologyStarterPresent: {
             classes: number;
@@ -14245,19 +14258,39 @@ export interface components {
         OntologyStarterSummary: {
             counts: components["schemas"]["OntologyStarterCounts"];
             description: string;
+            /** @description The highest version the graph holds in full, or null. */
+            held_version?: string | null;
             id: string;
             label: string;
+            /** @description `built_in` for an embedded starter, `environment` for a developer's base. */
+            origin?: components["schemas"]["OntologyStarterOrigin"];
+            /**
+             * @description The prefix of a base's terms, which is its id; null for a built-in
+             *     starter.
+             */
+            prefix?: string | null;
             sources: string[];
             status: components["schemas"]["OntologyStarterStatus"];
+            /**
+             * @description For a base, the highest stored version. The row's counts and status
+             *     are about this version.
+             */
             version: string;
+            /** @description The versions that exist, lowest first. */
+            versions?: string[];
         };
         /**
          * @description File the operations a graph lacks of a starter as one ontology change
          *     suggestion.
          */
         OntologyStarterUpdateRequest: {
-            /** @description The starter id, for example `crm`. */
+            /**
+             * @description The starter id, for example `crm`, or the id of a base of the
+             *     environment.
+             */
             starter: string;
+            /** @description The version, as for apply. */
+            version?: string | null;
         };
         /** @description The suggestion a starter update filed. */
         OntologyStarterUpdateResponse: {
@@ -55067,8 +55100,10 @@ export interface operations {
                 stack?: string;
                 /** @description Optional decimal u64 graph incarnation from /v1/workflows/scope. A changed incarnation returns 409 graph_epoch_changed; a graph missing at admission returns 404. Synchronous writes and CAS retries cannot mutate a replacement incarnation; detached jobs are outside this precondition. */
                 expected_graph_epoch?: string;
-                /** @description Starter id, for example crm */
+                /** @description Starter id, for example crm, or the id of a base ontology of the environment */
                 starter?: string;
+                /** @description A version of a base ontology, MAJOR.MINOR.PATCH; omitted reads the highest. A built-in starter has one version */
+                version?: string;
             };
             header?: {
                 /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */

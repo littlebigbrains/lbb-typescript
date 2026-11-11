@@ -1,3 +1,5 @@
+import { baseTerms } from "./bases.js";
+import type { StarterTerms } from "./starters.js";
 import type { WorkflowNamespace } from "./workflows.js";
 import type { LbbClient } from "./client.js";
 import type { RecordsNamespace } from "./records.js";
@@ -1669,8 +1671,17 @@ export class OntologySuggestionsNamespace {
   }
 }
 
+/** Options for {@link OntologyStartersNamespace.get} and `update`. */
+export interface OntologyStarterVersionOptions extends CallOptions {
+  /**
+   * A version of a base ontology. Omitted, the highest. A built-in starter
+   * has one version; another answers `404 starter_version_not_found`.
+   */
+  version?: string;
+}
+
 /** Options for {@link OntologyStartersNamespace.apply}. */
-export interface OntologyStarterApplyOptions extends CallOptions {
+export interface OntologyStarterApplyOptions extends OntologyStarterVersionOptions {
   /** Answer what applying would do without writing anything. */
   dryRun?: boolean;
   /** Refuse with `409 conflict` when the graph's ontology version differs. */
@@ -1686,7 +1697,11 @@ export interface OntologyStarterApplyOptions extends CallOptions {
 export class OntologyStartersNamespace {
   constructor(private readonly client: LbbClient) {}
 
-  /** Every starter with its status on the graph. */
+  /**
+   * Every starter and, when the server has bases enabled, every base ontology
+   * of the environment, with its status on the graph. A row says whether it is
+   * `built_in` or an `environment` base, and which version the graph holds.
+   */
   list(opts: CallOptions = {}): Promise<Schemas["OntologyStarterList"]> {
     return this.client.request("GET", "/v1/ontology/starters", opts);
   }
@@ -1697,11 +1712,12 @@ export class OntologyStartersNamespace {
    */
   get(
     starter: string,
-    opts: CallOptions = {},
+    options: OntologyStarterVersionOptions = {},
   ): Promise<Schemas["OntologyStarterDetail"]> {
+    const { version, ...opts } = options;
     return this.client.request("GET", "/v1/ontology/starters/detail", {
       ...opts,
-      query: { starter },
+      query: { starter, ...(version !== undefined ? { version } : {}) },
     });
   }
 
@@ -1715,12 +1731,13 @@ export class OntologyStartersNamespace {
     starter: string,
     options: OntologyStarterApplyOptions = {},
   ): Promise<Schemas["OntologyStarterApplyResponse"]> {
-    const { dryRun, expectedOntologyVersion, ...opts } = options;
+    const { dryRun, expectedOntologyVersion, version, ...opts } = options;
     return this.client.request("POST", "/v1/ontology/starters/apply", {
       ...opts,
       retry: opts.retry ?? true,
       body: {
         starter,
+        ...(version !== undefined ? { version } : {}),
         ...(dryRun !== undefined ? { dry_run: dryRun } : {}),
         ...(expectedOntologyVersion !== undefined
           ? { expected_ontology_version: expectedOntologyVersion }
@@ -1736,13 +1753,80 @@ export class OntologyStartersNamespace {
    */
   update(
     starter: string,
-    opts: CallOptions = {},
+    options: OntologyStarterVersionOptions = {},
   ): Promise<Schemas["OntologyStarterUpdateResponse"]> {
+    const { version, ...opts } = options;
     return this.client.request("POST", "/v1/ontology/starters/update", {
       ...opts,
       retry: opts.retry ?? true,
-      body: { starter },
+      body: { starter, ...(version !== undefined ? { version } : {}) },
     });
+  }
+}
+
+/** Options for {@link OntologyBasesNamespace.get} and `terms`. */
+export interface OntologyBaseVersionOptions extends CallOptions {
+  /** The version to read. Omitted, the highest stored one. */
+  version?: string;
+}
+
+/**
+ * The base ontologies a developer stores in the environment, behind the
+ * server's `LBB_ONTOLOGY_BASES` flag (a server with the flag off answers
+ * `404`). A base uses the starter document form; its `id` is the prefix of
+ * its terms (`acme.Agreement`), and a stored version never changes. A graph
+ * applies a base through {@link OntologyStartersNamespace}.
+ */
+export class OntologyBasesNamespace {
+  constructor(private readonly client: LbbClient) {}
+
+  /**
+   * Store one version of a base. The version must be higher than every stored
+   * one and a superset of the highest (`409 base_not_superset`). Storing the
+   * same document again answers `created: false`, so a retry is safe. A
+   * different document under a stored version fails with
+   * `409 base_version_exists`.
+   */
+  store(
+    document: Schemas["OntologyStarterDocument"],
+    opts: CallOptions = {},
+  ): Promise<Schemas["OntologyBaseStoreResponse"]> {
+    return this.client.request("POST", "/v1/ontology/bases", {
+      ...opts,
+      retry: opts.retry ?? true,
+      body: { document },
+    });
+  }
+
+  /** The bases of the environment with their stored versions. */
+  list(opts: CallOptions = {}): Promise<Schemas["OntologyBaseList"]> {
+    return this.client.request("GET", "/v1/ontology/bases", opts);
+  }
+
+  /** One stored version: the document with its local term names. */
+  get(
+    base: string,
+    options: OntologyBaseVersionOptions = {},
+  ): Promise<Schemas["OntologyBaseDetail"]> {
+    const { version, ...opts } = options;
+    return this.client.request("GET", "/v1/ontology/bases/detail", {
+      ...opts,
+      query: { base, ...(version !== undefined ? { version } : {}) },
+    });
+  }
+
+  /**
+   * The terms of a stored version, with the IRIs SPARQL uses: the shape of a
+   * built-in starter (`starters.crm`), keyed by local name, with qualified
+   * names in `name` and the references. For literal keys that the compiler
+   * checks, generate a file from the document with
+   * `database/scripts/gen-starter-terms.mjs --base`.
+   */
+  async terms(
+    base: string,
+    options: OntologyBaseVersionOptions = {},
+  ): Promise<StarterTerms> {
+    return baseTerms((await this.get(base, options)).document);
   }
 }
 
@@ -1832,6 +1916,8 @@ export class OntologyNamespace {
   readonly suggestions: OntologySuggestionsNamespace;
   /** Base ontologies a graph starts from. */
   readonly starters: OntologyStartersNamespace;
+  /** Base ontologies a developer stores in the environment. */
+  readonly bases: OntologyBasesNamespace;
   /** Proposed ontologies built from sample records. */
   readonly drafts: OntologyDraftsNamespace;
   /** Fit from text: suggestions made from the text of a class's instances. */
@@ -1840,6 +1926,7 @@ export class OntologyNamespace {
   constructor(private readonly client: LbbClient) {
     this.suggestions = new OntologySuggestionsNamespace(client);
     this.starters = new OntologyStartersNamespace(client);
+    this.bases = new OntologyBasesNamespace(client);
     this.drafts = new OntologyDraftsNamespace(client);
     this.fitSources = new FitSourcesNamespace(client);
   }

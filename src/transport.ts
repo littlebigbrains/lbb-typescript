@@ -154,10 +154,16 @@ export class LbbCapabilityError extends Error {
 }
 
 function endpointMigrationHint(code: string | undefined): string | undefined {
-  if (code === "stack_endpoint_required") {
+  if (
+    code === "stack_endpoint_required" ||
+    code === "environment_endpoint_required"
+  ) {
     return "Copy endpoint_url from the environment's Connect page and use it as baseUrl.";
   }
-  if (code === "stack_endpoint_mismatch") {
+  if (
+    code === "stack_endpoint_mismatch" ||
+    code === "environment_endpoint_mismatch"
+  ) {
     return "Use the endpoint_url and API key from the same environment.";
   }
   return undefined;
