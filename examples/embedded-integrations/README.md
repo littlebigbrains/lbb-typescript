@@ -11,7 +11,7 @@ browser never receives environment keys or provider credentials.
    `LBB_PROVIDER_APPS_ENABLED=1` opt-in and a shared explicit
    `LBB_CREDENTIALS_KEY` on the SaaS API and worker. This is a beta flow;
    provider approval and live app acceptance are separate from local tests.
-2. In the console, select that stack and open **Integrations → Provider apps**.
+2. In the console, select that environment and open **Integrations → Provider apps**.
    Register an app that your company owns. Copy its callback and events URLs
    into the provider's app settings. Those URLs point to LBB's externally
    reachable API, not this demo server. Complete the provider's distribution,
