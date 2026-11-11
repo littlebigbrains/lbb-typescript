@@ -22,6 +22,7 @@ const PAGES = [
   "guides/test-a-workflow.mdx",
   "guides/datasets.mdx",
   "guides/experiments.mdx",
+  "guides/add-an-organization.md",
 ];
 
 const SDK_IMPORT = '"@littlebigbrain/client"';
