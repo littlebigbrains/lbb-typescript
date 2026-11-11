@@ -13,7 +13,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Mint a short-lived read-only token for exact graphs or immutable namespace subtrees (environment administrator only) */
+        /** Mint a short-lived token for exact graphs or immutable namespace subtrees, for the operations it names (environment administrator only) */
         post: operations["post_v1_access_tokens"];
         delete?: never;
         options?: never;
@@ -16488,7 +16488,7 @@ export interface components {
          * @description A person's answer to a review item.
          *
          *     `value` goes with `correct` and `option` with `choose`; `note` holds the
-         *     free text of an `answer` item. The server sets `by` and `at`.
+         *     free text of an `answer` item. The server sets `by`, `at` and `via`.
          */
         ReviewAnswer: {
             /** @description When, RFC 3339, set by the server. */
@@ -16508,6 +16508,7 @@ export interface components {
              *     in the type of the property it corrects.
              */
             value?: unknown;
+            via?: null | components["schemas"]["ReviewAnswerVia"];
         };
         /**
          * @description `POST /v1/reviews/answer-batch`: one answer for up to 500 items, each
@@ -16543,6 +16544,17 @@ export interface components {
              * @description The revision the person saw; a later revision answers 409.
              */
             revision?: number | null;
+        };
+        /**
+         * @description The application token an answer came through. `by` of the answer holds the
+         *     end user the developer named when it issued the token. LBB records that
+         *     label and does not verify it.
+         */
+        ReviewAnswerVia: {
+            /** @description The credential that answered: `credential_id` of the token. */
+            credential_id: string;
+            /** @description Always `application_token`. */
+            kind: string;
         };
         /**
          * @description The answered item a `review.answered` event carries: what a workflow
@@ -17317,19 +17329,39 @@ export interface components {
         /** @enum {string} */
         ScopedNamespaceGrantKind: "namespace";
         /**
-         * @description Mint a short-lived, read-only credential. Issuing credentials requires an
-         *     environment administrator; a scoped token cannot mint another token.
+         * @description What an application token may do. A token carries a set of operations and
+         *     one set of grants for all of them. A route outside the operations of the
+         *     token is refused.
+         * @enum {string}
+         */
+        ScopedOperation: "read" | "review" | "files";
+        /**
+         * @description Mint a short-lived credential. `operations` says what it may do, and the
+         *     default is `read`. Issuing credentials requires an environment
+         *     administrator; a scoped token cannot mint another token.
          */
         ScopedTokenRequest: {
+            /**
+             * @description The person behind the token, as the developer's application names them,
+             *     1 to 200 characters without control characters. Required with any
+             *     operation beyond `read`. LBB records it in the audit trail and on the
+             *     answers the token gives, and does not verify it. Use a stable id of
+             *     your own, not a name or an email address.
+             */
+            end_user?: string | null;
             grants: components["schemas"]["ScopedGrantRequest"][];
+            /** @description What the token may do. Absent or empty: `["read"]`. */
+            operations?: components["schemas"]["ScopedOperation"][];
             /** Format: int32 */
             ttl_seconds?: number;
         };
         ScopedTokenResponse: {
             credential_id: string;
+            /** @description The `end_user` of the token, when it has one. */
+            end_user?: string | null;
             /** Format: int64 */
             expires_at_ms: number;
-            /** @description The initial release supports only `read` on its documented route set. */
+            /** @description The operations of the token, as issued. */
             operations: string[];
             /** @description Secret bearer value, returned only by issuance. */
             token: string;
