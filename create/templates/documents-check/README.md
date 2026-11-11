@@ -40,7 +40,7 @@ upload PDF ─▶ documents.parse ─▶ documents-texts ─▶ values.extract �
 ```sh
 npm install
 npm test                                      # both workflows on the samples, with mock models
-LBB_GRAPH=try-documents-check npm run try     # the pipeline and the sample PDFs on your stack
+LBB_GRAPH=try-documents-check npm run try     # the pipeline and the sample PDFs on your environment
 LBB_GRAPH=try-documents-check npm start       # serve the two workflows
 LBB_GRAPH=docs npm run setup && LBB_GRAPH=docs npm start   # your graph
 ```
@@ -50,7 +50,7 @@ engine, `pdftotext` for `documents.parse`, and models. A local server with
 mock model roles works. The mocks read `label: value` lines, so the samples
 are written that way.
 
-`src/live.test.ts` runs the whole pipeline on a stack. It creates and deletes
+`src/live.test.ts` runs the whole pipeline on an environment. It creates and deletes
 a graph, so it needs an explicit opt-in:
 
 ```sh
