@@ -3642,6 +3642,233 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/sandboxes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The graph's sandboxes, newest first. 409 `sandbox_not_enabled` */
+        get: operations["get_v1_sandboxes"];
+        put?: never;
+        /** Create a sandbox: one VM with a workspace disk and no network, from a template (`lbb/python` by default). With `run` it is the L1 shortcut: the sandbox runs `run(input, config)` once and is destroyed when the command ends; the answer holds the run (`run`) and waits for it at most `wait_ms` (0 to 30,000, default 0). A create with `run` needs an `Idempotency-Key`; a repeat answers the same record, also a `failed` one, and a new attempt needs a new key. 400 `idempotency_key_required`, 400 `sandbox_limits_invalid`, 404 `sandbox_template_not_found`, 409 `sandbox_template_revoked`, 409 `sandbox_not_enabled`, 503 `sandbox_unavailable` */
+        post: operations["post_v1_sandboxes"];
+        /** Destroy the VM and its disk. The commands that run end `cancelled` with reason `sandbox_destroyed`. A delete of a sandbox that is destroying or destroyed answers the record as it is. 404 `sandbox_not_found` */
+        delete: operations["delete_v1_sandboxes"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/sandboxes/commands": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The commands of a sandbox, newest first. 404 `sandbox_not_found` */
+        get: operations["get_v1_sandboxes_commands"];
+        put?: never;
+        /** Start a command: `argv` (an array, so a shell is explicit: `["bash", "-lc", "..."]`) or `run` (`run(input, config)` of the template's harness), with `cwd`, `env`, `stdin`, `timeout_ms` and `wait_ms` (0 to 30,000, default 0). The request needs an `Idempotency-Key`: a command never runs twice for one key, and a command whose outcome cannot be settled stays `lost`. `env` values and `stdin` are never stored. A sandbox runs 8 commands at once and holds 32 waiting. 400 `idempotency_key_required`, 400 `sandbox_path_invalid`, 404 `sandbox_not_found`, 409 `sandbox_not_running`, 429 `sandbox_limit_reached`, 503 `sandbox_unavailable` */
+        post: operations["post_v1_sandboxes_commands"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/sandboxes/commands/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** End a command: `SIGTERM` to its process group, then `SIGKILL` after `grace_ms` (0 to 60,000, default 5,000). A cancel of a command that has ended answers the record as it is. 404 `sandbox_not_found`, 404 `sandbox_command_not_found`, 503 `sandbox_unavailable` */
+        post: operations["post_v1_sandboxes_commands_cancel"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/sandboxes/commands/get": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** One command. 404 `sandbox_not_found`, 404 `sandbox_command_not_found` */
+        get: operations["get_v1_sandboxes_commands_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/sandboxes/commands/logs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** A page of one output stream of a command: frames of bytes as text, `next_offset`, `done` and `gap`. The server keeps the first 256 KiB and the last 768 KiB of each stream; `gap` marks the bytes between them. With `follow=true` the answer is NDJSON, one `sandbox_log_frame` a line, and holds until the command ends or 20 seconds pass. 404 `sandbox_not_found`, 404 `sandbox_command_not_found` */
+        get: operations["get_v1_sandboxes_commands_logs"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/sandboxes/files": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The entries of a directory of `/workspace`, in path order, 1,000 at most a page. A path is under `/workspace`: 1,024 bytes of UTF-8 at most, no NUL, no `..` after normalization (400 `sandbox_path_invalid`). 404 `sandbox_not_found`, 404 `sandbox_file_not_found`, 409 `sandbox_not_running` */
+        get: operations["get_v1_sandboxes_files"];
+        put?: never;
+        post?: never;
+        /** Delete a file or a directory of `/workspace`. A directory needs `recursive=true`. A path that is already gone answers the same. 400 `sandbox_path_invalid`, 404 `sandbox_not_found`, 409 `sandbox_not_running` */
+        delete: operations["delete_v1_sandboxes_files"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/sandboxes/files/content": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The bytes of a file of `/workspace`, 4 MiB at most an answer. One `Range: bytes=a-b`, `bytes=a-` or `bytes=-n` answers 206 with `Content-Range`; a range with no byte of the file answers 416. The answer sends `X-Content-Type-Options: nosniff` and `Content-Disposition: attachment`. 400 `sandbox_path_invalid`, 404 `sandbox_file_not_found`, 409 `sandbox_not_running`, 413 `sandbox_file_too_large` for a read of more than 4 MiB without a range */
+        get: operations["get_v1_sandboxes_files_content"];
+        /** Write a file of `/workspace` with the request body, 4 MiB at most, and make its directories. An empty body is an empty file. The same bytes again change nothing. 400 `sandbox_path_invalid`, 404 `sandbox_not_found`, 409 `sandbox_not_running`, 413 `sandbox_file_too_large` */
+        put: operations["put_v1_sandboxes_files_content"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/sandboxes/get": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** One sandbox, with its `run` for a sandbox of a create with `run`. 404 `sandbox_not_found` */
+        get: operations["get_v1_sandboxes_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/sandboxes/resume": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Start a stopped sandbox again. A resume does not move `expires_at`. A resume of a starting or running sandbox answers the sandbox as it is. 404 `sandbox_not_found`, 409 `sandbox_not_running` for a sandbox that is stopping or has ended, 503 `sandbox_unavailable` */
+        post: operations["post_v1_sandboxes_resume"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/sandboxes/stop": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Stop the VM and keep the record and the disk. The commands that run end `cancelled` with reason `sandbox_stopped`. A stop of a stopping or stopped sandbox answers the sandbox as it is. 404 `sandbox_not_found`, 409 `sandbox_not_running` for a sandbox that is starting or has ended, 503 `sandbox_unavailable` */
+        post: operations["post_v1_sandboxes_stop"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/sandboxes/templates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The saved templates of the graph, newest version first. A name resolves to its newest version; each save of a name is a version with its own id. The base templates LBB publishes are read by id (`sbt_lbb_python`, `sbt_lbb_node`, `sbt_lbb_shell`). 409 `sandbox_not_enabled` */
+        get: operations["get_v1_sandboxes_templates"];
+        put?: never;
+        /** Save a template: a base template, the `run` code (64 KiB), limits, a command timeout and a default config. Each call writes a new immutable version with a new `sbt_` id, and the name then resolves to it. `files` are not available yet (400 `invalid_request`). The optional `Idempotency-Key` makes a repeat answer the same version; the same key with another body answers 409 `idempotency_conflict`. 400 `sandbox_limits_invalid`, 409 `sandbox_not_enabled` */
+        post: operations["post_v1_sandboxes_templates"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/sandboxes/templates/get": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** One template version by its id (`sbt_`), or a base template by its id (`sbt_lbb_python`, `sbt_lbb_node`, `sbt_lbb_shell`). 404 `sandbox_template_not_found` */
+        get: operations["get_v1_sandboxes_templates_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/sandboxes/update": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Change `auto_stop_seconds` or `metadata` (the whole map) of a sandbox that has not ended. 404 `sandbox_not_found`, 409 `sandbox_not_running` for an ended sandbox */
+        post: operations["post_v1_sandboxes_update"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/schema": {
         parameters: {
             query?: never;
@@ -17204,6 +17431,554 @@ export interface components {
             offset: number;
             returned: number;
             total: number;
+        };
+        /** @description A sandbox: one VM with a workspace disk and no network. */
+        Sandbox: {
+            /**
+             * Format: int64
+             * @description When an idle sandbox stops, Unix seconds; present while it runs. A
+             *     sandbox is idle when no command is queued or running and no request
+             *     names it.
+             */
+            auto_stop_at?: number | null;
+            /**
+             * Format: int32
+             * @description Idle seconds before the sandbox stops, 30 to 3,600.
+             */
+            auto_stop_seconds: number;
+            /**
+             * Format: int64
+             * @description When it was created, Unix seconds.
+             */
+            created: number;
+            /** @description Who created it: `key:<id>`, `account:<id>` or `token`. */
+            created_by: string;
+            /**
+             * Format: int64
+             * @description When the sandbox is destroyed, Unix seconds. A resume does not move
+             *     it.
+             */
+            expires_at: number;
+            /** @description `sbx_`, an opaque id. */
+            id: string;
+            /** @description `run` for a sandbox made by a create with `run`, else `sandbox`. */
+            kind: components["schemas"]["SandboxKind"];
+            limits: components["schemas"]["SandboxLimits"];
+            metadata: {
+                [key: string]: string;
+            };
+            /** @description `sandbox`. */
+            object: string;
+            owner?: null | components["schemas"]["SandboxOwner"];
+            run?: null | components["schemas"]["SandboxRunSummary"];
+            status: components["schemas"]["SandboxStatus"];
+            status_reason?: null | components["schemas"]["SandboxStatusReason"];
+            template: components["schemas"]["SandboxTemplateRef"];
+            usage: components["schemas"]["SandboxUsage"];
+        };
+        /**
+         * @description A command on a sandbox. The record keeps the names of `env` and the size
+         *     of `stdin`; their values are never stored.
+         */
+        SandboxCommand: {
+            /** @description The process and its arguments, for a command made with `argv`. */
+            argv?: string[] | null;
+            /**
+             * Format: int64
+             * @description When it was accepted, Unix seconds.
+             */
+            created: number;
+            cwd?: string | null;
+            /**
+             * Format: int64
+             * @description When it ended, Unix seconds.
+             */
+            ended?: number | null;
+            /** @description The names of the variables the command got, in order. */
+            env_names: string[];
+            /** Format: int32 */
+            exit_code?: number | null;
+            /** @description `cmd_`, an opaque id. */
+            id: string;
+            /** @description `sandbox_command`. */
+            object: string;
+            reason?: null | components["schemas"]["SandboxCommandReason"];
+            /** @description What `run(input, config)` returned: JSON, 48 KiB at most. */
+            result?: unknown;
+            run?: null | components["schemas"]["SandboxCommandRun"];
+            /** @description The sandbox's id, `sbx_`. */
+            sandbox: string;
+            /**
+             * Format: int32
+             * @description The signal that ended the process.
+             */
+            signal?: number | null;
+            /**
+             * Format: int64
+             * @description When it started, Unix seconds.
+             */
+            started?: number | null;
+            status: components["schemas"]["SandboxCommandStatus"];
+            stderr: components["schemas"]["SandboxStreamSummary"];
+            /**
+             * Format: int64
+             * @description The bytes of `stdin`.
+             */
+            stdin_bytes: number;
+            stdout: components["schemas"]["SandboxStreamSummary"];
+            /** Format: int64 */
+            timeout_ms: number;
+        };
+        /** @description `POST /v1/sandboxes/commands/cancel`: end a command. */
+        SandboxCommandCancelRequest: {
+            /**
+             * Format: int64
+             * @description Milliseconds between `SIGTERM` and `SIGKILL`: 0 to 60,000, default
+             *     5,000.
+             */
+            grace_ms?: number | null;
+        };
+        /**
+         * @description `POST /v1/sandboxes/commands`: start a command. Send `argv` or `run`.
+         *     The request needs an `Idempotency-Key`: a command never runs twice for
+         *     one key.
+         */
+        SandboxCommandCreateRequest: {
+            /**
+             * @description The process and its arguments. A shell is explicit:
+             *     `["bash", "-lc", "..."]`.
+             */
+            argv?: string[] | null;
+            /** @description The working directory, a path in `/workspace`. */
+            cwd?: string | null;
+            /**
+             * @description Variables for the command. Names that start with `LBB_` are refused.
+             *     Values are never stored.
+             */
+            env?: {
+                [key: string]: string;
+            } | null;
+            run?: null | components["schemas"]["SandboxRunRequest"];
+            /** @description Text for the standard input, 1 MiB at most. It is never stored. */
+            stdin?: string | null;
+            /**
+             * Format: int64
+             * @description The timeout in milliseconds, 1 to 3,600,000; the template's when
+             *     absent.
+             */
+            timeout_ms?: number | null;
+            /**
+             * Format: int64
+             * @description Milliseconds the answer waits for the command to end: 0 to 30,000.
+             *     With 0, the default, the answer does not wait.
+             */
+            wait_ms?: number | null;
+        };
+        /** @description One page of commands, newest first. */
+        SandboxCommandList: {
+            data: components["schemas"]["SandboxCommand"][];
+            has_more: boolean;
+            /** @description Pass as `cursor` for the next page. */
+            next_cursor?: string | null;
+            /** @description `list`. */
+            object: string;
+        };
+        /**
+         * @description Why a command ended as it did. A reason a later version writes reads as
+         *     `unknown`.
+         * @enum {string}
+         */
+        SandboxCommandReason: "request" | "sandbox_stopped" | "sandbox_destroyed" | "budget" | "start_error" | "start_lost" | "host_lost" | "unknown";
+        /**
+         * @description The sizes of a `run` command's payload. The payload itself is read with
+         *     the command logs of the run, not here.
+         */
+        SandboxCommandRun: {
+            /** Format: int64 */
+            code_bytes: number;
+            /** Format: int64 */
+            config_bytes: number;
+            /** Format: int64 */
+            input_bytes: number;
+        };
+        /**
+         * @description Where a command stands: `queued` becomes `running`, then ends as
+         *     `exited`, `timed_out`, `cancelled`, `failed` or `lost`.
+         * @enum {string}
+         */
+        SandboxCommandStatus: "queued" | "running" | "exited" | "timed_out" | "cancelled" | "failed" | "lost";
+        /**
+         * @description `POST /v1/sandboxes`: create a sandbox. With `run` it is the L1 shortcut:
+         *     the sandbox runs one command and is destroyed when the command ends. A
+         *     create with `run` needs an `Idempotency-Key`.
+         */
+        SandboxCreateRequest: {
+            /**
+             * Format: int32
+             * @description Idle seconds before the sandbox stops: 30 to 3,600, default 300.
+             */
+            auto_stop_seconds?: number | null;
+            /**
+             * Format: int32
+             * @description Seconds until the sandbox is destroyed: 60 to 604,800, default
+             *     3,600.
+             */
+            expires_in_seconds?: number | null;
+            limits?: null | components["schemas"]["SandboxLimitsInput"];
+            /** @description Up to 16 keys: a key of 40 characters at most, a value of 500. */
+            metadata?: {
+                [key: string]: string;
+            } | null;
+            run?: null | components["schemas"]["SandboxRunRequest"];
+            /** @description A template name (its newest version) or id; `lbb/python` by default. */
+            template?: string | null;
+            /**
+             * Format: int64
+             * @description Milliseconds the answer waits for the run to end: 0 to 30,000. With
+             *     0, the default, the answer does not wait.
+             */
+            wait_ms?: number | null;
+        };
+        /** @description A file or a directory of `/workspace`. */
+        SandboxFile: {
+            /**
+             * Format: int64
+             * @description The bytes of a file; 0 for a directory.
+             */
+            bytes: number;
+            /**
+             * Format: int64
+             * @description The last change, Unix seconds.
+             */
+            modified: number;
+            /** @description `sandbox_file`. */
+            object: string;
+            /** @description The path in `/workspace`. */
+            path: string;
+            type: components["schemas"]["SandboxFileType"];
+        };
+        /**
+         * @description `DELETE /v1/sandboxes/files`: the entry is gone. A delete of a path that
+         *     is already gone answers the same.
+         */
+        SandboxFileDeleted: {
+            /** @description Always `true`. */
+            deleted: boolean;
+            /** @description `sandbox_file`. */
+            object: string;
+            path: string;
+        };
+        /** @description One page of workspace entries, in path order. */
+        SandboxFileList: {
+            data: components["schemas"]["SandboxFile"][];
+            has_more: boolean;
+            /** @description Pass as `cursor` for the next page. */
+            next_cursor?: string | null;
+            /** @description `list`. */
+            object: string;
+        };
+        /**
+         * @description What a workspace entry is.
+         * @enum {string}
+         */
+        SandboxFileType: "file" | "directory";
+        /**
+         * @description What a sandbox is for: a call to the L1 shortcut (a create with `run`)
+         *     or a sandbox a caller keeps.
+         * @enum {string}
+         */
+        SandboxKind: "run" | "sandbox";
+        /** @description The resource limits of a sandbox, as the sandbox holds them. */
+        SandboxLimits: {
+            /**
+             * Format: int32
+             * @description Workspace disk in MiB: 256 to 10,240.
+             */
+            disk_mib: number;
+            /**
+             * Format: int32
+             * @description Memory in MiB: 128 to 8,192.
+             */
+            memory_mib: number;
+            /**
+             * Format: int32
+             * @description Virtual CPUs: 1 to 4.
+             */
+            vcpus: number;
+        };
+        /**
+         * @description The limits a request names. A field left out keeps the template's value,
+         *     else the default.
+         */
+        SandboxLimitsInput: {
+            /**
+             * Format: int32
+             * @description Workspace disk in MiB: 256 to 10,240.
+             */
+            disk_mib?: number | null;
+            /**
+             * Format: int32
+             * @description Memory in MiB: 128 to 8,192.
+             */
+            memory_mib?: number | null;
+            /**
+             * Format: int32
+             * @description Virtual CPUs: 1 to 4.
+             */
+            vcpus?: number | null;
+        };
+        /** @description One page of sandboxes, newest first. */
+        SandboxList: {
+            data: components["schemas"]["Sandbox"][];
+            has_more: boolean;
+            /** @description Pass as `cursor` for the next page. */
+            next_cursor?: string | null;
+            /** @description `list`. */
+            object: string;
+        };
+        /**
+         * @description `GET /v1/sandboxes/commands/logs`: a page of one stream's bytes. It is
+         *     an exception to the list envelope, because it pages bytes.
+         */
+        SandboxLog: {
+            data: components["schemas"]["SandboxLogFrame"][];
+            /** @description The command has ended and the page reaches the end of the stream. */
+            done: boolean;
+            gap?: null | components["schemas"]["SandboxLogGap"];
+            /**
+             * Format: int64
+             * @description Pass as `offset` for the next page.
+             */
+            next_offset: number;
+            /** @description `sandbox_log`. */
+            object: string;
+        };
+        /**
+         * @description Bytes of a stream at `offset`, as text. A byte sequence that is not UTF-8
+         *     shows as U+FFFD.
+         */
+        SandboxLogFrame: {
+            /** @description `sandbox_log_frame`. */
+            object: string;
+            /**
+             * Format: int64
+             * @description The byte offset of the first byte of `text` in the stream.
+             */
+            offset: number;
+            stream: components["schemas"]["SandboxStream"];
+            text: string;
+        };
+        /** @description The bytes a stream lost between its head and its tail. */
+        SandboxLogGap: {
+            /**
+             * Format: int64
+             * @description The offset of the first dropped byte.
+             */
+            from: number;
+            /**
+             * Format: int64
+             * @description The offset after the last dropped byte.
+             */
+            to: number;
+        };
+        /**
+         * @description The workflow turn that owns a sandbox. A sandbox made under a workflow
+         *     grant records its owner; a sandbox made by an environment key has none.
+         *     The owner is stored and shown; the fence it enables is not built yet, so
+         *     `owner` is always `null` for now.
+         */
+        SandboxOwner: {
+            /** @description `sandbox_owner`. */
+            object: string;
+            run: string;
+            step: string;
+            workflow: string;
+        };
+        /** @description The function a `run` calls: `run(input, config)` of a template's harness. */
+        SandboxRunRequest: {
+            /** @description The code of `run`, 64 KiB at most; the template's code when absent. */
+            code?: string | null;
+            /**
+             * @description The config, JSON of 1 MiB at most; it takes precedence over the
+             *     template's config.
+             */
+            config?: unknown;
+            /** @description The input, JSON of 1 MiB at most. */
+            input?: unknown;
+            /**
+             * Format: int64
+             * @description The command timeout in milliseconds.
+             */
+            timeout_ms?: number | null;
+        };
+        /** @description What a create with `run` made of its command. */
+        SandboxRunSummary: {
+            /** @description The command's id, `cmd_`. */
+            command: string;
+            /** Format: int32 */
+            exit_code?: number | null;
+            /** @description What `run(input, config)` returned: JSON, 48 KiB at most. */
+            result?: unknown;
+            /** @description The command's status. */
+            status: components["schemas"]["SandboxCommandStatus"];
+        };
+        /**
+         * @description Where a sandbox stands. `starting` becomes `running` or `failed`;
+         *     `running` becomes `stopping`, `destroying` or `lost`; `stopped` becomes
+         *     `starting` (a resume), `destroying` or `lost`. `destroyed`, `failed` and
+         *     `lost` are final.
+         * @enum {string}
+         */
+        SandboxStatus: "starting" | "running" | "stopping" | "stopped" | "destroying" | "destroyed" | "failed" | "lost";
+        /**
+         * @description Why a sandbox is in its status. A reason a later version writes reads as
+         *     `unknown`.
+         * @enum {string}
+         */
+        SandboxStatusReason: "requested" | "idle" | "expired" | "run_ended" | "start_timeout" | "start_error" | "host_lost" | "unknown";
+        /**
+         * @description The stream of a command's output.
+         * @enum {string}
+         */
+        SandboxStream: "stdout" | "stderr";
+        /**
+         * @description What one output stream of a command holds. The server keeps the first
+         *     256 KiB and the last 768 KiB of each stream.
+         */
+        SandboxStreamSummary: {
+            /**
+             * Format: int64
+             * @description Bytes the command wrote to the stream.
+             */
+            bytes: number;
+            /** @description The last 16 KiB of the stream, as text. */
+            tail: string;
+            /**
+             * Format: int64
+             * @description Bytes between the head and the tail the server does not keep.
+             */
+            truncated_bytes: number;
+        };
+        /**
+         * @description A saved template: a base image, the `run` code, files, limits, a timeout
+         *     and a default config. Each create of a name is a new immutable version
+         *     with its own id; a name resolves to its newest version. The base
+         *     templates LBB publishes (`lbb/python`, `lbb/node`, `lbb/shell`) are
+         *     templates with `builtin: true`.
+         */
+        SandboxTemplate: {
+            /** @description The base template the VM boots from. */
+            base: string;
+            /** @description A base template LBB publishes. */
+            builtin: boolean;
+            /** @description The `run` code, 64 KiB at most. */
+            code?: string | null;
+            /** @description The default config a `run` passes to `run(input, config)`. */
+            config?: unknown;
+            /**
+             * Format: int64
+             * @description When this version was saved, Unix seconds.
+             */
+            created: number;
+            /** @description Files copied into `/workspace`. */
+            files?: components["schemas"]["SandboxTemplateFile"][];
+            /** @description `sbt_`, an opaque id. */
+            id: string;
+            /** @description The limits of a sandbox of this template. */
+            limits: components["schemas"]["SandboxLimits"];
+            /** @description The name a create resolves to its newest version. */
+            name: string;
+            /** @description `sandbox_template`. */
+            object: string;
+            /**
+             * @description A revoked template refuses new sandboxes (409
+             *     `sandbox_template_revoked`).
+             */
+            revoked: boolean;
+            /** @description Why it was revoked. */
+            revoked_reason?: string | null;
+            /**
+             * Format: int64
+             * @description The timeout of a command, in milliseconds, when the command names
+             *     none.
+             */
+            timeout_ms: number;
+        };
+        /** @description `POST /v1/sandboxes/templates`: save a new version of a template. */
+        SandboxTemplateCreateRequest: {
+            /**
+             * @description A base template: `lbb/python` (the default), `lbb/node` or
+             *     `lbb/shell`.
+             */
+            base?: string | null;
+            /** @description The `run` code, 64 KiB at most. */
+            code?: string | null;
+            /** @description The default config, JSON of 1 MiB at most. */
+            config?: unknown;
+            /**
+             * @description Files for `/workspace`. Not available yet; see
+             *     [`SandboxTemplateFile`].
+             */
+            files?: components["schemas"]["SandboxTemplateFile"][];
+            limits?: null | components["schemas"]["SandboxLimitsInput"];
+            /** @description 1 to 64 of `a-z`, `0-9`, `.`, `_` and `-`, not starting with `lbb/`. */
+            name: string;
+            /**
+             * Format: int64
+             * @description The default command timeout, 1 to 3,600,000 milliseconds.
+             */
+            timeout_ms?: number | null;
+        };
+        /**
+         * @description A file a template copies into `/workspace`. A template with files needs
+         *     the import from Files, which is not available yet: a create with `files`
+         *     answers 400 `invalid_request`.
+         */
+        SandboxTemplateFile: {
+            /** @description The path in `/workspace`. */
+            path: string;
+            /** @description The SHA-256 of a file of the graph. */
+            source_sha256: string;
+        };
+        /** @description One page of templates, newest first. */
+        SandboxTemplateList: {
+            data: components["schemas"]["SandboxTemplate"][];
+            has_more: boolean;
+            /** @description Pass as `cursor` for the next page. */
+            next_cursor?: string | null;
+            /** @description `list`. */
+            object: string;
+        };
+        /** @description The template a sandbox was made from. */
+        SandboxTemplateRef: {
+            /** @description The exact version, `sbt_`. */
+            id: string;
+            /** @description The name the create gave. */
+            name: string;
+        };
+        /** @description `POST /v1/sandboxes/update`: change a sandbox that has not ended. */
+        SandboxUpdateRequest: {
+            /**
+             * Format: int32
+             * @description Idle seconds before the sandbox stops, 30 to 3,600.
+             */
+            auto_stop_seconds?: number | null;
+            /** @description Replaces the metadata whole. */
+            metadata?: {
+                [key: string]: string;
+            } | null;
+        };
+        /**
+         * @description What a sandbox used, in seconds of its size. Metering is not built yet:
+         *     the counters stay 0.
+         */
+        SandboxUsage: {
+            /** Format: int64 */
+            disk_gib_seconds: number;
+            /** Format: int64 */
+            memory_gib_seconds: number;
+            /** Format: int64 */
+            vcpu_seconds: number;
         };
         SavedDatasetView: {
             definition: components["schemas"]["SavedDatasetViewDefinition"];
@@ -60213,6 +60988,2866 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ReviewItem"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Rate limit exceeded */
+            429: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Service unavailable */
+            503: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+        };
+    };
+    get_v1_sandboxes: {
+        parameters: {
+            query?: {
+                /** @description Graph name (default `main`) */
+                graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
+                /** @description one status: `starting`, `running`, `stopping`, `stopped`, `destroying`, `destroyed`, `failed` or `lost` */
+                status?: string;
+                /** @description the template name or id the sandbox was made from */
+                template?: string;
+                /** @description the workflow that owns the sandbox */
+                workflow?: string;
+                /** @description who created it: `key:<id>`, `account:<id>` or `token` */
+                created_by?: string;
+                /** @description `run` for sandboxes of a create with `run`, `sandbox` for the others */
+                kind?: string;
+                /** @description the `next_cursor` of the previous page */
+                cursor?: string;
+                /** @description rows, 1 to 200; default 50 */
+                limit?: string;
+            };
+            header?: {
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
+                "Lbb-Version"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SandboxList"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Rate limit exceeded */
+            429: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Service unavailable */
+            503: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+        };
+    };
+    post_v1_sandboxes: {
+        parameters: {
+            query?: {
+                /** @description Graph name (default `main`) */
+                graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
+            };
+            header?: {
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
+                "Lbb-Version"?: string;
+                /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
+                "Idempotency-Key"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SandboxCreateRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Sandbox"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Rate limit exceeded */
+            429: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Service unavailable */
+            503: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+        };
+    };
+    delete_v1_sandboxes: {
+        parameters: {
+            query?: {
+                /** @description Graph name (default `main`) */
+                graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
+                /** @description the sandbox's id (`sbx_`) */
+                id?: string;
+            };
+            header?: {
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
+                "Lbb-Version"?: string;
+                /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
+                "Idempotency-Key"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Sandbox"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Rate limit exceeded */
+            429: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Service unavailable */
+            503: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+        };
+    };
+    get_v1_sandboxes_commands: {
+        parameters: {
+            query?: {
+                /** @description Graph name (default `main`) */
+                graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
+                /** @description the sandbox's id (`sbx_`) */
+                sandbox?: string;
+                /** @description one status: `queued`, `running`, `exited`, `timed_out`, `cancelled`, `failed` or `lost` */
+                status?: string;
+                /** @description the `next_cursor` of the previous page */
+                cursor?: string;
+                /** @description rows, 1 to 200; default 50 */
+                limit?: string;
+            };
+            header?: {
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
+                "Lbb-Version"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SandboxCommandList"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Rate limit exceeded */
+            429: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Service unavailable */
+            503: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+        };
+    };
+    post_v1_sandboxes_commands: {
+        parameters: {
+            query?: {
+                /** @description Graph name (default `main`) */
+                graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
+                /** @description the sandbox's id (`sbx_`) */
+                sandbox?: string;
+            };
+            header: {
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
+                "Lbb-Version"?: string;
+                /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SandboxCommandCreateRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SandboxCommand"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Rate limit exceeded */
+            429: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Service unavailable */
+            503: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+        };
+    };
+    post_v1_sandboxes_commands_cancel: {
+        parameters: {
+            query?: {
+                /** @description Graph name (default `main`) */
+                graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
+                /** @description the sandbox's id (`sbx_`) */
+                sandbox?: string;
+                /** @description the command's id (`cmd_`) */
+                id?: string;
+            };
+            header?: {
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
+                "Lbb-Version"?: string;
+                /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
+                "Idempotency-Key"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["SandboxCommandCancelRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SandboxCommand"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Rate limit exceeded */
+            429: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Service unavailable */
+            503: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+        };
+    };
+    get_v1_sandboxes_commands_get: {
+        parameters: {
+            query?: {
+                /** @description Graph name (default `main`) */
+                graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
+                /** @description the sandbox's id (`sbx_`) */
+                sandbox?: string;
+                /** @description the command's id (`cmd_`) */
+                id?: string;
+            };
+            header?: {
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
+                "Lbb-Version"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SandboxCommand"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Rate limit exceeded */
+            429: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Service unavailable */
+            503: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+        };
+    };
+    get_v1_sandboxes_commands_logs: {
+        parameters: {
+            query?: {
+                /** @description Graph name (default `main`) */
+                graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
+                /** @description the sandbox's id (`sbx_`) */
+                sandbox?: string;
+                /** @description the command's id (`cmd_`) */
+                id?: string;
+                /** @description `stdout` (the default) or `stderr` */
+                stream?: string;
+                /** @description the byte offset to read from; default 0 */
+                offset?: string;
+                /** @description bytes, 1 to 262,144; default 65,536 */
+                limit?: string;
+                /** @description `true` waits for more output */
+                follow?: string;
+            };
+            header?: {
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
+                "Lbb-Version"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SandboxLog"];
+                    "application/x-ndjson": string;
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Rate limit exceeded */
+            429: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Service unavailable */
+            503: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+        };
+    };
+    get_v1_sandboxes_files: {
+        parameters: {
+            query?: {
+                /** @description Graph name (default `main`) */
+                graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
+                /** @description the sandbox's id (`sbx_`) */
+                sandbox?: string;
+                /** @description a directory; `/workspace` by default */
+                path?: string;
+                /** @description `true` lists the whole subtree */
+                recursive?: string;
+                /** @description the `next_cursor` of the previous page */
+                cursor?: string;
+                /** @description rows, 1 to 1,000; default 100 */
+                limit?: string;
+            };
+            header?: {
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
+                "Lbb-Version"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SandboxFileList"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Rate limit exceeded */
+            429: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Service unavailable */
+            503: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+        };
+    };
+    delete_v1_sandboxes_files: {
+        parameters: {
+            query?: {
+                /** @description Graph name (default `main`) */
+                graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
+                /** @description the sandbox's id (`sbx_`) */
+                sandbox?: string;
+                /** @description the path in `/workspace` */
+                path?: string;
+                /** @description `true` deletes a directory and what it holds */
+                recursive?: string;
+            };
+            header?: {
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
+                "Lbb-Version"?: string;
+                /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
+                "Idempotency-Key"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SandboxFileDeleted"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Rate limit exceeded */
+            429: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Service unavailable */
+            503: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+        };
+    };
+    get_v1_sandboxes_files_content: {
+        parameters: {
+            query?: {
+                /** @description Graph name (default `main`) */
+                graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
+                /** @description the sandbox's id (`sbx_`) */
+                sandbox?: string;
+                /** @description the file's path in `/workspace` */
+                path?: string;
+            };
+            header?: {
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
+                "Lbb-Version"?: string;
+                /** @description One byte range: `bytes=a-b`, `bytes=a-` or `bytes=-n` (RFC 9110) */
+                Range?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The file's bytes */
+            200: {
+                headers: {
+                    /** @description `attachment` with the file's name */
+                    "Content-Disposition"?: string;
+                    /** @description The bytes of the body */
+                    "Content-Length"?: number;
+                    /** @description `nosniff` */
+                    "X-Content-Type-Options"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/octet-stream": string;
+                };
+            };
+            /** @description One range of the file's bytes */
+            206: {
+                headers: {
+                    /** @description `attachment` with the file's name */
+                    "Content-Disposition"?: string;
+                    /** @description The bytes of the body */
+                    "Content-Length"?: number;
+                    /** @description `bytes <first>-<last>/<length>` */
+                    "Content-Range"?: string;
+                    /** @description `nosniff` */
+                    "X-Content-Type-Options"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/octet-stream": string;
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description The file is larger than 4 MiB and the request names no range */
+            413: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Range not satisfiable: no byte of the file is in it */
+            416: {
+                headers: {
+                    /** @description `bytes *\/<length>` */
+                    "Content-Range"?: string;
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Rate limit exceeded */
+            429: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Service unavailable */
+            503: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+        };
+    };
+    put_v1_sandboxes_files_content: {
+        parameters: {
+            query?: {
+                /** @description Graph name (default `main`) */
+                graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
+                /** @description the sandbox's id (`sbx_`) */
+                sandbox?: string;
+                /** @description the file's path in `/workspace` */
+                path?: string;
+            };
+            header?: {
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
+                "Lbb-Version"?: string;
+                /** @description Stable client-generated key for safely retrying the write. */
+                "Idempotency-Key"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        /** @description The file's bytes, at most 4 MiB. An empty body is an empty file. */
+        requestBody: {
+            content: {
+                "application/octet-stream": string;
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SandboxFile"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Rate limit exceeded */
+            429: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Service unavailable */
+            503: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+        };
+    };
+    get_v1_sandboxes_get: {
+        parameters: {
+            query?: {
+                /** @description Graph name (default `main`) */
+                graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
+                /** @description the sandbox's id (`sbx_`) */
+                id?: string;
+            };
+            header?: {
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
+                "Lbb-Version"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Sandbox"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Rate limit exceeded */
+            429: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Service unavailable */
+            503: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+        };
+    };
+    post_v1_sandboxes_resume: {
+        parameters: {
+            query?: {
+                /** @description Graph name (default `main`) */
+                graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
+                /** @description the sandbox's id (`sbx_`) */
+                id?: string;
+            };
+            header?: {
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
+                "Lbb-Version"?: string;
+                /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
+                "Idempotency-Key"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Sandbox"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Rate limit exceeded */
+            429: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Service unavailable */
+            503: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+        };
+    };
+    post_v1_sandboxes_stop: {
+        parameters: {
+            query?: {
+                /** @description Graph name (default `main`) */
+                graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
+                /** @description the sandbox's id (`sbx_`) */
+                id?: string;
+            };
+            header?: {
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
+                "Lbb-Version"?: string;
+                /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
+                "Idempotency-Key"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Sandbox"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Rate limit exceeded */
+            429: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Service unavailable */
+            503: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+        };
+    };
+    get_v1_sandboxes_templates: {
+        parameters: {
+            query?: {
+                /** @description Graph name (default `main`) */
+                graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
+                /** @description only the versions of this template name */
+                name?: string;
+                /** @description the `next_cursor` of the previous page */
+                cursor?: string;
+                /** @description rows, 1 to 200; default 50 */
+                limit?: string;
+            };
+            header?: {
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
+                "Lbb-Version"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SandboxTemplateList"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Rate limit exceeded */
+            429: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Service unavailable */
+            503: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+        };
+    };
+    post_v1_sandboxes_templates: {
+        parameters: {
+            query?: {
+                /** @description Graph name (default `main`) */
+                graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
+            };
+            header?: {
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
+                "Lbb-Version"?: string;
+                /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
+                "Idempotency-Key"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SandboxTemplateCreateRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SandboxTemplate"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Rate limit exceeded */
+            429: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Service unavailable */
+            503: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+        };
+    };
+    get_v1_sandboxes_templates_get: {
+        parameters: {
+            query?: {
+                /** @description Graph name (default `main`) */
+                graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
+                /** @description the template's id */
+                id?: string;
+            };
+            header?: {
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
+                "Lbb-Version"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SandboxTemplate"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Rate limit exceeded */
+            429: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Service unavailable */
+            503: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+        };
+    };
+    post_v1_sandboxes_update: {
+        parameters: {
+            query?: {
+                /** @description Graph name (default `main`) */
+                graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
+                /** @description the sandbox's id (`sbx_`) */
+                id?: string;
+            };
+            header?: {
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
+                "Lbb-Version"?: string;
+                /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
+                "Idempotency-Key"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SandboxUpdateRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Sandbox"];
                 };
             };
             /** @description Bad request */
