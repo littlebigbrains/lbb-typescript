@@ -509,6 +509,7 @@ test("dailyActivity reads the queries and the facts written per day and graph", 
     month: "2026-11",
     months: ["2026-10", "2026-11"],
     scope: "graph",
+    recording: true,
     graph: "crm",
     other_graphs: false,
     totals: counts,
@@ -526,6 +527,7 @@ test("dailyActivity reads the queries and the facts written per day and graph", 
     onlyGraph: "crm",
   });
   assert.equal(one.totals.queries, 5);
+  assert.equal(one.recording, true);
   assert.equal(one.by_day_graph[0]?.graph, "crm");
   await client.dailyActivity();
   const [first, second] = calls.map((call) => new URL(call.input));
@@ -536,6 +538,34 @@ test("dailyActivity reads the queries and the facts written per day and graph", 
   assert.equal(second.searchParams.has("month"), false);
   assert.equal(second.searchParams.has("only_graph"), false);
   assert.equal(second.searchParams.has("only_namespace"), false);
+});
+
+test("dailyActivity reads an answer from a server that does not say whether it records", async () => {
+  // A client newer than its server meets an answer from before `recording`
+  // existed: absent is "not known", not an error and not `false`.
+  const counts = {
+    queries: 0,
+    query_errors: 0,
+    facts_added: 0,
+    facts_removed: 0,
+    last_at_ms: 0,
+  };
+  const answer: Schemas["DailyActivityResponse"] = {
+    month: "2026-11",
+    months: [],
+    scope: "environment",
+    other_graphs: false,
+    totals: counts,
+    by_day: [],
+    by_graph: [],
+    by_day_graph: [],
+  };
+  const { fetch } = recordingFetch([{ body: JSON.stringify(answer) }]);
+  const client = new LbbClient({ baseUrl: "http://h", fetch });
+  const one = await client.dailyActivity();
+  assert.equal(one.recording, undefined);
+  assert.equal(one.totals.queries, 0);
+  assert.equal("recording" in one, false);
 });
 
 test("search reranks on request and reads and writes the graph's search settings", async () => {

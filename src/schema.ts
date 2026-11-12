@@ -6596,6 +6596,13 @@ export interface components {
              *     the answer at all.
              */
             other_graphs: boolean;
+            /**
+             * @description Whether this server records daily counts (`LBB_WORK_ACTIVITY_ENABLED`).
+             *     When it is `false`, the rows are empty because nothing is counted, not
+             *     because the month was quiet. A server of this version always sends it.
+             *     Absent in an answer of an older server: not known.
+             */
+            recording?: boolean | null;
             scope: components["schemas"]["DailyActivityScope"];
             /** @description The sum of every row of the scope. */
             totals: components["schemas"]["DailyActivityCounts"];

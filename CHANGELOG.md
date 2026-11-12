@@ -9,7 +9,9 @@ All notable changes to the `@littlebigbrain/client` package are documented here.
   code for the environment's model budget from a later release. Handle both.
 - `dailyActivity({ month, onlyGraph, onlyNamespace })` reads the queries and the
   facts written of the environment per day and per graph
-  (`GET /v1/activity/daily`).
+  (`GET /v1/activity/daily`). The answer says `recording` (`false` when the
+  server does not record daily counts, so empty rows are not a quiet month). It
+  is absent in the answer of an older server: not known.
 - `endpointHint` is set for the codes `environment_endpoint_required` and
   `environment_endpoint_mismatch`, as it is for `stack_endpoint_required` and
   `stack_endpoint_mismatch`. A server may send either code.
