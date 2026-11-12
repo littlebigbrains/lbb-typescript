@@ -497,6 +497,56 @@ test("modelActivity reads one month of the stack's model activity", async () => 
   assert.equal(second.searchParams.has("month"), false);
 });
 
+test("modelBudget reads the limit, the spend and the state of a month", async () => {
+  const answer: Schemas["ModelBudgetResponse"] = {
+    month: "2026-11",
+    months: ["2026-11"],
+    recording: true,
+    budget: {
+      limit_micro_usd: 85_000_000,
+      limit_source: "default",
+      state: "warning",
+      used_ratio: 0.9,
+      warn_at_ratio: 0.8,
+      resets_at: "2026-12-01T00:00:00Z",
+      resets_at_ms: 1_795_000_000_000,
+    },
+    spent_micro_usd: 76_500_000,
+    left_micro_usd: 8_500_000,
+    calls: 10,
+    errors: 0,
+    unpriced_calls: 0,
+    by_feature: [{ feature: "workflows", cost_micro_usd: 76_500_000 }],
+    by_model: [
+      {
+        provider: "anthropic",
+        model: "claude-sonnet-5-5",
+        cost_micro_usd: 76_500_000,
+      },
+    ],
+    by_day: [{ day: "2026-11-10", cost_micro_usd: 76_500_000 }],
+    complete: true,
+    dropped_micro_usd: 0,
+    dropped_keys: 0,
+    partial: [{ dimension: "spent", reason: "training_not_in_dollars" }],
+  };
+  const { fetch, calls } = recordingFetch([
+    { body: JSON.stringify(answer) },
+    { body: JSON.stringify(answer) },
+  ]);
+  const client = new LbbClient({ baseUrl: "http://h", fetch });
+  const one = await client.modelBudget({ month: "2026-11" });
+  assert.equal(one.budget.state, "warning");
+  assert.equal(one.left_micro_usd, 8_500_000);
+  assert.equal(one.by_feature[0]?.feature, "workflows");
+  await client.modelBudget();
+  const [first, second] = calls.map((call) => new URL(call.input));
+  assert.equal(calls[0].init.method, "GET");
+  assert.equal(first.pathname, "/v1/models/budget");
+  assert.equal(first.searchParams.get("month"), "2026-11");
+  assert.equal(second.searchParams.has("month"), false);
+});
+
 test("dailyActivity reads the queries and the facts written per day and graph", async () => {
   const counts = {
     queries: 5,
