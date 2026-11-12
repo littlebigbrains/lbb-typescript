@@ -4,6 +4,7 @@ import { checkedCurrentStatus } from "./status.js";
 import { CdcNamespace } from "./cdc.js";
 import { RecordsNamespace } from "./records.js";
 import { FilesNamespace } from "./files.js";
+import { SandboxesNamespace } from "./sandboxes.js";
 import { ReviewsNamespace } from "./reviews.js";
 import { AccessNamespace, CatalogNamespace } from "./catalog.js";
 import {
@@ -345,6 +346,12 @@ export class LbbClient {
    */
   readonly files: FilesNamespace;
   /**
+   * Sandboxes: isolated code runs. `run` is one call, `scoped` and `create`
+   * give a handle with files and commands, and `templates` saves the code
+   * and limits that a call names.
+   */
+  readonly sandboxes: SandboxesNamespace;
+  /**
    * Review: questions for a person. File, list and answer review items
    * (values, choices, grades, answers, and ontology changes).
    */
@@ -422,6 +429,7 @@ export class LbbClient {
     this.models = new ModelsNamespace(this);
     this.embeddings = new EmbeddingsNamespace(this);
     this.files = new FilesNamespace(this);
+    this.sandboxes = new SandboxesNamespace(this);
     this.reviews = new ReviewsNamespace(this);
     this.catalog = new CatalogNamespace(this);
     this.access = new AccessNamespace(this);

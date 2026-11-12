@@ -12,6 +12,7 @@ test("the runtime entrypoint exposes only the supported public values", () => {
     "LbbRecordCommitOutcomeError",
     "SPREADSHEET_MAX_COLUMNS",
     "SPREADSHEET_MAX_ROWS",
+    "SandboxWaitError",
     "WorkflowBlobsNamespace",
     "WorkflowError",
     "WorkflowExecutionError",

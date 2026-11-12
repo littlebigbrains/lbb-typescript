@@ -11845,11 +11845,15 @@ export interface components {
              *     when it is known.
              */
             amount?: number | null;
-            /** @description What it concerns: `spent` for the total and every row of it. */
+            /**
+             * @description What it concerns: `spent` for the total and every row of it, `budget`
+             *     for the limit.
+             */
             dimension: string;
             /**
              * @description `dropped`, `unpriced_calls`, `training_not_in_dollars`,
-             *     `host_jev_cost_not_priced` or `host_calls_not_asked`.
+             *     `host_jev_cost_not_priced`, `host_calls_not_asked` or
+             *     `plan_allowance_not_applied`.
              */
             reason: string;
         };
