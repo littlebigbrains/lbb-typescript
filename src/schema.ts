@@ -6766,6 +6766,14 @@ export interface components {
              * @description Queries that ended with a status of 400 or more.
              */
             query_errors: number;
+            /**
+             * Format: int64
+             * @description New units of workflow work: a run started, or a turn accepted for an
+             *     instance. A retry of the same run or message counts nothing, and a
+             *     failure is not in it. An instance start is not a unit of work: one
+             *     instance takes many messages. Absent in an answer of an older server.
+             */
+            workflow_runs?: number;
         };
         /** @description One day (UTC) of the whole scope. */
         DailyActivityDay: {
@@ -6781,6 +6789,8 @@ export interface components {
             queries: number;
             /** Format: int64 */
             query_errors: number;
+            /** Format: int64 */
+            workflow_runs?: number;
         };
         /**
          * @description One graph on one day. `graph` is `*` for the graphs past the bound of the
@@ -6800,6 +6810,8 @@ export interface components {
             queries: number;
             /** Format: int64 */
             query_errors: number;
+            /** Format: int64 */
+            workflow_runs?: number;
         };
         /** @description One graph over the month. `graph` is `*` for the graphs past the bound. */
         DailyActivityGraph: {
@@ -6814,6 +6826,8 @@ export interface components {
             queries: number;
             /** Format: int64 */
             query_errors: number;
+            /** Format: int64 */
+            workflow_runs?: number;
         };
         /** @description `GET /v1/activity/daily`. */
         DailyActivityResponse: {
@@ -6822,8 +6836,8 @@ export interface components {
             /** @description One row per day and graph, by day then by graph. */
             by_day_graph: components["schemas"]["DailyActivityDayGraph"][];
             /**
-             * @description The graphs with the most work first (queries plus facts added), at
-             *     most 100, then `*`.
+             * @description The graphs with the most work first (queries, facts added and workflow
+             *     runs), at most 100, then `*`.
              */
             by_graph: components["schemas"]["DailyActivityGraph"][];
             /** @description The graph of a `graph` scope. */

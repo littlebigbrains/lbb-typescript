@@ -553,6 +553,7 @@ test("dailyActivity reads the queries and the facts written per day and graph", 
     query_errors: 1,
     facts_added: 30,
     facts_removed: 2,
+    workflow_runs: 3,
     last_at_ms: 1_790_000_000_000,
   };
   const answer: Schemas["DailyActivityResponse"] = {
@@ -577,6 +578,7 @@ test("dailyActivity reads the queries and the facts written per day and graph", 
     onlyGraph: "crm",
   });
   assert.equal(one.totals.queries, 5);
+  assert.equal(one.totals.workflow_runs, 3);
   assert.equal(one.recording, true);
   assert.equal(one.by_day_graph[0]?.graph, "crm");
   await client.dailyActivity();
