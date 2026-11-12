@@ -34,6 +34,7 @@ const CLIENT_SOURCES = [
   "src/client.ts",
   "src/namespaces.ts",
   "src/files.ts",
+  "src/sandboxes.ts",
   "src/reviews.ts",
   "src/triggered-workflows.ts",
   "src/triggered-workflow-worker.ts",

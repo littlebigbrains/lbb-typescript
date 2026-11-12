@@ -67,6 +67,32 @@ export type {
   FilesNamespace,
   FileUploadOptions,
 } from "./files.js";
+export { SandboxWaitError } from "./sandboxes.js";
+export type {
+  Sandbox,
+  SandboxCommand,
+  SandboxCommandList,
+  SandboxCommands,
+  SandboxCommandSpec,
+  SandboxCommandStatus,
+  SandboxFile,
+  SandboxFileList,
+  SandboxFiles,
+  SandboxHandle,
+  SandboxLimits,
+  SandboxList,
+  SandboxListOptions,
+  SandboxLog,
+  SandboxesNamespace,
+  SandboxRunInput,
+  SandboxRunResult,
+  SandboxRunSpec,
+  SandboxSpec,
+  SandboxTemplate,
+  SandboxTemplateList,
+  SandboxTemplatesNamespace,
+  SandboxTemplateSpec,
+} from "./sandboxes.js";
 export * from "./spreadsheet.js";
 export * as googleDrive from "./google-drive.js";
 export type {

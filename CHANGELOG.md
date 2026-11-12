@@ -29,6 +29,20 @@ All notable changes to the `@littlebigbrain/client` package are documented here.
   jitter, and honor `Retry-After`. After `lbbWaitBudgetMs` of waits for a
   turn (default one day; `0` turns them off), its failures count attempts
   again. A `WorkflowError` never waits.
+- `client.sandboxes` runs code in an isolated sandbox with no network (the
+  server feature `LBB_SANDBOX_BACKEND`, off by default). `run({ code, input })`
+  makes a sandbox, runs `run(input, config)` and destroys the sandbox, and
+  answers `{ result, ok, status, exitCode, command, sandbox }`.
+  `run({ template, input })` uses a saved template
+  (`sandboxes.templates.create`). `scoped(spec, fn)` and `create(spec)` give a
+  handle with `files`, `commands`, `run`, `stop`, `resume`, `update` and
+  `delete`. Every call that runs code sends an `Idempotency-Key` (yours, or one
+  the SDK makes), so a retry never runs the code twice. A one-call run whose VM
+  the host lost goes again under the next key, at most `lostRetries` times (0 to
+  2; 2 by default and the most). `maxWaitMs` is per attempt. An empty
+  `idempotencyKey` is no key. `commandTimeoutMs` is the command's own timeout, because
+  `timeoutMs` is the request timeout. Level 4 (`ctx.sandboxes`) and the keep as a
+  File come later.
 - `modelBudget({ month })` reads the environment's monthly model budget: the
   limit, what the month spent and what is left, the state against the warning
   line, and the spend by feature, model and day (`GET /v1/models/budget`).
