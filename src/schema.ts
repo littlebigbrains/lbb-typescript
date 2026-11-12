@@ -4316,6 +4316,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/workflows/environment/summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** What the environment's graphs have waiting, in counts: graphs with work, graphs due, graphs only watching, graphs and instances that are blocked, graphs with a full inbox, the oldest message of an instance that asks for a person, and the 50 oldest graphs that ask. `state` is `off` while this server does not keep the environment ready index, `building` until the backfill of the graphs that had work before it is done (no counts: a count that is too low is worse than none), and `ready` after. It reads at most 64 ready and 64 attention shards (a HEAD each, a GET for a shard that changed) and no graph; a node reuses the answer for one poll interval. It does not say how many turns run. An environment read; the graph scope is not used */
+        get: operations["get_v1_workflows_environment_summary"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/workflows/heartbeat": {
         parameters: {
             query?: never;
@@ -22338,6 +22355,91 @@ export interface components {
              */
             media_types: string[];
         };
+        /** @description One graph with an instance that asks for a person. */
+        WorkflowEnvironmentAttention: {
+            /**
+             * Format: int32
+             * @description Instances whose head failed under `block`.
+             */
+            blocked: number;
+            branch_id: string;
+            graph_id: string;
+            /**
+             * Format: int32
+             * @description Instances at their inbox cap.
+             */
+            inbox_full: number;
+            /**
+             * Format: int64
+             * @description When the graph first asked, in milliseconds since the Unix epoch.
+             */
+            since_ms: number;
+        };
+        /** @description The counts of an environment. A count that never happened is 0. */
+        WorkflowEnvironmentCounts: {
+            /**
+             * Format: int64
+             * @description Graphs with at least one instance whose head failed under `block`.
+             */
+            graphs_blocked: number;
+            /**
+             * Format: int64
+             * @description Graphs with queued turns or a timer whose time has passed.
+             */
+            graphs_due: number;
+            /**
+             * Format: int64
+             * @description Graphs with at least one instance at its inbox cap.
+             */
+            graphs_inbox_full: number;
+            /**
+             * Format: int64
+             * @description Graphs with a watch pass due and no other work.
+             */
+            graphs_watching: number;
+            /**
+             * Format: int64
+             * @description Graphs with work of any kind in the index.
+             */
+            graphs_with_work: number;
+            /**
+             * Format: int64
+             * @description Instances whose head failed under `block`.
+             */
+            instances_blocked: number;
+            /**
+             * Format: int64
+             * @description When the oldest unfinished turn of an instance that asks for a person
+             *     (a blocked instance or a full inbox) was received, in milliseconds since
+             *     the Unix epoch. The index holds no queue depth for any other instance, so
+             *     this is not the oldest waiting message of the environment. Absent while
+             *     no instance asks.
+             */
+            oldest_waiting_message_at_ms?: number | null;
+        };
+        /** @description `GET /v1/workflows/environment/summary`. */
+        WorkflowEnvironmentSummaryResponse: {
+            /**
+             * Format: int64
+             * @description When the oldest of the shards the counts come from was read, in
+             *     milliseconds since the Unix epoch. Only with `state` `ready`. The answer
+             *     of a node is reused for one poll interval.
+             */
+            as_of_ms?: number | null;
+            /**
+             * @description The graphs that ask for a person, oldest first, at most 50. Empty unless
+             *     `state` is `ready`. The counts hold every graph; this list holds the
+             *     oldest.
+             */
+            attention: components["schemas"]["WorkflowEnvironmentAttention"][];
+            counts?: null | components["schemas"]["WorkflowEnvironmentCounts"];
+            state: components["schemas"]["WorkflowEnvironmentSummaryState"];
+        };
+        /**
+         * @description What the summary can say.
+         * @enum {string}
+         */
+        WorkflowEnvironmentSummaryState: "off" | "building" | "ready";
         /** @description One event a client sends. */
         WorkflowEvent: {
             /** @description Any JSON, at most 64 KiB serialized. */
@@ -68544,6 +68646,147 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DerivationRecordResponse"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Rate limit exceeded */
+            429: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Service unavailable */
+            503: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+        };
+    };
+    get_v1_workflows_environment_summary: {
+        parameters: {
+            query?: {
+                /** @description Graph name (default `main`) */
+                graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
+            };
+            header?: {
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
+                "Lbb-Version"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkflowEnvironmentSummaryResponse"];
                 };
             };
             /** @description Bad request */
