@@ -29,6 +29,9 @@ All notable changes to the `@littlebigbrain/client` package are documented here.
   jitter, and honor `Retry-After`. After `lbbWaitBudgetMs` of waits for a
   turn (default one day; `0` turns them off), its failures count attempts
   again. A `WorkflowError` never waits.
+- `modelBudget({ month })` reads the environment's monthly model budget: the
+  limit, what the month spent and what is left, the state against the warning
+  line, and the spend by feature, model and day (`GET /v1/models/budget`).
 
 ## 0.34.0 (2026-11-07)
 

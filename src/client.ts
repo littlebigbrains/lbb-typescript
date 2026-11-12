@@ -2293,6 +2293,20 @@ export class LbbClient {
     });
   }
 
+  /** The environment's monthly model budget (`GET /v1/models/budget`): the
+   * limit, what the month spent and what is left, the state against the
+   * warning line (`ok`, `warning`, `spent`, `unlimited`, `not_recorded`), and
+   * the spend by feature, model and day. The spend is an estimate at list
+   * prices, not an invoice. `month` is `yyyy-mm` (UTC); the current month by
+   * default. An environment read: the client's graph scope is not used. */
+  modelBudget(
+    opts: { month?: string } = {},
+  ): Promise<Schemas["ModelBudgetResponse"]> {
+    return this.request("GET", "/v1/models/budget", {
+      query: { month: opts.month },
+    });
+  }
+
   /** Wait until background reconciliation folds `targetSeq` into the RDF base. */
   async waitForPublished(
     targetSeq: number,
