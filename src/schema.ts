@@ -4333,6 +4333,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/workflows/environment/turns/claim": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Claim one turn from any graph of the environment that has work, found through the environment ready index (the claim path). The request is the one of the per-graph claim (`include_execution_credential` is refused: 400); `wait_ms` is at most 10000, and the first pass is always whole. The answer is `{claim: null}` when no graph had a claimable turn, else the graph (`graph_id`, `branch_id`, `graph_epoch`) and the `task` of the per-graph claim; the turn calls that follow stay on that graph's own routes. One claim visits at most 8 graphs, in a fair order, and takes one turn. The credential must have the whole environment as its scope: the environment key or a console session. A credential of a smaller scope (a work token, a worker pool credential, an application token) is refused (403), and a reserved workflow type (`lbb.*`) is refused as on the per-graph claim. A node that does not offer the route (LBB_WORKFLOW_READY_INDEX_CLAIM or LBB_WORKFLOW_READY_INDEX_WRITE is off) or whose environment has no complete index (the backfill is not done) answers 404 `not_found`: a 404 means use the per-graph claim (`POST /v1/workflows/turns/claim`), which stays, and never means there is no work (that is `{claim: null}`). A client that disconnects during `wait_ms` does not cancel the claim: a turn it takes is leased to nobody and is free again when its lease ends (the instance's `lease_ms`, 60 s by default), as on the per-graph claim. An environment route; the graph scope is not used */
+        post: operations["post_v1_workflows_environment_turns_claim"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/workflows/heartbeat": {
         parameters: {
             query?: never;
@@ -22418,6 +22435,28 @@ export interface components {
              * @description When the graph first asked, in milliseconds since the Unix epoch.
              */
             since_ms: number;
+        };
+        /**
+         * @description A turn the environment claim assigned, and the graph it belongs to. The turn
+         *     calls that follow (heartbeat, checkpoint, complete, fail) go to that graph's
+         *     own routes, with the turn's lease token.
+         */
+        WorkflowEnvironmentClaim: {
+            branch_id: string;
+            /**
+             * Format: int64
+             * @description The graph lifetime the turn belongs to. Send it as `expected_graph_epoch`
+             *     on the turn calls, so a graph that was deleted and created again is
+             *     refused.
+             */
+            graph_epoch: number;
+            graph_id: string;
+            /** @description The turn, as the per-graph claim answers it. */
+            task: components["schemas"]["WorkflowTurnTask"];
+        };
+        /** @description `POST /v1/workflows/environment/turns/claim`. */
+        WorkflowEnvironmentClaimResponse: {
+            claim?: null | components["schemas"]["WorkflowEnvironmentClaim"];
         };
         /** @description The counts of an environment. A count that never happened is 0. */
         WorkflowEnvironmentCounts: {
@@ -68837,6 +68876,153 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["WorkflowEnvironmentSummaryResponse"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Rate limit exceeded */
+            429: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Service unavailable */
+            503: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+        };
+    };
+    post_v1_workflows_environment_turns_claim: {
+        parameters: {
+            query?: {
+                /** @description Graph name (default `main`) */
+                graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
+            };
+            header?: {
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
+                "Lbb-Version"?: string;
+                /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
+                "Idempotency-Key"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WorkflowTurnClaimRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkflowEnvironmentClaimResponse"];
                 };
             };
             /** @description Bad request */
