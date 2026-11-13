@@ -49,6 +49,11 @@ All notable changes to the `@littlebigbrain/client` package are documented here.
 - `dailyActivity` rows carry `workflow_runs`: new units of workflow work that day (a
   run started, or a turn accepted for an instance). A retry counts nothing, and
   an instance start is not counted. An answer of an older server has no field.
+- `modelBudget` says who pays for the environment's model usage
+  (`budget.plan`: `we_pay`, `customer_pays` or `unknown`) and the plan
+  allowance (`budget.plan_allowance_micro_usd`). `budget.limit_source` can be
+  `plan`: where LBB pays, the allowance is the limit. Handle a value you do not
+  know.
 
 ## 0.34.0 (2026-11-07)
 

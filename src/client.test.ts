@@ -504,7 +504,9 @@ test("modelBudget reads the limit, the spend and the state of a month", async ()
     recording: true,
     budget: {
       limit_micro_usd: 85_000_000,
-      limit_source: "default",
+      limit_source: "plan",
+      plan: "we_pay",
+      plan_allowance_micro_usd: 85_000_000,
       state: "warning",
       used_ratio: 0.9,
       warn_at_ratio: 0.8,
@@ -537,6 +539,9 @@ test("modelBudget reads the limit, the spend and the state of a month", async ()
   const client = new LbbClient({ baseUrl: "http://h", fetch });
   const one = await client.modelBudget({ month: "2026-11" });
   assert.equal(one.budget.state, "warning");
+  assert.equal(one.budget.limit_source, "plan");
+  assert.equal(one.budget.plan, "we_pay");
+  assert.equal(one.budget.plan_allowance_micro_usd, 85_000_000);
   assert.equal(one.left_micro_usd, 8_500_000);
   assert.equal(one.by_feature[0]?.feature, "workflows");
   await client.modelBudget();
