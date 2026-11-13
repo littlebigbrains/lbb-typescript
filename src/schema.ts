@@ -8944,12 +8944,25 @@ export interface components {
              * @description The suite version the run read.
              */
             goldens_version: number;
+            /**
+             * @description True when the run skipped at least one golden, so `score` and the
+             *     counts speak for part of the suite. A partial run is not a pass: read
+             *     it with `ran` and `skipped_by`. Absent only in a result stored before
+             *     the field existed; the server then reads it as `skipped > 0`.
+             */
+            partial?: boolean | null;
             passed: number;
             /**
              * Format: float
              * @description Mean precision over the goldens with judged results returned.
              */
             precision?: number;
+            /**
+             * @description The goldens the run tested: `total` minus `skipped`. Absent only in a
+             *     result stored before the field existed; the server then reads it as
+             *     `total - skipped` ([`EvalResults::normalized`]), never as 0.
+             */
+            ran?: number | null;
             /** @description RFC 3339. */
             ran_at: string;
             /** @description `manual` or `tick`. */
@@ -8959,7 +8972,12 @@ export interface components {
              * @description Mean recall over the goldens with known-relevant results.
              */
             recall?: number;
-            /** @description True when `score` is below the settings threshold. */
+            /**
+             * @description True when `score` is below the settings threshold. On a partial run it
+             *     speaks only for the goldens that ran: `passed / ran` is below the
+             *     threshold, so a run that skipped goldens never reports a regression
+             *     that only the skipped goldens caused.
+             */
             regression: boolean;
             /** @description Traces this run opened for results nobody judged yet. */
             review_traces?: number;
@@ -8983,6 +9001,13 @@ export interface components {
             score: number;
             served_at_seq: components["schemas"]["CommitSeq"];
             skipped: number;
+            /**
+             * @description The skipped goldens by reason (`model_budget`, `run_time`,
+             *     `daily_eval_budget`, `no_rewriter`, `not_asked`).
+             */
+            skipped_by?: {
+                [key: string]: number;
+            };
             total: number;
             /**
              * Format: int32
@@ -9058,16 +9083,25 @@ export interface components {
         };
         EvalScorePoint: {
             failed: number;
+            /** @description The run skipped at least one golden: it is not a pass. */
+            partial?: boolean;
             passed: number;
             /** Format: float */
             precision?: number;
+            /**
+             * @description The goldens the run tested, and the suite it was asked about
+             *     (`ran` of `total`).
+             */
+            ran?: number | null;
             ran_at: string;
             /** Format: float */
             recall?: number;
+            /** @description On a partial run it speaks only for the goldens that ran. */
             regression: boolean;
             /** Format: float */
             score: number;
             served_at_seq: components["schemas"]["CommitSeq"];
+            total?: number;
         };
         EvalSettings: {
             /** @description Goldens the runner executes per run, at most [`EVAL_HARD_MAX_GOLDENS`]. */
@@ -9091,6 +9125,11 @@ export interface components {
             /** @description The app's cut. */
             cut: components["schemas"]["SearchShown"];
         };
+        /**
+         * @description Why a golden was skipped: the run did not test it.
+         * @enum {string}
+         */
+        EvalSkipReason: "model_budget" | "run_time" | "daily_eval_budget" | "no_rewriter" | "not_asked";
         EvalSummaryResponse: {
             goldens: number;
             goldens_from_traces: number;
@@ -9205,6 +9244,7 @@ export interface components {
              *     cut: the result counts above count only these.
              */
             shown?: number | null;
+            skip_reason?: null | components["schemas"]["EvalSkipReason"];
             /**
              * @description The query Ask wrote this time (`via: ask`), or the app's query
              *     (`via: app`).
