@@ -81,6 +81,10 @@ All notable changes to the `@littlebigbrain/client` package are documented here.
   rows may exist. The server answers `403 graph_catalog_disabled` until its operator turns
   the graph catalog reader on, and `503 graph_catalog_unavailable` (retry) for an
   environment whose catalog is not yet verified.
+- An embedding of `embeddings.list()` and `embeddings.get()` can have `paused`
+  (`reason`, `resumes_at`, `resumes_at_ms`): it builds no new vectors because the
+  environment's monthly model budget is spent, and it goes on by itself. A search
+  with a text that must be embedded can answer `429 model_budget_exceeded`.
 
 ## 0.34.0 (2026-11-07)
 
