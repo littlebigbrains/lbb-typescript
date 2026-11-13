@@ -4,6 +4,16 @@ All notable changes to the `@littlebigbrain/client` package are documented here.
 
 ## Unreleased
 
+- `client.workflows.claimEnvironmentTurn(request)` claims one turn from any graph
+  of the environment (`POST /v1/workflows/environment/turns/claim`), through the
+  environment's ready index, and `client.workflows.environmentSummary()` reads
+  what the environment's graphs have waiting (`GET
+  /v1/workflows/environment/summary`). The claim answers `{ claim: null }` or the
+  graph (`graph_id`, `branch_id`, `graph_epoch`) with the `task`; the turn calls go
+  to that graph's routes. A 404 means the server or the environment does not offer
+  it: use the per-graph claim. It is not retried. Needs the environment key or a
+  console session. The server offers it from a later release, behind a flag.
+
 - `Sandbox` has the optional `status_message`. A sandbox whose start failed
   because a file of its template could not be copied in (`start_error`) names
   the file by its SHA-256 and the path it was to go to. It is absent otherwise.

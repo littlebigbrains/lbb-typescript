@@ -307,6 +307,95 @@ test("deleteInstance posts the workflow id to the delete route in the graph scop
   assert.deepEqual(seen[0]?.body, { workflow_id: "agent" });
 });
 
+test("claimEnvironmentTurn posts the claim to the environment route once, and answers the graph with the task", async () => {
+  const seen: { method?: string; url: URL; body: unknown }[] = [];
+  const claimed = {
+    claim: {
+      graph_id: "alpha",
+      branch_id: "main",
+      graph_epoch: 7,
+      task: task(),
+    },
+  };
+  const client = new LbbClient({
+    baseUrl: "http://localhost:7400",
+    maxRetries: 3,
+    retryDelayMs: 0,
+    fetch: async (input, init) => {
+      seen.push({
+        method: init?.method,
+        url: new URL(input),
+        body: JSON.parse(String(init?.body ?? "null")),
+      });
+      return new Response(JSON.stringify(claimed), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      });
+    },
+  });
+  const answer = await client.workflows.claimEnvironmentTurn({
+    worker: "w1",
+    workflows: [{ workflow_type: "counter", version: "v1" }],
+    wait_ms: 0,
+  });
+  assert.equal(answer.claim?.graph_id, "alpha");
+  assert.equal(answer.claim?.graph_epoch, 7);
+  assert.equal(answer.claim?.task.workflow_type, "counter");
+  assert.equal(seen.length, 1);
+  assert.equal(seen[0]?.method, "POST");
+  assert.equal(seen[0]?.url.pathname, "/v1/workflows/environment/turns/claim");
+  assert.deepEqual(seen[0]?.body, {
+    worker: "w1",
+    workflows: [{ workflow_type: "counter", version: "v1" }],
+    wait_ms: 0,
+  });
+});
+
+test("claimEnvironmentTurn is not retried: a server error is the caller's to see once", async () => {
+  let calls = 0;
+  const client = new LbbClient({
+    baseUrl: "http://localhost:7400",
+    maxRetries: 3,
+    retryDelayMs: 0,
+    fetch: async () => {
+      calls += 1;
+      return new Response(
+        JSON.stringify({
+          error: { code: "not_found", message: "workflow route" },
+        }),
+        { status: 404, headers: { "content-type": "application/json" } },
+      );
+    },
+  });
+  await assert.rejects(
+    client.workflows.claimEnvironmentTurn({
+      worker: "w1",
+      workflows: [{ workflow_type: "counter", version: "v1" }],
+    }),
+    (error: unknown) => error instanceof LbbError && error.status === 404,
+  );
+  assert.equal(calls, 1);
+});
+
+test("environmentSummary reads the environment summary route", async () => {
+  const seen: { method?: string; url: URL }[] = [];
+  const client = new LbbClient({
+    baseUrl: "http://localhost:7400",
+    maxRetries: 0,
+    fetch: async (input, init) => {
+      seen.push({ method: init?.method, url: new URL(input) });
+      return new Response(JSON.stringify({ state: "off", attention: [] }), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      });
+    },
+  });
+  const summary = await client.workflows.environmentSummary();
+  assert.equal(summary.state, "off");
+  assert.equal(seen[0]?.method, "GET");
+  assert.equal(seen[0]?.url.pathname, "/v1/workflows/environment/summary");
+});
+
 test("durable signal wait releases the worker and resumes from the received checkpoint", async () => {
   const resolved = {
     key: "review",
