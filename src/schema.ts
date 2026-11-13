@@ -11819,6 +11819,14 @@ export interface components {
              */
             limit_micro_usd?: number | null;
             limit_source: components["schemas"]["ModelBudgetLimitSource"];
+            /** @description Who pays for the model usage of this environment. */
+            plan: components["schemas"]["ModelBudgetPlan"];
+            /**
+             * Format: int64
+             * @description The plan allowance in millionths of a US dollar. Null: no allowance
+             *     applies (the customer pays, or the cell has none).
+             */
+            plan_allowance_micro_usd?: number | null;
             /**
              * @description When the month's budget is whole again: the first day of the next
              *     month, UTC (RFC 3339).
@@ -11843,7 +11851,7 @@ export interface components {
          * @description Where the limit in force comes from.
          * @enum {string}
          */
-        ModelBudgetLimitSource: "environment" | "default";
+        ModelBudgetLimitSource: "environment" | "default" | "plan";
         /**
          * @description The spend of one model in the month. At most 64 models; the rest sum
          *     under `*` for both fields.
@@ -11862,18 +11870,20 @@ export interface components {
              *     when it is known.
              */
             amount?: number | null;
-            /**
-             * @description What it concerns: `spent` for the total and every row of it, `budget`
-             *     for the limit.
-             */
+            /** @description What it concerns: `spent` for the total and every row of it. */
             dimension: string;
             /**
              * @description `dropped`, `unpriced_calls`, `training_not_in_dollars`,
-             *     `host_jev_cost_not_priced`, `host_calls_not_asked` or
-             *     `plan_allowance_not_applied`.
+             *     `host_jev_cost_not_priced` or `host_calls_not_asked`.
              */
             reason: string;
         };
+        /**
+         * @description Who pays for the model usage of the environment. It decides whether the
+         *     plan allowance caps the budget.
+         * @enum {string}
+         */
+        ModelBudgetPlan: "we_pay" | "customer_pays" | "unknown";
         /** @description `GET /v1/models/budget`. */
         ModelBudgetResponse: {
             budget: components["schemas"]["ModelBudgetLimit"];
