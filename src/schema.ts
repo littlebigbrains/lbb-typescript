@@ -226,6 +226,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/catalog/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Search the graphs and namespaces of the environment by name (graph catalog; application tokens and worker credentials are refused; answers 403 graph_catalog_disabled while the graph catalog reader is off) */
+        get: operations["get_v1_catalog_search"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/catalog/usage": {
         parameters: {
             query?: never;
@@ -6149,6 +6166,41 @@ export interface components {
             time_basis: string;
             /** @description returned_owner_index_page: native inventory is not a total-completeness proof. */
             totals_scope: string;
+        };
+        /** @description A graph that matches a search by name. */
+        CatalogSearchGraph: {
+            graph_id: string;
+            owner?: null | components["schemas"]["CatalogNamespaceIdentity"];
+            /** @description The path of the owner, not including the graph id. Absent for a graph in no namespace. */
+            path?: string | null;
+            /** @description The state of the graph. Today only `live`. The set is open: a reader treats any other value as an unknown state and does not fail. */
+            state: string;
+        };
+        /** @description A namespace that matches a search by name. */
+        CatalogSearchNamespace: {
+            /**
+             * Format: int32
+             * @description The number of names in `path`.
+             */
+            depth: number;
+            identity: components["schemas"]["CatalogNamespaceIdentity"];
+            name: string;
+            /** @description The names from the first level, joined by `/`. The root has no row. */
+            path: string;
+        };
+        /** @description The answer of `GET /v1/catalog/search`. Rows are ordered exact match, then prefix, then substring; within a rank the shorter text comes first, then the lexicographic order. Every row was checked: a graph against its head and its binding, a namespace against the application catalog. */
+        CatalogSearchPage: {
+            /**
+             * Format: int64
+             * @description When the newest read of the view that answered finished, in milliseconds since the Unix epoch. A result can lag the heads by about this age.
+             */
+            as_of_ms: number;
+            graphs: components["schemas"]["CatalogSearchGraph"][];
+            /** @description True when more matching graphs may exist, as for `more_namespaces`. */
+            more_graphs: boolean;
+            /** @description True when more matching namespaces may exist: a match beyond `limit` was found, or the call ended its read budget before it finished. There is no count. */
+            more_namespaces: boolean;
+            namespaces: components["schemas"]["CatalogSearchNamespace"][];
         };
         CatalogUsagePage: components["schemas"]["CatalogRegisteredUsagePage"] | components["schemas"]["CatalogRawUsagePage"];
         CatalogUsageTotals: {
@@ -26904,6 +26956,153 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CatalogNamespaceIdentity"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Rate limit exceeded */
+            429: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Service unavailable */
+            503: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+        };
+    };
+    get_v1_catalog_search: {
+        parameters: {
+            query?: {
+                /** @description Graph name (default `main`) */
+                graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
+                /** @description required; 1 to 64 characters after trimming; no control character or backslash; a query with / finds namespaces only; a query of one or two characters matches by prefix only */
+                q?: string;
+                /** @description optional stable namespace id; search only the graphs owned in its subtree and the namespaces below it (root or absent searches the environment); an unknown id is 404 */
+                namespace_id?: string;
+                /** @description rows of each kind, 1 through 25 (default 5) */
+                limit?: string;
+            };
+            header?: {
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
+                "Lbb-Version"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CatalogSearchPage"];
                 };
             };
             /** @description Bad request */
