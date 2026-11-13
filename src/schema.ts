@@ -7660,6 +7660,19 @@ export interface components {
             dim?: number | null;
             model: string;
         };
+        /** @description Why an embedding builds no new vectors, and when it goes on. */
+        EmbeddingPaused: {
+            /** @description `model_budget`: the environment's monthly model budget is spent. */
+            reason: string;
+            /**
+             * @description The latest time the build goes on: the reset of the budget, the first
+             *     day of the next month, UTC (RFC 3339). It goes on earlier when the
+             *     budget is raised.
+             */
+            resumes_at: string;
+            /** Format: int64 */
+            resumes_at_ms: number;
+        };
         /**
          * @description Preview a declaration (`POST /v1/embeddings/preview`): stores nothing and
          *     calls no model.
@@ -7920,6 +7933,7 @@ export interface components {
              */
             lag_commits?: number | null;
             name: string;
+            paused?: null | components["schemas"]["EmbeddingPaused"];
             /** Format: int64 */
             previous?: number | null;
             published_seq?: null | components["schemas"]["CommitSeq"];
