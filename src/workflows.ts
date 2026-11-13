@@ -724,6 +724,41 @@ export class WorkflowNamespace {
           : undefined,
     });
   }
+  /**
+   * Claim one turn from any graph of the environment that has work, through
+   * the environment's ready index. The request is the one of the per-graph
+   * claim. The answer is `{ claim: null }` when no graph had a claimable turn
+   * within `wait_ms`, else the graph (`graph_id`, `branch_id`, `graph_epoch`) and
+   * the `task`: its turn calls (heartbeat, checkpoint, complete, fail) go to
+   * that graph's own routes, with `expected_graph_epoch` set to `graph_epoch`.
+   *
+   * The credential must be the environment's (the environment key or a
+   * console session); a credential of one graph, a worker pool credential and
+   * an application token are refused (403). A 404 means this server or this
+   * environment does not offer the route: use the per-graph claim, which
+   * stays. It never means there is no work. Not retried: a lost answer must
+   * not claim a second turn. Hosted workers still take LBB's own work through the work board.
+   */
+  claimEnvironmentTurn(
+    request: Schemas["WorkflowTurnClaimRequest"],
+    options: CallOptions = {},
+  ): Promise<Schemas["WorkflowEnvironmentClaimResponse"]> {
+    return this.client.request("POST", `${base}/environment/turns/claim`, {
+      ...options,
+      retry: false,
+      body: request,
+    });
+  }
+  /**
+   * What the environment's graphs have waiting, in counts, from the ready
+   * index and no graph read: `state` is `off`, `building` or `ready`. An
+   * environment read; the graph scope is not used.
+   */
+  environmentSummary(
+    options: CallOptions = {},
+  ): Promise<Schemas["WorkflowEnvironmentSummaryResponse"]> {
+    return this.client.request("GET", `${base}/environment/summary`, options);
+  }
 }
 const suspended = Symbol("workflow sleep");
 
