@@ -16,6 +16,15 @@ export interface CatalogGraphPageOptions extends CatalogPageOptions {
   includeDescendants?: boolean;
 }
 
+export interface CatalogSearchOptions extends CallOptions {
+  /** Search only the graphs owned in this namespace's subtree and the namespaces below it. */
+  namespaceId?: string;
+  /** Rows of each kind, 1 through 25 (default 5). */
+  limit?: number;
+}
+
+export type CatalogSearchPage = Schemas["CatalogSearchPage"];
+
 export type CatalogUsageProfile =
   "registered-request-resource-v1" | "raw-resource-receipts-v1";
 export type CatalogUsagePage = Schemas["CatalogUsagePage"];
@@ -121,6 +130,25 @@ export class CatalogNamespace {
 
   graph(opts: CallOptions = {}): Promise<Schemas["CatalogGraph"]> {
     return this.client.request("GET", "/v1/catalog/graph", opts);
+  }
+
+  /**
+   * Search the graphs and namespaces of the environment by name. Rows are ordered
+   * exact match, then prefix, then substring, and each was checked against its
+   * head. `more_graphs` and `more_namespaces` are true when more rows may exist
+   * (there is no count). Needs an environment key and
+   * `LBB_GRAPH_CATALOG_READ` on the node; otherwise `graph_catalog_disabled` (403)
+   * or `graph_catalog_unavailable` (503, retry).
+   */
+  search(
+    q: string,
+    options: CatalogSearchOptions = {},
+  ): Promise<CatalogSearchPage> {
+    const { namespaceId, limit, ...opts } = options;
+    return this.client.request("GET", "/v1/catalog/search", {
+      ...opts,
+      query: { q, namespace_id: namespaceId, limit },
+    });
   }
 
   /** Continue until next_cursor is null, including through empty pages. */

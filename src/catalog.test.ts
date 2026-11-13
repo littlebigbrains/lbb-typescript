@@ -389,3 +389,77 @@ test("saved dataset views preserve immutable selection and exact primary epoch",
   assert.equal(seen[2].url.searchParams.get("graph"), "project");
   assert.deepEqual(seen[2].body, body);
 });
+
+test("catalog.search sends the query, the namespace and the limit with the graph scope", async () => {
+  const seen: URL[] = [];
+  const fetch: FetchLike = async (url) => {
+    seen.push(new URL(url));
+    return {
+      ok: true,
+      status: 200,
+      headers: { get: () => "application/json" },
+      text: async () =>
+        JSON.stringify({
+          namespaces: [],
+          graphs: [{ graph_id: "acme-support", state: "live" }],
+          more_namespaces: false,
+          more_graphs: true,
+          as_of_ms: 1795000000000,
+        }),
+    };
+  };
+  const client = new LbbClient({
+    baseUrl: "https://example.test",
+    graph: "project",
+    environment: "prod",
+    fetch,
+  });
+  const page = await client.catalog.search("acme", {
+    namespaceId: "ns_stable",
+    limit: 3,
+  });
+  assert.equal(page.graphs[0].graph_id, "acme-support");
+  assert.equal(page.more_graphs, true);
+  await client.catalog.search("acme/pro");
+  assert.equal(seen[0].pathname, "/v1/catalog/search");
+  assert.equal(seen[0].searchParams.get("q"), "acme");
+  assert.equal(seen[0].searchParams.get("namespace_id"), "ns_stable");
+  assert.equal(seen[0].searchParams.get("limit"), "3");
+  assert.equal(seen[1].searchParams.get("q"), "acme/pro");
+  assert.equal(seen[1].searchParams.has("namespace_id"), false);
+  assert.equal(seen[1].searchParams.has("limit"), false);
+  for (const request of seen) {
+    assert.equal(request.searchParams.get("graph"), "project");
+    assert.equal(request.searchParams.get("stack"), "prod");
+  }
+});
+
+test("catalog.search accepts a state that the server did not send before, and fields it adds", async () => {
+  const fetch: FetchLike = async () => ({
+    ok: true,
+    status: 200,
+    headers: { get: () => "application/json" },
+    text: async () =>
+      JSON.stringify({
+        namespaces: [],
+        graphs: [
+          { graph_id: "old", state: "live" },
+          { graph_id: "later", state: "archived", added_later: { any: 1 } },
+        ],
+        more_namespaces: false,
+        more_graphs: false,
+        as_of_ms: 1,
+        added_at_page_level: true,
+      }),
+  });
+  const client = new LbbClient({ baseUrl: "https://example.test", fetch });
+  const page = await client.catalog.search("later");
+  // `state` is an open set: the type is a string, so a reader can handle a value that
+  // it does not know without a cast, and nothing validates the object shape away.
+  const states: string[] = page.graphs.map((graph) => graph.state);
+  assert.deepEqual(states, ["live", "archived"]);
+  assert.equal(
+    (page as unknown as { added_at_page_level: boolean }).added_at_page_level,
+    true,
+  );
+});
