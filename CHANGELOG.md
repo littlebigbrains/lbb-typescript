@@ -4,6 +4,17 @@ All notable changes to the `@littlebigbrain/client` package are documented here.
 
 ## Unreleased
 
+- `Sandbox` has the optional `status_message`. A sandbox whose start failed
+  because a file of its template could not be copied in (`start_error`) names
+  the file by its SHA-256 and the path it was to go to. It is absent otherwise.
+  No code needs a change.
+- `FileOrigin` has the optional `sandbox` (`sbx_`). `workflow`, `run` and `step`
+  stay required strings. A file kept from a sandbox workspace
+  (`POST /v1/files?source_sandbox=&source_path=`, from a later release of the
+  server with the sandbox feature on) has empty `workflow`, `run` and `step`
+  and a `sandbox`. A file a workflow run wrote has the three and no `sandbox`,
+  as before. No code needs a change: a client that requires the three fields
+  reads every record.
 - A step that meets `429 model_budget_exceeded` waits for the reset the same way
   as one that meets `429 workflow_budget_exceeded`. The server produces the new
   code for the environment's model budget from a later release. Handle both.
