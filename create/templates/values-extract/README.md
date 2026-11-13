@@ -49,7 +49,12 @@ with `stableHashHex`). One owned write per turn replaces the values of the
 turn's instances: a property the workflow does not write again loses its
 value and its source. Each value's evidence is its quote, with the
 instance's page box as its region when the instance has one (`page`, `x0`,
-`y0`, `x1`, `y1`, as a `DocEntry` has).
+`y0`, `x1`, `y1`, as a `DocEntry` has). Its source is the page of the file the
+instance is `DEFINED_IN` (`<Document IRI>#page=3`, the page from 1, as `documents.link`
+writes it) when the instance has that edge and a page; otherwise the instance's label.
+The source is a claim of the data: the workflow does not check it against the file, so
+the evidence has no `source_sha256`. A file named this way stays stored after it is
+deleted, while the value stays. The review item names the same source.
 
 Before it writes, the workflow reads the items (`lbb.reviewItems(keys)`): a
 person's answer wins over the model, for the evidence it was given on

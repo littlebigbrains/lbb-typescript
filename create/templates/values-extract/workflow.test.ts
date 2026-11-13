@@ -128,6 +128,8 @@ interface Row {
   name: string;
   text?: string;
   box?: Record<string, number>;
+  /** The `Document`s the instance is `DEFINED_IN`. */
+  documents?: string[];
 }
 
 function rules(records: Row[], more: MockRules = {}): MockRules {
@@ -148,14 +150,18 @@ function rules(records: Row[], more: MockRules = {}): MockRules {
       ),
     sparql: (query) => {
       assert.ok(query.startsWith("# values-extract: texts"));
+      assert.ok(query.includes("<https://littlebigbrain.com/r/defined_in>"));
       return records
         .filter((r) => query.includes(iriOf(r.name)))
-        .map((r) => ({
-          s: iriOf(r.name),
-          label: r.name,
-          ...(r.text !== undefined ? { text: r.text } : {}),
-          ...Object.fromEntries(Object.entries(r.box ?? {}).map(([k, v]) => [k, String(v)])),
-        }));
+        .flatMap((r) =>
+          (r.documents?.length ? r.documents : [undefined]).map((document) => ({
+            s: iriOf(r.name),
+            label: r.name,
+            ...(r.text !== undefined ? { text: r.text } : {}),
+            ...(document !== undefined ? { document } : {}),
+            ...Object.fromEntries(Object.entries(r.box ?? {}).map(([k, v]) => [k, String(v)])),
+          })),
+        );
     },
     ...more,
   };
@@ -708,6 +714,66 @@ test("a value's evidence has the instance's page box as its region", async () =>
     y1: 0.3,
     confidence: 0.92,
   });
+});
+
+const DOCUMENT = "https://littlebigbrain.com/e/41ab41ab41ab41ab41ab41ab41ab41ab";
+const OTHER_DOCUMENT = "https://littlebigbrain.com/e/9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f";
+const COAT_RAIL = "S 9.2 Coat rail, stainless steel, 30 x 10 cm.";
+const BOX = { x0: 0.1, y0: 0.2, x1: 0.6, y1: 0.3 };
+
+/** The source of the evidence of the one value written for a record. */
+async function sourceOfValue(record: Row): Promise<string | undefined> {
+  const lbb = new MockActivities(rules([record]));
+  await runMessage(createWorkflow(lbb), triggerMessage("values-extract", [iriOf(record.name)]));
+  const edge = lbb.graph.edgesOf("HAS_VALUE_SOURCE")[0]!;
+  return (edge.evidence as { source_id?: string }).source_id;
+}
+
+test("a value names the page of the document its instance is defined in, else the label", async () => {
+  const base = { name: "S 9.2", text: COAT_RAIL };
+  // A document and a page: the file's IRI and the page from 1.
+  assert.equal(
+    await sourceOfValue({ ...base, box: { page: 2, ...BOX }, documents: [DOCUMENT] }),
+    `${DOCUMENT}#page=3`,
+  );
+  assert.equal(
+    await sourceOfValue({ ...base, box: { page: 0, ...BOX }, documents: [DOCUMENT] }),
+    `${DOCUMENT}#page=1`,
+  );
+  // A document and no page, a page and no document, and neither: the label.
+  assert.equal(await sourceOfValue({ ...base, documents: [DOCUMENT] }), "S 9.2");
+  assert.equal(await sourceOfValue({ ...base, box: { page: 2, ...BOX } }), "S 9.2");
+  assert.equal(await sourceOfValue(base), "S 9.2");
+  // A page that is not a whole number from 0 is no page.
+  assert.equal(
+    await sourceOfValue({ ...base, box: { page: -1, ...BOX }, documents: [DOCUMENT] }),
+    "S 9.2",
+  );
+});
+
+test("an instance defined in two documents names the smaller IRI, whatever the row order", async () => {
+  const base = { name: "S 9.2", text: COAT_RAIL, box: { page: 2, ...BOX } };
+  for (const documents of [
+    [DOCUMENT, OTHER_DOCUMENT],
+    [OTHER_DOCUMENT, DOCUMENT],
+  ]) {
+    assert.equal(await sourceOfValue({ ...base, documents }), `${DOCUMENT}#page=3`);
+  }
+});
+
+test("the review item of a value below the gate names the same page, and the page box stays 0-based", async () => {
+  const record: Row = {
+    name: "S 9.2",
+    text: "S 9.2 Desk, width 600 mm, of oak.",
+    box: { page: 2, ...BOX },
+    documents: [DOCUMENT],
+  };
+  const proposals = [{ property: "width_cm", value: "600", unit: "mm", quote: "width 600 mm" }];
+  const lbb = new MockActivities(rules([record], { reason: () => ({ values: proposals }) }));
+  await runMessage(createWorkflow(lbb), triggerMessage("values-extract", [iriOf(record.name)]));
+  const item = [...lbb.questions.values()][0]!;
+  assert.equal(item.evidence![0]!.source_id, `${DOCUMENT}#page=3`);
+  assert.equal((item.evidence![0]!.region as { page: number }).page, 2);
 });
 
 test("a message of more instances than a turn reads continues in a new turn", async () => {

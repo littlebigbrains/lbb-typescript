@@ -20,7 +20,8 @@
 //    value;
 // 4. writes the values at or above the gate, each with a `ValueSource` whose
 //    evidence is the quote (with the instance's page box as its region, when
-//    the instance has one), and asks a person about each value between 0.5
+//    the instance has one, and the page of the file it is `DEFINED_IN` as its
+//    source, else its label), and asks a person about each value between 0.5
 //    and the gate: a `value` review item in the property's unit, one per
 //    property of an instance. A value below 0.5 is dropped.
 //
@@ -225,6 +226,10 @@ interface Instance {
   label: string;
   text: string;
   box: Schemas["RegionAnchorInput"] | null;
+  /** The `Document` the instance is `DEFINED_IN`, when it has one (the smallest IRI if there are several). */
+  document: string | null;
+  /** The 0-based page of the instance in that file, from its `page` fact. */
+  page: number | null;
 }
 
 /** What the models made of one instance. */
@@ -265,6 +270,7 @@ const PLAIN_IRI = /^[^\s<>"{}|\\^`]+$/;
 const ENTITY_IRI = /^https:\/\/littlebigbrain\.com\/e\/[0-9a-fA-F]{32}$/;
 const LABEL = "http://www.w3.org/2000/01/rdf-schema#label";
 const P = "https://littlebigbrain.com/p/";
+const DEFINED_IN = "https://littlebigbrain.com/r/defined_in";
 const BOX = ["page", "x0", "y0", "x1", "y1"] as const;
 /**
  * White space as Rust's `char::is_whitespace` has it (Unicode White_Space), which is what LBB's
@@ -859,7 +865,7 @@ export function createWorkflow(lbb: LbbActivities, settings: Settings = defaults
             evidence: [
               {
                 quote: chars(v.quote, 600),
-                source_id: iri,
+                source_id: facts.edge.evidence.source_id,
                 ...(facts.edge.evidence.region ? { region: facts.edge.evidence.region } : {}),
                 confidence: support,
               },
@@ -1017,23 +1023,35 @@ export function createWorkflow(lbb: LbbActivities, settings: Settings = defaults
         // An instance that is no entity of the graph is not read (LBB skips it too).
         const plain = iris.filter((iri) => PLAIN_IRI.test(iri) && ENTITY_IRI.test(iri));
         const query = `# values-extract: texts
-SELECT ?s ?label ?text ${BOX.map((b) => `?${b}`).join(" ")} WHERE {
+SELECT ?s ?label ?text ?document ${BOX.map((b) => `?${b}`).join(" ")} WHERE {
   VALUES ?s { ${plain.map((iri) => `<${iri}>`).join(" ")} }
   ?s a ?class .
   OPTIONAL { ?s <${LABEL}> ?label }
   OPTIONAL { ?s <${P}${encodeURIComponent(settings.textField.toLowerCase())}> ?text }
+  OPTIONAL { ?s <${DEFINED_IN}> ?document }
 ${BOX.map((b) => `  OPTIONAL { ?s <${P}${b}> ?${b} }`).join("\n")}
 }`;
         const { rows } = await lbb.sparql({ query, as_of_commit_seq: message.as_of_commit_seq });
         const found = new Map<
           string,
-          { labels: Set<string>; texts: Set<string>; box: Record<string, string> }
+          {
+            labels: Set<string>;
+            texts: Set<string>;
+            documents: Set<string>;
+            box: Record<string, string>;
+          }
         >();
         for (const row of rows) {
-          const at = found.get(row.s!) ?? { labels: new Set(), texts: new Set(), box: {} };
+          const at = found.get(row.s!) ?? {
+            labels: new Set(),
+            texts: new Set(),
+            documents: new Set(),
+            box: {},
+          };
           found.set(row.s!, at);
           if (row.label && normalize(row.label)) at.labels.add(normalize(row.label));
           if (row.text && normalize(row.text)) at.texts.add(normalize(row.text));
+          if (row.document) at.documents.add(row.document);
           for (const b of BOX) if (row[b] !== undefined) at.box[b] ??= row[b]!;
         }
         const out: Record<string, Instance> = {};
@@ -1045,10 +1063,35 @@ ${BOX.map((b) => `  OPTIONAL { ?s <${P}${b}> ?${b} }`).join("\n")}
             ? chars(`${settings.textField}: ${values.join(", ")}`, TEXT_CHARS)
             : "";
           const label = [...at.labels].sort()[0] ?? entityIdFromIri(iri);
-          out[iri] = { label, text, box: region(at.box) };
+          out[iri] = {
+            label,
+            text,
+            box: region(at.box),
+            document: [...at.documents].sort()[0] ?? null,
+            page: pageOf(at.box.page),
+          };
         }
         return out;
       })());
+  }
+
+  /** The 0-based page of an instance read from a file: a whole number from 0, else none. */
+  function pageOf(page: string | undefined): number | null {
+    if (page === undefined) return null;
+    const n = Number(page);
+    return Number.isInteger(n) && n >= 0 ? n : null;
+  }
+
+  /**
+   * The source of the evidence of a value: the page of the file the instance is
+   * defined in (`<Document IRI>#page=3`, the page from 1, as the hosted agent
+   * writes it) when it has a `DEFINED_IN` document and a page, else its label.
+   * It is a claim of the data, not one checked against the file: no `source_sha256`.
+   */
+  function sourceOf(record: Instance): string {
+    return record.document !== null && record.page !== null
+      ? `${record.document}#page=${record.page + 1}`
+      : chars(record.label, 200);
   }
 
   /** The instance's page box as a region, when it has a valid one (`page`, `x0`, `y0`, `x1`, `y1`). */
@@ -1130,7 +1173,7 @@ ${BOX.map((b) => `  OPTIONAL { ?s <${P}${b}> ?${b} }`).join("\n")}
         confidence: support,
         evidence: {
           text: v.quote,
-          source_id: chars(record.label, 200),
+          source_id: sourceOf(record),
           ...(region ? { region } : {}),
         },
       },
