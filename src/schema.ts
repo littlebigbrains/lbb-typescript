@@ -1693,7 +1693,7 @@ export interface paths {
         /** One page of the graph's files, newest upload first, with what the parse workflow (`documents.parse`) made of each. Without `limit`, the newest 1,000. `next` is the cursor of the next page; a page can hold fewer than `limit` files while `next` is set. With `parse_status` or `name`, one SPARQL read of the `Document` facts at the published generation finds the page, and `as_of_commit_seq` names the commit it read; a file whose record no longer matches (a rename or a parse since) is left out. 400 for an invalid `limit`, `after`, `parse_status` or `name` */
         get: operations["get_v1_files"];
         put?: never;
-        /** Upload a file: the raw request body is stored once under its SHA-256, and a `Document` entity (key `file:<sha256>`) is committed for it, with its `Content` (key `content:<sha256>`) and the edge `HAS_CONTENT`. `language` and `schema` are stored on the `Document` when given. A file holds at most 1 GiB by default (the server setting `LBB_FILES_MAX_BYTES`); a larger body is refused with 413 `file_too_large` before it is read. An empty body is an empty file. The same bytes under the same name change nothing. 409 `file_generated` for the bytes of a generated file (one a workflow run wrote): delete that file first, then upload the bytes as a source. 429 `file_reclaim_in_progress` while a reclaim pass deletes the same bytes of a deleted file (seconds). Under a `file_write` execution credential (a turn of the hosted agent type; LBB's hosted workers only) the upload writes a generated file, an output: `step` is required, the server sets `origin.workflow` and `origin.run` from the credential, the file expires after `retain_days` (default 31), and no `Document`, `Content` or content log entry is written. The type is text/plain, text/markdown or application/json, the extension must match, the body holds at most 1 MiB, and one message writes at most 5 files and 4 MiB (415 `file_output_type`, 400 `file_output_content`, 403 `file_output_limit`). A file that already exists is answered with `created: false` and a `collision` (`retry` or `existing`). A person or a stack key that sends `step` or `retain_days` gets 400 */
+        /** Upload a file: the raw request body is stored once under its SHA-256, and a `Document` entity (key `file:<sha256>`) is committed for it, with its `Content` (key `content:<sha256>`) and the edge `HAS_CONTENT`. `language` and `schema` are stored on the `Document` when given. A file holds at most 1 GiB by default (the server setting `LBB_FILES_MAX_BYTES`); a larger body is refused with 413 `file_too_large` before it is read. An empty body is an empty file. The same bytes under the same name change nothing. 409 `file_generated` for the bytes of a generated file (one a workflow run wrote, or a key kept from a sandbox): delete that file first, then upload the bytes as a source. 429 `file_reclaim_in_progress` while a reclaim pass deletes the same bytes of a deleted file (seconds). Under a `file_write` execution credential (a turn of the hosted agent type; LBB's hosted workers only) the upload writes a generated file, an output: `step` is required, the server sets `origin.workflow` and `origin.run` from the credential, the file expires after `retain_days` (default 31), and no `Document`, `Content` or content log entry is written. The type is text/plain, text/markdown or application/json, the extension must match, the body holds at most 1 MiB, and one message writes at most 5 files and 4 MiB (415 `file_output_type`, 400 `file_output_content`, 403 `file_output_limit`). A file that already exists is answered with `created: false` and a `collision` (`retry` or `existing`). A person or a stack key that sends `step` gets 400, and `retain_days` too unless the request is a keep. With `source_sandbox` and `source_path` (an environment key or a console session, while the sandbox feature is on, else 409 `sandbox_not_enabled`) the route keeps a file of a sandbox's `/workspace` as a generated file, an output: the body is empty, `origin.sandbox` names the sandbox, the file expires after `retain_days`, and no `Document` is written. The server reads the file from the guest in parts, refuses one over 1 MiB (413 `file_too_large`) and hashes it itself; the type follows the name as for any output (415 `file_output_type`, 400 `file_output_content`), and a sandbox keeps 5 files and 4 MiB (403 `file_output_limit`). A repeat under the same `Idempotency-Key` answers the same File (`created: false`, `collision: retry`), also when the workspace file has changed. A kept file is never evidence (`source_generated`). 404 `sandbox_not_found`, 404 `sandbox_file_not_found`, 400 `sandbox_path_invalid`, 409 `sandbox_not_running`, 409 `graph_epoch_changed` */
         post: operations["post_v1_files"];
         /** Remove a file from the list and retract its `Document` entity. The facts whose evidence names the file stay, and keep its content from the reclaim, which deletes a deleted file's bytes, pages and derivations after a grace (30 days by default). With `purge=true` the delete also retracts the edges whose evidence names the file (`purged_edges`, at most 10,000, found at the published generation); a deleted file can be purged. A generated file has no `Document`: its delete retracts nothing, and `purge` retracts no edge (`purged_edges` is 0). 429 `file_reclaim_in_progress` while a reclaim pass holds the content */
         delete: operations["delete_v1_files"];
@@ -1747,7 +1747,7 @@ export interface paths {
         get?: never;
         put?: never;
         post?: never;
-        /** Keep a generated file: remove its `expires_at`, so it stays until a person deletes it and shows in `GET /v1/files` from now on. A generated file is one a workflow run wrote (`origin`). A repeat answers the same record, so the call needs no `Idempotency-Key`, and the server ignores one. A live file without an expiry answers as it is. 404 `file_not_found` for no file, a deleted one and a reclaimed one */
+        /** Keep a generated file: remove its `expires_at`, so it stays until a person deletes it and shows in `GET /v1/files` from now on. A generated file is one a workflow run wrote, or a key kept from a sandbox (`origin`). A repeat answers the same record, so the call needs no `Idempotency-Key`, and the server ignores one. A live file without an expiry answers as it is. 404 `file_not_found` for no file, a deleted one and a reclaimed one */
         delete: operations["delete_v1_files_expiry"];
         options?: never;
         head?: never;
@@ -3774,7 +3774,7 @@ export interface paths {
         };
         /** The bytes of a file of `/workspace`, 4 MiB at most an answer. One `Range: bytes=a-b`, `bytes=a-` or `bytes=-n` answers 206 with `Content-Range`; a range with no byte of the file answers 416. The answer sends `X-Content-Type-Options: nosniff` and `Content-Disposition: attachment`. 400 `sandbox_path_invalid`, 404 `sandbox_file_not_found`, 409 `sandbox_not_running`, 413 `sandbox_file_too_large` for a read of more than 4 MiB without a range */
         get: operations["get_v1_sandboxes_files_content"];
-        /** Write a file of `/workspace` with the request body, 4 MiB at most, and make its directories. An empty body is an empty file. The same bytes again change nothing. 400 `sandbox_path_invalid`, 404 `sandbox_not_found`, 409 `sandbox_not_running`, 413 `sandbox_file_too_large` */
+        /** Write a file of `/workspace` with the request body, 4 MiB at most, and make its directories. An empty body is an empty file. The same bytes again change nothing. With `source_sha256` the body is empty and the file is the File of the graph with that SHA-256 (an import): the server reads it from storage and sends it to the guest in parts of 512 KiB, up to the server's file limit (`LBB_FILES_MAX_BYTES`) and the sandbox's disk, and checks its SHA-256 before the file appears at `path`; a File whose bytes do not match is refused and the path stays as it was. 400 `sandbox_path_invalid`, 404 `sandbox_not_found`, 404 `file_not_found` (an import), 409 `sandbox_not_running`, 409 `graph_epoch_changed` (an import), 413 `sandbox_file_too_large`, 413 `file_too_large` (an import) */
         put: operations["put_v1_sandboxes_files_content"];
         post?: never;
         delete?: never;
@@ -3844,7 +3844,7 @@ export interface paths {
         /** The saved templates of the graph, newest version first. A name resolves to its newest version; each save of a name is a version with its own id. The base templates LBB publishes are read by id (`sbt_lbb_python`, `sbt_lbb_node`, `sbt_lbb_shell`). 409 `sandbox_not_enabled` */
         get: operations["get_v1_sandboxes_templates"];
         put?: never;
-        /** Save a template: a base template, the `run` code (64 KiB), limits, a command timeout and a default config. Each call writes a new immutable version with a new `sbt_` id, and the name then resolves to it. `files` are not available yet (400 `invalid_request`). The optional `Idempotency-Key` makes a repeat answer the same version; the same key with another body answers 409 `idempotency_conflict`. 400 `sandbox_limits_invalid`, 409 `sandbox_not_enabled` */
+        /** Save a template: a base template, the `run` code (64 KiB), limits, a command timeout and a default config. Each call writes a new immutable version with a new `sbt_` id, and the name then resolves to it. `files` are Files of the graph by SHA-256 (`{path, source_sha256}`, 64 at most and 16 MiB together): the server copies them into `/workspace` when a sandbox of the template first starts, before the sandbox is `running`. A file the graph does not hold is refused with 404 `file_not_found`; a path outside `/workspace` with 400 `sandbox_path_invalid`. The optional `Idempotency-Key` makes a repeat answer the same version; the same key with another body answers 409 `idempotency_conflict`. 400 `sandbox_limits_invalid`, 409 `sandbox_not_enabled` */
         post: operations["post_v1_sandboxes_templates"];
         delete?: never;
         options?: never;
@@ -9417,13 +9417,37 @@ export interface components {
              */
             next?: string | null;
         };
-        /** @description The run that wrote a generated file. */
+        /**
+         * @description Where a generated file came from: the run that wrote it, or the sandbox
+         *     whose workspace file it keeps.
+         *
+         *     A file a workflow run wrote has `workflow`, `run` and `step`, and no
+         *     `sandbox`. A file kept from a sandbox (`POST /v1/files?source_sandbox=&source_path=`)
+         *     has `sandbox`, and `workflow`, `run` and `step` as empty strings, because no
+         *     run wrote it. The three are always strings, as they were before the keep
+         *     existed, so a client that requires them reads every record. The server sets
+         *     every field. A request never does.
+         */
         FileOrigin: {
-            /** @description The run (one attempt of a turn) that wrote it. */
+            /**
+             * @description The run (one attempt of a turn) that wrote it. Empty on a file kept
+             *     from a sandbox by a key.
+             */
             run: string;
-            /** @description The step of the run that wrote it. */
+            /**
+             * @description The sandbox (`sbx_`) whose workspace file this file keeps. Present only
+             *     on a file kept from a sandbox.
+             */
+            sandbox?: string | null;
+            /**
+             * @description The step of the run that wrote it. Empty on a file kept from a sandbox
+             *     by a key.
+             */
             step: string;
-            /** @description The workflow that wrote the file. */
+            /**
+             * @description The workflow that wrote the file. Empty on a file kept from a sandbox
+             *     by a key.
+             */
             workflow: string;
         };
         /**
@@ -17663,6 +17687,15 @@ export interface components {
             owner?: null | components["schemas"]["SandboxOwner"];
             run?: null | components["schemas"]["SandboxRunSummary"];
             status: components["schemas"]["SandboxStatus"];
+            /**
+             * @description What went wrong, in words, for a sandbox whose start failed for a cause
+             *     of its own: a file of its template is gone or cannot be copied in (it
+             *     names the file by its SHA-256 and the path it was to go to), the
+             *     template is gone, the graph was deleted and made again, or the image of
+             *     the sandbox is older than the server. Absent otherwise, and gone when
+             *     the status changes.
+             */
+            status_message?: string | null;
             status_reason?: null | components["schemas"]["SandboxStatusReason"];
             template: components["schemas"]["SandboxTemplateRef"];
             usage: components["schemas"]["SandboxUsage"];
@@ -18107,8 +18140,8 @@ export interface components {
             /** @description The default config, JSON of 1 MiB at most. */
             config?: unknown;
             /**
-             * @description Files for `/workspace`. Not available yet; see
-             *     [`SandboxTemplateFile`].
+             * @description Files for `/workspace`: Files of the graph, copied when a sandbox of
+             *     this template first starts. See [`SandboxTemplateFile`].
              */
             files?: components["schemas"]["SandboxTemplateFile"][];
             limits?: null | components["schemas"]["SandboxLimitsInput"];
@@ -18121,14 +18154,15 @@ export interface components {
             timeout_ms?: number | null;
         };
         /**
-         * @description A file a template copies into `/workspace`. A template with files needs
-         *     the import from Files, which is not available yet: a create with `files`
-         *     answers 400 `invalid_request`.
+         * @description A file a template copies into `/workspace` when a sandbox of the template
+         *     first starts: a File of the graph, named by its SHA-256. A template holds
+         *     64 files at most and 16 MiB together. The path is under `/workspace`; the
+         *     template shows it as an absolute path.
          */
         SandboxTemplateFile: {
             /** @description The path in `/workspace`. */
             path: string;
-            /** @description The SHA-256 of a file of the graph. */
+            /** @description The SHA-256 of a file of the graph, 64 hexadecimal characters. */
             source_sha256: string;
         };
         /** @description One page of templates, newest first. */
@@ -41282,15 +41316,19 @@ export interface operations {
                 stack?: string;
                 /** @description Optional decimal u64 graph incarnation from /v1/workflows/scope. A changed incarnation returns 409 graph_epoch_changed; a graph missing at admission returns 404. Synchronous writes and CAS retries cannot mutate a replacement incarnation; detached jobs are outside this precondition. */
                 expected_graph_epoch?: string;
-                /** @description the file's name */
+                /** @description the file's name; a keep takes the name of the workspace file when it is left out */
                 name?: string;
+                /** @description a keep: the sandbox's id (`sbx_`); it must run */
+                source_sandbox?: string;
+                /** @description a keep: the path of the file in `/workspace` */
+                source_path?: string;
                 /** @description the natural language of the content, a BCP 47 tag such as `en` or `de-CH` */
                 language?: string;
                 /** @description the schema the content follows (a name or a URL), at most 256 characters */
                 schema?: string;
                 /** @description a `file_write` credential only, required: the step that wrote the file, 1 to 128 of A-Z a-z 0-9 _ . : - */
                 step?: string;
-                /** @description a `file_write` credential only: days until the file expires, 1 to 365 (default 31) */
+                /** @description a `file_write` credential or a keep only: days until the file expires, 1 to 365 (default 31) */
                 retain_days?: string;
             };
             header?: {
@@ -63220,6 +63258,8 @@ export interface operations {
                 sandbox?: string;
                 /** @description the file's path in `/workspace` */
                 path?: string;
+                /** @description an import: the SHA-256 of a File of the graph (64 hexadecimal characters); the body is then empty */
+                source_sha256?: string;
             };
             header?: {
                 /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
