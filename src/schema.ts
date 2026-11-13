@@ -11942,6 +11942,38 @@ export interface components {
             /** @description Object key of the artifact (under the tenant prefix, so purge covers it). */
             key: string;
         };
+        /**
+         * @description `GET /api/admin/model-budget/check` (database admin token): the answer for a
+         *     paid call of the SaaS API that may run (a spent budget is the error
+         *     `429 model_budget_exceeded`, an unreadable one `503 model_budget_unavailable`).
+         *     The caller keeps the answer for `ttl_ms` and spends at most
+         *     `headroom_micro_usd` with it.
+         */
+        ModelBudgetCheckResponse: {
+            /** @description Always `true`: a call that may not run is an error. */
+            allowed: boolean;
+            /** Format: int64 */
+            checked_at_ms: number;
+            /**
+             * @description False when the cell's check is off (`LBB_MODEL_BUDGET_ENFORCE`): the
+             *     answer is `allowed` and nothing was read.
+             */
+            enforcing: boolean;
+            /**
+             * Format: int64
+             * @description What the environment can still spend this month, in millionths of a US
+             *     dollar: the limit minus the spend this node knows. Null when the
+             *     environment has no limit, or the check is off. The caller never spends
+             *     more than this between two answers.
+             */
+            headroom_micro_usd?: number | null;
+            /**
+             * Format: int64
+             * @description How long the answer holds, in milliseconds: the cache time of the check
+             *     (10 s, 5 s from 80 % of the limit).
+             */
+            ttl_ms: number;
+        };
         /** @description The spend of one day (UTC). */
         ModelBudgetDay: {
             /** Format: int64 */
