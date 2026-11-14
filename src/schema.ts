@@ -11946,8 +11946,9 @@ export interface components {
          * @description `GET /api/admin/model-budget/check` (database admin token): the answer for a
          *     paid call of the SaaS API that may run (a spent budget is the error
          *     `429 model_budget_exceeded`, an unreadable one `503 model_budget_unavailable`).
-         *     The caller keeps the answer for `ttl_ms` and spends at most
-         *     `headroom_micro_usd` with it.
+         *     The caller keeps the answer for `ttl_ms` and takes `headroom_micro_usd` as
+         *     the room it has, less what it spent in the last 75 seconds that the headroom
+         *     does not hold yet (`docs/architecture/model-budget.md`, slice M3e-3).
          */
         ModelBudgetCheckResponse: {
             /** @description Always `true`: a call that may not run is an error. */
@@ -11962,9 +11963,11 @@ export interface components {
             /**
              * Format: int64
              * @description What the environment can still spend this month, in millionths of a US
-             *     dollar: the limit minus the spend this node knows. Null when the
-             *     environment has no limit, or the check is off. The caller never spends
-             *     more than this between two answers.
+             *     dollar: the limit minus the spend this node knows. It does not hold the
+             *     caller's own spend of the last 75 seconds (its report, the node's flush
+             *     and this check's cache come between a call and the ledger), so the
+             *     caller takes that out. Null when the environment has no limit, or the
+             *     check is off. It is not a bound on the overshoot of a cell.
              */
             headroom_micro_usd?: number | null;
             /**
@@ -12053,7 +12056,9 @@ export interface components {
             dimension: string;
             /**
              * @description `dropped`, `unpriced_calls`, `training_not_in_dollars`,
-             *     `host_jev_cost_not_priced` or `host_calls_not_asked`.
+             *     `host_jev_cost_not_priced`, `host_calls_not_asked` or
+             *     `cdc_plan_spend_not_recorded` (the CDC plan runner reports its model
+             *     calls to no ledger, so its spend is not in the figure).
              */
             reason: string;
         };
