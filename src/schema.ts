@@ -11718,7 +11718,7 @@ export interface components {
          * @description The feature a model call served.
          * @enum {string}
          */
-        ModelActivityFeature: "index" | "search" | "fit" | "judge" | "training" | "rerank" | "rewrite" | "trial" | "workflows";
+        ModelActivityFeature: "index" | "search" | "fit" | "judge" | "training" | "rerank" | "rewrite" | "trial" | "workflows" | "cdc_plan";
         /**
          * @description One feature and model on one graph over the month. `graph` is `*` for
          *     the graphs past the ledger's bound ("other graphs").
