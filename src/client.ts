@@ -2403,6 +2403,23 @@ export class LbbClient {
   listGraphs(): Promise<Schemas["GraphListResponse"]> {
     return this.request("GET", "/v1/graphs");
   }
+
+  /**
+   * One page of the graphs under the scoped tenant with the state of each
+   * one's background work: how far the index is behind in commits and in time,
+   * queued items and how long they wait, and the write limit
+   * (`GET /v1/graphs/health`). The server computes it on read from the reads of
+   * {@link LbbClient.activity}; a row is at most 15 seconds old
+   * (`observed_at_micros`). Page with `next_cursor` while `has_more` is true
+   * (25 rows by default, 100 at most).
+   */
+  graphsHealth(
+    opts: { cursor?: string; limit?: number } = {},
+  ): Promise<Schemas["GraphHealthResponse"]> {
+    return this.request("GET", "/v1/graphs/health", {
+      query: { cursor: opts.cursor, limit: opts.limit },
+    });
+  }
 }
 
 function isStatusObject(value: unknown): value is Record<string, unknown> {

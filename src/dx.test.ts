@@ -1130,6 +1130,51 @@ test("a false profile is never sent, so older servers accept the body", async ()
   }
 });
 
+test("the client reads the health of the graphs of the environment, with paging", async () => {
+  const row = {
+    graph_id: "main",
+    state: "current",
+    epoch: 1,
+    head_seq: 3,
+    published_seq: 3,
+    lag_commits: 0,
+    behind_ms: 0,
+    publication: "current",
+    pending_commits: 0,
+    soft_pending_commits: 256,
+    max_pending_commits: 1024,
+    active_items: 0,
+    oldest_wait_ms: null,
+    failed_items: 0,
+    embeddings_behind: 0,
+    embeddings_failed: 0,
+    observed_at_micros: 10,
+  };
+  const { fetch, urls } = queuedFetch([
+    {
+      body: {
+        object: "list",
+        data: [row],
+        has_more: true,
+        next_cursor: "main",
+      },
+    },
+    { body: { object: "list", data: [], has_more: false, next_cursor: null } },
+  ]);
+  const client = new LbbClient({ baseUrl: "http://h", fetch });
+
+  const first = await client.graphsHealth();
+  const second = await client.graphsHealth({ cursor: "main", limit: 10 });
+
+  assert.equal(first.data[0]?.state, "current");
+  assert.equal(first.has_more, true);
+  assert.equal(second.has_more, false);
+  assert.deepEqual(urls, [
+    "http://h/v1/graphs/health",
+    "http://h/v1/graphs/health?cursor=main&limit=10",
+  ]);
+});
+
 test("graph namespace reads planner statistics with paging", async () => {
   const { fetch, urls } = queuedFetch([
     { body: { served_at_seq: null, predicates: [], next_cursor: null } },
