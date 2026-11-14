@@ -11793,6 +11793,12 @@ export interface components {
             feature: components["schemas"]["ModelActivityFeature"];
             /** Format: int64 */
             gpu_seconds?: number;
+            /**
+             * @description A graph name (lowercase letters, digits, dashes and underscores, 1 to 32
+             *     characters), or `@none` for a count that belongs to no graph. `@none` is
+             *     reserved: it is not a graph name, so no graph can have it. The graph is
+             *     not checked to exist.
+             */
             graph: string;
             /** Format: int64 */
             items?: number;
