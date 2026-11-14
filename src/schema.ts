@@ -11953,8 +11953,8 @@ export interface components {
          *     paid call of the SaaS API that may run (a spent budget is the error
          *     `429 model_budget_exceeded`, an unreadable one `503 model_budget_unavailable`).
          *     The caller keeps the answer for `ttl_ms` and takes `headroom_micro_usd` as
-         *     the room it has, less what it spent in the last 75 seconds that the headroom
-         *     does not hold yet (`docs/architecture/model-budget.md`, slice M3e-3).
+         *     the room it has, less what it spent recently that the headroom does not hold
+         *     yet (`docs/architecture/model-budget.md`, slice M3e-3).
          */
         ModelBudgetCheckResponse: {
             /** @description Always `true`: a call that may not run is an error. */
@@ -11970,10 +11970,10 @@ export interface components {
              * Format: int64
              * @description What the environment can still spend this month, in millionths of a US
              *     dollar: the limit minus the spend this node knows. It does not hold the
-             *     caller's own spend of the last 75 seconds (its report, the node's flush
-             *     and this check's cache come between a call and the ledger), so the
-             *     caller takes that out. Null when the environment has no limit, or the
-             *     check is off. It is not a bound on the overshoot of a cell.
+             *     caller's own recent spend (its report, the node's flush and this
+             *     check's cache come between a call and the ledger), so the caller takes
+             *     that out. Null when the environment has no limit, or the check is off.
+             *     It is not a bound on the overshoot of a cell.
              */
             headroom_micro_usd?: number | null;
             /**
