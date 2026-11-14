@@ -2218,6 +2218,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/graphs/health": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** One page of the graphs under the scoped tenant with the state of each one's background work (index lag in commits and time, queued items and their wait, write limit); computed on read from the reads of the graph activity route, a row at most 15 seconds old */
+        get: operations["get_v1_graphs_health"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/managed-models": {
         parameters: {
             query?: never;
@@ -5446,6 +5463,14 @@ export interface components {
             target_seq?: null | components["schemas"]["CommitSeq"];
             /** Format: int64 */
             updated_at_micros: number;
+            /**
+             * Format: int64
+             * @description For a queued or waiting item: milliseconds since it was enqueued, at
+             *     the response's `observed_at_micros`. A waiting item counts the time it
+             *     was held back on purpose (its `stage` names the condition). `null` for
+             *     a running or finished item: the server keeps no start time.
+             */
+            waited_ms?: number | null;
         };
         /** @enum {string} */
         ActivityKind: "publish" | "compaction" | "statistics" | "validation" | "embeddings" | "import" | "export" | "fork" | "index_upgrade" | "workflow";
@@ -10497,6 +10522,15 @@ export interface components {
          *     reports it.
          */
         GraphActivityResponse: {
+            /**
+             * Format: int64
+             * @description How long the oldest commit that the published generation does not
+             *     cover has waited, in milliseconds, at `observed_at_micros`: the time
+             *     since the writer wrote it. `0` when `lag_commits` is 0. `null` when
+             *     commits wait but the head holds no write time for the oldest one (a
+             *     commit written before the head kept it).
+             */
+            behind_ms?: number | null;
             embeddings: components["schemas"]["ActivityEmbedding"][];
             /** Format: int64 */
             epoch: number;
@@ -10769,6 +10803,89 @@ export interface components {
             queued: boolean;
             src_graph_id: string;
         };
+        /**
+         * @description `GET /v1/graphs/health`: one page of the graphs of the environment, with
+         *     the state of each one's background work. The server reads each graph as
+         *     `GET /v1/graph/activity` does and keeps a row for 15 seconds, so a row is at
+         *     most that old (`observed_at_micros`). **[PIN]** the serde field names: the
+         *     console reads them.
+         */
+        GraphHealthResponse: {
+            data: components["schemas"]["GraphHealthRow"][];
+            has_more: boolean;
+            /** @description The cursor of the next page: the last graph id of this one. */
+            next_cursor?: string | null;
+            object: string;
+        };
+        /**
+         * @description The state of one graph's background work. Every field except `graph_id`
+         *     and `state` is `0` or `null` when `state` is `unavailable`.
+         */
+        GraphHealthRow: {
+            /**
+             * Format: int32
+             * @description Items that are queued, waiting or running, among the newest 25.
+             */
+            active_items: number;
+            /**
+             * Format: int64
+             * @description As `behind_ms` of `GET /v1/graph/activity`.
+             */
+            behind_ms?: number | null;
+            /**
+             * Format: int32
+             * @description Embeddings that are backfilling or behind, and embeddings that failed.
+             */
+            embeddings_behind: number;
+            /** Format: int32 */
+            embeddings_failed: number;
+            /** Format: int64 */
+            epoch: number;
+            /**
+             * Format: int32
+             * @description Failed items among the newest 25.
+             */
+            failed_items: number;
+            graph_id: string;
+            /** @description The newest commit written to the graph. */
+            head_seq: components["schemas"]["CommitSeq"];
+            /**
+             * Format: int64
+             * @description `target_seq - published_seq`, as in `GET /v1/graph/activity`.
+             */
+            lag_commits: number;
+            /** Format: int64 */
+            max_pending_commits: number;
+            /**
+             * Format: int64
+             * @description Server clock when this row was read (micros since the Unix epoch).
+             */
+            observed_at_micros: number;
+            /**
+             * Format: int64
+             * @description The longest `waited_ms` among the queued and waiting items.
+             */
+            oldest_wait_ms?: number | null;
+            /**
+             * Format: int64
+             * @description Unpublished commits, the commit count at which writes start to slow
+             *     (`0` when the server has no soft limit), and the count at which writes
+             *     are refused.
+             */
+            pending_commits: number;
+            publication?: null | components["schemas"]["PublicationState"];
+            /** @description The newest commit the published RDF generation covers. */
+            published_seq: components["schemas"]["CommitSeq"];
+            /** Format: int64 */
+            soft_pending_commits: number;
+            state: components["schemas"]["GraphHealthState"];
+        };
+        /**
+         * @description One word for the state of a graph, with the first rule that holds in this
+         *     order.
+         * @enum {string}
+         */
+        GraphHealthState: "blocked" | "paused" | "slowed" | "behind" | "current" | "unavailable";
         GraphId: string;
         /** @description Stable response returned when a durable import is accepted or replayed. */
         GraphImportJobAccepted: {
@@ -47045,6 +47162,151 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["GraphListResponse"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Rate limit exceeded */
+            429: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Service unavailable */
+            503: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+        };
+    };
+    get_v1_graphs_health: {
+        parameters: {
+            query?: {
+                /** @description Graph name (default `main`) */
+                graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
+                /** @description Max rows (default 25, at most 100) */
+                limit?: string;
+                /** @description Opaque cursor from the previous page */
+                cursor?: string;
+            };
+            header?: {
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
+                "Lbb-Version"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GraphHealthResponse"];
                 };
             };
             /** @description Bad request */
