@@ -3703,10 +3703,27 @@ export interface paths {
         /** The graph's sandboxes, newest first. 409 `sandbox_not_enabled` */
         get: operations["get_v1_sandboxes"];
         put?: never;
-        /** Create a sandbox: one VM with a workspace disk and no network, from a template (`lbb/python` by default). With `run` it is the L1 shortcut: the sandbox runs `run(input, config)` once and is destroyed when the command ends; the answer holds the run (`run`) and waits for it at most `wait_ms` (0 to 30,000, default 0). A create with `run` needs an `Idempotency-Key`; a repeat answers the same record, also a `failed` one, and a new attempt needs a new key. 400 `idempotency_key_required`, 400 `sandbox_limits_invalid`, 403 `sandbox_plan_unavailable` (a Free account), 404 `sandbox_template_not_found`, 409 `sandbox_template_revoked`, 409 `sandbox_not_enabled`, 429 `sandbox_limit_reached` (the graph or the environment already holds as many sandboxes as the limits of the cell allow, 5 for a graph and 10 for an environment by default; a sandbox counts while it is starting, running, stopping or being destroyed), 503 `sandbox_capacity_unavailable` (the sandbox host has no room: nothing is made, so the same request with the same `Idempotency-Key` works later; retry after 30 seconds), 503 `sandbox_unavailable` */
+        /** Create a sandbox: one VM with a workspace disk and no network, from a template (`lbb/python` by default). With `run` it is the L1 shortcut: the sandbox runs `run(input, config)` once and is destroyed when the command ends; the answer holds the run (`run`) and waits for it at most `wait_ms` (0 to 30,000, default 0). A create with `run` needs an `Idempotency-Key`; a repeat answers the same record, also a `failed` one, and a new attempt needs a new key. 400 `idempotency_key_required`, 400 `sandbox_limits_invalid`, 403 `sandbox_plan_unavailable` (a Free account), 404 `sandbox_template_not_found`, 409 `sandbox_template_revoked`, 409 `sandbox_not_enabled`, 429 `sandbox_limit_reached` (the graph or the environment already holds as many sandboxes as the limits of the cell allow, 5 for a graph and 10 for an environment by default; a sandbox counts while it is starting, running, stopping or being destroyed), 429 `sandbox_budget_exceeded` (the environment spent its monthly sandbox budget; the error says `limit_source` and `retry_at`, and the same call is refused until the budget is raised or the month ends), 503 `sandbox_capacity_unavailable` (the sandbox host has no room: nothing is made, so the same request with the same `Idempotency-Key` works later; retry after 30 seconds), 503 `sandbox_unavailable` */
         post: operations["post_v1_sandboxes"];
         /** Destroy the VM and its disk. The commands that run end `cancelled` with reason `sandbox_destroyed`. A delete of a sandbox that is destroying or destroyed answers the record as it is. 404 `sandbox_not_found` */
         delete: operations["delete_v1_sandboxes"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/sandboxes/budget": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The environment's monthly sandbox budget: the limit and where it comes from (`environment` or `default`), what the month spent, what is left and the state against the warning line. A call that starts a sandbox is refused with 429 `sandbox_budget_exceeded` at the budget, and the running sandboxes stop with `status_reason` `budget`. An environment read. Amounts are millionths of a US dollar. The answer holds no unit price. 503 `storage_degraded` when the month's sum cannot be read */
+        get: operations["get_v1_sandboxes_budget"];
+        put?: never;
+        post?: never;
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -3722,7 +3739,7 @@ export interface paths {
         /** The commands of a sandbox, newest first. 404 `sandbox_not_found` */
         get: operations["get_v1_sandboxes_commands"];
         put?: never;
-        /** Start a command: `argv` (an array, so a shell is explicit: `["bash", "-lc", "..."]`) or `run` (`run(input, config)` of the template's harness), with `cwd`, `env`, `stdin`, `timeout_ms` and `wait_ms` (0 to 30,000, default 0). The request needs an `Idempotency-Key`: a command never runs twice for one key, and a command whose outcome cannot be settled stays `lost`. `env` values and `stdin` are never stored. A sandbox runs 8 commands at once and holds 32 waiting. 400 `idempotency_key_required`, 400 `sandbox_path_invalid`, 403 `sandbox_plan_unavailable` (a Free account), 404 `sandbox_not_found`, 409 `sandbox_not_running`, 429 `sandbox_limit_reached`, 503 `sandbox_unavailable` */
+        /** Start a command: `argv` (an array, so a shell is explicit: `["bash", "-lc", "..."]`) or `run` (`run(input, config)` of the template's harness), with `cwd`, `env`, `stdin`, `timeout_ms` and `wait_ms` (0 to 30,000, default 0). The request needs an `Idempotency-Key`: a command never runs twice for one key, and a command whose outcome cannot be settled stays `lost`. `env` values and `stdin` are never stored. A sandbox runs 8 commands at once and holds 32 waiting. 400 `idempotency_key_required`, 400 `sandbox_path_invalid`, 403 `sandbox_plan_unavailable` (a Free account), 404 `sandbox_not_found`, 409 `sandbox_not_running`, 429 `sandbox_limit_reached`, 429 `sandbox_budget_exceeded` (the environment spent its monthly sandbox budget), 503 `sandbox_unavailable` */
         post: operations["post_v1_sandboxes_commands"];
         delete?: never;
         options?: never;
@@ -3824,7 +3841,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** One sandbox, with its `run` for a sandbox of a create with `run`. 404 `sandbox_not_found` */
+        /** One sandbox, with its `run` for a sandbox of a create with `run`, and its `cost` so far (computed from its receipts on this read; left out when they cannot be read in a short time, and where the server prices nothing). 404 `sandbox_not_found` */
         get: operations["get_v1_sandboxes_get"];
         put?: never;
         post?: never;
@@ -3843,7 +3860,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Start a stopped sandbox again. A resume does not move `expires_at`. A resume of a starting or running sandbox answers the sandbox as it is. 403 `sandbox_plan_unavailable` (a Free account), 404 `sandbox_not_found`, 409 `sandbox_not_running` for a sandbox that is stopping or has ended, 429 `sandbox_limit_reached` (the graph or the environment already holds as many sandboxes as the limits of the cell allow, 5 for a graph and 10 for an environment by default), 503 `sandbox_capacity_unavailable` (the sandbox host has no room: the sandbox stays `stopped` with its disk; retry after 30 seconds), 503 `sandbox_unavailable` */
+        /** Start a stopped sandbox again. A resume does not move `expires_at`. A resume of a starting or running sandbox answers the sandbox as it is. 403 `sandbox_plan_unavailable` (a Free account), 404 `sandbox_not_found`, 409 `sandbox_not_running` for a sandbox that is stopping or has ended, 429 `sandbox_limit_reached` (the graph or the environment already holds as many sandboxes as the limits of the cell allow, 5 for a graph and 10 for an environment by default), 429 `sandbox_budget_exceeded` (the environment spent its monthly sandbox budget; a sandbox that the budget stopped stays `stopped` with its disk, and nothing resumes it by itself), 503 `sandbox_capacity_unavailable` (the sandbox host has no room: the sandbox stays `stopped` with its disk; retry after 30 seconds), 503 `sandbox_unavailable` */
         post: operations["post_v1_sandboxes_resume"];
         delete?: never;
         options?: never;
@@ -17966,6 +17983,7 @@ export interface components {
              * @description Idle seconds before the sandbox stops, 30 to 3,600.
              */
             auto_stop_seconds: number;
+            cost?: null | components["schemas"]["SandboxCost"];
             /**
              * Format: int64
              * @description When it was created, Unix seconds.
@@ -18006,6 +18024,111 @@ export interface components {
             template: components["schemas"]["SandboxTemplateRef"];
             usage: components["schemas"]["SandboxUsage"];
         };
+        /** @description The limit, and the state of the month against it. */
+        SandboxBudgetLimit: {
+            /**
+             * Format: int64
+             * @description The monthly limit in millionths of a US dollar. Null: no limit.
+             */
+            limit_micro_usd?: number | null;
+            limit_source: components["schemas"]["SandboxBudgetLimitSource"];
+            /**
+             * @description When the month's budget is whole again: the first day of the next month,
+             *     UTC (RFC 3339).
+             */
+            resets_at: string;
+            /** Format: int64 */
+            resets_at_ms: number;
+            state: components["schemas"]["SandboxBudgetState"];
+            /**
+             * Format: double
+             * @description Spent divided by the limit. Null when there is no limit or nothing is
+             *     priced.
+             */
+            used_ratio?: number | null;
+            /**
+             * Format: double
+             * @description The ratio at which `state` becomes `warning`.
+             */
+            warn_at_ratio: number;
+        };
+        /**
+         * @description Where the limit in force comes from.
+         * @enum {string}
+         */
+        SandboxBudgetLimitSource: "environment" | "default";
+        /** @description A way the answer is partial. */
+        SandboxBudgetPartial: {
+            /** @description What it concerns: `spent` or `open`. */
+            dimension: string;
+            /**
+             * @description `unverified` (the month's sum was built from the intervals that ended and
+             *     no check of the receipts has confirmed it yet, so `spent` may lack a
+             *     receipt) or `incomplete` (the last pass of the sweep did not see every
+             *     sandbox that runs, so `open` may be low). `open` is left out when no pass
+             *     priced the sandboxes that run now lately.
+             */
+            reason: string;
+        };
+        /**
+         * @description `GET /v1/sandboxes/budget`: the environment's monthly sandbox budget, what the
+         *     month spent and what is left. Amounts are millionths of a US dollar, and each is
+         *     rounded up on its own, except `left_micro_usd`, which is rounded down. The answer
+         *     holds no unit price.
+         */
+        SandboxBudgetResponse: {
+            budget: components["schemas"]["SandboxBudgetLimit"];
+            /**
+             * @description Whether the cell refuses calls and stops sandboxes at the budget. False
+             *     when the budget is off for the cell (a default of 0) and where the server
+             *     prices nothing. The environment's setting is kept either way.
+             */
+            enforced: boolean;
+            /**
+             * Format: int64
+             * @description The part of `spent_micro_usd` that is an estimate for a lost VM. It
+             *     counts against the budget and is never billed.
+             */
+            estimate_micro_usd: number;
+            /**
+             * Format: int64
+             * @description The limit minus `spent_micro_usd`, never below 0. Null when there is no
+             *     limit.
+             */
+            left_micro_usd?: number | null;
+            /** @description `yyyy-mm` (UTC). */
+            month: string;
+            /**
+             * Format: int64
+             * @description The sandboxes that run now, as the last pass of the sweep priced them.
+             *     They are not in `spent_micro_usd` until they stop. Null for a past month,
+             *     and when no recent pass of the sweep priced them.
+             */
+            open_micro_usd?: number | null;
+            /** @description Every way this answer is partial. */
+            partial: components["schemas"]["SandboxBudgetPartial"][];
+            /**
+             * Format: int64
+             * @description The intervals of run time the month holds.
+             */
+            receipts: number;
+            /**
+             * Format: int64
+             * @description The part of `spent_micro_usd` the host measured.
+             */
+            run_micro_usd: number;
+            /**
+             * Format: int64
+             * @description What the month spent: the intervals that ended, and the estimates for
+             *     lost VMs.
+             */
+            spent_micro_usd: number;
+        };
+        /**
+         * @description How much of the sandbox budget the month used.
+         * @enum {string}
+         */
+        SandboxBudgetState: "ok" | "warning" | "spent" | "unlimited" | "not_recorded";
         /**
          * @description A command on a sandbox. The record keeps the names of `env` and the size
          *     of `stdin`; their values are never stored.
@@ -18137,6 +18260,33 @@ export interface components {
          * @enum {string}
          */
         SandboxCommandStatus: "queued" | "running" | "exited" | "timed_out" | "cancelled" | "failed" | "lost";
+        /**
+         * @description What a sandbox cost so far, in millionths of a US dollar. A sandbox is paid
+         *     for each second it runs, by its reserved size. Time before the guest answers,
+         *     a failed start and a stopped disk are free. Each amount is rounded up to a
+         *     whole millionth on its own. Present on a retrieve of a sandbox only, and only
+         *     where the server prices time.
+         */
+        SandboxCost: {
+            /**
+             * Format: int64
+             * @description The estimate for a VM the host lost. It counts against the budget and is
+             *     never billed.
+             */
+            estimate_micro_usd: number;
+            /**
+             * Format: int64
+             * @description The interval that runs now, up to the time of the read. It becomes
+             *     settled when the interval ends.
+             */
+            open_micro_usd: number;
+            /**
+             * Format: int64
+             * @description The intervals that ended, as the host measured them. This is what a later
+             *     invoice bills.
+             */
+            settled_micro_usd: number;
+        };
         /**
          * @description `POST /v1/sandboxes`: create a sandbox. With `run` it is the L1 shortcut:
          *     the sandbox runs one command and is destroyed when the command ends. A
@@ -18365,7 +18515,7 @@ export interface components {
          *     `unknown`.
          * @enum {string}
          */
-        SandboxStatusReason: "requested" | "idle" | "expired" | "run_ended" | "start_timeout" | "start_error" | "host_lost" | "unknown";
+        SandboxStatusReason: "requested" | "idle" | "expired" | "run_ended" | "start_timeout" | "start_error" | "host_lost" | "budget" | "unknown";
         /**
          * @description The stream of a command's output.
          * @enum {string}
@@ -62514,6 +62664,149 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Sandbox"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Rate limit exceeded */
+            429: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Service unavailable */
+            503: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+        };
+    };
+    get_v1_sandboxes_budget: {
+        parameters: {
+            query?: {
+                /** @description Graph name (default `main`) */
+                graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
+                /** @description yyyy-mm (UTC); default: the current month */
+                month?: string;
+            };
+            header?: {
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
+                "Lbb-Version"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SandboxBudgetResponse"];
                 };
             };
             /** @description Bad request */
