@@ -1139,6 +1139,7 @@ test("the client reads the health of the graphs of the environment, with paging"
     published_seq: 3,
     lag_commits: 0,
     behind_ms: 0,
+    last_write_at_micros: 1700000000000000,
     publication: "current",
     pending_commits: 0,
     soft_pending_commits: 256,
@@ -1160,18 +1161,23 @@ test("the client reads the health of the graphs of the environment, with paging"
       },
     },
     { body: { object: "list", data: [], has_more: false, next_cursor: null } },
+    { body: { object: "list", data: [], has_more: false, next_cursor: null } },
   ]);
   const client = new LbbClient({ baseUrl: "http://h", fetch });
 
   const first = await client.graphsHealth();
   const second = await client.graphsHealth({ cursor: "main", limit: 10 });
+  const third = await client.graphsHealth({ namespaceId: "ns-1", limit: 5 });
 
   assert.equal(first.data[0]?.state, "current");
+  assert.equal(first.data[0]?.last_write_at_micros, 1700000000000000);
   assert.equal(first.has_more, true);
   assert.equal(second.has_more, false);
+  assert.equal(third.has_more, false);
   assert.deepEqual(urls, [
     "http://h/v1/graphs/health",
     "http://h/v1/graphs/health?cursor=main&limit=10",
+    "http://h/v1/graphs/health?limit=5&namespace_id=ns-1",
   ]);
 });
 

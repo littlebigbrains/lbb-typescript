@@ -2225,7 +2225,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** One page of the graphs under the scoped tenant with the state of each one's background work (index lag in commits and time, queued items and their wait, write limit); computed on read from the reads of the graph activity route, a row at most 15 seconds old */
+        /** One page of the graphs under the scoped tenant, or of one namespace and its descendants, with the state of each one's background work (index lag in commits and time, queued items and their wait, write limit, time of the newest commit); computed on read from the reads of the graph activity route, a row at most 15 seconds old */
         get: operations["get_v1_graphs_health"];
         put?: never;
         post?: never;
@@ -10555,6 +10555,15 @@ export interface components {
             lag_commits: number;
             /**
              * Format: int64
+             * @description The time of the newest commit of data, in microseconds since the Unix
+             *     epoch, as the writer recorded it. It does not move for maintenance, a
+             *     schema change or an index change. `null` when the graph has no commit,
+             *     or when the newest commit has no recorded time (a commit written before
+             *     2026-10-06), or when the server could not read it now.
+             */
+            last_write_at_micros?: number | null;
+            /**
+             * Format: int64
              * @description Server clock when the route read the state (micros since the Unix
              *     epoch).
              */
@@ -10804,7 +10813,8 @@ export interface components {
             src_graph_id: string;
         };
         /**
-         * @description `GET /v1/graphs/health`: one page of the graphs of the environment, with
+         * @description `GET /v1/graphs/health`: one page of the graphs of the environment, or, with
+         *     `namespace_id`, of the graphs of that namespace and its descendants, with
          *     the state of each one's background work. The server reads each graph as
          *     `GET /v1/graph/activity` does and keeps a row for 15 seconds, so a row is at
          *     most that old (`observed_at_micros`). **[PIN]** the serde field names: the
@@ -10813,7 +10823,12 @@ export interface components {
         GraphHealthResponse: {
             data: components["schemas"]["GraphHealthRow"][];
             has_more: boolean;
-            /** @description The cursor of the next page: the last graph id of this one. */
+            /**
+             * @description The cursor of the next page. Without `namespace_id` it is the last graph
+             *     id of this page. With `namespace_id` it is the catalog's own cursor:
+             *     opaque, to be passed back as it is, with the same `namespace_id`. A page
+             *     can hold fewer rows than `limit`, or none, and still have a next cursor.
+             */
             next_cursor?: string | null;
             object: string;
         };
@@ -10854,6 +10869,13 @@ export interface components {
              * @description `target_seq - published_seq`, as in `GET /v1/graph/activity`.
              */
             lag_commits: number;
+            /**
+             * Format: int64
+             * @description As `last_write_at_micros` of `GET /v1/graph/activity`: the time of the
+             *     newest commit of data; it does not move for maintenance, a schema
+             *     change or an index change.
+             */
+            last_write_at_micros?: number | null;
             /** Format: int64 */
             max_pending_commits: number;
             /**
@@ -47284,8 +47306,10 @@ export interface operations {
                 stack?: string;
                 /** @description Max rows (default 25, at most 100) */
                 limit?: string;
-                /** @description Opaque cursor from the previous page */
+                /** @description Opaque cursor from the previous page, to be passed back with the same namespace_id */
                 cursor?: string;
+                /** @description Catalog id of a namespace: only the graphs of that namespace and its descendants, in the catalog's order (needs the application catalog); root is the whole environment */
+                namespace_id?: string;
             };
             header?: {
                 /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
