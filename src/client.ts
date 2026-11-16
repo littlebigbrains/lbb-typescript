@@ -2411,13 +2411,29 @@ export class LbbClient {
    * (`GET /v1/graphs/health`). The server computes it on read from the reads of
    * {@link LbbClient.activity}; a row is at most 15 seconds old
    * (`observed_at_micros`). Page with `next_cursor` while `has_more` is true
-   * (25 rows by default, 100 at most).
+   * (25 rows by default, 100 at most). `last_write_at_micros` of a row is the
+   * time of the newest commit of data; it does not move for maintenance, a
+   * schema change or an index change.
+   *
+   * With `namespaceId` (the catalog id of a namespace, as
+   * `GET /v1/catalog/namespaces` returns it) the page holds the graphs of that
+   * namespace and its descendants, in the catalog's order, and `next_cursor` is
+   * the catalog's own cursor: pass it back unchanged with the same
+   * `namespaceId`. A page can hold fewer rows than `limit`, or none, and still
+   * have a next cursor. It needs the application catalog (a 400 where it is
+   * off); `root` is the whole environment. **Send `namespaceId` only to a
+   * server whose `GET /version` lists `graph_health_namespace_v1`**: a server
+   * without it ignores the filter and answers with every graph, with no error.
    */
   graphsHealth(
-    opts: { cursor?: string; limit?: number } = {},
+    opts: { cursor?: string; limit?: number; namespaceId?: string } = {},
   ): Promise<Schemas["GraphHealthResponse"]> {
     return this.request("GET", "/v1/graphs/health", {
-      query: { cursor: opts.cursor, limit: opts.limit },
+      query: {
+        cursor: opts.cursor,
+        limit: opts.limit,
+        namespace_id: opts.namespaceId,
+      },
     });
   }
 }
