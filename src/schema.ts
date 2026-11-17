@@ -2807,7 +2807,7 @@ export interface paths {
         /** The graph's model trials, newest first, each with its report (calls compared, right share, mean score, cost per call and median latency of both models, the difference with its bootstrap 95% interval, the outcome, and whether the candidate meets the quality threshold); without their calls */
         get: operations["get_v1_models_trials"];
         put?: never;
-        /** Test a candidate model: one trial per job (`jobs`, default every job it can do that has checked calls). A trial answers the job's checked calls with the candidate, newest first, scores each answer against the call's ground truth (a decision and an order without a model, an `ask` answer by the checker with the ground truth as reference) beside the current model's score, and adds each new check of the job until it has `target` calls (default 40) or its `days` end (default 14). It runs on the graph's `lbb.model-trials` workflow and changes no model. An open trial of the same job and candidate is answered as it is; `skipped` names the jobs left out. 503 when workflows are off or the catalog has no checker */
+        /** Test a candidate model: one trial per job (`jobs`, default every job it can do that has checked calls). A trial answers the job's checked calls with the candidate, newest first, scores each answer against the call's ground truth (a decision and an order without a model, an `ask` answer by the checker with the ground truth as reference) beside the current model's score, and adds each new check of the job until it has `target` calls (default 40) or its `days` end (default 14), or it spends `max_cost_usd` (default the server's, at most 100). It runs on the graph's `lbb.model-trials` workflow and changes no model. An open trial of the same job and candidate is answered as it is; `skipped` names the jobs left out. 503 when workflows are off or the catalog has no checker */
         post: operations["post_v1_models_trials"];
         delete?: never;
         options?: never;
@@ -2849,6 +2849,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/models/trials/limit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Change the cost limit of a trial (`max_cost_usd`, more than it spent, at most 100). A running or collecting trial goes on with the new limit; a trial that ended done before its target and its days, and that compared with the model the job uses now, opens again and compares its next calls. 400 `invalid_trial_request` for a limit out of range; 409 `trial_not_continuable` with the reason for a trial that cannot go on */
+        post: operations["post_v1_models_trials_limit"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/models/trials/options": {
         parameters: {
             query?: never;
@@ -2856,7 +2873,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** What a model trial can test on the graph: per job (route, fit, rerank, label, ask) the model it uses now, its checked calls of the last three months, and the candidate models with their efforts, prices and whether this server holds their key; whether trials can run here (workflows and a checker) and the budget of one trial */
+        /** What a model trial can test on the graph: per job (route, fit, rerank, label, ask) the model it uses now, its checked calls of the last three months, and the candidate models with their efforts, prices and whether this server holds their key; whether trials can run here (workflows and a checker), and the default and largest cost limit of one trial */
         get: operations["get_v1_models_trials_options"];
         put?: never;
         post?: never;
@@ -13789,6 +13806,19 @@ export interface components {
             job: components["schemas"]["ModelJob"];
             switched?: null | components["schemas"]["ModelSwitch"];
         };
+        /**
+         * @description `POST /v1/models/trials/limit?graph&id`: change the cost limit of a
+         *     trial. A trial that ended done before its target and its days opens
+         *     again with the new limit.
+         */
+        ModelTrialLimitRequest: {
+            /**
+             * Format: double
+             * @description The new cost limit, in US dollars: more than the trial spent, at
+             *     most 100.
+             */
+            max_cost_usd: number;
+        };
         /** @description `GET /v1/models/trials?graph`: trials, newest first, without their calls. */
         ModelTrialListResponse: {
             trials: components["schemas"]["ModelTrial"][];
@@ -13811,7 +13841,12 @@ export interface components {
             available: boolean;
             /**
              * Format: int64
-             * @description The budget of one trial (`LBB_MODEL_TRIAL_USD`).
+             * @description The largest cost limit a trial takes, in millionths of a US dollar.
+             */
+            budget_max_micro_usd?: number;
+            /**
+             * Format: int64
+             * @description The default cost limit of one trial (`LBB_MODEL_TRIAL_USD`).
              */
             budget_micro_usd: number;
             jobs: components["schemas"]["ModelTrialJobOption"][];
@@ -13907,6 +13942,12 @@ export interface components {
              *     calls.
              */
             jobs?: components["schemas"]["ModelJob"][] | null;
+            /**
+             * Format: double
+             * @description The cost limit of each trial, in US dollars: more than 0, at most
+             *     100; default the server's (`budget_micro_usd` of the options).
+             */
+            max_cost_usd?: number | null;
             /**
              * Format: int32
              * @description Calls to compare per trial, 1 to 100; default 40.
@@ -53856,6 +53897,155 @@ export interface operations {
             cookie?: never;
         };
         requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ModelTrial"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Rate limit exceeded */
+            429: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Service unavailable */
+            503: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+        };
+    };
+    post_v1_models_trials_limit: {
+        parameters: {
+            query?: {
+                /** @description Graph name (default `main`) */
+                graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
+                /** @description the trial id */
+                id?: string;
+            };
+            header?: {
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
+                "Lbb-Version"?: string;
+                /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
+                "Idempotency-Key"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ModelTrialLimitRequest"];
+            };
+        };
         responses: {
             /** @description OK */
             200: {
