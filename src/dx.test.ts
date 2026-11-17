@@ -335,6 +335,7 @@ test("model trials and switches map each operation to its route", async () => {
   await client.models.trials.get(id);
   await client.models.trials.call(id, "c1");
   await client.models.trials.stop(id);
+  await client.models.trials.limit(id, 10);
   await client.models.switches.list();
   await client.models.switches.create({ trial: id });
   await client.models.switches.revert("ask");
@@ -347,6 +348,7 @@ test("model trials and switches map each operation to its route", async () => {
     `http://h/v1/models/trials/get?graph=crm&id=${id}`,
     `http://h/v1/models/trials/call?graph=crm&id=${id}&call=c1`,
     `http://h/v1/models/trials/stop?graph=crm&id=${id}`,
+    `http://h/v1/models/trials/limit?graph=crm&id=${id}`,
     "http://h/v1/models/switches?graph=crm",
     "http://h/v1/models/switches?graph=crm",
     "http://h/v1/models/switches/revert?graph=crm&job=ask",
@@ -361,7 +363,8 @@ test("model trials and switches map each operation to its route", async () => {
     jobs: ["ask"],
     target: 20,
   });
-  assert.deepEqual(JSON.parse(bodies[7] ?? ""), { trial: id });
+  assert.deepEqual(JSON.parse(bodies[6] ?? ""), { max_cost_usd: 10 });
+  assert.deepEqual(JSON.parse(bodies[8] ?? ""), { trial: id });
 });
 
 test("model choices map each operation to its route", async () => {

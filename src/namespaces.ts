@@ -1087,6 +1087,20 @@ export class ModelTrialsNamespace {
     });
   }
 
+  /** Change the cost limit of a trial, in US dollars. A trial that ended
+   * at its limit, before its target and its days, opens again. */
+  limit(
+    trialId: string,
+    maxCostUsd: number,
+    opts: CallOptions = {},
+  ): Promise<Schemas["ModelTrial"]> {
+    return this.client.request("POST", "/v1/models/trials/limit", {
+      ...opts,
+      query: { id: trialId },
+      body: { max_cost_usd: maxCostUsd },
+    });
+  }
+
   /**
    * Read the trial until it compared what it can (`until: "compared"`, the
    * default) or until it ended (`until: "ended"`), and return it. A trial
