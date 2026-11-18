@@ -888,27 +888,29 @@ export class ChecksNamespace {
   }
 
   /**
-   * Diagnose one `ask` call: the server searches the question on each
-   * serving embedding at the commit the call read, adds the names it linked,
-   * lets the checker grade what it found, and stores the cause (`plan`,
-   * `present_not_found`, `too_coarse`, `absent` or `unknown`) with its
-   * evidence. Calls the checker model and counts on the check budget.
+   * Find why one `ask` answer was weak, and what to do about it. At the
+   * commit the call read, the judge grades the entities the answer reached,
+   * the names the server linked and the hits of one search of the question
+   * over the graph. Read `outcome` (`missed`, `broader_only`,
+   * `answered_badly`, `not_in_graph`), `summary` and `next_steps` first;
+   * `best` and `used` are the entities that explain it. Calls the checker
+   * model and counts on the check budget.
    */
   diagnose(
     callId: string,
     opts: CallOptions = {},
-  ): Promise<Record<string, unknown>> {
+  ): Promise<Schemas["ModelCheckDiagnosis"]> {
     return this.client.request("POST", "/v1/models/checks/diagnose", {
       ...opts,
       query: { call: callId },
     });
   }
 
-  /** The stored diagnosis of one `ask` call. */
+  /** The stored diagnosis of one `ask` call; 404 when it has none. */
   diagnosis(
     callId: string,
     opts: CallOptions = {},
-  ): Promise<Record<string, unknown>> {
+  ): Promise<Schemas["ModelCheckDiagnosis"]> {
     return this.client.request("GET", "/v1/models/checks/diagnosis", {
       ...opts,
       query: { call: callId },

@@ -2449,7 +2449,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Diagnose one `ask` call: probe the graph at the commit the call read (a search by meaning of the question on each serving embedding, the names the server linked), let the checker grade what the probes found, and store the cause (`plan`, `present_not_found`, `too_coarse`, `absent` or `unknown`) with its evidence. Calls the checker model and counts on the check budget */
+        /** Diagnose one `ask` call: probe the graph at the commit the call read (a search by meaning of the question on the serving embeddings, the names the server linked, the entities the answer reached), let the checker grade them, and store the outcome (`missed`, `broader_only`, `answered_badly` or `not_in_graph`) with a summary, next steps and the evidence. Calls the checker model and counts on the check budget */
         post: operations["post_v1_models_checks_diagnose"];
         delete?: never;
         options?: never;
@@ -2464,7 +2464,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** The stored diagnosis of one `ask` call */
+        /** The stored diagnosis of one `ask` call: its outcome, summary, next steps and evidence */
         get: operations["get_v1_models_checks_diagnosis"];
         put?: never;
         post?: never;
@@ -7349,6 +7349,55 @@ export interface components {
             pending_removed: number;
             workflow: components["schemas"]["WorkflowTypeRef"];
         };
+        /**
+         * @description The finer cause behind an outcome, for tools and tests.
+         * @enum {string}
+         */
+        DiagnosisCause: "plan" | "present_not_found" | "too_coarse" | "absent" | "unknown";
+        /** @description One entity a probe found or the answer reached, with the checker's grade. */
+        DiagnosisEvidence: {
+            class?: string | null;
+            /** @description The embedding a search hit came from. */
+            embedding?: string | null;
+            /**
+             * Format: int32
+             * @description 0 unrelated, 1 related, 2 relevant, 3 answers the question.
+             */
+            grade: number;
+            iri: string;
+            label?: string;
+            /**
+             * @description `search` (found by meaning), `linked` (a name the server linked
+             *     before the answer loop) or `reached` (a citation, a row value or an
+             *     IRI of one of the answer's queries).
+             */
+            probe: string;
+            /** @description The hit's place in the search's list, from 1. */
+            rank?: number | null;
+            /** @description Whether the answer reached the entity. */
+            reached: boolean;
+        };
+        /** @description One thing the developer can do next. */
+        DiagnosisNextStep: {
+            /** @description The entity the step is about. */
+            iri?: string | null;
+            kind: components["schemas"]["DiagnosisStepKind"];
+            /** @description For `accept_stand_in`: the reference to correct the check with. */
+            reference?: string | null;
+            /** @description One sentence for a person. */
+            text: string;
+        };
+        /**
+         * @description What a diagnosis tells the developer: one of four outcomes, each with
+         *     its next steps.
+         * @enum {string}
+         */
+        DiagnosisOutcome: "missed" | "broader_only" | "answered_badly" | "not_in_graph";
+        /**
+         * @description What a next step asks the developer to do.
+         * @enum {string}
+         */
+        DiagnosisStepKind: "add_alias" | "tune_search" | "declare_embedding" | "accept_stand_in" | "add_data" | "keep_as_test" | "add_source";
         /** @description Validated content address. Deserialization cannot introduce an object path. */
         Digest: string;
         DiscoveryApproval: {
@@ -13232,6 +13281,53 @@ export interface components {
             day: string;
             /** Format: int64 */
             limit_micro_usd: number;
+        };
+        /**
+         * @description The diagnosis of one Ask call. Start with `outcome`, `summary` and
+         *     `next_steps`; `best` and `used` are the two entities that explain it, and
+         *     `evidence` holds everything the checker graded.
+         */
+        ModelCheckDiagnosis: {
+            /** Format: int64 */
+            at_ms: number;
+            best?: null | components["schemas"]["DiagnosisEvidence"];
+            call: string;
+            cause: components["schemas"]["DiagnosisCause"];
+            /** Format: int64 */
+            cost_micro_usd: number;
+            /** @description Graded items, best first. */
+            evidence: components["schemas"]["DiagnosisEvidence"][];
+            judge_model?: string;
+            next_steps?: components["schemas"]["DiagnosisNextStep"][];
+            /** @description Findings beside the outcome: `linking_noise` (a linked name graded 0). */
+            notes?: string[];
+            outcome?: components["schemas"]["DiagnosisOutcome"];
+            question: string;
+            /**
+             * @description For `broader_only`: the reference a test grades against until a
+             *     person reviews the check.
+             */
+            reference_draft?: string | null;
+            /** @description The embeddings the search probe read. */
+            searched?: string[];
+            /**
+             * Format: int64
+             * @description The commit the call's answer read; the probes read the same one.
+             */
+            served_at_seq?: number | null;
+            /**
+             * @description For `present_not_found`: `no_search` (no query of the answer searched
+             *     by meaning) or `ranking` (it searched and did not read the entity).
+             */
+            sub_cause?: string | null;
+            /** @description The outcome in one or two sentences, with the entities named. */
+            summary?: string;
+            used?: null | components["schemas"]["DiagnosisEvidence"];
+            /**
+             * Format: int32
+             * @description 2 since outcomes and next steps; a version 1 object gets them on read.
+             */
+            v: number;
         };
         ModelCheckFile: {
             checks: components["schemas"]["ModelCheckSpec"][];
@@ -49868,7 +49964,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": Record<string, never>;
+                    "application/json": components["schemas"]["ModelCheckDiagnosis"];
                 };
             };
             /** @description Bad request */
@@ -50011,7 +50107,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": Record<string, never>;
+                    "application/json": components["schemas"]["ModelCheckDiagnosis"];
                 };
             };
             /** @description Bad request */
