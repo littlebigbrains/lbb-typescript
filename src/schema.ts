@@ -15402,6 +15402,66 @@ export interface components {
             /** @description Fields removed, counted per entity. */
             fields_removed: number;
         };
+        /** @description Subject-major or object-major copies of groups of PSO tables. */
+        PlannerAccessPath: {
+            /** Format: int64 */
+            groups: number;
+            /**
+             * Format: int64
+             * @description Uncompressed canonical record bytes, not the stored size of the tables.
+             */
+            logical_bytes: number;
+            /** @description The generation names at least one group. */
+            present: boolean;
+            /** Format: int64 */
+            records: number;
+            /**
+             * Format: int64
+             * @description Over every stored group.
+             */
+            tables: number;
+            /** Format: int64 */
+            tombstones: number;
+            /**
+             * Format: int64
+             * @description Groups whose covered PSO tables are all still tables of the generation.
+             */
+            usable_groups: number;
+        };
+        /** @description A set of dictionary tables. */
+        PlannerDictionarySet: {
+            /**
+             * Format: int64
+             * @description Uncompressed canonical record bytes, not the stored size of the tables.
+             */
+            logical_bytes: number;
+            /**
+             * Format: int64
+             * @description Records stored. A term that several L0 windows hold counts once for
+             *     each window, until a compaction collapses them.
+             */
+            records: number;
+            /** Format: int64 */
+            tables: number;
+        };
+        /** @description One key-histogram artifact: the size of its base and its delta layers. */
+        PlannerHistogramArtifact: {
+            /**
+             * Format: int64
+             * @description Compressed chunk bytes of this artifact, base and layers.
+             */
+            bytes: number;
+            /**
+             * Format: int64
+             * @description Compressed chunk bytes the layers alone occupy.
+             */
+            layer_bytes: number;
+            /**
+             * Format: int64
+             * @description Delta layers over this artifact, not yet folded into its base.
+             */
+            layers: number;
+        };
         /** @description The per-(predicate, subject) and per-(predicate, object) count histograms. */
         PlannerKeyHistograms: {
             /**
@@ -15419,16 +15479,123 @@ export interface components {
              * @description Delta layers over both artifacts, not yet folded into their bases.
              */
             layers: number;
+            /**
+             * @description The `(predicate, object)` counts, from the POS view. All zero when the
+             *     histograms are not present.
+             */
+            object: components["schemas"]["PlannerHistogramArtifact"];
             present: boolean;
+            /**
+             * @description The `(predicate, subject)` counts, from the PSO view. All zero when the
+             *     histograms are not present.
+             */
+            subject: components["schemas"]["PlannerHistogramArtifact"];
+        };
+        /** @description The class lattice (`rdfs:subClassOf`) of the generation. */
+        PlannerLattice: {
+            /**
+             * Format: int64
+             * @description L0 windows that hold lattice statements.
+             */
+            l0_windows: number;
+            /** Format: int64 */
+            ontology_version?: number | null;
+            /** @description The generation records the ontology version of its lattice. */
+            present: boolean;
+        };
+        /** @description The tables of one level. */
+        PlannerLevel: {
+            /** @description Dictionary tables. */
+            dict: components["schemas"]["PlannerDictionarySet"];
+            /** Format: int32 */
+            level: number;
+            /** @description Predicate-object-subject tables. */
+            pos: components["schemas"]["PlannerTableSet"];
+            /** @description Predicate-subject-object tables. */
+            pso: components["schemas"]["PlannerTableSet"];
+            /**
+             * Format: int64
+             * @description L0 windows. Present on level 0 only.
+             */
+            windows?: number | null;
+        };
+        /** @description The tables of every level, summed. */
+        PlannerLevelTotals: {
+            dict: components["schemas"]["PlannerDictionarySet"];
+            pos: components["schemas"]["PlannerTableSet"];
+            pso: components["schemas"]["PlannerTableSet"];
+        };
+        /** @description The member-order pairs an operator declared. */
+        PlannerMemberOrder: {
+            /** @description At most 64 pairs, in the order of the manifest. */
+            declared: components["schemas"]["PlannerMemberOrderPair"][];
+        };
+        /** @description One declared member-order pair and the state of its index. */
+        PlannerMemberOrderPair: {
+            /**
+             * Format: int64
+             * @description Stored size of the parts of the index.
+             */
+            bytes: number;
+            /** @description The IRI of the member predicate. */
+            member: string;
+            /** @description The IRI of the order predicate. */
+            order: string;
+            /** Format: int64 */
+            parts: number;
+            /**
+             * Format: int64
+             * @description Rows of the index. Zero when `state` is `declared`.
+             */
+            rows: number;
+            /**
+             * @description `built`: an index exists and describes the view the levels hold now.
+             *     `declared`: no usable index yet; maintenance builds one. A writer drops
+             *     an index that describes an older view.
+             */
+            state: string;
         };
         /** @description The pairwise join-count sidecar. */
         PlannerPairCounts: {
+            /**
+             * Format: int64
+             * @description Size of the sidecar object. Zero when there is none.
+             */
+            bytes: number;
+            /**
+             * @description The sidecar records that the generation has too many predicates for a
+             *     count matrix. Then `present` is `false` and `predicates` is `0`.
+             */
+            declined: boolean;
             /**
              * Format: int64
              * @description Predicates its count matrix covers.
              */
             predicates: number;
             present: boolean;
+        };
+        /** @description The predicate-pattern index: for each subject, the set of its predicates. */
+        PlannerPredicatePatterns: {
+            /**
+             * Format: int64
+             * @description Stored size of those objects.
+             */
+            bytes: number;
+            /**
+             * Format: int64
+             * @description Objects of the index, subject rows and pattern rows together.
+             */
+            parts: number;
+            /** Format: int64 */
+            pattern_rows: number;
+            /** Format: int64 */
+            patterns: number;
+            /** @description The generation names an index. */
+            present: boolean;
+            /** Format: int64 */
+            subjects: number;
+            /** @description Readers use it: it describes the watermark the generation serves. */
+            usable: boolean;
         };
         /** @description Exact visible counts for one predicate. */
         PlannerPredicateStats: {
@@ -15463,6 +15630,8 @@ export interface components {
             /** Format: int64 */
             generation?: number | null;
             key_histograms: components["schemas"]["PlannerKeyHistograms"];
+            lattice?: null | components["schemas"]["PlannerLattice"];
+            member_order?: null | components["schemas"]["PlannerMemberOrder"];
             /**
              * @description Pass as `cursor` for the next page; `null` on the last page. A cursor
              *     belongs to this generation: after a newer one is published it is
@@ -15470,12 +15639,14 @@ export interface components {
              *     again without a cursor.
              */
             next_cursor?: string | null;
+            object_access?: null | components["schemas"]["PlannerAccessPath"];
             pair_counts: components["schemas"]["PlannerPairCounts"];
             /**
              * Format: int64
              * @description Predicates in the generation, across all pages.
              */
             predicate_count: number;
+            predicate_patterns?: null | components["schemas"]["PlannerPredicatePatterns"];
             /** @description One page of predicates, by triple count descending, then IRI. */
             predicates: components["schemas"]["PlannerPredicateStats"][];
             /**
@@ -15485,6 +15656,8 @@ export interface components {
              */
             published_at?: string | null;
             served_at_seq?: null | components["schemas"]["CommitSeq"];
+            subject_access?: null | components["schemas"]["PlannerAccessPath"];
+            tables?: null | components["schemas"]["PlannerTables"];
             trigram: components["schemas"]["PlannerTrigram"];
             /** Format: int64 */
             triple_count: number;
@@ -15493,6 +15666,32 @@ export interface components {
              *     reports.
              */
             value_order_index: components["schemas"]["IndexUpgradePlan"];
+        };
+        /** @description A set of PSO or POS tables. */
+        PlannerTableSet: {
+            /**
+             * Format: int64
+             * @description Uncompressed canonical record bytes, not the stored size of the tables.
+             */
+            logical_bytes: number;
+            /**
+             * Format: int64
+             * @description Records stored, tombstones included.
+             */
+            records: number;
+            /** Format: int64 */
+            tables: number;
+            /** Format: int64 */
+            tombstones: number;
+        };
+        /**
+         * @description The tables of a generation, by level. Level 0 is the L0 windows (commit
+         *     ordered, overlapping runs); levels 1 and up are the leveled tables.
+         */
+        PlannerTables: {
+            levels: components["schemas"]["PlannerLevel"][];
+            /** @description The sum over every level. */
+            total: components["schemas"]["PlannerLevelTotals"];
         };
         /** @description Label-trigram sidecar coverage. */
         PlannerTrigram: {
