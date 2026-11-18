@@ -1069,6 +1069,77 @@ test("checks lists, reviews, summarizes and exports the checks of a month", asyn
   assert.equal(urls[5].search, "?graph=crm");
 });
 
+test("checks.diagnose finds why an answer was weak and diagnosis reads it back, typed", async () => {
+  const diagnosis = {
+    v: 2,
+    call: "00000001794994178785-n58f4b7278fbf48ff-0000000003-1",
+    question: "which groups work on topic X?",
+    at_ms: 1_790_000_100_000,
+    served_at_seq: 168,
+    outcome: "broader_only",
+    summary:
+      'Your graph\'s closest match is "Cold fusion", which is broader than the question.',
+    next_steps: [
+      {
+        kind: "accept_stand_in",
+        text: "Correct the check.",
+        iri: "https://x.test/topic/cf",
+        reference: "The finest entity …",
+      },
+      {
+        kind: "add_data",
+        text: "Add finer entities.",
+        iri: "https://x.test/topic/cf",
+      },
+    ],
+    used: {
+      iri: "https://x.test/topic/cf",
+      label: "Cold fusion",
+      probe: "reached",
+      grade: 2,
+      reached: true,
+    },
+    cause: "too_coarse",
+    notes: [],
+    evidence: [
+      {
+        iri: "https://x.test/topic/cf",
+        label: "Cold fusion",
+        probe: "reached",
+        grade: 2,
+        reached: true,
+      },
+    ],
+    searched: ["researchtopic"],
+    cost_micro_usd: 90_000,
+    judge_model: "claude-opus-5-5",
+  };
+  const { fetch, calls } = recordingFetch([
+    { body: JSON.stringify(diagnosis) },
+    { body: JSON.stringify(diagnosis) },
+  ]);
+  const checks = new LbbClient({ baseUrl: "http://h", fetch }).graph(
+    "crm",
+  ).checks;
+  const made = await checks.diagnose(diagnosis.call);
+  const outcome: "missed" | "broader_only" | "answered_badly" | "not_in_graph" =
+    made.outcome ?? "not_in_graph";
+  assert.equal(outcome, "broader_only");
+  assert.equal(made.next_steps?.[0]?.kind, "accept_stand_in");
+  assert.equal(made.next_steps?.[0]?.reference, "The finest entity …");
+  assert.equal(made.used?.label, "Cold fusion");
+  assert.deepEqual(await checks.diagnosis(diagnosis.call), made);
+  const urls = calls.map((entry) => new URL(entry.input));
+  assert.deepEqual(
+    calls.map((entry, index) => `${entry.init.method} ${urls[index].pathname}`),
+    ["POST /v1/models/checks/diagnose", "GET /v1/models/checks/diagnosis"],
+  );
+  assert.deepEqual(Object.fromEntries(urls[0].searchParams), {
+    graph: "crm",
+    call: diagnosis.call,
+  });
+});
+
 test("trainSubmit enqueues a durable trainer job under the caller's key, trainJob polls it", async () => {
   const queued = {
     job_id: "train-7",
