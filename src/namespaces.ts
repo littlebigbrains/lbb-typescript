@@ -887,6 +887,34 @@ export class ChecksNamespace {
     });
   }
 
+  /**
+   * Diagnose one `ask` call: the server searches the question on each
+   * serving embedding at the commit the call read, adds the names it linked,
+   * lets the checker grade what it found, and stores the cause (`plan`,
+   * `present_not_found`, `too_coarse`, `absent` or `unknown`) with its
+   * evidence. Calls the checker model and counts on the check budget.
+   */
+  diagnose(
+    callId: string,
+    opts: CallOptions = {},
+  ): Promise<Record<string, unknown>> {
+    return this.client.request("POST", "/v1/models/checks/diagnose", {
+      ...opts,
+      query: { call: callId },
+    });
+  }
+
+  /** The stored diagnosis of one `ask` call. */
+  diagnosis(
+    callId: string,
+    opts: CallOptions = {},
+  ): Promise<Record<string, unknown>> {
+    return this.client.request("GET", "/v1/models/checks/diagnosis", {
+      ...opts,
+      query: { call: callId },
+    });
+  }
+
   /** The checks of a month as parsed JSON lines, oldest first: the call and
    * its check, at most 10,000 lines. */
   async export(
