@@ -2301,6 +2301,48 @@ export class LbbClient {
     });
   }
 
+  /** The requests the environment's data routes answered, how they ended and
+   * how long they took (`GET /v1/activity/requests`). A series of the
+   * environment, of one graph (`onlyGraph`) or of the graphs of one catalog
+   * namespace (`onlyNamespace`), by `day` or, for the environment, by `hour`,
+   * from `from` to `to` (`yyyy-mm-dd`, at most 92 days; the last 30 days by
+   * default). Pass `list: "graphs"` or `"namespaces"` for the subjects of one
+   * `month` with their totals instead: nine shards a page, `cursor` from
+   * `next_cursor` while `cut` is true. `recording: false` says the server does
+   * not count requests. A quantile (`p50_ms`, `p95_ms`, `p99_ms`) is given
+   * only with 20 or more requests. Gate on the capability
+   * `request_activity_v1`. An environment read: the client's graph scope is not
+   * used. */
+  requestActivity(
+    opts: {
+      from?: string;
+      to?: string;
+      granularity?: "day" | "hour";
+      class?: Schemas["RequestActivityClass"];
+      onlyGraph?: string;
+      onlyNamespace?: string;
+      list?: "graphs" | "namespaces";
+      month?: string;
+      limit?: number;
+      cursor?: string;
+    } = {},
+  ): Promise<Schemas["RequestActivityResponse"]> {
+    return this.request("GET", "/v1/activity/requests", {
+      query: {
+        from: opts.from,
+        to: opts.to,
+        granularity: opts.granularity,
+        class: opts.class,
+        only_graph: opts.onlyGraph,
+        only_namespace: opts.onlyNamespace,
+        list: opts.list,
+        month: opts.month,
+        limit: opts.limit,
+        cursor: opts.cursor,
+      },
+    });
+  }
+
   /** The environment's monthly model budget (`GET /v1/models/budget`): the
    * limit, what the month spent and what is left, the state against the
    * warning line (`ok`, `warning`, `spent`, `unlimited`, `not_recorded`), and

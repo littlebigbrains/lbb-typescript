@@ -55,6 +55,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/activity/requests": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The requests the environment's data routes answered, how they ended (ok, client error, failed, refused by a limit) and how long they took (sum, longest, p50, p95, p99), per period and class: a series of the environment, of one graph (`only_graph`) or of the graphs of one catalog namespace (`only_namespace`), by day or, for the environment, by hour; or a list of the graphs or namespaces of one month (`list`), a bounded part of the month a page with a cursor. A quantile is given only with 20 or more requests. Off by default: `recording: false` says the server does not count requests. An environment read; the answering node adds the counts it has not written yet to a series */
+        get: operations["get_v1_activity_requests"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/catalog/graph": {
         parameters: {
             query?: never;
@@ -17633,6 +17650,193 @@ export interface components {
             /** @description The instances this write is for. */
             subjects: components["schemas"]["NamedEntityInput"][];
         };
+        /**
+         * @description What a request was: one class for each data request.
+         * @enum {string}
+         */
+        RequestActivityClass: "query" | "search" | "ask" | "write" | "other";
+        /**
+         * @description New graph and namespace rows that the stored counts refused for their
+         *     size. A refused row is not counted for its graph or namespace (the
+         *     environment rows are never refused), so a graph or namespace figure is lower
+         *     than the truth when these are not 0 (`incomplete` says so).
+         */
+        RequestActivityDropped: {
+            /** Format: int64 */
+            graph_rows: number;
+            /** Format: int64 */
+            namespace_rows: number;
+        };
+        /**
+         * @description How a series is cut into periods.
+         * @enum {string}
+         */
+        RequestActivityGranularity: "day" | "hour";
+        /** @description `GET /v1/activity/requests`. */
+        RequestActivityResponse: {
+            /**
+             * Format: int64
+             * @description What the stored counts of this answer are as of, in milliseconds since
+             *     the Unix epoch: the time the answering server read the oldest of them,
+             *     or the time of the answer when it read none. An answer a server kept
+             *     (up to 60 seconds) keeps its time.
+             */
+            as_of_ms: number;
+            /**
+             * @description A list stopped before the end of the month (or the page filled): pass
+             *     `next_cursor` for the rest.
+             */
+            cut: boolean;
+            dropped: components["schemas"]["RequestActivityDropped"];
+            /**
+             * @description `yyyy-mm-dd` (UTC): the first and the last day the rows cover (in a
+             *     list, the first and the last day of its month).
+             */
+            from: string;
+            granularity: components["schemas"]["RequestActivityGranularity"];
+            /**
+             * @description The answer adds the counts that the answering server holds and has not
+             *     written yet (a series of the environment or a graph, and the rows of a
+             *     namespace it has already resolved). The counts of other servers appear
+             *     when those servers write them. Always `false` in a list.
+             */
+            includes_unwritten: boolean;
+            /**
+             * @description The numbers are short: a graph or namespace figure misses requests
+             *     because a full stored record refused new rows (`dropped`), or a stored
+             *     record in the range is of a format this server does not read.
+             */
+            incomplete: boolean;
+            list?: null | components["schemas"]["RequestActivitySubjects"];
+            /** @description Pass as `cursor` for the next page of a list; absent on the last page. */
+            next_cursor?: string | null;
+            /**
+             * @description `false` when this server does not count requests
+             *     (`LBB_REQUEST_ACTIVITY_ENABLED` is off): there are no rows, which is
+             *     not a quiet period.
+             */
+            recording: boolean;
+            /**
+             * @description The series: one row for each period and class that has requests, oldest
+             *     period first, the classes in the order query, search, ask, write,
+             *     other. Empty in a list.
+             */
+            rows: components["schemas"]["RequestActivityRow"][];
+            scope: components["schemas"]["RequestActivityScope"];
+            /**
+             * @description The graph id or the namespace id of the scope. Absent for the
+             *     environment.
+             */
+            subject?: string | null;
+            /**
+             * @description The subjects this page covered, in storage order. The caller sorts.
+             *     Empty in a series.
+             */
+            subjects?: components["schemas"]["RequestActivitySubject"][];
+            to: string;
+        };
+        /** @description One period and class of a series. A count that never happened is 0. */
+        RequestActivityRow: {
+            class: components["schemas"]["RequestActivityClass"];
+            /**
+             * Format: int64
+             * @description Requests that ended with a 4xx other than 429: the caller's request was
+             *     wrong.
+             */
+            client_errors: number;
+            /**
+             * Format: int64
+             * @description Requests that ended with a 5xx: the server failed, or a deadline passed.
+             */
+            failed: number;
+            /**
+             * Format: int64
+             * @description The longest duration in whole milliseconds, rounded up.
+             */
+            max_ms: number;
+            /**
+             * Format: int64
+             * @description Requests that ended with a status below 400.
+             */
+            ok: number;
+            /**
+             * Format: int64
+             * @description The median duration in milliseconds: the upper edge of its bucket,
+             *     never below the true value and never above `max_ms`. Absent below 20
+             *     requests.
+             */
+            p50_ms?: number | null;
+            /** Format: int64 */
+            p95_ms?: number | null;
+            /** Format: int64 */
+            p99_ms?: number | null;
+            /** @description `yyyy-mm-dd` (UTC) for a day, `yyyy-mm-ddThh` for an hour. */
+            period: string;
+            /**
+             * Format: int64
+             * @description Requests that a limit refused (the rate limits, the capacity of the
+             *     node, the free plan's fair share, the memory guard and a quota, which
+             *     answers `402`). A refusal is in `requests` with a duration of 0, so the
+             *     mean and the quantiles include it.
+             */
+            refused: number;
+            /**
+             * Format: int64
+             * @description Requests that reached the data route and were counted.
+             */
+            requests: number;
+            /**
+             * Format: int64
+             * @description The sum of the durations in whole milliseconds. With `requests` it gives
+             *     the mean. Within half a millisecond for each flush that wrote the row.
+             */
+            sum_ms: number;
+        };
+        /**
+         * @description What a read of the request activity covers.
+         * @enum {string}
+         */
+        RequestActivityScope: "environment" | "graph" | "namespace";
+        /**
+         * @description One subject of a list: a graph or a catalog namespace, with its counts over
+         *     the month (all classes, or the one named by `class`).
+         */
+        RequestActivitySubject: {
+            /** Format: int64 */
+            client_errors: number;
+            /** Format: int64 */
+            failed: number;
+            /** Format: int64 */
+            max_ms: number;
+            /** Format: int64 */
+            ok: number;
+            /** Format: int64 */
+            p50_ms?: number | null;
+            /** Format: int64 */
+            p95_ms?: number | null;
+            /** Format: int64 */
+            p99_ms?: number | null;
+            /** Format: int64 */
+            refused: number;
+            /**
+             * Format: int64
+             * @description The fields below are those of a row of a series.
+             */
+            requests: number;
+            /**
+             * @description The graph id or the namespace id. A namespace row can also be
+             *     `@none` (graphs of no namespace) or `@unknown` (graphs whose namespace
+             *     could not be read when the requests were counted).
+             */
+            subject: string;
+            /** Format: int64 */
+            sum_ms: number;
+        };
+        /**
+         * @description What a list names (`list=graphs`, `list=namespaces`).
+         * @enum {string}
+         */
+        RequestActivitySubjects: "graphs" | "namespaces";
         /** @description A row of a suggestion's facts that an accept must keep. */
         RequiredFactRow: {
             /**
@@ -26188,6 +26392,167 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DailyActivityResponse"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Rate limit exceeded */
+            429: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Service unavailable */
+            503: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+        };
+    };
+    get_v1_activity_requests: {
+        parameters: {
+            query?: {
+                /** @description Graph name (default `main`) */
+                graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
+                /** @description yyyy-mm-dd (UTC), first day of a series; default: 30 days before `to` (2 days for hours) */
+                from?: string;
+                /** @description yyyy-mm-dd (UTC), last day of a series; default: today */
+                to?: string;
+                /** @description day (default) or hour; hour is for the environment and keeps the last 48 hours */
+                granularity?: string;
+                /** @description query, search, ask, write or other: only that class */
+                class?: string;
+                /** @description one graph id; not with `only_namespace` or `list` */
+                only_graph?: string;
+                /** @description one catalog namespace id: its graphs and the namespaces below it; not with `only_graph` or `list`; needs the application catalog */
+                only_namespace?: string;
+                /** @description graphs or namespaces: the subjects of one month with their totals instead of a series */
+                list?: string;
+                /** @description yyyy-mm (UTC) of a list; default: the current month */
+                month?: string;
+                /** @description subjects of a list, 1 to 100; default 50 */
+                limit?: string;
+                /** @description the `next_cursor` of the previous page of a list */
+                cursor?: string;
+            };
+            header?: {
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
+                "Lbb-Version"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RequestActivityResponse"];
                 };
             };
             /** @description Bad request */
