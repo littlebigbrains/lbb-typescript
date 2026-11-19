@@ -103,6 +103,8 @@ export type {
   StarterTerms,
 } from "./starters.js";
 export type {
+  AnswerTestsNamespace,
+  AnswerTestWaitOptions,
   ModelCallListOptions,
   ModelCheckExportLine,
   ModelCheckListOptions,

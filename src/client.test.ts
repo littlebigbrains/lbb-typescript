@@ -1140,6 +1140,78 @@ test("checks.diagnose finds why an answer was weak and diagnosis reads it back, 
   });
 });
 
+test("checks.answerTests starts a test of a next step, estimates it and waits for its verdict, typed", async () => {
+  const call = "00000001794994178785-n58f4b7278fbf48ff-0000000003-1";
+  const queued = {
+    id: "atest_0123456789abcdef01234567",
+    object: "answer_test",
+    created: "2026-11-19T19:00:00Z",
+    call,
+    step: "tune_search",
+    change: { kind: "ask_rerank" },
+    status: "queued",
+    warnings: [],
+    replays: 2,
+    max_cost_micro_usd: 15_000_000,
+    estimate_micro_usd: 3_000_000,
+    cost_micro_usd: 0,
+    items: [],
+  };
+  const done = {
+    ...queued,
+    status: "done",
+    verdict: "worked",
+    failed: {
+      items: 4,
+      a: 0.25,
+      b: 0.75,
+      delta: 0.5,
+      ci_low: 0.2,
+      ci_high: 0.8,
+    },
+  };
+  const estimate = {
+    object: "answer_test_estimate",
+    failed_items: 4,
+    guard_items: 10,
+    answers: 36,
+    estimate_micro_usd: 3_000_000,
+    max_cost_micro_usd: 15_000_000,
+  };
+  const { fetch, calls } = recordingFetch([
+    { body: JSON.stringify(estimate) },
+    { body: JSON.stringify(queued) },
+    { body: JSON.stringify(queued) },
+    { body: JSON.stringify(done) },
+  ]);
+  const tests = new LbbClient({ baseUrl: "http://h", fetch }).graph("crm")
+    .checks.answerTests;
+  const priced = await tests.estimate(call, { step: 0 });
+  assert.equal(priced.answers, 36);
+  const started = await tests.create(call, { step: 0 });
+  assert.equal(started.change.kind, "ask_rerank");
+  const ended = await tests.wait(started.id, { pollIntervalMs: 0 });
+  const verdict: "worked" | "no_change" | "worse" | "too_few" | undefined =
+    ended.verdict ?? undefined;
+  assert.equal(verdict, "worked");
+  const urls = calls.map((entry) => new URL(entry.input));
+  assert.deepEqual(
+    calls.map((entry, index) => `${entry.init.method} ${urls[index].pathname}`),
+    [
+      "POST /v1/models/checks/answer-tests/estimate",
+      "POST /v1/models/checks/answer-tests",
+      "GET /v1/models/checks/answer-tests/get",
+      "GET /v1/models/checks/answer-tests/get",
+    ],
+  );
+  assert.deepEqual(Object.fromEntries(urls[1].searchParams), {
+    graph: "crm",
+    call,
+  });
+  assert.equal(calls[1].init.body, JSON.stringify({ step: 0 }));
+  assert.equal(urls[2].searchParams.get("id"), started.id);
+});
+
 test("trainSubmit enqueues a durable trainer job under the caller's key, trainJob polls it", async () => {
   const queued = {
     job_id: "train-7",
