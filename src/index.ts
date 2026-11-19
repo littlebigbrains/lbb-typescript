@@ -109,6 +109,7 @@ export type {
   ModelChoiceListOptions,
   ModelChoicesNamespace,
   ModelCalibrationNamespace,
+  InstructionsNamespace,
   ModelsNamespace,
   ModelSwitchesNamespace,
   ModelTrialListOptions,

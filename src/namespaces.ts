@@ -77,6 +77,7 @@ export class GraphNamespace {
   readonly evals: EvalsNamespace;
   readonly checks: ChecksNamespace;
   readonly models: ModelsNamespace;
+  readonly instructions: InstructionsNamespace;
   readonly embeddings: EmbeddingsNamespace;
   /** Files of this graph and their parsed pages. */
   readonly files: FilesNamespace;
@@ -95,6 +96,7 @@ export class GraphNamespace {
     this.evals = client.evals;
     this.checks = client.checks;
     this.models = client.models;
+    this.instructions = client.instructions;
     this.embeddings = client.embeddings;
     this.files = client.files;
     this.reviews = client.reviews;
@@ -1329,6 +1331,151 @@ export class ModelChoicesNamespace {
         opts.idempotencyKey ??
         this.client.idempotencyKey("models.choices.delete"),
       query: { use: params.use, workflow: params.workflow },
+    });
+  }
+}
+
+/**
+ * Instructions: your notes and worked examples for a use of a model (`ask`:
+ * the answer loop of `query.ask`), kept as content-addressed versions. A
+ * version is a draft until you publish it; a binding names the published
+ * version that applies to the environment or to one graph. A call of `ask`
+ * reads, in order: the request's `instructions` (a draft too), the graph's
+ * binding, the graph's rewrite profile, the environment's binding.
+ *
+ * ```ts
+ * const made = await lbb.instructions.create({
+ *   use: "ask",
+ *   name: "topics",
+ *   text: "Topic questions: search the topic class by meaning.",
+ * });
+ * // Try the draft on one question before you publish it.
+ * await lbb.query.ask({
+ *   question: "Which groups work on lattice-assisted fusion?",
+ *   instructions: { id: made.id, version: made.version },
+ * });
+ * await lbb.instructions.publish({ id: made.id, version: made.version });
+ * await lbb.instructions.bind({
+ *   use: "ask",
+ *   scope: "environment",
+ *   id: made.id,
+ *   version: made.version,
+ *   expected_version: "",
+ * });
+ * ```
+ */
+export class InstructionsNamespace {
+  constructor(private readonly client: LbbClient) {}
+
+  /** The environment's instructions, newest first, and the bindings of the environment and the graph. */
+  list(
+    options: CallOptions & { use?: Schemas["InstructionsUse"] } = {},
+  ): Promise<Schemas["InstructionsList"]> {
+    const { use, ...opts } = options;
+    return this.client.request("GET", "/v1/instructions", {
+      ...opts,
+      query: { use },
+    });
+  }
+
+  /** One object with one version's content (default: the newest published, else the newest). */
+  get(
+    id: string,
+    options: CallOptions & { version?: string } = {},
+  ): Promise<Schemas["Instructions"]> {
+    const { version, ...opts } = options;
+    return this.client.request("GET", "/v1/instructions/get", {
+      ...opts,
+      query: { id, version },
+    });
+  }
+
+  /**
+   * Make instructions and their first version (a draft unless `publish`).
+   * `from_profile` copies the graph's rewrite profile. The client sends an
+   * idempotency key (or yours).
+   */
+  create(
+    body: Schemas["InstructionsCreateRequest"],
+    opts: CallOptions = {},
+  ): Promise<Schemas["Instructions"]> {
+    return this.client.request("POST", "/v1/instructions", {
+      ...opts,
+      retry: opts.retry ?? true,
+      idempotencyKey:
+        opts.idempotencyKey ??
+        this.client.idempotencyKey("instructions.create"),
+      body,
+    });
+  }
+
+  /** Add a version. The same content answers the version the object has. */
+  addVersion(
+    body: Schemas["InstructionsVersionRequest"],
+    opts: CallOptions = {},
+  ): Promise<Schemas["Instructions"]> {
+    return this.client.request("POST", "/v1/instructions/versions", {
+      ...opts,
+      retry: opts.retry ?? true,
+      body,
+    });
+  }
+
+  /** Publish a version, so a binding may name it. */
+  publish(
+    body: Schemas["InstructionsPublishRequest"],
+    opts: CallOptions = {},
+  ): Promise<Schemas["Instructions"]> {
+    return this.client.request("POST", "/v1/instructions/publish", {
+      ...opts,
+      retry: opts.retry ?? true,
+      body,
+    });
+  }
+
+  /**
+   * Bind a published version for a use in the environment or the graph.
+   * `expected_version` (the version bound now, `""` for none) makes the
+   * write conditional: another binding fails with `409 conflict`.
+   */
+  bind(
+    body: Schemas["InstructionsBindRequest"],
+    opts: CallOptions = {},
+  ): Promise<Schemas["InstructionsBinding"]> {
+    return this.client.request("PUT", "/v1/instructions/bindings", {
+      ...opts,
+      retry: opts.retry ?? body.expected_version !== undefined,
+      body,
+    });
+  }
+
+  /** Remove a binding: the use reads the next level. */
+  unbind(
+    params: {
+      use: Schemas["InstructionsUse"];
+      scope?: Schemas["InstructionsScope"];
+      expected_version?: string;
+    },
+    opts: CallOptions = {},
+  ): Promise<Schemas["InstructionsUnbound"]> {
+    return this.client.request("DELETE", "/v1/instructions/bindings", {
+      ...opts,
+      query: {
+        use: params.use,
+        scope: params.scope,
+        expected_version: params.expected_version,
+      },
+    });
+  }
+
+  /** What a call of the use on the graph reads now, and from where. */
+  resolve(
+    use: Schemas["InstructionsUse"] = "ask",
+    opts: CallOptions = {},
+  ): Promise<Schemas["InstructionsResolved"]> {
+    return this.client.request("GET", "/v1/instructions/resolve", {
+      ...opts,
+      query: { use },
     });
   }
 }
