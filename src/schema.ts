@@ -7503,7 +7503,10 @@ export interface components {
             /** @description The entity the step is about. */
             iri?: string | null;
             kind: components["schemas"]["DiagnosisStepKind"];
-            /** @description For `accept_stand_in`: the reference to correct the check with. */
+            /**
+             * @description For `accept_stand_in` and `keep_as_test`: the reference to correct
+             *     the check with.
+             */
             reference?: string | null;
             /** @description One sentence for a person. */
             text: string;
@@ -13624,8 +13627,9 @@ export interface components {
             outcome?: components["schemas"]["DiagnosisOutcome"];
             question: string;
             /**
-             * @description For `broader_only`: the reference a test grades against until a
-             *     person reviews the check.
+             * @description For `broader_only`, and for `not_in_graph` when the answer was
+             *     `unsupported`: the reference a test grades against until a person
+             *     reviews the check.
              */
             reference_draft?: string | null;
             /** @description The embeddings the search probe read. */
@@ -13642,10 +13646,17 @@ export interface components {
             sub_cause?: string | null;
             /** @description The outcome in one or two sentences, with the entities named. */
             summary?: string;
+            /**
+             * @description The answer reached entities and the checker graded every one of them
+             *     0: it answered without support from the graph.
+             */
+            unsupported?: boolean;
             used?: null | components["schemas"]["DiagnosisEvidence"];
             /**
              * Format: int32
-             * @description 2 since outcomes and next steps; a version 1 object gets them on read.
+             * @description 2 since outcomes and next steps; 3 since `unsupported` and a broader
+             *     match (best grade 1) giving `broader_only`. An older object gets the
+             *     newer fields on read.
              */
             v: number;
         };
