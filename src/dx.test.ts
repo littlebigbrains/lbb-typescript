@@ -1184,6 +1184,58 @@ test("the client reads the health of the graphs of the environment, with paging"
   ]);
 });
 
+test("requestActivity reads a series and a list of the request ledger", async () => {
+  const empty = {
+    recording: true,
+    scope: "environment",
+    granularity: "day",
+    from: "2026-11-01",
+    to: "2026-11-17",
+    rows: [],
+    cut: false,
+    as_of_ms: 1_790_000_000_000,
+    incomplete: false,
+    dropped: { graph_rows: 0, namespace_rows: 0 },
+    includes_unwritten: true,
+  };
+  const { fetch, urls } = queuedFetch([
+    { body: empty },
+    { body: { ...empty, scope: "graph", subject: "main" } },
+    {
+      body: {
+        ...empty,
+        list: "graphs",
+        subjects: [],
+        cut: true,
+        next_cursor: "9",
+        includes_unwritten: false,
+      },
+    },
+  ]);
+  const client = new LbbClient({ baseUrl: "http://h", fetch });
+
+  const series = await client.requestActivity({
+    from: "2026-11-01",
+    to: "2026-11-17",
+    class: "query",
+  });
+  const graph = await client.requestActivity({ onlyGraph: "main" });
+  const list = await client.requestActivity({
+    list: "graphs",
+    month: "2026-11",
+    limit: 20,
+  });
+
+  assert.equal(series.recording, true);
+  assert.equal(graph.subject, "main");
+  assert.equal(list.next_cursor, "9");
+  assert.deepEqual(urls, [
+    "http://h/v1/activity/requests?from=2026-11-01&to=2026-11-17&class=query",
+    "http://h/v1/activity/requests?only_graph=main",
+    "http://h/v1/activity/requests?list=graphs&month=2026-11&limit=20",
+  ]);
+});
+
 test("graph namespace reads planner statistics with paging", async () => {
   const { fetch, urls } = queuedFetch([
     { body: { served_at_seq: null, predicates: [], next_cursor: null } },
