@@ -840,7 +840,12 @@ export interface ModelCheckExportLine {
  * spends the platform's judge budget.
  */
 export class ChecksNamespace {
-  constructor(private readonly client: LbbClient) {}
+  /** Test a change for a diagnosed `ask` call before you apply it. */
+  readonly answerTests: AnswerTestsNamespace;
+
+  constructor(private readonly client: LbbClient) {
+    this.answerTests = new AnswerTestsNamespace(client);
+  }
 
   /**
    * One month of checks (`yyyy-mm`, UTC; the current month by default): per
@@ -1170,6 +1175,126 @@ export class ModelTrialsNamespace {
       if (deadline !== undefined && Date.now() >= deadline) {
         throw new Error(
           `timed out waiting for model trial ${trialId} (${trial.status}, ${trial.report.calls} calls compared)`,
+        );
+      }
+      await sleep(pollIntervalMs);
+    }
+  }
+}
+
+const ANSWER_TEST_ENDED = new Set(["done", "failed", "cancelled"]);
+
+/** Options of `checks.answerTests.wait`. */
+export type AnswerTestWaitOptions = CallOptions & {
+  /** Milliseconds between reads (default 5,000). */
+  pollIntervalMs?: number;
+  /** Milliseconds before it gives up; 0 waits without a limit (default). */
+  timeoutMs?: number;
+  /** Called with the test after each read. */
+  onUpdate?: (test: Schemas["AnswerTest"]) => void;
+};
+
+/**
+ * Answer tests: one change tested on a diagnosed `ask` call before anyone
+ * applies it. Arm A is Ask as it is, arm B is Ask with the change; both
+ * answer the question, the checker's rewordings of it and a guard set of
+ * questions answered right, at one pinned commit, and the checker grades
+ * each answer. The test runs as a workflow turn; `verdict` says whether the
+ * change worked (`worked`, `no_change`, `worse`, `too_few`).
+ */
+export class AnswerTestsNamespace {
+  constructor(private readonly client: LbbClient) {}
+
+  /**
+   * Start a test: name a next step of the diagnosis (`{ step: <index> }`)
+   * or a change (`{ change: { kind: "ask_rerank" } }`, or `{ change: {
+   * kind: "instructions", instructions: { id, version } } }`). Call
+   * `estimate` first and show its cost. A step with no test yet answers 400
+   * `diagnosis_step_untestable`.
+   */
+  create(
+    callId: string,
+    body: Schemas["AnswerTestCreateRequest"],
+    opts: CallOptions = {},
+  ): Promise<Schemas["AnswerTest"]> {
+    return this.client.request("POST", "/v1/models/checks/answer-tests", {
+      ...opts,
+      query: { call: callId },
+      body,
+    });
+  }
+
+  /** What `create` with the same body would cost. Writes nothing. */
+  estimate(
+    callId: string,
+    body: Schemas["AnswerTestCreateRequest"],
+    opts: CallOptions = {},
+  ): Promise<Schemas["AnswerTestEstimate"]> {
+    return this.client.request(
+      "POST",
+      "/v1/models/checks/answer-tests/estimate",
+      { ...opts, query: { call: callId }, body },
+    );
+  }
+
+  /** The graph's tests, newest first; with `call`, that call's. */
+  list(
+    options: { call?: string } & CallOptions = {},
+  ): Promise<Schemas["AnswerTestList"]> {
+    const { call, ...opts } = options;
+    return this.client.request("GET", "/v1/models/checks/answer-tests", {
+      ...opts,
+      query: { call },
+    });
+  }
+
+  /** One test with each arm's answers, the reports and the verdict. */
+  get(id: string, opts: CallOptions = {}): Promise<Schemas["AnswerTest"]> {
+    return this.client.request("GET", "/v1/models/checks/answer-tests/get", {
+      ...opts,
+      query: { id },
+    });
+  }
+
+  /** Cancel a test; it keeps the verdict of what it compared. */
+  cancel(id: string, opts: CallOptions = {}): Promise<Schemas["AnswerTest"]> {
+    return this.client.request(
+      "POST",
+      "/v1/models/checks/answer-tests/cancel",
+      { ...opts, query: { id } },
+    );
+  }
+
+  /** Read the test until it is done, failed or cancelled. */
+  async wait(
+    id: string,
+    options: AnswerTestWaitOptions = {},
+  ): Promise<Schemas["AnswerTest"]> {
+    const {
+      pollIntervalMs = 5_000,
+      timeoutMs = 0,
+      onUpdate,
+      ...opts
+    } = options;
+    if (!Number.isFinite(pollIntervalMs) || pollIntervalMs < 0) {
+      throw new RangeError("pollIntervalMs must be a non-negative number");
+    }
+    if (!Number.isFinite(timeoutMs) || timeoutMs < 0) {
+      throw new RangeError("timeoutMs must be a non-negative number");
+    }
+    const deadline = timeoutMs > 0 ? Date.now() + timeoutMs : undefined;
+    for (;;) {
+      if (opts.signal?.aborted) {
+        throw opts.signal.reason ?? new Error("request aborted");
+      }
+      const test = await this.get(id, opts);
+      onUpdate?.(test);
+      if (ANSWER_TEST_ENDED.has(test.status)) {
+        return test;
+      }
+      if (deadline !== undefined && Date.now() >= deadline) {
+        throw new Error(
+          `timed out waiting for answer test ${id} (${test.status})`,
         );
       }
       await sleep(pollIntervalMs);
