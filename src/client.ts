@@ -77,6 +77,7 @@ import {
   EvalsNamespace,
   ChecksNamespace,
   ModelsNamespace,
+  InstructionsNamespace,
   EmbeddingsNamespace,
 } from "./namespaces.js";
 
@@ -339,6 +340,8 @@ export class LbbClient {
   readonly checks: ChecksNamespace;
   /** Model trials of other models on the graph's uses, and switches. */
   readonly models: ModelsNamespace;
+  /** Instructions: your notes and examples for a use of a model, as versions with bindings. */
+  readonly instructions: InstructionsNamespace;
   readonly embeddings: EmbeddingsNamespace;
   /**
    * Files of the graph: upload a document, list the files, read a file's
@@ -427,6 +430,7 @@ export class LbbClient {
     this.evals = new EvalsNamespace(this);
     this.checks = new ChecksNamespace(this);
     this.models = new ModelsNamespace(this);
+    this.instructions = new InstructionsNamespace(this);
     this.embeddings = new EmbeddingsNamespace(this);
     this.files = new FilesNamespace(this);
     this.sandboxes = new SandboxesNamespace(this);

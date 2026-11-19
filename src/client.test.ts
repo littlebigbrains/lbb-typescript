@@ -2704,3 +2704,96 @@ test("entity retrieve refuses a legacy or incomplete success response", async ()
     );
   }
 });
+
+test("instructions: make, try a draft in ask, publish, bind and resolve, typed", async () => {
+  const made = {
+    id: "ins_0123456789abcdef01234567",
+    object: "instructions",
+    use: "ask",
+    name: "topics",
+    created_at: "2026-11-19T10:00:00.000Z",
+    version: "b1cb9dd7c3275c16033a21c0",
+    text: "Topic questions: search the topic class by meaning.",
+    examples: [],
+    versions: [
+      {
+        version: "b1cb9dd7c3275c16033a21c0",
+        state: "draft",
+        source: "person",
+        created_at: "2026-11-19T10:00:00.000Z",
+        created_by: "token",
+      },
+    ],
+    bindings: [],
+  };
+  const binding = {
+    use: "ask",
+    scope: "environment",
+    id: made.id,
+    version: made.version,
+    since: "2026-11-19T10:01:00.000Z",
+    by: "token",
+  };
+  const { fetch, calls } = recordingFetch([
+    { body: JSON.stringify(made) },
+    { body: JSON.stringify({ ...made, published_version: made.version }) },
+    { body: JSON.stringify(binding) },
+    {
+      body: JSON.stringify({
+        use: "ask",
+        from: "environment",
+        instructions: { id: made.id, version: made.version },
+        text: made.text,
+        examples: [],
+      }),
+    },
+  ]);
+  const instructions = new LbbClient({ baseUrl: "http://h", fetch }).graph(
+    "crm",
+  ).instructions;
+  const created = await instructions.create({
+    use: "ask",
+    name: "topics",
+    text: made.text,
+  });
+  const state: "draft" | "published" = created.versions[0]?.state ?? "draft";
+  assert.equal(state, "draft");
+  const published = await instructions.publish({
+    id: created.id,
+    version: created.version,
+  });
+  assert.equal(published.published_version, made.version);
+  const bound = await instructions.bind({
+    use: "ask",
+    scope: "environment",
+    id: created.id,
+    version: created.version,
+    expected_version: "",
+  });
+  assert.equal(bound.scope, "environment");
+  const resolved = await instructions.resolve();
+  assert.equal(resolved.from, "environment");
+  const urls = calls.map((entry) => new URL(entry.input));
+  assert.deepEqual(
+    calls.map((entry, index) => `${entry.init.method} ${urls[index].pathname}`),
+    [
+      "POST /v1/instructions",
+      "POST /v1/instructions/publish",
+      "PUT /v1/instructions/bindings",
+      "GET /v1/instructions/resolve",
+    ],
+  );
+  assert.equal(urls[0].searchParams.get("graph"), "crm");
+  assert.ok(
+    new Headers(calls[0].init.headers).get("idempotency-key"),
+    "create sends an idempotency key",
+  );
+  assert.deepEqual(JSON.parse(String(calls[2].init.body)), {
+    use: "ask",
+    scope: "environment",
+    id: made.id,
+    version: made.version,
+    expected_version: "",
+  });
+  assert.equal(urls[3].searchParams.get("use"), "ask");
+});
