@@ -2571,7 +2571,7 @@ export interface paths {
         /** The graph's answer tests, newest first, at most 50 */
         get: operations["get_v1_models_checks_answer_tests"];
         put?: never;
-        /** Test one change for a diagnosed `ask` call before you apply it: name a next step of the diagnosis (`step`, its index; `tune_search` tests rerank in Ask's searches) or a `change` (`ask_rerank`, or `instructions` with a version, a draft too). The test asks the question, the checker's 3 rewordings (`rewordings: false` turns them off) and up to `guard` questions rated right (default 10, at most 40; 0 runs without a guard set and the result warns) on arm A (Ask as it is) and arm B (Ask with the change), at one pinned commit, and the checker grades each answer. It runs as a turn of the graph's `eval-experiments` workflow. The result's `verdict`: `worked`, `no_change`, `worse` or `too_few`. Nothing is applied. The estimate must fit `max_cost_usd` (default 15, at most 100). A step with no test yet answers 400 `diagnosis_step_untestable` */
+        /** Test one change for a diagnosed `ask` call before you apply it: name a next step of the diagnosis (`step`, its index; `tune_search` tests rerank in Ask's searches, `add_alias` the alias of its entity) or a `change` (`ask_rerank`; `instructions` with a version, a draft too; or `alias` with `{iri, label}`, which name linking reads as a label of the entity). The test asks the question, the checker's 3 rewordings (`rewordings: false` turns them off) and up to `guard` questions rated right (default 10, at most 40; 0 runs without a guard set and the result warns) on arm A (Ask as it is) and arm B (Ask with the change), at one pinned commit, and the checker grades each answer. It runs as a turn of the graph's `eval-experiments` workflow. The result's `verdict`: `worked`, `no_change`, `worse` or `too_few`. Nothing is applied. The estimate must fit `max_cost_usd` (default 15, at most 100). A step with no test yet answers 400 `diagnosis_step_untestable` */
         post: operations["post_v1_models_checks_answer_tests"];
         delete?: never;
         options?: never;
@@ -6112,8 +6112,20 @@ export interface components {
              */
             warnings?: string[];
         };
+        /** @description An alias arm B links as a label of `iri`. */
+        AnswerTestAlias: {
+            /**
+             * @description The entity's classes, which name linking reads; the start reads them
+             *     from the graph when the request names none.
+             */
+            classes?: string[];
+            iri: string;
+            /** @description The words people use for the entity; from a next step, the question. */
+            label: string;
+        };
         /** @description The one change arm B runs. */
         AnswerTestChange: {
+            alias?: null | components["schemas"]["AnswerTestAlias"];
             instructions?: null | components["schemas"]["InstructionsRef"];
             kind: components["schemas"]["AnswerTestChangeKind"];
         };
@@ -6121,7 +6133,7 @@ export interface components {
          * @description The kind of change arm B runs.
          * @enum {string}
          */
-        AnswerTestChangeKind: "ask_rerank" | "instructions";
+        AnswerTestChangeKind: "ask_rerank" | "instructions" | "alias";
         /**
          * @description The body of `POST /v1/models/checks/answer-tests?call=` and of its
          *     estimate. Name `step` (an index of the diagnosis's `next_steps`) or
