@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { existsSync, readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { LbbClient, LbbError, type FetchLike } from "./client.js";
-import { SandboxWaitError } from "./sandboxes.js";
+import { SandboxWaitError, type Sandbox } from "./sandboxes.js";
 
 // A stand-in for the sandbox routes of the server. It keeps sandboxes,
 // commands and files in memory and answers the way the server does for the
@@ -342,6 +342,26 @@ function clientOf(fetch: FetchLike) {
 const CODE = "def run(input, config):\n    return sum(input)";
 const CSV = "1,2\n3,4\n";
 
+test("sandbox File transfers select their graphs independently of the client's pinned graph", async () => {
+  const backend = service();
+  const client = clientOf(backend.fetch).withScope({ expectedGraphEpoch: "7" });
+  backend.respond(() => ({ body: {} }));
+  const files = client.sandboxes.handle({
+    id: "sbx_transfer",
+  } as Sandbox).files;
+  await files.importFile("data.txt", "inputs", "a".repeat(64));
+  await files.keep("data.txt", "outputs");
+  await files.keep("data.txt", "main");
+  const [imported, other, pinned] = backend.calls;
+  assert.equal(imported.query.get("source_graph"), "inputs");
+  assert.equal(imported.query.has("graph"), false);
+  assert.equal(imported.query.has("expected_graph_epoch"), false);
+  assert.equal(other.path, "/v1/files");
+  assert.equal(other.query.get("graph"), "outputs");
+  assert.equal(other.query.has("expected_graph_epoch"), false);
+  assert.equal(pinned.query.get("expected_graph_epoch"), "7");
+});
+
 // ---- level 1 and 2 ---------------------------------------------------------------
 
 test("run sends one create with the code, the input and a key, and returns the result", async () => {
@@ -359,7 +379,7 @@ test("run sends one create with the code, the input and a key, and returns the r
   assert.equal(host.calls.length, 1);
   const call = host.calls[0]!;
   assert.equal(`${call.method} ${call.path}`, "POST /v1/sandboxes");
-  assert.equal(call.query.get("graph"), "main");
+  assert.equal(call.query.has("graph"), false);
   assert.match(
     call.headers["idempotency-key"] ?? "",
     /^sandboxes\.run:/,
