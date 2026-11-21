@@ -6085,7 +6085,12 @@ export interface components {
             created: string;
             created_by?: string | null;
             error?: string | null;
-            /** Format: int64 */
+            /**
+             * Format: int64
+             * @description The estimate of the items the test holds. It is lower than the
+             *     estimate route's answer when the checker wrote fewer rewordings than
+             *     asked for: that answer counts the rewordings before they exist.
+             */
             estimate_micro_usd: number;
             failed?: null | components["schemas"]["AnswerTestSetReport"];
             finish_reason?: null | components["schemas"]["AnswerTestFinishReason"];
@@ -6128,6 +6133,13 @@ export interface components {
             alias?: null | components["schemas"]["AnswerTestAlias"];
             instructions?: null | components["schemas"]["InstructionsRef"];
             kind: components["schemas"]["AnswerTestChangeKind"];
+            /**
+             * @description For `instructions` from an `add_instruction` step: the note the
+             *     draft version adds to the instructions that apply. The start makes
+             *     the draft (nothing is published or bound) and names it in
+             *     `instructions`.
+             */
+            note?: string | null;
         };
         /**
          * @description The kind of change arm B runs.
@@ -7769,9 +7781,16 @@ export interface components {
         };
         /** @description One thing the developer can do next. */
         DiagnosisNextStep: {
+            /**
+             * @description For `add_alias`: the words of the question that name the entity, the
+             *     proposed label. Edit it before you add it.
+             */
+            alias?: string | null;
             /** @description The entity the step is about. */
             iri?: string | null;
             kind: components["schemas"]["DiagnosisStepKind"];
+            /** @description For `add_instruction`: the drafted note for the Ask instructions. */
+            note?: string | null;
             /**
              * @description For `accept_stand_in` and `keep_as_test`: the reference to correct
              *     the check with.
@@ -7790,7 +7809,7 @@ export interface components {
          * @description What a next step asks the developer to do.
          * @enum {string}
          */
-        DiagnosisStepKind: "add_alias" | "tune_search" | "declare_embedding" | "accept_stand_in" | "add_data" | "keep_as_test" | "add_source";
+        DiagnosisStepKind: "add_alias" | "tune_search" | "declare_embedding" | "accept_stand_in" | "add_data" | "keep_as_test" | "add_source" | "add_instruction";
         /** @description Validated content address. Deserialization cannot introduce an object path. */
         Digest: string;
         DiscoveryApproval: {
