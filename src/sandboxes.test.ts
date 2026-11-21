@@ -906,6 +906,114 @@ test("the handle stops, resumes, updates, reads and deletes its sandbox and keep
   assert.equal((await sb.delete()).status, "destroyed");
 });
 
+test("a retrieve carries the measured usage, the cost and the times of the latest run, typed as the wire has them", async () => {
+  const host = service();
+  const id = "sbx_1793174400000a1b2c3d4e5f6";
+  const usage = {
+    vcpu_seconds: 90,
+    memory_gib_seconds: 90,
+    disk_gib_seconds: 4,
+    state: "measured",
+    intervals: 1,
+    billed_ms: 90_000,
+    elapsed_ms: 94_000,
+    memory_mib_seconds: 92_160,
+    disk_mib_seconds: 4_096,
+  };
+  host.respond((call) =>
+    call.method === "GET" && call.path === "/v1/sandboxes/get"
+      ? {
+          body: {
+            id,
+            object: "sandbox",
+            created: 1_793_174_400,
+            created_ms: 1_793_174_400_123,
+            status: "stopped",
+            kind: "sandbox",
+            template: { id: "sbt_lbb_python", name: "lbb/python" },
+            limits: { vcpus: 1, memory_mib: 1024, disk_mib: 4096 },
+            auto_stop_seconds: 300,
+            expires_at: 1_793_178_000,
+            expires_at_ms: 1_793_178_000_123,
+            owner: null,
+            created_by: "key:test",
+            usage,
+            cost: {
+              settled_micro_usd: 1_665,
+              estimate_micro_usd: 0,
+              open_micro_usd: 0,
+            },
+            started_ms: 1_793_174_401_000,
+            ready_ms: 1_793_174_402_500,
+            ended_ms: 1_793_174_495_000,
+            create_to_ready_ms: 2_377,
+            metadata: {},
+          },
+        }
+      : undefined,
+  );
+
+  const sandbox = await clientOf(host.fetch).sandboxes.retrieve(id);
+
+  // The fields are in the type: a client reads them without a cast.
+  const state: "measured" | "not_read" | "unknown" | null | undefined =
+    sandbox.usage.state;
+  assert.equal(state, "measured");
+  assert.equal(sandbox.usage.billed_ms, 90_000);
+  assert.equal(sandbox.usage.elapsed_ms, 94_000);
+  assert.equal(sandbox.usage.memory_mib_seconds, 92_160);
+  assert.equal(sandbox.usage.disk_mib_seconds, 4_096);
+  assert.equal(sandbox.usage.intervals, 1);
+  assert.equal(sandbox.usage.vcpu_seconds, 90);
+  assert.equal(sandbox.cost?.settled_micro_usd, 1_665);
+  assert.equal(sandbox.created_ms, 1_793_174_400_123);
+  assert.equal(sandbox.expires_at_ms, 1_793_178_000_123);
+  assert.equal(sandbox.started_ms, 1_793_174_401_000);
+  assert.equal(sandbox.ready_ms, 1_793_174_402_500);
+  assert.equal(sandbox.ended_ms, 1_793_174_495_000);
+  assert.equal(sandbox.create_to_ready_ms, 2_377);
+});
+
+test("an answer of an older server has no state and no new field, and a command carries its times in milliseconds", async () => {
+  const host = service();
+  const lbb = clientOf(host.fetch);
+  const sb = await lbb.sandboxes.create({});
+  // The stand-in answers the record of an older server: the three counters and nothing else.
+  assert.equal(sb.record.usage.state, undefined);
+  assert.equal(sb.record.usage.billed_ms, undefined);
+  assert.equal(sb.record.created_ms, undefined);
+  host.respond((call) =>
+    call.method === "GET" && call.path === "/v1/sandboxes/commands/get"
+      ? {
+          body: {
+            id: "cmd_1793174400000a1b2c3d4e5f6",
+            object: "sandbox_command",
+            created: 1_793_174_410,
+            created_ms: 1_793_174_410_400,
+            sandbox: sb.id,
+            status: "exited",
+            env_names: [],
+            stdin_bytes: 0,
+            timeout_ms: 60_000,
+            exit_code: 0,
+            started: 1_793_174_411,
+            ended: 1_793_174_412,
+            started_ms: 1_793_174_411_250,
+            ended_ms: 1_793_174_412_100,
+            duration_ms: 850,
+            stdout: { bytes: 0, truncated_bytes: 0, tail: "" },
+            stderr: { bytes: 0, truncated_bytes: 0, tail: "" },
+          },
+        }
+      : undefined,
+  );
+  const command = await sb.commands.retrieve("cmd_1793174400000a1b2c3d4e5f6");
+  assert.equal(command.created_ms, 1_793_174_410_400);
+  assert.equal(command.started_ms, 1_793_174_411_250);
+  assert.equal(command.ended_ms, 1_793_174_412_100);
+  assert.equal(command.duration_ms, 850);
+});
+
 test("the namespace lists, retrieves and saves templates with the filters of the wire", async () => {
   const host = service();
   const lbb = clientOf(host.fetch);
