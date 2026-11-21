@@ -4082,7 +4082,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** One sandbox, with its `run` for a sandbox of a create with `run`, and its `cost` so far (computed from its receipts on this read; left out when they cannot be read in a short time, and where the server prices nothing). 404 `sandbox_not_found` */
+        /** One sandbox, with its `run` for a sandbox of a create with `run`, its `cost` so far, its `usage` and the times of its latest run (`started_ms`, `ready_ms`, `ended_ms`, `create_to_ready_ms`). The cost and the usage are computed from its receipts on this read, with the same billed seconds: `cost` is left out and `usage.state` is `unknown` when the receipts cannot be read in a short time or the server prices nothing. A create, a list and every other answer do not read the receipts, and their `usage.state` is `not_read`. 404 `sandbox_not_found` */
         get: operations["get_v1_sandboxes_get"];
         put?: never;
         post?: never;
@@ -19145,6 +19145,12 @@ export interface components {
              */
             auto_stop_at?: number | null;
             /**
+             * Format: int64
+             * @description When an idle sandbox stops, Unix milliseconds; present while it runs. The exact
+             *     time that `auto_stop_at` rounds down to seconds.
+             */
+            auto_stop_at_ms?: number | null;
+            /**
              * Format: int32
              * @description Idle seconds before the sandbox stops, 30 to 3,600.
              */
@@ -19152,18 +19158,46 @@ export interface components {
             cost?: null | components["schemas"]["SandboxCost"];
             /**
              * Format: int64
+             * @description How long the first run took to become ready, in milliseconds: the first answer of
+             *     the guest (the clock of the host) minus `created_ms` (the clock of the server), so
+             *     it includes any difference of the two clocks. Present on a retrieve only, once the
+             *     first run was ready; absent when the host puts that answer before the create.
+             */
+            create_to_ready_ms?: number | null;
+            /**
+             * Format: int64
              * @description When it was created, Unix seconds.
              */
             created: number;
             /** @description Who created it: `key:<id>`, `account:<id>` or `token`. */
             created_by: string;
+            /**
+             * Format: int64
+             * @description When it was created, Unix milliseconds, by the clock of the server. The exact
+             *     time that `created` rounds down to seconds.
+             */
+            created_ms?: number | null;
             egress?: null | components["schemas"]["SandboxEgress"];
+            /**
+             * Format: int64
+             * @description When the VM of the latest run ended, Unix milliseconds, by the clock of the host.
+             *     It is the end of that run, not of the sandbox: a stopped sandbox has it too.
+             *     Present on a retrieve only, under the rules of `started_ms`, and absent while the
+             *     run goes on.
+             */
+            ended_ms?: number | null;
             /**
              * Format: int64
              * @description When the sandbox is destroyed, Unix seconds. A resume does not move
              *     it.
              */
             expires_at: number;
+            /**
+             * Format: int64
+             * @description When the sandbox is destroyed, Unix milliseconds. The exact time that
+             *     `expires_at` rounds down to seconds.
+             */
+            expires_at_ms?: number | null;
             /** @description `sbx_`, an opaque id. */
             id: string;
             /** @description `run` for a sandbox made by a create with `run`, else `sandbox`. */
@@ -19175,7 +19209,23 @@ export interface components {
             /** @description `sandbox`. */
             object: string;
             owner?: null | components["schemas"]["SandboxOwner"];
+            /**
+             * Format: int64
+             * @description When the guest of the latest run first answered, Unix milliseconds, by the clock
+             *     of the host. Billing starts here. Present on a retrieve only, under the rules of
+             *     `started_ms`, and absent for a run whose guest never answered.
+             */
+            ready_ms?: number | null;
             run?: null | components["schemas"]["SandboxRunSummary"];
+            /**
+             * Format: int64
+             * @description When the latest run started, Unix milliseconds, by the clock of the host: the
+             *     moment the host launched its VM. Present on a retrieve only, from the receipts
+             *     of a sandbox that is stopped or has ended, and from the host for a running one
+             *     (left out when the host does not answer). Absent while the sandbox starts, stops
+             *     or is destroyed, and when its latest interval is the estimate for a lost VM.
+             */
+            started_ms?: number | null;
             status: components["schemas"]["SandboxStatus"];
             /**
              * @description What went wrong, in words, for a sandbox whose start failed for a cause
@@ -19308,12 +19358,33 @@ export interface components {
              * @description When it was accepted, Unix seconds.
              */
             created: number;
+            /**
+             * Format: int64
+             * @description When it was accepted, Unix milliseconds, by the clock of the server. The exact
+             *     time that `created` rounds down to seconds.
+             */
+            created_ms?: number | null;
             cwd?: string | null;
+            /**
+             * Format: int64
+             * @description How long it ran, in milliseconds: `ended_ms` minus `started_ms`, both from the
+             *     clock of the guest. Absent while it runs, when it never started, and for a lost
+             *     command (its end is then a time of the server).
+             */
+            duration_ms?: number | null;
             /**
              * Format: int64
              * @description When it ended, Unix seconds.
              */
             ended?: number | null;
+            /**
+             * Format: int64
+             * @description When it ended, Unix milliseconds. The guest reports it, by its own clock; a
+             *     command that ended with no word of the guest (lost, or cancelled or failed
+             *     before it started) has the time of the server. The exact time that `ended`
+             *     rounds down to seconds.
+             */
+            ended_ms?: number | null;
             /** @description The names of the variables the command got, in order. */
             env_names: string[];
             /** Format: int32 */
@@ -19338,6 +19409,13 @@ export interface components {
              * @description When it started, Unix seconds.
              */
             started?: number | null;
+            /**
+             * Format: int64
+             * @description When it started, Unix milliseconds, by the clock of the guest (which the host
+             *     sets from its own clock when it launches the VM). The exact time that `started`
+             *     rounds down to seconds.
+             */
+            started_ms?: number | null;
             status: components["schemas"]["SandboxCommandStatus"];
             stderr: components["schemas"]["SandboxStreamSummary"];
             /**
@@ -19881,17 +19959,93 @@ export interface components {
             } | null;
         };
         /**
-         * @description What a sandbox used, in seconds of its size. Metering is not built yet:
-         *     the counters stay 0.
+         * @description What a sandbox used, in seconds of its size, from the receipts of its time. A
+         *     retrieve measures it (`state` is `measured`); every other answer does not
+         *     (`not_read`). The counters use the same billed seconds as the cost, so usage and
+         *     cost agree: each run interval is billed from the first answer of the guest to its
+         *     end (less the silent time of a run that ended `cell_silent`), rounded up to a
+         *     whole second for each interval. `vcpu_seconds` is the billed seconds times the
+         *     vCPUs. Memory and disk are kept in MiB-seconds, before any rounding to GiB, and
+         *     the GiB-seconds are those figures divided by 1,024 and rounded up once for the
+         *     whole sandbox, never for each interval. The interval that runs now counts up to
+         *     the time of the read. Not yet in it are the run that a stop or a destroy is
+         *     closing and the VM that a start or a resume is booting: each is added when its
+         *     receipt is written. The estimate for a VM the host lost is in the cost only,
+         *     never in usage. The counters are 0 and mean nothing unless `state` is `measured`.
          */
         SandboxUsage: {
-            /** Format: int64 */
+            /**
+             * Format: int64
+             * @description The billed time in milliseconds: the billed seconds of every interval, each
+             *     rounded up to a whole second, times 1,000. It is a multiple of 1,000. Absent
+             *     unless `state` is `measured`.
+             */
+            billed_ms?: number | null;
+            /**
+             * Format: int64
+             * @description GiB-seconds of the disk while the sandbox was stopped: `disk_mib_seconds`
+             *     divided by 1,024 and rounded up once. A stopped disk is free.
+             */
             disk_gib_seconds: number;
-            /** Format: int64 */
+            /**
+             * Format: int64
+             * @description The disk in MiB-seconds while the sandbox was stopped: the seconds of each
+             *     stopped interval, rounded up to a whole second, times the disk limit in MiB.
+             *     The disk of a running VM is part of the run and is not counted here. A resume
+             *     that still boots counts the stopped time up to the moment of the resume. Absent
+             *     unless `state` is `measured`.
+             */
+            disk_mib_seconds?: number | null;
+            /**
+             * Format: int64
+             * @description The time the VMs ran in milliseconds, from the start of each VM to its end, or
+             *     to the time of the read for the one that runs now. It includes the free time
+             *     before the guest answered and the silent time of a run that ended `cell_silent`.
+             *     Absent unless `state` is `measured`.
+             */
+            elapsed_ms?: number | null;
+            /**
+             * Format: int64
+             * @description The run intervals counted: the ones the host measured and the one that runs
+             *     now. Absent unless `state` is `measured`.
+             */
+            intervals?: number | null;
+            /**
+             * Format: int64
+             * @description GiB-seconds of memory: `memory_mib_seconds` divided by 1,024 and rounded up
+             *     once. The figure before the rounding is `memory_mib_seconds`.
+             */
             memory_gib_seconds: number;
-            /** Format: int64 */
+            /**
+             * Format: int64
+             * @description Memory in MiB-seconds, not rounded: the billed seconds times the memory limit
+             *     in MiB. Absent unless `state` is `measured`.
+             */
+            memory_mib_seconds?: number | null;
+            state?: null | components["schemas"]["SandboxUsageState"];
+            /**
+             * Format: int64
+             * @description vCPU-seconds: the billed seconds times the vCPUs, for the intervals the host
+             *     measured and the one that runs now.
+             */
             vcpu_seconds: number;
         };
+        /**
+         * @description How far the counters of a `usage` can be trusted. `measured`: the receipts of
+         *     the sandbox were read, and the numbers are exact for what they hold and for the
+         *     interval that runs now, which counts up to the time of the read. Not yet in them
+         *     are the run that a stop or a destroy is closing and the VM that a start or a
+         *     resume is booting: each is added when its receipt is written. `not_read`: this
+         *     answer did not read the receipts, so the counters are 0 and say nothing; only a
+         *     retrieve reads them. `unknown`: a retrieve could not measure the usage (the
+         *     sandbox has more receipts than a read takes, a receipt could not be read, the
+         *     store did not answer in time, or the server prices nothing), so the counters are
+         *     0 and say nothing; never a partial number. The states are a closed set: a new
+         *     state is a change of the contract and needs a new SDK, because the Python enum
+         *     rejects a value it does not know.
+         * @enum {string}
+         */
+        SandboxUsageState: "measured" | "not_read" | "unknown";
         SavedDatasetView: {
             definition: components["schemas"]["SavedDatasetViewDefinition"];
             revision: string;

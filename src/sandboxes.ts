@@ -17,7 +17,12 @@ import type { LbbClient } from "./client.js";
 import { LbbError, sleep, type CallOptions } from "./transport.js";
 import type { Schemas } from "./types.js";
 
-/** A sandbox record: its status, template, limits, owner, usage and (for an L1 run) its `run`. */
+/**
+ * A sandbox record: its status, template, limits, owner, usage and (for an L1 run) its `run`. A retrieve
+ * also measures `usage` (read it only when `usage.state` is `"measured"`), `cost` and the times of the
+ * latest run (`started_ms`, `ready_ms`, `ended_ms`, `create_to_ready_ms`); every other answer says
+ * `usage.state: "not_read"`.
+ */
 export type Sandbox = Schemas["Sandbox"];
 /** A command record: its status, exit code, output tails and (for a `run`) its `result`. */
 export type SandboxCommand = Schemas["SandboxCommand"];
