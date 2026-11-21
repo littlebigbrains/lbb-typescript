@@ -182,6 +182,8 @@ export interface SandboxTemplateSpec extends CallOptions {
   base?: string;
   /** The `run` code, 64 KiB at most. */
   code?: string;
+  /** Files to copy into the new workspace, each from its source graph. */
+  files?: Schemas["SandboxTemplateFile"][];
   limits?: SandboxLimits;
   /** The default command timeout, in milliseconds. */
   commandTimeoutMs?: number;
@@ -316,6 +318,41 @@ export class SandboxFiles {
       query: { sandbox: this.sandbox, path },
       rawBody: bytesOf(data),
       contentType: "application/octet-stream",
+    });
+  }
+
+  /** Copy a graph File into the workspace. */
+  importFile(
+    path: string,
+    sourceGraph: string,
+    sourceSha256: string,
+    options: CallOptions = {},
+  ): Promise<SandboxFile> {
+    return this.client.request("PUT", "/v1/sandboxes/files/content", {
+      ...options,
+      query: {
+        sandbox: this.sandbox,
+        path,
+        source_graph: sourceGraph,
+        source_sha256: sourceSha256,
+      },
+    });
+  }
+
+  /** Save a workspace file in the chosen graph. */
+  keep(
+    path: string,
+    graph: string,
+    options: CallOptions = {},
+  ): Promise<Schemas["FileUploadResponse"]> {
+    const destination = this.client.withScope({
+      graph,
+      expectedGraphEpoch:
+        graph === this.client.graphName ? this.client.graphEpoch : null,
+    });
+    return destination.request("POST", "/v1/files", {
+      ...options,
+      query: { source_sandbox: this.sandbox, source_path: path },
     });
   }
 
@@ -589,6 +626,7 @@ export class SandboxTemplatesNamespace {
     const body: Schemas["SandboxTemplateCreateRequest"] = {
       name: spec.name,
       base: spec.base,
+      files: spec.files,
       code: spec.code,
       limits: limitsBody(spec.limits),
       timeout_ms: spec.commandTimeoutMs,
@@ -624,7 +662,7 @@ export class SandboxTemplatesNamespace {
 }
 
 /**
- * Sandboxes of the graph in scope: `run` (one call), `scoped` and `create`
+ * Sandboxes of the environment: `run` (one call), `scoped` and `create`
  * (a handle), and the resource calls.
  */
 export class SandboxesNamespace {

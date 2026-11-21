@@ -470,7 +470,7 @@ export class LbbClient {
     environment?: string;
     /** @deprecated Use `environment`. */
     stack?: string;
-    expectedGraphEpoch?: string;
+    expectedGraphEpoch?: string | null;
   }): LbbClient {
     return new LbbClient(
       {
@@ -478,7 +478,10 @@ export class LbbClient {
         integrationsUrl: this.integrationsUrl,
         apiKey: this.apiKey,
         graph: scope.graph ?? this.graphName,
-        expectedGraphEpoch: scope.expectedGraphEpoch ?? this.expectedGraphEpoch,
+        expectedGraphEpoch:
+          scope.expectedGraphEpoch === null
+            ? undefined
+            : (scope.expectedGraphEpoch ?? this.expectedGraphEpoch),
         environment: environmentScope(scope) ?? this.environment,
         fetch: this.fetchImpl,
         apiVersion: this.apiVersion,
@@ -542,7 +545,10 @@ export class LbbClient {
       );
     // Namespace queries own their graph selection. A graph-scoped client must
     // not leak its graph or epoch into this environment-scoped route.
-    const graphScoped = path !== "/v1/query/namespace";
+    const graphScoped =
+      path !== "/v1/query/namespace" &&
+      path !== "/v1/sandboxes" &&
+      !path.startsWith("/v1/sandboxes/");
     if (graphScoped && this.graphName !== undefined)
       push("graph", this.graphName);
     if (this.environment !== undefined) push("stack", this.environment);

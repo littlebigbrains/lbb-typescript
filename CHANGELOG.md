@@ -4,6 +4,8 @@ All notable changes to the `@littlebigbrain/client` package are documented here.
 
 ## Unreleased
 
+- Every `client.sandboxes` call uses the environment, including templates, lifecycle, commands and workspace files. A graph or epoch configured on the client still scopes graph APIs. File imports and template entries select a source graph. Workspace keeps select a destination graph.
+
 - `Sandbox.usage` is measured on a retrieve, from the receipts of the sandbox, in the same
   billed seconds as its `cost`. `SandboxUsage` has the optional `state` (`measured`,
   `not_read` or `unknown`) and the exact figures `intervals`, `billed_ms`, `elapsed_ms`,

@@ -3941,10 +3941,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** The graph's sandboxes, newest first. 409 `sandbox_not_enabled` */
+        /** The environment's sandboxes, newest first. 409 `sandbox_not_enabled` */
         get: operations["get_v1_sandboxes"];
         put?: never;
-        /** Create a sandbox: one VM with a workspace disk and no network, from a template (`lbb/python` by default). With `run` it is the L1 shortcut: the sandbox runs `run(input, config)` once and is destroyed when the command ends; the answer holds the run (`run`) and waits for it at most `wait_ms` (0 to 30,000, default 0). A create with `run` needs an `Idempotency-Key`; a repeat answers the same record, also a `failed` one, and a new attempt needs a new key. 400 `idempotency_key_required`, 400 `sandbox_limits_invalid`, 403 `sandbox_plan_unavailable` (a Free account), 404 `sandbox_egress_policy_not_found` (the template names a network policy that the environment does not hold), 404 `sandbox_template_not_found`, 409 `sandbox_egress_not_available` (the template names a network policy and the sandbox backend cannot enforce one: nothing is made, and no backend enforces a policy yet), 409 `sandbox_template_revoked`, 409 `sandbox_not_enabled`, 429 `sandbox_limit_reached` (the graph or the environment already holds as many sandboxes as the limits of the cell allow, 5 for a graph and 10 for an environment by default; a sandbox counts while it is starting, running, stopping or being destroyed), 429 `sandbox_budget_exceeded` (the environment spent its monthly sandbox budget; the error says `limit_source` and `retry_at`, and the same call is refused until the budget is raised or the month ends), 503 `sandbox_capacity_unavailable` (the sandbox host has no room: nothing is made, so the same request with the same `Idempotency-Key` works later; retry after 30 seconds), 503 `sandbox_unavailable`, 503 `storage_degraded` (the template names a network policy and the policies of the environment cannot be read: nothing is made, and the same request works when they can) */
+        /** Create a sandbox: one VM with a workspace disk and no network, from a template (`lbb/python` by default). With `run` it is the L1 shortcut: the sandbox runs `run(input, config)` once and is destroyed when the command ends; the answer holds the run (`run`) and waits for it at most `wait_ms` (0 to 30,000, default 0). A create with `run` needs an `Idempotency-Key`; a repeat answers the same record, also a `failed` one, and a new attempt needs a new key. 400 `idempotency_key_required`, 400 `sandbox_limits_invalid`, 403 `sandbox_plan_unavailable` (a Free account), 404 `sandbox_egress_policy_not_found` (the template names a network policy that the environment does not hold), 404 `sandbox_template_not_found`, 409 `sandbox_egress_not_available` (the template names a network policy and the sandbox backend cannot enforce one: nothing is made, and no backend enforces a policy yet), 409 `sandbox_template_revoked`, 409 `sandbox_not_enabled`, 429 `sandbox_limit_reached` (the environment has reached its running sandbox limit, 10 by default; a sandbox counts while it is starting, running, stopping or being destroyed), 429 `sandbox_budget_exceeded` (the environment spent its monthly sandbox budget; the error says `limit_source` and `retry_at`, and the same call is refused until the budget is raised or the month ends), 503 `sandbox_capacity_unavailable` (the sandbox host has no room: nothing is made, so the same request with the same `Idempotency-Key` works later; retry after 30 seconds), 503 `sandbox_unavailable`, 503 `storage_degraded` (the template names a network policy and the policies of the environment cannot be read: nothing is made, and the same request works when they can) */
         post: operations["post_v1_sandboxes"];
         /** Destroy the VM and its disk. The commands that run end `cancelled` with reason `sandbox_destroyed`. A delete of a sandbox that is destroying or destroyed answers the record as it is. 404 `sandbox_not_found` */
         delete: operations["delete_v1_sandboxes"];
@@ -4066,7 +4066,7 @@ export interface paths {
         };
         /** The bytes of a file of `/workspace`, 4 MiB at most an answer. One `Range: bytes=a-b`, `bytes=a-` or `bytes=-n` answers 206 with `Content-Range`; a range with no byte of the file answers 416. The answer sends `X-Content-Type-Options: nosniff` and `Content-Disposition: attachment`. 400 `sandbox_path_invalid`, 404 `sandbox_file_not_found`, 409 `sandbox_not_running`, 413 `sandbox_file_too_large` for a read of more than 4 MiB without a range */
         get: operations["get_v1_sandboxes_files_content"];
-        /** Write a file of `/workspace` with the request body, 4 MiB at most, and make its directories. An empty body is an empty file. The same bytes again change nothing. With `source_sha256` the body is empty and the file is the File of the graph with that SHA-256 (an import): the server reads it from storage and sends it to the guest in parts of 512 KiB, up to the server's file limit (`LBB_FILES_MAX_BYTES`) and the sandbox's disk, and checks its SHA-256 before the file appears at `path`; a File whose bytes do not match is refused and the path stays as it was. 400 `sandbox_path_invalid`, 403 `sandbox_plan_unavailable` (a Free account), 404 `sandbox_not_found`, 404 `file_not_found` (an import), 409 `sandbox_not_running`, 409 `graph_epoch_changed` (an import), 413 `sandbox_file_too_large`, 413 `file_too_large` (an import) */
+        /** Write a file of `/workspace` with the request body, 4 MiB at most, and make its directories. An empty body is an empty file. The same bytes again change nothing. With `source_sha256` and `source_graph` the body is empty and the file is the File with that SHA-256 in the named graph (an import): the server reads it from storage and sends it to the guest in parts of 512 KiB, up to the server's file limit (`LBB_FILES_MAX_BYTES`) and the sandbox's disk, and checks its SHA-256 before the file appears at `path`; a File whose bytes do not match is refused and the path stays as it was. 400 `sandbox_path_invalid`, 403 `sandbox_plan_unavailable` (a Free account), 404 `sandbox_not_found`, 404 `file_not_found` (an import), 409 `sandbox_not_running`, 409 `graph_epoch_changed` (an import), 413 `sandbox_file_too_large`, 413 `file_too_large` (an import) */
         put: operations["put_v1_sandboxes_files_content"];
         post?: never;
         delete?: never;
@@ -4101,7 +4101,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Start a stopped sandbox again. A resume does not move `expires_at`. A resume of a starting or running sandbox answers the sandbox as it is. 403 `sandbox_plan_unavailable` (a Free account), 404 `sandbox_not_found`, 409 `sandbox_not_running` for a sandbox that is stopping or has ended, 429 `sandbox_limit_reached` (the graph or the environment already holds as many sandboxes as the limits of the cell allow, 5 for a graph and 10 for an environment by default), 429 `sandbox_budget_exceeded` (the environment spent its monthly sandbox budget; a sandbox that the budget stopped stays `stopped` with its disk, and nothing resumes it by itself), 503 `sandbox_capacity_unavailable` (the sandbox host has no room: the sandbox stays `stopped` with its disk; retry after 30 seconds), 503 `sandbox_unavailable` */
+        /** Start a stopped sandbox again. A resume does not move `expires_at`. A resume of a starting or running sandbox answers the sandbox as it is. 403 `sandbox_plan_unavailable` (a Free account), 404 `sandbox_not_found`, 409 `sandbox_not_running` for a sandbox that is stopping or has ended, 429 `sandbox_limit_reached` (the environment has reached its running sandbox limit, 10 by default), 429 `sandbox_budget_exceeded` (the environment spent its monthly sandbox budget; a sandbox that the budget stopped stays `stopped` with its disk, and nothing resumes it by itself), 503 `sandbox_capacity_unavailable` (the sandbox host has no room: the sandbox stays `stopped` with its disk; retry after 30 seconds), 503 `sandbox_unavailable` */
         post: operations["post_v1_sandboxes_resume"];
         delete?: never;
         options?: never;
@@ -4133,10 +4133,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** The saved templates of the graph, newest version first. A name resolves to its newest version; each save of a name is a version with its own id. The base templates LBB publishes are read by id (`sbt_lbb_python`, `sbt_lbb_node`, `sbt_lbb_shell`). 409 `sandbox_not_enabled` */
+        /** The saved templates of the environment, newest version first. A name resolves to its newest version; each save of a name is a version with its own id. The base templates LBB publishes are read by id (`sbt_lbb_python`, `sbt_lbb_node`, `sbt_lbb_shell`). 409 `sandbox_not_enabled` */
         get: operations["get_v1_sandboxes_templates"];
         put?: never;
-        /** Save a template: a base template, the `run` code (64 KiB), limits, a command timeout and a default config. Each call writes a new immutable version with a new `sbt_` id, and the name then resolves to it. `files` are Files of the graph by SHA-256 (`{path, source_sha256}`, 64 at most and 16 MiB together): the server copies them into `/workspace` when a sandbox of the template first starts, before the sandbox is `running`. A file the graph does not hold is refused with 404 `file_not_found`; a path outside `/workspace` with 400 `sandbox_path_invalid`. `egress` names a network policy of the environment by its `policy` name; a template never holds hosts, and the policy is read again when a sandbox is created. The optional `Idempotency-Key` makes a repeat answer the same version; the same key with another body answers 409 `idempotency_conflict`. 400 `sandbox_egress_invalid` (the policy name is not valid), 400 `sandbox_limits_invalid`, 403 `sandbox_plan_unavailable` (a Free account), 404 `sandbox_egress_policy_not_found` (the environment holds no policy of that name), 409 `sandbox_not_enabled`, 503 `storage_degraded` (the network policies of the environment cannot be read; the same request works when they can) */
+        /** Save a template: a base template, the `run` code (64 KiB), limits, a command timeout and a default config. Each call writes a new immutable version with a new `sbt_` id, and the name then resolves to it. `files` are Files from their named source graphs (`{path, source_graph, source_sha256}`, 64 at most and 16 MiB together): the server copies them into `/workspace` when a sandbox of the template first starts, before the sandbox is `running`. A file the graph does not hold is refused with 404 `file_not_found`; a path outside `/workspace` with 400 `sandbox_path_invalid`. `egress` names a network policy of the environment by its `policy` name; a template never holds hosts, and the policy is read again when a sandbox is created. The optional `Idempotency-Key` makes a repeat answer the same version; the same key with another body answers 409 `idempotency_conflict`. 400 `sandbox_egress_invalid` (the policy name is not valid), 400 `sandbox_limits_invalid`, 403 `sandbox_plan_unavailable` (a Free account), 404 `sandbox_egress_policy_not_found` (the environment holds no policy of that name), 409 `sandbox_not_enabled`, 503 `storage_degraded` (the network policies of the environment cannot be read; the same request works when they can) */
         post: operations["post_v1_sandboxes_templates"];
         delete?: never;
         options?: never;
@@ -19250,7 +19250,7 @@ export interface components {
              * @description What went wrong, in words, for a sandbox whose start failed for a cause
              *     of its own: a file of its template is gone or cannot be copied in (it
              *     names the file by its SHA-256 and the path it was to go to), the
-             *     template is gone, the graph was deleted and made again, or the image of
+             *     template is gone, a source graph changed during the copy, or the image of
              *     the sandbox is older than the server. A `stopped` sandbox has it after a
              *     resume that did not start (a static sentence: the sandbox keeps its
              *     disk). Absent otherwise, and gone when the status changes.
@@ -19911,7 +19911,7 @@ export interface components {
             config?: unknown;
             egress?: null | components["schemas"]["SandboxTemplateEgress"];
             /**
-             * @description Files for `/workspace`: Files of the graph, copied when a sandbox of
+             * @description Files copied from their named source graphs into `/workspace` when a sandbox of
              *     this template first starts. See [`SandboxTemplateFile`].
              */
             files?: components["schemas"]["SandboxTemplateFile"][];
@@ -19939,14 +19939,16 @@ export interface components {
         };
         /**
          * @description A file a template copies into `/workspace` when a sandbox of the template
-         *     first starts: a File of the graph, named by its SHA-256. A template holds
+         *     first starts: a File of the chosen source graph, named by its SHA-256. A template holds
          *     64 files at most and 16 MiB together. The path is under `/workspace`; the
          *     template shows it as an absolute path.
          */
         SandboxTemplateFile: {
             /** @description The path in `/workspace`. */
             path: string;
-            /** @description The SHA-256 of a file of the graph, 64 hexadecimal characters. */
+            /** @description The graph of this environment that holds the File. */
+            source_graph: string;
+            /** @description The SHA-256 of a File in the source graph, 64 hexadecimal characters. */
             source_sha256: string;
         };
         /** @description One page of templates, newest first. */
@@ -66229,8 +66231,6 @@ export interface operations {
     get_v1_sandboxes: {
         parameters: {
             query?: {
-                /** @description Graph name (default `main`) */
-                graph?: string;
                 /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
                 environment?: string;
                 /**
@@ -66384,8 +66384,6 @@ export interface operations {
     post_v1_sandboxes: {
         parameters: {
             query?: {
-                /** @description Graph name (default `main`) */
-                graph?: string;
                 /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
                 environment?: string;
                 /**
@@ -66531,8 +66529,6 @@ export interface operations {
     delete_v1_sandboxes: {
         parameters: {
             query?: {
-                /** @description Graph name (default `main`) */
-                graph?: string;
                 /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
                 environment?: string;
                 /**
@@ -66676,8 +66672,6 @@ export interface operations {
     get_v1_sandboxes_budget: {
         parameters: {
             query?: {
-                /** @description Graph name (default `main`) */
-                graph?: string;
                 /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
                 environment?: string;
                 /**
@@ -66819,8 +66813,6 @@ export interface operations {
     get_v1_sandboxes_commands: {
         parameters: {
             query?: {
-                /** @description Graph name (default `main`) */
-                graph?: string;
                 /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
                 environment?: string;
                 /**
@@ -66968,8 +66960,6 @@ export interface operations {
     post_v1_sandboxes_commands: {
         parameters: {
             query?: {
-                /** @description Graph name (default `main`) */
-                graph?: string;
                 /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
                 environment?: string;
                 /**
@@ -67117,8 +67107,6 @@ export interface operations {
     post_v1_sandboxes_commands_cancel: {
         parameters: {
             query?: {
-                /** @description Graph name (default `main`) */
-                graph?: string;
                 /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
                 environment?: string;
                 /**
@@ -67268,8 +67256,6 @@ export interface operations {
     get_v1_sandboxes_commands_get: {
         parameters: {
             query?: {
-                /** @description Graph name (default `main`) */
-                graph?: string;
                 /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
                 environment?: string;
                 /**
@@ -67413,8 +67399,6 @@ export interface operations {
     get_v1_sandboxes_commands_logs: {
         parameters: {
             query?: {
-                /** @description Graph name (default `main`) */
-                graph?: string;
                 /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
                 environment?: string;
                 /**
@@ -67567,8 +67551,6 @@ export interface operations {
     get_v1_sandboxes_files: {
         parameters: {
             query?: {
-                /** @description Graph name (default `main`) */
-                graph?: string;
                 /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
                 environment?: string;
                 /**
@@ -67718,8 +67700,6 @@ export interface operations {
     delete_v1_sandboxes_files: {
         parameters: {
             query?: {
-                /** @description Graph name (default `main`) */
-                graph?: string;
                 /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
                 environment?: string;
                 /**
@@ -67867,8 +67847,6 @@ export interface operations {
     get_v1_sandboxes_files_content: {
         parameters: {
             query?: {
-                /** @description Graph name (default `main`) */
-                graph?: string;
                 /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
                 environment?: string;
                 /**
@@ -68061,8 +68039,6 @@ export interface operations {
     put_v1_sandboxes_files_content: {
         parameters: {
             query?: {
-                /** @description Graph name (default `main`) */
-                graph?: string;
                 /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
                 environment?: string;
                 /**
@@ -68074,6 +68050,8 @@ export interface operations {
                 sandbox?: string;
                 /** @description the file's path in `/workspace` */
                 path?: string;
+                /** @description the source graph in this environment; required for an import with source_sha256 */
+                source_graph?: string;
                 /** @description an import: the SHA-256 of a File of the graph (64 hexadecimal characters); the body is then empty */
                 source_sha256?: string;
             };
@@ -68215,8 +68193,6 @@ export interface operations {
     get_v1_sandboxes_get: {
         parameters: {
             query?: {
-                /** @description Graph name (default `main`) */
-                graph?: string;
                 /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
                 environment?: string;
                 /**
@@ -68358,8 +68334,6 @@ export interface operations {
     post_v1_sandboxes_resume: {
         parameters: {
             query?: {
-                /** @description Graph name (default `main`) */
-                graph?: string;
                 /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
                 environment?: string;
                 /**
@@ -68503,8 +68477,6 @@ export interface operations {
     post_v1_sandboxes_stop: {
         parameters: {
             query?: {
-                /** @description Graph name (default `main`) */
-                graph?: string;
                 /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
                 environment?: string;
                 /**
@@ -68648,8 +68620,6 @@ export interface operations {
     get_v1_sandboxes_templates: {
         parameters: {
             query?: {
-                /** @description Graph name (default `main`) */
-                graph?: string;
                 /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
                 environment?: string;
                 /**
@@ -68795,8 +68765,6 @@ export interface operations {
     post_v1_sandboxes_templates: {
         parameters: {
             query?: {
-                /** @description Graph name (default `main`) */
-                graph?: string;
                 /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
                 environment?: string;
                 /**
@@ -68942,8 +68910,6 @@ export interface operations {
     get_v1_sandboxes_templates_get: {
         parameters: {
             query?: {
-                /** @description Graph name (default `main`) */
-                graph?: string;
                 /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
                 environment?: string;
                 /**
@@ -69085,8 +69051,6 @@ export interface operations {
     post_v1_sandboxes_update: {
         parameters: {
             query?: {
-                /** @description Graph name (default `main`) */
-                graph?: string;
                 /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
                 environment?: string;
                 /**
