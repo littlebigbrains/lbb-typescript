@@ -253,6 +253,8 @@ export type {
   WorkflowStartOptions,
   WorkflowStepOptions,
   WorkflowStepContext,
+  WorkflowSandboxes,
+  WorkflowSandboxRun,
   WorkflowProgressCounts,
   InboxOptions,
   WorkflowSignalResult,
