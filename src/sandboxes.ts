@@ -107,6 +107,14 @@ export interface SandboxRunSpec extends SandboxSpec, SandboxRunInput {
    * again at most, so a larger number is 2. 0 turns it off.
    */
   lostRetries?: number;
+  /**
+   * The workflow turn that makes the sandbox: the server records it as the
+   * sandbox's owner, and the call needs the step's effect id as its
+   * `idempotencyKey`. `ctx.sandboxes.run` of a workflow worker sets both; set
+   * it yourself only from a worker of your own. A run that goes again after a
+   * loss sends the step `<step>.2` with the key `<key>.2`.
+   */
+  workflowFence?: Schemas["SandboxWorkflowFence"];
 }
 
 /** The most a lost run goes again: the design says twice for the class `fresh`. */
@@ -708,13 +716,24 @@ export class SandboxesNamespace {
     };
     for (let attempt = 1; ; attempt += 1) {
       const key = attempt === 1 ? baseKey : `${baseKey}.${attempt}`;
+      const fence = spec.workflowFence;
       let sandbox = await this.client.request<Sandbox>(
         "POST",
         "/v1/sandboxes",
         {
           ...callOptions(spec),
           idempotencyKey: key,
-          body,
+          body:
+            fence === undefined
+              ? body
+              : {
+                  ...body,
+                  workflow_fence: {
+                    ...fence,
+                    step:
+                      attempt === 1 ? fence.step : `${fence.step}.${attempt}`,
+                  },
+                },
         },
       );
       const began = Date.now();

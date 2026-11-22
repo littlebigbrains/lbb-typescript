@@ -19582,6 +19582,7 @@ export interface components {
              *     0, the default, the answer does not wait.
              */
             wait_ms?: number | null;
+            workflow_fence?: null | components["schemas"]["SandboxWorkflowFence"];
         };
         /**
          * @description The network policy a sandbox was made with: its name and the rules as they
@@ -19775,16 +19776,32 @@ export interface components {
             to: number;
         };
         /**
-         * @description The workflow turn that owns a sandbox. A sandbox made under a workflow
-         *     grant records its owner; a sandbox made by an environment key has none.
-         *     The owner is stored and shown; the fence it enables is not built yet, so
-         *     `owner` is always `null` for now.
+         * @description The workflow turn that owns a sandbox. A sandbox made in a step of a workflow
+         *     (a create with a `workflow_fence`) records its owner; any other sandbox has
+         *     none. The server takes every field from the turn the fence holds, never from
+         *     the body.
          */
         SandboxOwner: {
+            /**
+             * @description The graph the workflow runs in. An attribute only: it gives no right to
+             *     the sandbox, and a graph delete does not end it.
+             */
+            graph: string;
+            /**
+             * Format: int64
+             * @description The lifetime of that graph when the sandbox was made.
+             */
+            graph_epoch: number;
             /** @description `sandbox_owner`. */
             object: string;
+            /** @description The run of the turn: the `id` of a run of the runs routes. */
             run: string;
+            /** @description The step key that made the sandbox (`ctx.sandboxes.run(key, …)`). */
             step: string;
+            /**
+             * @description The named workflow of the turn, or the engine identity when the turn
+             *     belongs to no named workflow.
+             */
             workflow: string;
         };
         /** @description The function a `run` calls: `run(input, config)` of a template's harness. */
@@ -20067,6 +20084,27 @@ export interface components {
          * @enum {string}
          */
         SandboxUsageState: "measured" | "not_read" | "unknown";
+        /**
+         * @description The turn of a workflow that makes a sandbox (`workflow_fence` of
+         *     `POST /v1/sandboxes`), as a commit names it, with the graph of the turn and
+         *     the step key. The create runs only while `token` holds turn `turn` of instance
+         *     `workflow_id` (`409 sandbox_fence_lost`); a repeat of its `Idempotency-Key`
+         *     answers the sandbox it made. The key must be the step's effect id: the
+         *     effect prefix of the turn, `/`, then `step`.
+         */
+        SandboxWorkflowFence: {
+            /**
+             * @description The graph of the workflow. Absent: the graph that a call with no graph
+             *     reaches, as for the worker's other calls.
+             */
+            graph?: string | null;
+            /** @description The step key: 1 to 128 characters. */
+            step: string;
+            token: string;
+            /** Format: int64 */
+            turn: number;
+            workflow_id: string;
+        };
         SavedDatasetView: {
             definition: components["schemas"]["SavedDatasetViewDefinition"];
             revision: string;
