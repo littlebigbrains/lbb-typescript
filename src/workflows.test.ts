@@ -1080,3 +1080,123 @@ test("a turn waits for LBB without an attempt until its wait budget is spent", a
   await worker.runOnce();
   assert.ok(failures().at(-1)!.retry_at_ms, "a new budget starts");
 });
+
+test("ctx.sandboxes.run runs code as a step, under the step's effect id and the turn's fence", async () => {
+  const calls: {
+    method: string;
+    path: string;
+    key: string | null;
+    body: Record<string, unknown>;
+  }[] = [];
+  const tasks = [task()];
+  const client = new LbbClient({
+    baseUrl: "http://localhost:7400",
+    maxRetries: 0,
+    retryDelayMs: 0,
+    fetch: async (input, init) => {
+      const path = new URL(input).pathname;
+      const body = JSON.parse(String(init?.body ?? "{}")) as Record<
+        string,
+        unknown
+      >;
+      const key = new Headers(init?.headers).get("idempotency-key");
+      calls.push({ method: init?.method ?? "GET", path, key, body });
+      const answer =
+        path === "/v1/sandboxes"
+          ? {
+              id: "sbx_1",
+              object: "sandbox",
+              status: "destroyed",
+              run: {
+                status: "exited",
+                exit_code: 0,
+                result: 6,
+                command: "cmd_1",
+              },
+            }
+          : path.endsWith("/claim")
+            ? { task: tasks.shift() ?? null }
+            : {};
+      return new Response(JSON.stringify(answer), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      });
+    },
+  });
+  let ran: unknown;
+  const summer = workflow({
+    name: "counter",
+    version: "v1",
+    initialState: { count: 0 },
+    async onMessage(ctx, state) {
+      ran = await ctx.sandboxes!.run("sum", {
+        code: "def run(input, config):\n    return sum(input)",
+        input: [1, 2, 3],
+      });
+      return { state };
+    },
+  });
+  await new WorkflowWorker(client, [summer], { worker: "test" }).runOnce();
+  const creates = calls.filter((c) => c.path === "/v1/sandboxes");
+  assert.equal(creates.length, 1);
+  assert.equal(creates[0].key, "stable/sum");
+  assert.deepEqual(creates[0].body.workflow_fence, {
+    workflow_id: "agent",
+    turn: 1,
+    token: "token",
+    step: "sum",
+  });
+  assert.deepEqual(ran, {
+    result: 6,
+    status: "exited",
+    exitCode: 0,
+    command: "cmd_1",
+    ok: true,
+    sandbox: "sbx_1",
+  });
+  assert.equal(calls.filter((c) => c.path.endsWith("/complete")).length, 1);
+});
+
+test("a sandbox create whose fence is lost stops the attempt and fails nothing", async () => {
+  const tasks = [task()];
+  const paths: string[] = [];
+  const client = new LbbClient({
+    baseUrl: "http://localhost:7400",
+    maxRetries: 0,
+    retryDelayMs: 0,
+    fetch: async (input) => {
+      const path = new URL(input).pathname;
+      paths.push(path);
+      if (path === "/v1/sandboxes")
+        return new Response(
+          JSON.stringify({
+            error: {
+              type: "conflict_error",
+              code: "sandbox_fence_lost",
+              message: "the workflow_fence does not hold turn 1",
+              param: "workflow_fence",
+            },
+          }),
+          { status: 409, headers: { "content-type": "application/json" } },
+        );
+      return new Response(
+        JSON.stringify(
+          path.endsWith("/claim") ? { task: tasks.shift() ?? null } : {},
+        ),
+        { status: 200, headers: { "content-type": "application/json" } },
+      );
+    },
+  });
+  const summer = workflow({
+    name: "counter",
+    version: "v1",
+    initialState: { count: 0 },
+    async onMessage(ctx, state) {
+      await ctx.sandboxes!.run("sum", { code: "def run(i, c):\n    return 1" });
+      return { state };
+    },
+  });
+  await new WorkflowWorker(client, [summer], { worker: "test" }).runOnce();
+  assert.equal(paths.filter((path) => path.endsWith("/fail")).length, 0);
+  assert.equal(paths.filter((path) => path.endsWith("/complete")).length, 0);
+});

@@ -13,6 +13,7 @@ import {
   TriggeredWorkflowsNamespace,
 } from "./triggered-workflows.js";
 import { WorkflowTestsNamespace } from "./workflow-tests.js";
+import type { SandboxRunResult, SandboxRunSpec } from "./sandboxes.js";
 import {
   replayedInputs,
   RunResultsCollector,
@@ -306,6 +307,28 @@ export interface WorkflowStepContext {
    */
   progress(phase: string, counts: WorkflowProgressCounts): void;
 }
+/** What {@link WorkflowSandboxes.run} gives back: the run, with the sandbox by its id. */
+export interface WorkflowSandboxRun extends Omit<SandboxRunResult, "sandbox"> {
+  /** The id (`sbx_`) of the sandbox of the run. */
+  sandbox: string;
+}
+/** Sandboxes as steps of a turn (`ctx.sandboxes`). */
+export interface WorkflowSandboxes {
+  /**
+   * Run code once in a new sandbox, as step `key` of the turn: the L1 call of
+   * `client.sandboxes.run` with a checkpoint. The server records the turn as
+   * the sandbox's owner (workflow, run, step `key`, graph), so the run shows
+   * under its step. The key of the call is the step's effect id, so a later
+   * attempt of the turn answers the same run, and a finished step is not run
+   * again. A turn whose lease ended stops: the next holder runs the step.
+   * Check `ok` before you use `result`.
+   */
+  run(
+    key: string,
+    spec: Omit<SandboxRunSpec, "idempotencyKey" | "workflowFence" | "signal">,
+    options?: WorkflowStepOptions,
+  ): Promise<WorkflowSandboxRun>;
+}
 export type WorkflowSignalResult<T> =
   { received: true; value: T } | { received: false; value: null };
 export interface WorkflowContext {
@@ -333,6 +356,12 @@ export interface WorkflowContext {
    * with custom contexts.
    */
   blobJson?<T = unknown>(key: string): Promise<T>;
+  /**
+   * Sandboxes as steps of this turn: `ctx.sandboxes.run(key, spec)`. The
+   * server must record owners of sandboxes. Optional for compatibility with
+   * custom contexts.
+   */
+  readonly sandboxes?: WorkflowSandboxes;
   /** Where the message came from, when its sender named it. */
   readonly origin?: Schemas["WorkflowMessageOrigin"] | null;
   /** The named workflow of this identity (a shard's or a fan-in identity's), if any. */
@@ -1423,6 +1452,36 @@ export class WorkflowWorker {
           signal: controller.signal,
         });
       },
+      sandboxes: {
+        run: async (key, spec, options) =>
+          (await checkpoint(
+            key,
+            "step",
+            async (step: WorkflowStepContext): Promise<WorkflowSandboxRun> => {
+              const ran = await this.client.sandboxes.run({
+                ...spec,
+                signal: step.signal,
+                idempotencyKey: step.effectId,
+                workflowFence: {
+                  ...(step.fence ?? { ...lease }),
+                  ...(step.graph === undefined ? {} : { graph: step.graph }),
+                  step: key,
+                },
+              });
+              return {
+                result: ran.result,
+                status: ran.status,
+                exitCode: ran.exitCode,
+                command: ran.command,
+                ok: ran.ok,
+                sandbox: ran.sandbox.id,
+              };
+            },
+            undefined,
+            undefined,
+            options,
+          )) as WorkflowSandboxRun,
+      },
       origin: task.turn.origin ?? null,
       workflowName: workflowOfIdentity(lease.workflow_id),
       step: async <T>(
@@ -1521,7 +1580,11 @@ export class WorkflowWorker {
         return; // The coordinator expires/fences this attempt and schedules its retry.
       }
       // A fenced write found the lease gone: the turn's next holder writes.
-      if (error instanceof LbbError && error.code === "workflow_fence_lost")
+      if (
+        error instanceof LbbError &&
+        (error.code === "workflow_fence_lost" ||
+          error.code === "sandbox_fence_lost")
+      )
         return;
       stopHeartbeat();
       // A wait for a cause outside the turn counts no attempt. LBB itself
