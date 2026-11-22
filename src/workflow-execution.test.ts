@@ -743,3 +743,47 @@ test("hosted agent scoped clones retain the owned-write execution bearer", async
     WorkflowExecutionError,
   );
 });
+
+test("the hosted client runs a sandbox under the turn's sandbox grants, with the credential's graph", async () => {
+  const { client, seen } = setup((call) => {
+    if (call.url.pathname.endsWith("/execution-credential")) {
+      const operation = call.body.operation ?? "sparql_read";
+      return {
+        ...credential(),
+        token: `lbb_wke_${operation}.signature`,
+        operations: [operation],
+      };
+    }
+    if (call.url.pathname === "/v1/sandboxes")
+      return {
+        id: "sbx_1",
+        object: "sandbox",
+        status: "destroyed",
+        run: { status: "exited", exit_code: 0, result: 6, command: "cmd_1" },
+      };
+    return {};
+  });
+  const scoped = new WorkflowTurnReader(client, task()).agentClient();
+  const ran = await scoped.sandboxes.run({
+    code: "def run(input, config):\n    return sum(input)",
+    input: [1, 2, 3],
+    idempotencyKey: "stable/run",
+  });
+  assert.equal(ran.ok, true);
+  assert.equal(ran.result, 6);
+  const create = seen.find((call) => call.url.pathname === "/v1/sandboxes")!;
+  assert.equal(
+    create.headers.authorization,
+    "Bearer lbb_wke_sandbox_write.signature",
+  );
+  assert.equal(create.url.searchParams.get("graph"), "project");
+  const asked = seen
+    .filter((call) => call.url.pathname.endsWith("/execution-credential"))
+    .map((call) => call.body.operation);
+  assert.deepEqual(asked, ["sandbox_write"]);
+  // Templates and the budget are not a turn's: the client sends nothing.
+  assert.throws(
+    () => scoped.request("GET", "/v1/sandboxes/templates"),
+    WorkflowExecutionError,
+  );
+});

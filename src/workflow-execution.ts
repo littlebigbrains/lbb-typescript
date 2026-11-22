@@ -121,7 +121,7 @@ function optionsChecked(options: WorkflowReadOptions): void {
 
 /** A call of one execution operation. */
 interface Execution {
-  method: "GET" | "POST" | "PUT";
+  method: "GET" | "POST" | "PUT" | "DELETE";
   path: string;
   query?: RequestOptions["query"];
   headers?: Record<string, string>;
@@ -246,12 +246,18 @@ export class WorkflowTurnReader {
           };
         }
       }
+      // A sandbox route names no graph for a client, but a grant is for the
+      // graph of its turn: the server matches the credential to this graph.
+      const query =
+        operation === "sandbox_read" || operation === "sandbox_write"
+          ? { ...(options.query ?? {}), graph: this.#credential.graph_id }
+          : options.query;
       return this.#execute<T>(
         operation,
         {
           method: method as Execution["method"],
           path,
-          query: options.query,
+          query,
           body,
           idempotencyKey: options.idempotencyKey,
           headers: options.headers,
@@ -417,7 +423,11 @@ export class WorkflowTurnReader {
       check();
       const budget = Math.min(
         options.timeoutMs ?? 30_000,
-        operation === "model_call" ? 55_000 : 30_000,
+        // A model call, and a sandbox call that waits for its VM and its
+        // command (30 s at most), need more than a read.
+        operation === "model_call" || operation === "sandbox_write"
+          ? 55_000
+          : 30_000,
       );
       let credential = this.#credentials.get(operation);
       let deadline = this.#deadlines.get(operation);
@@ -532,5 +542,41 @@ function agentOperation(method: string, path: string): Operation | undefined {
   if (method === "GET" && path === "/v1/workflows/named/revisions/get")
     return "revision_read";
   if (method === "POST" && path === "/v1/graph/commit") return "owned_write";
+  return sandboxOperation(method, path);
+}
+
+/**
+ * The sandbox grants of a turn (`sandbox_read`, `sandbox_write`): the routes of
+ * the turn's own sandboxes. Templates and the budget have no grant.
+ */
+function sandboxOperation(method: string, path: string): Operation | undefined {
+  if (
+    method === "GET" &&
+    [
+      "/v1/sandboxes",
+      "/v1/sandboxes/get",
+      "/v1/sandboxes/commands",
+      "/v1/sandboxes/commands/get",
+      "/v1/sandboxes/commands/logs",
+      "/v1/sandboxes/files",
+      "/v1/sandboxes/files/content",
+    ].includes(path)
+  )
+    return "sandbox_read";
+  if (
+    (method === "POST" &&
+      [
+        "/v1/sandboxes",
+        "/v1/sandboxes/update",
+        "/v1/sandboxes/stop",
+        "/v1/sandboxes/resume",
+        "/v1/sandboxes/commands",
+        "/v1/sandboxes/commands/cancel",
+      ].includes(path)) ||
+    (method === "DELETE" &&
+      (path === "/v1/sandboxes" || path === "/v1/sandboxes/files")) ||
+    (method === "PUT" && path === "/v1/sandboxes/files/content")
+  )
+    return "sandbox_write";
   return undefined;
 }
