@@ -24543,7 +24543,7 @@ export interface components {
          *     (`HOSTED_AGENT_WORKFLOW_TYPE`).
          * @enum {string}
          */
-        WorkflowExecutionOperation: "sparql_read" | "file_read" | "owned_write" | "model_call" | "review" | "revision_read" | "file_write";
+        WorkflowExecutionOperation: "sparql_read" | "file_read" | "owned_write" | "model_call" | "review" | "revision_read" | "file_write" | "sandbox_read" | "sandbox_write";
         /**
          * @description A commit made from a workflow turn (`POST /v1/graph/commit`,
          *     `workflow_fence`): the server answers a repeat of the commit's request id
