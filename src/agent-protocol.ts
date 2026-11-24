@@ -16,11 +16,44 @@ export const AGENT_TOOLS = [
   "graph.read",
   "files.read",
   "propose_write",
+  "run_code",
 ] as const;
 export type AgentToolName = (typeof AGENT_TOOLS)[number];
+/**
+ * The tools of a spec that names none. `run_code` is not one of them: a spec
+ * names it, and a cell takes it only with `LBB_AGENT_RUN_CODE`.
+ */
+export const DEFAULT_AGENT_TOOLS: readonly AgentToolName[] = [
+  "graph.read",
+  "files.read",
+  "propose_write",
+];
 
 /** Bounds of one step, in UTF-8 bytes. */
 export const ARGUMENTS_MAX_BYTES = 2_048;
+/**
+ * The arguments of an action when the run has `run_code`: the code is in them.
+ * A run without the tool keeps {@link ARGUMENTS_MAX_BYTES} and its pin.
+ */
+export const RUN_CODE_ARGUMENTS_MAX_BYTES = 6_144;
+/** The code of one `run_code` call, and the JSON of its input. */
+export const RUN_CODE_MAX_BYTES = 5_120;
+/**
+ * `run_code` (SB-6): the calls of one run, each in its own sandbox of 1 vCPU and
+ * 1 GiB that ends after 120 seconds. The server holds the same limits under
+ * `LBB_AGENT_RUN_CODE`.
+ */
+export const RUN_CODE_CALLS = 3;
+export const RUN_CODE_SECONDS = 120;
+/** The command's own timeout, inside the sandbox's 120 seconds. */
+export const RUN_CODE_COMMAND_MS = 100_000;
+/**
+ * The worst case of one call in micro-USD (120 s × 18,500 nano-USD a second):
+ * the loop reserves it against the run's cost cap before the call.
+ */
+export const RUN_CODE_RESERVE_MICRO_USD = 2_220;
+/** A `run_code` step times out after this long: the sandbox's life and a margin. */
+export const RUN_CODE_STEP_TIMEOUT_MS = 180_000;
 export const SUMMARY_MAX_BYTES = 300;
 export const FINISH_SUMMARY_MAX_BYTES = 2_048;
 /** A tool result is cut to this many bytes. */
@@ -136,7 +169,9 @@ export function askedOf(action: {
         ? `${String(args.file ?? "")} ${String(args.locator ?? "")}`
         : action.tool === "propose_write"
           ? `${Array.isArray(args.proposals) ? args.proposals.length : 0} proposals`
-          : "";
+          : action.tool === "run_code"
+            ? `${utf8(String(args.code ?? ""))} bytes of code`
+            : "";
   return cutBytes(text.replace(/\s+/g, " ").trim(), 120);
 }
 
@@ -412,6 +447,34 @@ export const TOOL_DEFINITIONS: Record<AgentToolName, ToolDefinition> = {
       },
     },
   },
+  run_code: {
+    name: "run_code",
+    version: "1",
+    description:
+      'Run Python code in a sandbox with no network and no access to the graph or the files. Arguments: {"code": Python that defines def run(input, config) and returns JSON, "input": the JSON the code gets as input (copy the text it needs from what you read)}. Returns {"ok", "status", "exit_code", "result_json": what run returned, as JSON text}. Use it to compute, parse or check, not to fetch. At most 3 calls a run, each up to 100 seconds. A run that called run_code writes nothing: a person reviews every value it proposes.',
+    arguments: {
+      type: "object",
+      additionalProperties: false,
+      required: ["code"],
+      properties: {
+        code: { type: "string", minLength: 1, maxBytes: RUN_CODE_MAX_BYTES },
+        input: {},
+      },
+    },
+    result: {
+      type: "object",
+      properties: {
+        ok: { type: "boolean" },
+        status: { type: "string" },
+        exit_code: { type: "integer" },
+        result_json: { type: "string" },
+        truncated: { type: "boolean" },
+        sandbox: { type: "string" },
+        command: { type: "string" },
+        error: { type: "string" },
+      },
+    },
+  },
 };
 
 /** `finish`: always present, no effect. */
@@ -432,7 +495,12 @@ export function actionSchema(tools: readonly AgentToolName[]): Schema {
     required: ["tool", "arguments_json", "summary"],
     properties: {
       tool: { type: "string", enum: [...tools, "finish"] },
-      arguments_json: { type: "string", maxBytes: ARGUMENTS_MAX_BYTES },
+      arguments_json: {
+        type: "string",
+        maxBytes: tools.includes("run_code")
+          ? RUN_CODE_ARGUMENTS_MAX_BYTES
+          : ARGUMENTS_MAX_BYTES,
+      },
       summary: { type: "string", maxBytes: SUMMARY_MAX_BYTES },
     },
   };

@@ -3,6 +3,7 @@
 // capture (`captureActivities`) takes this host and swaps the commit for the
 // dry run and the Review filing for a kept request.
 import type { LbbActivities } from "./activities.js";
+import { RUN_CODE_COMMAND_MS } from "./agent-protocol.js";
 import type { AgentFileRecord, AgentHost } from "./agent.js";
 import type { LbbClient } from "./client.js";
 import type { CallOptions } from "./transport.js";
@@ -194,6 +195,54 @@ export function lbbAgentHost(
           found.set(row.s, { type, name: row.label });
       }
       return found;
+    },
+    async runCode(request, runOptions) {
+      // SB-6: one sandbox for each call, sized and timed as the server's limits
+      // of an agent turn (1 vCPU, 1 GiB, 120 s), with no second run after a
+      // lost VM: a call makes one sandbox.
+      const ran = await client.sandboxes.run({
+        template: "lbb/python",
+        code: request.code,
+        input: request.input,
+        limits: { vcpus: 1, memoryMib: 1_024 },
+        expiresInSeconds: 120,
+        commandTimeoutMs: RUN_CODE_COMMAND_MS,
+        waitMs: 30_000,
+        maxWaitMs: 140_000,
+        lostRetries: 0,
+        idempotencyKey: runOptions.idempotencyKey,
+        ...call(runOptions.signal),
+      });
+      // An L1 run destroys its sandbox when the command ends; read what it
+      // cost. A read that fails leaves the cost unknown, and the loop charges
+      // the worst case.
+      let cost: Schemas["SandboxCost"] | null | undefined;
+      try {
+        cost = (
+          await client.sandboxes.retrieve(
+            ran.sandbox.id,
+            call(runOptions.signal),
+          )
+        ).cost;
+      } catch {
+        cost = undefined;
+      }
+      return {
+        ok: ran.ok,
+        status: ran.status,
+        ...(ran.exitCode !== undefined ? { exitCode: ran.exitCode } : {}),
+        result: ran.result,
+        sandbox: ran.sandbox.id,
+        command: ran.command,
+        ...(cost
+          ? {
+              costMicroUsd:
+                cost.settled_micro_usd +
+                cost.estimate_micro_usd +
+                cost.open_micro_usd,
+            }
+          : {}),
+      };
     },
     reviewItems(keys, signal) {
       return activities.reviewItems(keys, call(signal));
