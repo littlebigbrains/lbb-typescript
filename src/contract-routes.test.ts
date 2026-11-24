@@ -36,6 +36,7 @@ const CLIENT_SOURCES = [
   "src/files.ts",
   "src/sandboxes.ts",
   "src/reviews.ts",
+  "src/erasures.ts",
   "src/triggered-workflows.ts",
   "src/triggered-workflow-worker.ts",
   "src/workflow-tests.ts",

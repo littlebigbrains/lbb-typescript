@@ -1388,6 +1388,41 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/erasures": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The graph's erasures, newest first */
+        get: operations["get_v1_erasures"];
+        put?: never;
+        /** Erase subjects and files from the graph: one commit retracts every statement that names a subject (as subject or object), the statement nodes about those statements, the nodes the `follow` rules reach and the files, and masks their terms on every read at every `as_of_commit_seq`. A background purge then deletes them from storage, backups included, before `deadline`. It cannot be undone. Needs an `Idempotency-Key`; a retry answers the same erasure with `idempotent_replay: true`. With `dry_run: true` the answer is an `erasure_preview` (counts, up to 50 statements, the shape results it would create) and nothing is written; a dry run needs no key. 409 `erasure_not_enabled` until the cell records its build floor; 409 `erasure_fork_in_progress` while a fork of the graph runs; 400 `erasure_scope_empty`, `erasure_scope_too_large`, `erasure_unsupported`; 409 `erasure_shape_conflict` (send `accept_shape_violations: true`) */
+        post: operations["post_v1_erasures"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/erasures/get": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** One erasure by its id (`ers_`). `GET /v1/erasures/{id}` answers the same. 404 `not_found` */
+        get: operations["get_v1_erasures_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/evals": {
         parameters: {
             query?: never;
@@ -8811,6 +8846,144 @@ export interface components {
             name: string;
             type: string;
         };
+        /** @description One erasure. It never names its subjects. */
+        Erasure: {
+            accept_shape_violations: boolean;
+            counts: components["schemas"]["ErasureCounts"];
+            /**
+             * Format: int64
+             * @description Unix seconds.
+             */
+            created: number;
+            /**
+             * Format: int64
+             * @description Unix seconds: the purge completes before this time.
+             */
+            deadline: number;
+            /**
+             * Format: int64
+             * @description Unix seconds: when the last backup copy is gone.
+             */
+            external_copies_expire?: number | null;
+            failure?: string | null;
+            follow: components["schemas"]["ErasureFollowRule"][];
+            graph: string;
+            /** @description `ers_` and the id. */
+            id: string;
+            /**
+             * @description On `POST /v1/erasures` only: whether the key answered an earlier
+             *     request.
+             */
+            idempotent_replay?: boolean | null;
+            /**
+             * Format: int64
+             * @description The commit that retracted the scope and masked it.
+             */
+            masked_at_commit_seq?: number | null;
+            object: string;
+            /** @description The purge receipt, once the purge has one. */
+            receipt?: unknown;
+            shape_violations: components["schemas"]["ErasureShapeViolation"][];
+            /** Format: int64 */
+            shape_violations_total: number;
+            status: components["schemas"]["ErasureStatus"];
+        };
+        /** @description What an erasure covers. */
+        ErasureCounts: {
+            /** Format: int64 */
+            files: number;
+            /** Format: int64 */
+            followed: number;
+            /** Format: int64 */
+            statement_nodes: number;
+            /** Format: int64 */
+            statements: number;
+            /** Format: int64 */
+            subjects: number;
+        };
+        /**
+         * @description `POST /v1/erasures`: erase subjects and files, or preview the erasure with
+         *     `dry_run`.
+         */
+        ErasureCreateRequest: {
+            /** @description Erase even when the retraction breaks a shape. */
+            accept_shape_violations?: boolean;
+            /** @description Compute the scope and write nothing. */
+            dry_run?: boolean;
+            /** @description SHA-256 hex digests of files to erase. */
+            files?: string[];
+            follow?: components["schemas"]["ErasureFollowRule"][];
+            /** @description Absolute IRIs of the subjects to erase. */
+            subjects?: string[];
+        };
+        /**
+         * @description The answer to `POST /v1/erasures`: the erasure, or its preview for a dry
+         *     run.
+         */
+        ErasureCreateResponse: components["schemas"]["Erasure"] | components["schemas"]["ErasurePreview"];
+        /**
+         * @description Which way a follow rule walks its predicate.
+         * @enum {string}
+         */
+        ErasureFollowDirection: "in" | "out";
+        /**
+         * @description A follow rule: the nodes linked to the set by `predicate` join the set.
+         *     `in` adds the subjects of `?node <predicate> <member>`, `out` the objects of
+         *     `<member> <predicate> ?node`. Rules repeat up to 3 steps.
+         */
+        ErasureFollowRule: {
+            direction: components["schemas"]["ErasureFollowDirection"];
+            predicate: string;
+        };
+        /** @description `GET /v1/erasures`: the graph's erasures. */
+        ErasureList: {
+            data: components["schemas"]["Erasure"][];
+            has_more: boolean;
+            object: string;
+        };
+        /** @description The answer to a dry run: the scope at the head, and nothing written. */
+        ErasurePreview: {
+            /**
+             * Format: int64
+             * @description The commit the scope was computed at.
+             */
+            commit_seq: number;
+            counts: components["schemas"]["ErasureCounts"];
+            dry_run: boolean;
+            follow: components["schemas"]["ErasurePreviewRule"][];
+            graph: string;
+            object: string;
+            samples: components["schemas"]["ErasureSample"][];
+            /** Format: int64 */
+            samples_limit: number;
+            shape_violations: components["schemas"]["ErasureShapeViolation"][];
+            /** Format: int64 */
+            shape_violations_total: number;
+        };
+        /** @description A follow rule of a dry run, with the nodes it added. */
+        ErasurePreviewRule: {
+            /** Format: int64 */
+            added: number;
+            direction: components["schemas"]["ErasureFollowDirection"];
+            predicate: string;
+        };
+        /** @description A statement the erasure would retract, in N-Triples term form. */
+        ErasureSample: {
+            object: string;
+            predicate: string;
+            subject: string;
+        };
+        /** @description A shape result that the retraction creates. */
+        ErasureShapeViolation: {
+            focus_node: string;
+            path?: string | null;
+            shape: string;
+        };
+        /**
+         * @description The state of an erasure.
+         * @enum {string}
+         */
+        ErasureStatus: "masking" | "masked" | "purging" | "verifying" | "complete" | "failed";
         /**
          * @description The inputs of an Ask request (`POST /v1/query/ask`) that shape its
          *     answer, kept on an `ask` trace and its golden so a run asks the same way.
@@ -39640,6 +39813,437 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["EmbeddingRefreshResponse"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Rate limit exceeded */
+            429: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Service unavailable */
+            503: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+        };
+    };
+    get_v1_erasures: {
+        parameters: {
+            query?: {
+                /** @description Graph name (default `main`) */
+                graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
+            };
+            header?: {
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
+                "Lbb-Version"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErasureList"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Rate limit exceeded */
+            429: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Service unavailable */
+            503: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+        };
+    };
+    post_v1_erasures: {
+        parameters: {
+            query?: {
+                /** @description Graph name (default `main`) */
+                graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
+            };
+            header?: {
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
+                "Lbb-Version"?: string;
+                /** @description Stable client-generated key for safely retrying mutations and supervision writes. */
+                "Idempotency-Key"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ErasureCreateRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErasureCreateResponse"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Rate limit exceeded */
+            429: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Service unavailable */
+            503: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+        };
+    };
+    get_v1_erasures_get: {
+        parameters: {
+            query?: {
+                /** @description Graph name (default `main`) */
+                graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
+                /** @description the erasure's id (`ers_`) */
+                id?: string;
+            };
+            header?: {
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
+                "Lbb-Version"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Erasure"];
                 };
             };
             /** @description Bad request */
