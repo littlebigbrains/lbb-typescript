@@ -19845,7 +19845,7 @@ export interface components {
          *     `unknown`.
          * @enum {string}
          */
-        SandboxStatusReason: "requested" | "idle" | "expired" | "run_ended" | "start_timeout" | "start_error" | "host_lost" | "budget" | "unknown";
+        SandboxStatusReason: "requested" | "idle" | "expired" | "run_ended" | "start_timeout" | "start_error" | "host_lost" | "budget" | "owner_ended" | "unknown";
         /**
          * @description The stream of a command's output.
          * @enum {string}
