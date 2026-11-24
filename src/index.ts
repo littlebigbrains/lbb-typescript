@@ -330,6 +330,7 @@ export type {
   AgentVerdictCode,
 } from "./agent.js";
 export type { ReviewListOptions, ReviewsNamespace } from "./reviews.js";
+export type { ErasureScope, ErasuresNamespace } from "./erasures.js";
 
 export {
   WorkflowExecutionError,

@@ -4,6 +4,8 @@ All notable changes to the `@littlebigbrain/client` package are documented here.
 
 ## Unreleased
 
+- `client.erasures`: `preview`, `erase`, `get` and `list` for `/v1/erasures`, the subject erasure of a graph (GDPR). `erase` sends an `Idempotency-Key`; pass `idempotencyKey` to make a rerun answer the first erasure. Schema types: `Erasure`, `ErasurePreview`, `ErasureList`, `ErasureCreateRequest`, `ErasureFollowRule`, `ErasureStatus`.
+
 - Every `client.sandboxes` call uses the environment, including templates, lifecycle, commands and workspace files. A graph or epoch configured on the client still scopes graph APIs. File imports and template entries select a source graph. Workspace keeps select a destination graph.
 
 - `Sandbox.usage` is measured on a retrieve, from the receipts of the sandbox, in the same

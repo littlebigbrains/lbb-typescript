@@ -6,6 +6,7 @@ import { RecordsNamespace } from "./records.js";
 import { FilesNamespace } from "./files.js";
 import { SandboxesNamespace } from "./sandboxes.js";
 import { ReviewsNamespace } from "./reviews.js";
+import { ErasuresNamespace } from "./erasures.js";
 import { AccessNamespace, CatalogNamespace } from "./catalog.js";
 import {
   DEFAULT_INTEGRATIONS_URL,
@@ -359,6 +360,11 @@ export class LbbClient {
    * (values, choices, grades, answers, and ontology changes).
    */
   readonly reviews: ReviewsNamespace;
+  /**
+   * Subject erasure (GDPR): erase what a person said, on every read at every
+   * commit, then from storage.
+   */
+  readonly erasures: ErasuresNamespace;
   readonly catalog: CatalogNamespace;
   readonly access: AccessNamespace;
   readonly workflows: WorkflowNamespace;
@@ -435,6 +441,7 @@ export class LbbClient {
     this.files = new FilesNamespace(this);
     this.sandboxes = new SandboxesNamespace(this);
     this.reviews = new ReviewsNamespace(this);
+    this.erasures = new ErasuresNamespace(this);
     this.catalog = new CatalogNamespace(this);
     this.access = new AccessNamespace(this);
     this.workflows = new WorkflowNamespace(this);
