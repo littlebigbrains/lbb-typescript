@@ -703,6 +703,52 @@ test("the host reads at a commit when it is told one, and strong otherwise", asy
   assert.match(reads[1]?.query ?? "", /consistency=strong/);
 });
 
+test("the host runs code in one small sandbox under the step's key and reads its cost", async () => {
+  const sandbox = {
+    id: "sbx_1",
+    status: "destroyed",
+    run: { status: "exited", exit_code: 0, command: "cmd_1", result: { n: 2 } },
+  };
+  const { client, calls } = served({
+    "POST /v1/sandboxes": () => ({ body: sandbox }),
+    "GET /v1/sandboxes/get": () => ({
+      body: {
+        ...sandbox,
+        cost: {
+          settled_micro_usd: 30,
+          estimate_micro_usd: 0,
+          open_micro_usd: 4,
+        },
+      },
+    }),
+  });
+  const host = lbbAgentHost(client, lbbActivities(client));
+  const ran = await host.runCode!(
+    { code: "def run(input, config):\n    return {'n': 2}", input: { a: 1 } },
+    { idempotencyKey: "wf/msg/agent.i01.tool" },
+  );
+  assert.deepEqual(ran, {
+    ok: true,
+    status: "exited",
+    exitCode: 0,
+    result: { n: 2 },
+    sandbox: "sbx_1",
+    command: "cmd_1",
+    costMicroUsd: 34,
+  });
+  const create = calls[0]!;
+  assert.equal(
+    create.headers["Idempotency-Key"] ?? create.headers["idempotency-key"],
+    "wf/msg/agent.i01.tool",
+  );
+  assert.equal(create.body?.template, "lbb/python");
+  assert.deepEqual(create.body?.limits, { vcpus: 1, memory_mib: 1_024 });
+  assert.equal(create.body?.expires_in_seconds, 120);
+  assert.deepEqual((create.body?.run as { input?: unknown })?.input, { a: 1 });
+  // One create: a lost VM does not run again in a second sandbox.
+  assert.equal(calls.filter((call) => call.method === "POST").length, 1);
+});
+
 test("a graph that cannot say its commit reads at the head", async () => {
   const { client } = served({
     "GET /v1/graph/metadata": () => ({

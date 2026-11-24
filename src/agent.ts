@@ -16,6 +16,7 @@
 import {
   AGENT_RULES,
   AGENT_TOOLS,
+  DEFAULT_AGENT_TOOLS,
   DECISION_MAX_TOKENS,
   DECISION_TIMEOUT_MS,
   FILE_READ_RETURN_BYTES,
@@ -24,6 +25,10 @@ import {
   GRAPH_READ_ROWS,
   INVALID_IN_A_ROW,
   RESULT_MAX_BYTES,
+  RUN_CODE_CALLS,
+  RUN_CODE_MAX_BYTES,
+  RUN_CODE_RESERVE_MICRO_USD,
+  RUN_CODE_STEP_TIMEOUT_MS,
   SAVED_BYTES_FACTOR,
   SAVED_BYTES_GUARD,
   SUPPORT_CONTEXT_BYTES,
@@ -95,6 +100,7 @@ import type { WorkflowRunInput } from "./run-results.js";
 export {
   AGENT_INTERPRETER,
   AGENT_TOOLS,
+  DEFAULT_AGENT_TOOLS,
   type AgentToolName,
 } from "./agent-protocol.js";
 
@@ -295,6 +301,21 @@ export interface AgentOntology {
  * files, the commit and the Review inbox. {@link lbbAgentHost} makes one
  * from a client; a test hands the interpreter a scripted one.
  */
+/** What one `run_code` call came to. */
+export interface AgentCodeRun {
+  /** The run exited with code 0. */
+  ok: boolean;
+  status: string;
+  exitCode?: number;
+  /** What `run(input, config)` returned. */
+  result: unknown;
+  /** The sandbox (`sbx_`) and the command (`cmd_`) of the run. */
+  sandbox: string;
+  command: string;
+  /** The cost the sandbox reported, in micro-USD; absent when it reported none. */
+  costMicroUsd?: number;
+}
+
 export interface AgentHost {
   reason<T>(
     request: ReasonRequest,
@@ -356,6 +377,16 @@ export interface AgentHost {
     iris: readonly string[],
     signal?: AbortSignal,
   ): Promise<Map<string, { type: string; name: string }>>;
+  /**
+   * Run the code of a `run_code` call in a sandbox of 1 vCPU and 1 GiB that
+   * ends after 120 seconds, with no network, under the step's effect id as the
+   * idempotency key (SB-6). Optional: a host without it answers the tool with
+   * `run_code_unavailable`.
+   */
+  runCode?(
+    request: { code: string; input: unknown },
+    options: { idempotencyKey: string; signal?: AbortSignal },
+  ): Promise<AgentCodeRun>;
   /** Called with each input the run writes, files or fails (a capture keeps them). */
   report?(input: WorkflowRunInput): void;
   /** The Review items filed under `keys`, of every status. */
@@ -431,6 +462,9 @@ interface ToolRecord {
   elapsedMs?: number;
   /** The class and name of the entities a `graph.read` returned for the first time. */
   labels?: Record<string, EntityLabel>;
+  /** A `run_code` call that made a sandbox: its cost, or the reserve when unknown. */
+  ran?: boolean;
+  costMicroUsd?: number;
 }
 
 /** One verdict a `propose_write` result holds. */
@@ -569,7 +603,7 @@ export function resolveSpec(spec: AgentSpec): Resolved {
     utf8(spec.instructions) > 8_000
   )
     throw new WorkflowError("instructions are 1 to 8,000 bytes of text");
-  const tools = [...(spec.tools ?? AGENT_TOOLS)];
+  const tools = [...(spec.tools ?? DEFAULT_AGENT_TOOLS)];
   if (
     new Set(tools).size !== tools.length ||
     tools.some((tool) => !AGENT_TOOLS.includes(tool))
@@ -696,12 +730,22 @@ class Run {
     }
   }
 
+  /** The `run_code` calls that made a sandbox. */
+  codeRuns = 0;
+
+  /** A run that ran code writes nothing: every proposal goes to a person. */
+  get ranCode(): boolean {
+    return this.codeRuns > 0;
+  }
+
   addTool(
     n: number,
     action: NonNullable<DecisionRecord["action"]>,
     record: ToolRecord,
   ): void {
     this.savedBytes += jsonSize(record);
+    if (record.ran) this.codeRuns += 1;
+    this.costMicroUsd += record.costMicroUsd ?? 0;
     this.toolCounts[action.tool] = (this.toolCounts[action.tool] ?? 0) + 1;
     this.observations.push({
       n,
@@ -1067,7 +1111,13 @@ export async function runAgent(
     const tool = await ctx.step<ToolRecord>(
       `${key}.i${pad(n)}.tool`,
       async (s) => toolStep(host, s, run, cfg, action, n, start, owned),
-      { kind: "tool", timeoutMs: TOOL_TIMEOUT_MS },
+      {
+        kind: "tool",
+        timeoutMs:
+          action.tool === "run_code"
+            ? RUN_CODE_STEP_TIMEOUT_MS
+            : TOOL_TIMEOUT_MS,
+      },
     );
     run.addTool(n, action, tool);
   }
@@ -1416,6 +1466,8 @@ async function toolStep(
     total: cfg.maxIterations,
     unit: "iterations",
   });
+  if (action.tool === "run_code")
+    return await runCode(host, s, run, cfg, action.arguments);
   const timer = timed(s.signal, TOOL_TIMEOUT_MS - 5_000);
   try {
     if (action.tool === "graph.read")
@@ -1447,6 +1499,100 @@ async function toolStep(
         "tool_timeout",
         `the ${action.tool} call took longer than ${(TOOL_TIMEOUT_MS - 5_000) / 1_000} seconds`,
       );
+    throw error;
+  } finally {
+    timer.done();
+  }
+}
+
+/**
+ * `run_code` (SB-6): the code in a sandbox, under the step's effect id, so a
+ * step that runs again answers with the same sandbox. The checks before the
+ * call read the saved steps only: at most {@link RUN_CODE_CALLS} calls make a
+ * sandbox, and a call needs room for its worst case
+ * ({@link RUN_CODE_RESERVE_MICRO_USD}) under the run's cost cap. A call whose
+ * cost is unknown is charged that worst case.
+ */
+async function runCode(
+  host: AgentHost,
+  s: WorkflowStepContext,
+  run: Run,
+  cfg: Resolved,
+  args: Record<string, unknown>,
+): Promise<ToolRecord> {
+  if (!host.runCode)
+    return refused("run_code_unavailable", "this worker cannot run code");
+  if (run.codeRuns >= RUN_CODE_CALLS)
+    return refused(
+      "run_code_limit",
+      `a run makes at most ${RUN_CODE_CALLS} run_code calls`,
+    );
+  if (run.costMicroUsd + RUN_CODE_RESERVE_MICRO_USD > cfg.maxCostMicroUsd)
+    return refused(
+      "cost_budget",
+      "the cost cap of this run leaves no room for another run_code call",
+    );
+  const input = args.input ?? null;
+  if (jsonSize(input) > RUN_CODE_MAX_BYTES)
+    return refused(
+      "input_too_large",
+      `the input is at most ${RUN_CODE_MAX_BYTES} bytes of JSON`,
+    );
+  const timer = timed(s.signal, RUN_CODE_STEP_TIMEOUT_MS - 10_000);
+  try {
+    const ran = await host.runCode(
+      { code: String(args.code), input },
+      { idempotencyKey: s.effectId, signal: timer.signal },
+    );
+    const head = {
+      ok: ran.ok,
+      status: ran.status,
+      ...(ran.exitCode !== undefined ? { exit_code: ran.exitCode } : {}),
+      sandbox: ran.sandbox,
+      command: ran.command,
+    };
+    const json = JSON.stringify(ran.result ?? null);
+    const room = RESULT_MAX_BYTES - jsonSize(head) - 64;
+    const result =
+      utf8(json) <= room
+        ? { ...head, result_json: json }
+        : { ...head, result_json: cutBytes(json, room), truncated: true };
+    return {
+      ok: ran.ok,
+      note: ran.ok
+        ? `ran: ${utf8(json)} bytes of result`
+        : `ran: ${ran.status}${ran.exitCode !== undefined ? ` exit ${ran.exitCode}` : ""}`,
+      result,
+      ran: true,
+      costMicroUsd: Math.min(
+        ran.costMicroUsd ?? RUN_CODE_RESERVE_MICRO_USD,
+        RUN_CODE_RESERVE_MICRO_USD,
+      ),
+    };
+  } catch (error) {
+    // A refusal of the create made no sandbox; the model gets it as the result.
+    if (
+      error instanceof LbbError &&
+      error.status >= 400 &&
+      error.status < 500 &&
+      error.status !== 409 &&
+      error.status !== 429
+    )
+      return refused(
+        error.code ?? "run_code_refused",
+        cutBytes(error.message, 200),
+      );
+    // Our own time cap ended the wait: the sandbox may have run, so the call
+    // counts, at its worst case.
+    if (timer.timedOut())
+      return {
+        ...refused(
+          "tool_timeout",
+          `the run_code call took longer than ${(RUN_CODE_STEP_TIMEOUT_MS - 10_000) / 1_000} seconds`,
+        ),
+        ran: true,
+        costMicroUsd: RUN_CODE_RESERVE_MICRO_USD,
+      };
     throw error;
   } finally {
     timer.done();
@@ -2029,8 +2175,12 @@ async function commitPhase(input: PhaseInput): Promise<{ uncertain?: string }> {
     "source_changed",
   ]);
 
+  // A run that ran code writes nothing: its grounded proposals go to a person
+  // as the proposals of a run that did not finish do (SB-6).
+  const writable = finished && !run.ranCode;
+
   // The support gate: one `decide` for all grounded proposals.
-  if (finished && cfg.gate !== undefined && grounded.length) {
+  if (writable && cfg.gate !== undefined && grounded.length) {
     const support = await ctx.step<SupportRecord>(
       `${key}.commit.support`,
       async (s) => supportStep(host, s, cfg, grounded, workflow, options),
@@ -2046,14 +2196,14 @@ async function commitPhase(input: PhaseInput): Promise<{ uncertain?: string }> {
   }
 
   // Written candidates: grounded, finished, past the gate.
-  const candidates = finished
+  const candidates = writable
     ? proposals.filter((p) => p.verdict.code === "grounded")
     : [];
   const toReview = proposals.filter(
     (p) =>
       p.verdict.code === "weak_support" ||
       reviewCodes.has(p.verdict.code) ||
-      (!finished && p.verdict.code === "grounded"),
+      (!writable && p.verdict.code === "grounded"),
   );
   for (const p of proposals)
     if (!candidates.includes(p) && !toReview.includes(p))
