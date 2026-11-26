@@ -2364,8 +2364,10 @@ export class LbbClient {
    * that a limit refused (`GET /v1/activity/requests/failed`), newest first,
    * over the last 30 days: time, class, route, status, outcome, error code,
    * duration and request id. No query, body or other customer text. The graph
-   * is `graph` or, without it, the client's graph scope; the server keeps the
-   * newest 500 entries of a graph and a UTC day. Pass `class` to read one
+   * is `graph` or, without it, the client's graph scope; the server keeps at
+   * most 500 entries of a graph and a UTC day (the first 100 and the newest
+   * 400) and says in `skipped` how many failures of the days a page read are
+   * not listed. Pass `class` to read one
    * class, `limit` (1 to 100) for the page and `cursor` from `next_cursor` for
    * the next, older page; a page reads at most three stored days.
    * `recording: false` says the server does not log requests. Gate on the
