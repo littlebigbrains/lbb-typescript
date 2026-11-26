@@ -18448,7 +18448,7 @@ export interface components {
          * @description What a request was: one class for each data request.
          * @enum {string}
          */
-        RequestActivityClass: "query" | "search" | "ask" | "write" | "graph" | "ontology" | "models" | "workflows" | "files" | "status" | "other";
+        RequestActivityClass: "query" | "query_search" | "search" | "ask" | "write" | "graph" | "ontology" | "models" | "workflows" | "files" | "status" | "other";
         /**
          * @description New graph and namespace rows that the stored counts refused for their
          *     size. A refused row is not counted for its graph or namespace (the
@@ -18512,9 +18512,9 @@ export interface components {
             recording: boolean;
             /**
              * @description The series: one row for each period and class that has requests, oldest
-             *     period first, the classes in the order query, search, ask, write,
-             *     graph, ontology, models, workflows, files, status, other. Empty in a
-             *     list.
+             *     period first, the classes in the order query, query_search, search,
+             *     ask, write, graph, ontology, models, workflows, files, status, other.
+             *     Empty in a list.
              */
             rows: components["schemas"]["RequestActivityRow"][];
             scope: components["schemas"]["RequestActivityScope"];
@@ -27564,7 +27564,7 @@ export interface operations {
                 to?: string;
                 /** @description day (default) or hour; hour is for the environment and keeps the last 48 hours */
                 granularity?: string;
-                /** @description query, search, ask, write, graph, ontology, models, workflows, files, status or other: only that class */
+                /** @description query, query_search, search, ask, write, graph, ontology, models, workflows, files, status or other: only that class */
                 class?: string;
                 /** @description one graph id; not with `only_namespace` or `list` */
                 only_graph?: string;
