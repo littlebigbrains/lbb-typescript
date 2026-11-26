@@ -62,7 +62,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** The requests the environment's data routes answered, how they ended (ok, client error, failed, refused by a limit) and how long they took (sum, longest, p50, p95, p99), per period and class: a series of the environment, of one graph (`only_graph`) or of the graphs of one catalog namespace (`only_namespace`), by day or, for the environment, by hour; or a list of the graphs or namespaces of one month (`list`), a bounded part of the month a page with a cursor. A quantile is given only with 20 or more requests. Off by default: `recording: false` says the server does not count requests. An environment read; the answering node adds the counts it has not written yet to a series */
+        /** The requests the environment's data routes answered, how they ended (ok, client error, failed, refused by a limit) and how long they took (sum, longest, p50, p95, p99), per period and class: a series of the environment, of one graph (`only_graph`) or of the graphs of one catalog namespace (`only_namespace`), by day or, for the environment and for one graph, by hour; or a list of the graphs or namespaces of one month (`list`), a bounded part of the month a page with a cursor. A quantile is given only with 20 or more requests. Off by default: `recording: false` says the server does not count requests. An environment read; the answering node adds the counts it has not written yet to a series */
         get: operations["get_v1_activity_requests"];
         put?: never;
         post?: never;
@@ -18454,6 +18454,7 @@ export interface components {
          *     size. A refused row is not counted for its graph or namespace (the
          *     environment rows are never refused), so a graph or namespace figure is lower
          *     than the truth when these are not 0 (`incomplete` says so).
+         *     In an hour series of a graph, `graph_rows` counts the refused hour rows.
          */
         RequestActivityDropped: {
             /** Format: int64 */
@@ -27642,11 +27643,11 @@ export interface operations {
                  * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
                  */
                 stack?: string;
-                /** @description yyyy-mm-dd (UTC), first day of a series; default: 30 days before `to` (2 days for hours) */
+                /** @description yyyy-mm-dd (UTC), first day of a series; default: 30 days before `to` (2 days for hours); at most 92 days from `to` (14 for hours) */
                 from?: string;
                 /** @description yyyy-mm-dd (UTC), last day of a series; default: today */
                 to?: string;
-                /** @description day (default) or hour; hour is for the environment and keeps the last 48 hours */
+                /** @description day (default) or hour; hour is for the environment and for one graph (`only_graph`), not for a namespace, and keeps the last 14 days */
                 granularity?: string;
                 /** @description query, query_search, search, ask, write, graph, ontology, models, workflows, files, status or other: only that class */
                 class?: string;
