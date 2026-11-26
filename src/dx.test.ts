@@ -1236,6 +1236,49 @@ test("requestActivity reads a series and a list of the request ledger", async ()
   ]);
 });
 
+test("requestFailures reads the failed requests of one graph, with paging", async () => {
+  const entry = {
+    at_ms: 1_790_000_000_000,
+    class: "query",
+    route: "/api/query/sparql",
+    status: 503,
+    outcome: "failed",
+    error_code: "query_deadline_exceeded",
+    duration_ms: 25_000,
+    request_id: "req-1",
+  };
+  const { fetch, urls } = queuedFetch([
+    {
+      body: {
+        recording: true,
+        graph: "support",
+        failures: [entry],
+        next_cursor: "1790000000000.req-1",
+      },
+    },
+    { body: { recording: true, graph: "main", failures: [] } },
+  ]);
+  const client = new LbbClient({ baseUrl: "http://h", fetch });
+
+  const first = await client.requestFailures({
+    graph: "support",
+    class: "query",
+    limit: 20,
+  });
+  const second = await client.requestFailures({
+    graph: "main",
+    cursor: "1790000000000.req-1",
+  });
+
+  assert.equal(first.failures[0]?.error_code, "query_deadline_exceeded");
+  assert.equal(first.next_cursor, "1790000000000.req-1");
+  assert.deepEqual(second.failures, []);
+  assert.deepEqual(urls, [
+    "http://h/v1/activity/requests/failed?graph=support&class=query&limit=20",
+    "http://h/v1/activity/requests/failed?graph=main&cursor=1790000000000.req-1",
+  ]);
+});
+
 test("graph namespace reads planner statistics with paging", async () => {
   const { fetch, urls } = queuedFetch([
     { body: { served_at_seq: null, predicates: [], next_cursor: null } },

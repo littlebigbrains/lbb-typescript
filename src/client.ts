@@ -2360,6 +2360,35 @@ export class LbbClient {
     });
   }
 
+  /** The single requests of one graph that failed (a 5xx or a deadline) or
+   * that a limit refused (`GET /v1/activity/requests/failed`), newest first,
+   * over the last 30 days: time, class, route, status, outcome, error code,
+   * duration and request id. No query, body or other customer text. The graph
+   * is `graph` or, without it, the client's graph scope; the server keeps the
+   * newest 500 entries of a graph and a UTC day. Pass `class` to read one
+   * class, `limit` (1 to 100) for the page and `cursor` from `next_cursor` for
+   * the next, older page; a page reads at most three stored days.
+   * `recording: false` says the server does not log requests. Gate on the
+   * capability `request_failures_v1`. */
+  requestFailures(
+    opts: {
+      graph?: string;
+      class?: Schemas["RequestActivityClass"];
+      limit?: number;
+      cursor?: string;
+    } = {},
+  ): Promise<Schemas["RequestFailuresResponse"]> {
+    const client =
+      opts.graph === undefined ? this : this.withScope({ graph: opts.graph });
+    return client.request("GET", "/v1/activity/requests/failed", {
+      query: {
+        class: opts.class,
+        limit: opts.limit,
+        cursor: opts.cursor,
+      },
+    });
+  }
+
   /** The environment's monthly model budget (`GET /v1/models/budget`): the
    * limit, what the month spent and what is left, the state against the
    * warning line (`ok`, `warning`, `spent`, `unlimited`, `not_recorded`), and

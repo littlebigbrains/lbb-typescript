@@ -72,6 +72,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/activity/requests/failed": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The single requests of one graph (`graph`, required) that failed (a 5xx or a deadline) or that a limit refused, newest first, over the last 30 days: the time, class, route, status, outcome, error code, duration and request id of each. No query, body or other customer text. The log keeps the newest 500 entries of a graph and a UTC day. A page reads at most three stored days; pass `next_cursor` as `cursor` for the next, older page. Off by default: `recording: false` says the server does not log requests. The answering node adds the entries it has not written yet */
+        get: operations["get_v1_activity_requests_failed"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/catalog/graph": {
         parameters: {
             query?: never;
@@ -18431,7 +18448,7 @@ export interface components {
          * @description What a request was: one class for each data request.
          * @enum {string}
          */
-        RequestActivityClass: "query" | "search" | "ask" | "write" | "other";
+        RequestActivityClass: "query" | "search" | "ask" | "write" | "graph" | "ontology" | "models" | "workflows" | "files" | "status" | "other";
         /**
          * @description New graph and namespace rows that the stored counts refused for their
          *     size. A refused row is not counted for its graph or namespace (the
@@ -18496,7 +18513,8 @@ export interface components {
             /**
              * @description The series: one row for each period and class that has requests, oldest
              *     period first, the classes in the order query, search, ask, write,
-             *     other. Empty in a list.
+             *     graph, ontology, models, workflows, files, status, other. Empty in a
+             *     list.
              */
             rows: components["schemas"]["RequestActivityRow"][];
             scope: components["schemas"]["RequestActivityScope"];
@@ -18614,6 +18632,63 @@ export interface components {
          * @enum {string}
          */
         RequestActivitySubjects: "graphs" | "namespaces";
+        /** @description One request that failed or that a limit refused. */
+        RequestFailure: {
+            /**
+             * Format: int64
+             * @description When the request ended, in milliseconds since the Unix epoch.
+             */
+            at_ms: number;
+            /**
+             * @description The class of the request: `query`, `search`, `ask`, `write` or `other`
+             *     (the classes of `GET /v1/activity/requests`).
+             */
+            class: string;
+            /**
+             * Format: int64
+             * @description How long the request took, in whole milliseconds; 0 for a request that a
+             *     limit refused before the route ran.
+             */
+            duration_ms: number;
+            /** @description The `error.code` of the error envelope, when the answer has one. */
+            error_code?: string | null;
+            outcome: components["schemas"]["RequestFailureOutcome"];
+            /**
+             * @description The request id: the `X-Request-Id` of the answer. Absent when the request
+             *     had none.
+             */
+            request_id?: string | null;
+            /**
+             * @description The route as the canonical `/api/...` path of a route the server has, or
+             *     `other`. Never the caller's own path.
+             */
+            route: string;
+            /**
+             * Format: int32
+             * @description The HTTP status of the answer.
+             */
+            status: number;
+        };
+        /**
+         * @description How a request ended.
+         * @enum {string}
+         */
+        RequestFailureOutcome: "failed" | "refused";
+        /** @description `GET /v1/activity/requests/failed`. */
+        RequestFailuresResponse: {
+            /** @description The entries, newest first. */
+            failures: components["schemas"]["RequestFailure"][];
+            /** @description The graph the entries are of. */
+            graph: string;
+            /** @description Pass as `cursor` for the next, older page; absent on the last page. */
+            next_cursor?: string | null;
+            /**
+             * @description `false` when this server does not log requests
+             *     (`LBB_REQUEST_ACTIVITY_ENABLED` is off): there are no entries, which is
+             *     not a quiet period.
+             */
+            recording: boolean;
+        };
         /** @description A row of a suggestion's facts that an accept must keep. */
         RequiredFactRow: {
             /**
@@ -27489,7 +27564,7 @@ export interface operations {
                 to?: string;
                 /** @description day (default) or hour; hour is for the environment and keeps the last 48 hours */
                 granularity?: string;
-                /** @description query, search, ask, write or other: only that class */
+                /** @description query, search, ask, write, graph, ontology, models, workflows, files, status or other: only that class */
                 class?: string;
                 /** @description one graph id; not with `only_namespace` or `list` */
                 only_graph?: string;
@@ -27524,6 +27599,153 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["RequestActivityResponse"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Rate limit exceeded */
+            429: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Service unavailable */
+            503: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+        };
+    };
+    get_v1_activity_requests_failed: {
+        parameters: {
+            query?: {
+                /** @description Graph name (default `main`) */
+                graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
+                /** @description query, search, ask, write or other: only that class */
+                class?: string;
+                /** @description entries of a page, 1 to 100; default 50 */
+                limit?: string;
+                /** @description the `next_cursor` of the previous page */
+                cursor?: string;
+            };
+            header?: {
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
+                "Lbb-Version"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RequestFailuresResponse"];
                 };
             };
             /** @description Bad request */
