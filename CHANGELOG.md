@@ -4,6 +4,15 @@ All notable changes to the `@littlebigbrain/client` package are documented here.
 
 ## Unreleased
 
+- `Sandbox` has the optional `machine` (`SandboxMachine`), and only a retrieve shows it, once
+  the latest run has ended. It says how the run ended (`end_reason`, a `SandboxRunEnd`: `stop`,
+  `deadline`, `exit`, `killed`, `oom`, `crashed`, `host_restart`, `destroy`, `cell_silent` or
+  `unknown`), the billed time of the run (`billed_ms`), and what the host measured of the VM
+  from its cgroup, never from the guest: `cpu_time_ms`, `peak_memory_bytes` and
+  `memory_limit_bytes` (bytes), `oom_kills`, `exit_code` and `exit_signal`. `oom` is a run that
+  the kernel of the host killed because the VM met its memory limit. A figure that the host did
+  not measure is absent, so read a figure only when it is there. No code needs a change.
+
 ## 0.35.0 (2026-11-24)
 
 - `client.erasures`: `preview`, `erase`, `get` and `list` for `/v1/erasures`, the subject erasure of a graph (GDPR). `erase` sends an `Idempotency-Key`; pass `idempotencyKey` to make a rerun answer the first erasure. Schema types: `Erasure`, `ErasurePreview`, `ErasureList`, `ErasureCreateRequest`, `ErasureFollowRule`, `ErasureStatus`.

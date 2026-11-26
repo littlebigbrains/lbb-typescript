@@ -4134,7 +4134,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** One sandbox, with its `run` for a sandbox of a create with `run`, its `cost` so far, its `usage` and the times of its latest run (`started_ms`, `ready_ms`, `ended_ms`, `create_to_ready_ms`). The cost and the usage are computed from its receipts on this read, with the same billed seconds: `cost` is left out and `usage.state` is `unknown` when the receipts cannot be read in a short time or the server prices nothing. A create, a list and every other answer do not read the receipts, and their `usage.state` is `not_read`. 404 `sandbox_not_found` */
+        /** One sandbox, with its `run` for a sandbox of a create with `run`, its `cost` so far, its `usage`, the times of its latest run (`started_ms`, `ready_ms`, `ended_ms`, `create_to_ready_ms`) and, once that run ended, what the host measured of its machine (`machine`: the peak memory, the CPU time, the kills of the kernel for memory, the exit, and how the run ended, with `oom` named). The cost and the usage are computed from its receipts on this read, with the same billed seconds: `cost` is left out and `usage.state` is `unknown` when the receipts cannot be read in a short time or the server prices nothing. A create, a list and every other answer do not read the receipts, and their `usage.state` is `not_read`. 404 `sandbox_not_found` */
         get: operations["get_v1_sandboxes_get"];
         put?: never;
         post?: never;
@@ -19470,6 +19470,7 @@ export interface components {
             /** @description `run` for a sandbox made by a create with `run`, else `sandbox`. */
             kind: components["schemas"]["SandboxKind"];
             limits: components["schemas"]["SandboxLimits"];
+            machine?: null | components["schemas"]["SandboxMachine"];
             metadata: {
                 [key: string]: string;
             };
@@ -20024,6 +20025,72 @@ export interface components {
             to: number;
         };
         /**
+         * @description What the host measured of the machine of a sandbox in its latest run, with how the run
+         *     ended. It comes from the cgroup of the VM and from the exit of its process, and never from
+         *     the guest. A figure is absent when the host did not measure it (a host that is older, a
+         *     kernel that has no such counter, a run that a reboot of the host ended), and a zero is a
+         *     measure: `oom_kills` of 0 says that the kernel killed nothing. The object is absent when
+         *     there is nothing of the latest run to say, which is the case for a run that is going on:
+         *     the host reports a run when it has ended. Present on a retrieve only.
+         *
+         *     What the figures count. `peak_memory_bytes` is the highest memory the cgroup of the VM
+         *     was charged: the memory of the guest that the guest touched (a guest never gives memory
+         *     back, so it includes the page cache of the guest), the VM process, and the cache of the
+         *     disks on the host. It is an upper bound of what the programs needed, and it can read near
+         *     `memory_limit_bytes` for a VM that read many files. `memory_limit_bytes` is the limit that
+         *     the host enforces, which is the `memory_mib` of the sandbox and the overhead of the VM
+         *     process, so it is more than `limits.memory_mib`. `cpu_time_ms` is the CPU time of the VM
+         *     process and its threads, which run the guest, so it is measured on the host and not by
+         *     the guest. It is set beside the billed vCPU-seconds of the same run: `billed_ms` / 1,000
+         *     times `limits.vcpus`.
+         */
+        SandboxMachine: {
+            /**
+             * Format: int64
+             * @description The billed time of the run in milliseconds: its billed seconds (from the first
+             *     answer of the guest to its end, rounded up, less the silent time of a run that ended
+             *     `cell_silent`) times 1,000. Billed vCPU-seconds of the run are this divided by 1,000
+             *     and multiplied by the vCPUs of the sandbox. Absent when the run was not priced.
+             */
+            billed_ms?: number | null;
+            /**
+             * Format: int64
+             * @description The CPU time that the VM process and its threads used in the run, in milliseconds,
+             *     from the cgroup of the VM.
+             */
+            cpu_time_ms?: number | null;
+            end_reason?: null | components["schemas"]["SandboxRunEnd"];
+            /**
+             * Format: int32
+             * @description The exit status of the VM process, when it ended by an exit.
+             */
+            exit_code?: number | null;
+            /**
+             * Format: int32
+             * @description The number of the signal that ended the VM process, when a signal ended it. A run
+             *     that the host itself ended (a stop that had to kill it, a destroy, the deadline) has
+             *     neither this nor an exit status: its `end_reason` says why.
+             */
+            exit_signal?: number | null;
+            /**
+             * Format: int64
+             * @description The memory limit of the cgroup of the VM, in bytes: the memory of the guest and the
+             *     overhead of the VM process.
+             */
+            memory_limit_bytes?: number | null;
+            /**
+             * Format: int64
+             * @description The processes of the cgroup of the VM that the kernel killed for memory in the run.
+             *     At least 1 for a run that ended `oom`.
+             */
+            oom_kills?: number | null;
+            /**
+             * Format: int64
+             * @description The highest memory the cgroup of the VM was charged in the run, in bytes.
+             */
+            peak_memory_bytes?: number | null;
+        };
+        /**
          * @description The workflow turn that owns a sandbox. A sandbox made in a step of a workflow
          *     (a create with a `workflow_fence`) records its owner; any other sandbox has
          *     none. The server takes every field from the turn the fence holds, never from
@@ -20052,6 +20119,13 @@ export interface components {
              */
             workflow: string;
         };
+        /**
+         * @description How a run of the machine of a sandbox ended, as the host says it. A word that a later
+         *     version adds reads as `unknown` in the Rust types. The Python enum rejects a value it does
+         *     not know, so a new word is a change of the contract that needs a new SDK.
+         * @enum {string}
+         */
+        SandboxRunEnd: "stop" | "deadline" | "exit" | "killed" | "oom" | "crashed" | "host_restart" | "destroy" | "cell_silent" | "unknown";
         /** @description The function a `run` calls: `run(input, config)` of a template's harness. */
         SandboxRunRequest: {
             /** @description The code of `run`, 64 KiB at most; the template's code when absent. */
