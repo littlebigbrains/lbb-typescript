@@ -1034,6 +1034,84 @@ test("an answer of an older server has no state and no new field, and a command 
   assert.equal(command.duration_ms, 850);
 });
 
+test("a retrieve of a run the kernel killed carries its machine: how it ended, its billed time and what the host measured, typed as the wire has them", async () => {
+  const host = service();
+  const id = "sbx_1793174400000a1b2c3d4e5f6";
+  const record = {
+    id,
+    object: "sandbox",
+    created: 1_793_174_400,
+    status: "stopped",
+    kind: "sandbox",
+    template: { id: "sbt_lbb_python", name: "lbb/python" },
+    limits: { vcpus: 1, memory_mib: 1024, disk_mib: 4096 },
+    auto_stop_seconds: 300,
+    expires_at: 1_793_178_000,
+    owner: null,
+    created_by: "key:test",
+    usage: { vcpu_seconds: 0, memory_gib_seconds: 0, disk_gib_seconds: 0 },
+    metadata: {},
+  };
+  const machine = {
+    end_reason: "oom",
+    billed_ms: 60_000,
+    cpu_time_ms: 1_840,
+    peak_memory_bytes: 629_145_600,
+    memory_limit_bytes: 671_088_640,
+    oom_kills: 1,
+    exit_signal: 9,
+  };
+  let answer: Record<string, unknown> = { ...record, machine };
+  host.respond((call) =>
+    call.method === "GET" && call.path === "/v1/sandboxes/get"
+      ? { body: answer }
+      : undefined,
+  );
+
+  const sandbox = await clientOf(host.fetch).sandboxes.retrieve(id);
+
+  // The fields are in the type: a client reads them without a cast.
+  const end:
+    | "stop"
+    | "deadline"
+    | "exit"
+    | "killed"
+    | "oom"
+    | "crashed"
+    | "host_restart"
+    | "destroy"
+    | "cell_silent"
+    | "unknown"
+    | null
+    | undefined = sandbox.machine?.end_reason;
+  assert.equal(end, "oom");
+  assert.equal(sandbox.machine?.billed_ms, 60_000);
+  assert.equal(sandbox.machine?.cpu_time_ms, 1_840);
+  assert.equal(sandbox.machine?.peak_memory_bytes, 629_145_600);
+  assert.equal(sandbox.machine?.memory_limit_bytes, 671_088_640);
+  assert.equal(sandbox.machine?.oom_kills, 1);
+  assert.equal(sandbox.machine?.exit_signal, 9);
+  // A figure the host did not measure is absent, and a client never reads a zero in its place.
+  assert.equal(sandbox.machine?.exit_code, undefined);
+
+  // A run that no host measured has the end and the billed time, and no figure.
+  answer = {
+    ...record,
+    machine: { end_reason: "crashed", billed_ms: 12_000 },
+  };
+  const plain = await clientOf(host.fetch).sandboxes.retrieve(id);
+  assert.equal(plain.machine?.end_reason, "crashed");
+  assert.equal(plain.machine?.billed_ms, 12_000);
+  assert.equal(plain.machine?.cpu_time_ms, undefined);
+  assert.equal(plain.machine?.peak_memory_bytes, undefined);
+  assert.equal(plain.machine?.oom_kills, undefined);
+
+  // A run that goes on has no machine, and neither has the answer of an older server.
+  answer = record;
+  const running = await clientOf(host.fetch).sandboxes.retrieve(id);
+  assert.equal(running.machine, undefined);
+});
+
 test("the namespace lists, retrieves and saves templates with the filters of the wire", async () => {
   const host = service();
   const lbb = clientOf(host.fetch);

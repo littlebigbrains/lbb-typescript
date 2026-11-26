@@ -21,7 +21,10 @@ import type { Schemas } from "./types.js";
  * A sandbox record: its status, template, limits, owner, usage and (for an L1 run) its `run`. A retrieve
  * also measures `usage` (read it only when `usage.state` is `"measured"`), `cost` and the times of the
  * latest run (`started_ms`, `ready_ms`, `ended_ms`, `create_to_ready_ms`); every other answer says
- * `usage.state: "not_read"`.
+ * `usage.state: "not_read"`. Once the latest run has ended, a retrieve also has `machine`: how the run ended
+ * (`end_reason`, with `"oom"` for a VM the kernel of the host killed for memory), its `billed_ms`, and what
+ * the host measured of the machine (`cpu_time_ms`, `peak_memory_bytes`, `memory_limit_bytes`, `oom_kills`,
+ * `exit_code`, `exit_signal`). A figure that the host did not measure is absent, never a zero.
  */
 export type Sandbox = Schemas["Sandbox"];
 /** A command record: its status, exit code, output tails and (for a `run`) its `result`. */
