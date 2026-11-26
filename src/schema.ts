@@ -26515,6 +26515,7 @@ export interface components {
          *     for a number, the unit the property holds.
          */
         WorkflowTestProperty: {
+            allowed_values?: string[];
             name: string;
             unit?: string | null;
             value_type: string;
