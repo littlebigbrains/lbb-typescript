@@ -775,13 +775,25 @@ export class WorkflowNamespace {
    * environment does not offer the route: use the per-graph claim, which
    * stays. It never means there is no work. Not retried: a lost answer must
    * not claim a second turn. Hosted workers still take LBB's own work through the work board.
+   *
+   * `wait_ms` may be up to 60000; a server older than the 60-second claim
+   * accepts 10000 and refuses more with 400. The request's own deadline is
+   * `wait_ms` plus 15 seconds (an immediate claim keeps the client's), so the
+   * client's default timeout does not end an idle claim: a claim the client
+   * abandons is held by the server until it sees the disconnect, and can take
+   * a turn that nobody receives. Pass `timeoutMs` to choose another deadline.
    */
   claimEnvironmentTurn(
     request: Schemas["WorkflowTurnClaimRequest"],
     options: CallOptions = {},
   ): Promise<Schemas["WorkflowEnvironmentClaimResponse"]> {
+    const waitMs = request.wait_ms ?? 0;
+    const timeoutMs =
+      options.timeoutMs ??
+      (waitMs > 0 ? waitMs + CLAIM_DEADLINE_MARGIN_MS : undefined);
     return this.client.request("POST", `${base}/environment/turns/claim`, {
       ...options,
+      ...(timeoutMs !== undefined ? { timeoutMs } : {}),
       retry: false,
       body: request,
     });

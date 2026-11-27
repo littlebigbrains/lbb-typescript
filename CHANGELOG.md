@@ -12,6 +12,12 @@ All notable changes to the `@littlebigbrain/client` package are documented here.
   deadline, the wait plus 15 seconds, so a client `timeoutMs` shorter than
   the wait no longer ends an idle claim early.
 
+- `claimEnvironmentTurn` accepts `wait_ms` up to 60000 (a server without the
+  60-second environment claim accepts 10000 and answers 400 above it). A claim
+  with a wait carries its own request deadline, the wait plus 15 seconds, as the
+  worker's claim does; pass `timeoutMs` to choose another. The server ends
+  the wait when the client disconnects.
+
 - `Sandbox` has the optional `machine` (`SandboxMachine`), and only a retrieve shows it, once
   the latest run has ended. It says how the run ended (`end_reason`, a `SandboxRunEnd`: `stop`,
   `deadline`, `exit`, `killed`, `oom`, `crashed`, `host_restart`, `destroy`, `cell_silent` or

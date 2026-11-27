@@ -642,6 +642,56 @@ test("claimEnvironmentTurn is not retried: a server error is the caller's to see
   assert.equal(calls, 1);
 });
 
+test("claimEnvironmentTurn carries a deadline that outlasts a client timeout shorter than its wait", async () => {
+  const waits: number[] = [];
+  const client = new LbbClient({
+    baseUrl: "http://localhost:7400",
+    timeoutMs: 20,
+    maxRetries: 0,
+    fetch: async (_input, init) => {
+      const body = JSON.parse(String(init?.body)) as { wait_ms: number };
+      waits.push(body.wait_ms);
+      if (body.wait_ms === 60_000)
+        return new Response(JSON.stringify({ claim: null }), { status: 200 });
+      await new Promise<void>((resolve, reject) => {
+        const timer = setTimeout(resolve, 100);
+        init?.signal?.addEventListener(
+          "abort",
+          () => {
+            clearTimeout(timer);
+            reject(new Error("aborted"));
+          },
+          { once: true },
+        );
+      });
+      return new Response(JSON.stringify({ claim: null }), { status: 200 });
+    },
+  });
+  const request = {
+    worker: "w1",
+    workflows: [{ workflow_type: "counter", version: "v1" }],
+  };
+  // An idle claim of 250 ms is not ended by the client's 20 ms timeout.
+  assert.deepEqual(
+    await client.workflows.claimEnvironmentTurn({ ...request, wait_ms: 250 }),
+    { claim: null },
+  );
+  // A claim of 60 seconds is sent as asked: the SDK adds no limit of its own.
+  assert.deepEqual(
+    await client.workflows.claimEnvironmentTurn({
+      ...request,
+      wait_ms: 60_000,
+    }),
+    { claim: null },
+  );
+  // An immediate claim keeps the client's own deadline.
+  await assert.rejects(
+    client.workflows.claimEnvironmentTurn({ ...request, wait_ms: 0 }),
+    { name: "TimeoutError" },
+  );
+  assert.deepEqual(waits, [250, 60_000, 0]);
+});
+
 test("environmentSummary reads the environment summary route", async () => {
   const seen: { method?: string; url: URL }[] = [];
   const client = new LbbClient({
