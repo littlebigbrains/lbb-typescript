@@ -9028,6 +9028,17 @@ export interface components {
             today?: string | null;
         };
         /**
+         * @description A labelled box on an item's image: `[x0, y0, x1, y1]` in pixels of the
+         *     image, with `x0 < x1` and `y0 < y1`, inside the image.
+         */
+        EvalBox: {
+            box: number[];
+            /** @description One of the dataset's `install.labels`. */
+            label: string;
+            /** @description The person who drew it was not sure. A scorer may leave it out. */
+            uncertain?: boolean;
+        };
+        /**
          * @description An Evals dataset: a name, a kind, the settings it is graded with, and
          *     its items. It belongs to a graph and is erased with it.
          */
@@ -9091,12 +9102,18 @@ export interface components {
             records: components["schemas"]["EvalDatasetRecord"][];
         };
         /**
-         * @description The settings a `values` dataset is graded with, as a template answer key
-         *     has them: the value type of each property (`text`, `keyword`, `i64`,
-         *     `f64`, `bool`), the units, and the context.
+         * @description The settings a dataset is graded with. A `values` dataset has them as a
+         *     template answer key does: the value type of each property (`text`,
+         *     `keyword`, `i64`, `f64`, `bool`), the units, and the context. A `boxes`
+         *     dataset has its box labels.
          */
         EvalDatasetInstall: {
             context?: string | null;
+            /**
+             * @description `boxes`: the labels a box may have, in the order the label page
+             *     offers them (its keys 1 to 9 pick the first nine).
+             */
+            labels?: string[];
             properties?: {
                 [key: string]: string;
             };
@@ -9104,17 +9121,40 @@ export interface components {
                 [key: string]: string;
             };
         };
-        /** @description One example of a `values` dataset. */
+        /**
+         * @description One example of a dataset: an input text with its values (`values`), or
+         *     an image with its boxes (`boxes`).
+         */
         EvalDatasetItem: {
+            /** @description `boxes`: the boxes a correct detector finds. */
+            boxes?: components["schemas"]["EvalBox"][];
             /** @description What the example shows, in one sentence. */
             case?: string | null;
+            /**
+             * @description `boxes`: the SHA-256 of the graph's file that holds the image
+             *     (`GET /v1/files/content?sha256=`).
+             */
+            file?: string | null;
+            /** Format: int32 */
+            height?: number | null;
+            /**
+             * @description `boxes`: regions where a box of the region's label is neither found
+             *     nor false.
+             */
+            ignore?: components["schemas"]["EvalBox"][];
             /** @description The instance the input was read from, when it came from a graph. */
             iri?: string | null;
+            /**
+             * @description `boxes`: the labels the item is labelled for; absent for every label
+             *     of the dataset. A scorer counts only these labels on the item.
+             */
+            labels?: string[] | null;
             /** @description Values a correct run does not write. */
             leave_out?: components["schemas"]["EvalExpectedValue"][];
             /** @description The input's name: a record name or label, unique in the dataset. */
             name: string;
             source?: null | components["schemas"]["EvalDatasetSource"];
+            status?: null | components["schemas"]["EvalItemStatus"];
             /**
              * @description The input text, at most 40,000 characters. A write needs it; the
              *     `expected.records` of an export leave it out, because `records`
@@ -9123,6 +9163,8 @@ export interface components {
             text?: string;
             /** @description Values a correct run writes. */
             values?: components["schemas"]["EvalExpectedValue"][];
+            /** Format: int32 */
+            width?: number | null;
         };
         /**
          * @description `POST /v1/evals/datasets/items`: add items to the dataset `id`. An item
@@ -9136,7 +9178,7 @@ export interface components {
          * @description What the items of a dataset hold.
          * @enum {string}
          */
-        EvalDatasetKind: "values";
+        EvalDatasetKind: "values" | "boxes";
         /**
          * @description `GET /v1/evals/datasets`: the graph's datasets, newest first, without
          *     their items.
@@ -9573,6 +9615,13 @@ export interface components {
             /** @description True: the result answers the request (thumbs up). */
             valid: boolean;
         };
+        /**
+         * @description Where a person is with an item of a `boxes` dataset (`status`): `todo`
+         *     and `skipped` items are left out of scores; an item without a status
+         *     counts as `done`.
+         * @enum {string}
+         */
+        EvalItemStatus: "todo" | "done" | "skipped";
         /** @description The results a query returned, in a form that compares across commits. */
         EvalItems: {
             item_count: number;
