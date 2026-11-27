@@ -1476,6 +1476,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/evals/datasets/coco": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** A `boxes` Evals dataset in the COCO object detection format: one image per item (`file_name` is the item's name, `lbb_file` the SHA-256 of its file, `lbb_status` where labelling stands), one annotation per box (`bbox` as x, y, width, height in pixels) and per ignore region (`iscrowd: 1`), one category per label. A `values` dataset is 400 */
+        get: operations["get_v1_evals_datasets_coco"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/evals/datasets/export": {
         parameters: {
             query?: never;
@@ -9037,6 +9054,77 @@ export interface components {
             label: string;
             /** @description The person who drew it was not sure. A scorer may leave it out. */
             uncertain?: boolean;
+        };
+        /** @description One box. `bbox` is `[x, y, width, height]` in pixels, as COCO has it. */
+        EvalCocoAnnotation: {
+            /** Format: double */
+            area: number;
+            bbox: number[];
+            /** Format: int32 */
+            category_id: number;
+            /**
+             * Format: int32
+             * @description 1 for the first box of the export.
+             */
+            id: number;
+            /** Format: int32 */
+            image_id: number;
+            /**
+             * Format: int32
+             * @description 1 for an ignore region, 0 for a box.
+             */
+            iscrowd: number;
+            /** @description The person who drew it was not sure. */
+            lbb_uncertain?: boolean;
+        };
+        /** @description One label: its id is its place in `install.labels`, from 1. */
+        EvalCocoCategory: {
+            /** Format: int32 */
+            id: number;
+            name: string;
+        };
+        /**
+         * @description `GET /v1/evals/datasets/coco?id=`: a `boxes` dataset in the COCO object
+         *     detection format, which detector training and scoring tools read. Every
+         *     item is an image, in the order of the items, whatever its status; each box
+         *     is an annotation and each ignore region an annotation with `iscrowd: 1`.
+         *     The `lbb_` fields are LBB's own: COCO readers skip them.
+         */
+        EvalCocoExport: {
+            annotations: components["schemas"]["EvalCocoAnnotation"][];
+            categories: components["schemas"]["EvalCocoCategory"][];
+            images: components["schemas"]["EvalCocoImage"][];
+            info: components["schemas"]["EvalCocoInfo"];
+        };
+        /** @description One image: an item of the dataset. */
+        EvalCocoImage: {
+            /** @description The item's name, unique in the dataset: save the image under it. */
+            file_name: string;
+            /** Format: int32 */
+            height: number;
+            /**
+             * Format: int32
+             * @description 1 for the first item, in the order of the items.
+             */
+            id: number;
+            /**
+             * @description The SHA-256 of the graph's file that holds the image
+             *     (`GET /v1/files/content?sha256=`).
+             */
+            lbb_file: string;
+            /** @description The labels the image is labelled for; absent for every label. */
+            lbb_labels?: string[] | null;
+            lbb_status: components["schemas"]["EvalItemStatus"];
+            /** Format: int32 */
+            width: number;
+        };
+        /** @description The dataset an export holds. */
+        EvalCocoInfo: {
+            /** @description When the dataset was created, RFC 3339. */
+            created: string;
+            /** @description The dataset's id (`ds_…`). */
+            dataset: string;
+            name: string;
         };
         /**
          * @description An Evals dataset: a name, a kind, the settings it is graded with, and
@@ -41181,6 +41269,149 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["EvalDatasetDeleted"];
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Rate limit exceeded */
+            429: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+            /** @description Service unavailable */
+            503: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LbbErrorEnvelope"];
+                };
+            };
+        };
+    };
+    get_v1_evals_datasets_coco: {
+        parameters: {
+            query?: {
+                /** @description Graph name (default `main`) */
+                graph?: string;
+                /** @description Optional managed-environment slug. The bearer and hosted endpoint must authorize the same environment. Environment API keys already select it; account session tokens may need it. In single mode the configured environment applies. */
+                environment?: string;
+                /**
+                 * @deprecated
+                 * @description Deprecated alias of environment. If both selectors are supplied their values must be equal; disagreement returns 400 before work starts.
+                 */
+                stack?: string;
+                /** @description the dataset's id */
+                id?: string;
+            };
+            header?: {
+                /** @description API contract version to pin: `2026-10-27` for this contract. A date before `2026-10-21` keeps the earlier workflow-list shapes; no header gets the current contract. Status/demo query version, not this header, selects their explicit legacy compatibility. */
+                "Lbb-Version"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description API contract version used for the response */
+                    "Lbb-Version"?: string;
+                    /** @description Request correlation id */
+                    "X-Request-Id"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EvalCocoExport"];
                 };
             };
             /** @description Bad request */

@@ -22,6 +22,7 @@ export type EvalGradeSource = Schemas["EvalGradeSource"];
 export type EvalDatasetCreateRequest = Schemas["EvalDatasetCreateRequest"];
 /** A dataset as a template's samples: `records` and `expected`. */
 export type EvalDatasetExport = Schemas["EvalDatasetExport"];
+export type EvalCocoExport = Schemas["EvalCocoExport"];
 /** One page of datasets. */
 export type EvalDatasetList = Schemas["EvalDatasetList"];
 /** A deleted dataset: `{ id, object: "eval_dataset", deleted: true }`. */
@@ -115,6 +116,21 @@ export class EvalDatasetsNamespace {
    */
   export(id: string, opts: CallOptions = {}): Promise<EvalDatasetExport> {
     return this.client.request("GET", "/v1/evals/datasets/export", {
+      ...opts,
+      query: { id },
+    });
+  }
+
+  /**
+   * A `boxes` dataset in the COCO object detection format
+   * (`GET /v1/evals/datasets/coco`): one image per item (`file_name` is the
+   * item's name, `lbb_file` the SHA-256 of its file, `lbb_status` where
+   * labelling stands), one annotation per box and per ignore region
+   * (`iscrowd: 1`), one category per label. Read each image's bytes with
+   * `files.content(image.lbb_file)`. A `values` dataset fails with `400`.
+   */
+  coco(id: string, opts: CallOptions = {}): Promise<EvalCocoExport> {
+    return this.client.request("GET", "/v1/evals/datasets/coco", {
       ...opts,
       query: { id },
     });
