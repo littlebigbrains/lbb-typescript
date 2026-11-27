@@ -4,6 +4,14 @@ All notable changes to the `@littlebigbrain/client` package are documented here.
 
 ## Unreleased
 
+- `WorkflowWorker.run` requests a 60-second claim wait. `runOnce` still
+  defaults to an immediate claim and accepts `waitMs` for a shorter wait.
+  An old server's specific wait-limit refusal triggers one 10-second claim,
+  adding a rejected request per old-node cycle; deploy servers first to
+  avoid those rejections. A claim with a wait carries its own request
+  deadline, the wait plus 15 seconds, so a client `timeoutMs` shorter than
+  the wait no longer ends an idle claim early.
+
 - `Sandbox` has the optional `machine` (`SandboxMachine`), and only a retrieve shows it, once
   the latest run has ended. It says how the run ended (`end_reason`, a `SandboxRunEnd`: `stop`,
   `deadline`, `exit`, `killed`, `oom`, `crashed`, `host_restart`, `destroy`, `cell_silent` or

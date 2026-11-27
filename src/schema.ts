@@ -4686,7 +4686,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Claim one turn from any graph of the environment that has work, found through the environment ready index (the claim path). The request is the one of the per-graph claim (`include_execution_credential` is refused: 400); `wait_ms` is at most 10000, and the first pass is always whole. The answer is `{claim: null}` when no graph had a claimable turn, else the graph (`graph_id`, `branch_id`, `graph_epoch`) and the `task` of the per-graph claim; the turn calls that follow stay on that graph's own routes. One claim visits at most 8 graphs, in a fair order, and takes one turn. The credential must have the whole environment as its scope: the environment key or a console session. A credential of a smaller scope (a work token, a worker pool credential, an application token) is refused (403), and a reserved workflow type (`lbb.*`) is refused as on the per-graph claim. A node that does not offer the route (LBB_WORKFLOW_READY_INDEX_CLAIM or LBB_WORKFLOW_READY_INDEX_WRITE is off) or whose environment has no complete index (the backfill is not done) answers 404 `not_found`: a 404 means use the per-graph claim (`POST /v1/workflows/turns/claim`), which stays, and never means there is no work (that is `{claim: null}`). A client that disconnects during `wait_ms` does not cancel the claim: a turn it takes is leased to nobody and is free again when its lease ends (the instance's `lease_ms`, 60 s by default), as on the per-graph claim. An environment route; the graph scope is not used */
+        /** Claim one turn from any graph of the environment that has work, found through the environment ready index (the claim path). The request is the one of the per-graph claim (`include_execution_credential` is refused: 400); `wait_ms` is at most 10000, and the first pass is always whole. The answer is `{claim: null}` when no graph had a claimable turn, else the graph (`graph_id`, `branch_id`, `graph_epoch`) and the `task` of the per-graph claim; the turn calls that follow stay on that graph's own routes. One claim visits at most 8 graphs, in a fair order, and takes one turn. The credential must have the whole environment as its scope: the environment key or a console session. A credential of a smaller scope (a work token, a worker pool credential, an application token) is refused (403), and a reserved workflow type (`lbb.*`) is refused as on the per-graph claim. A node that does not offer the route (LBB_WORKFLOW_READY_INDEX_CLAIM or LBB_WORKFLOW_READY_INDEX_WRITE is off) or whose environment has no complete index (the backfill is not done) answers 404 `not_found`: a 404 means use the per-graph claim (`POST /v1/workflows/turns/claim`), which stays, and never means there is no work (that is `{claim: null}`). A client that disconnects during `wait_ms` does not cancel the claim, unlike the per-graph claim, which stops its wait at the disconnect: a turn it takes is leased to nobody and is free again when its lease ends (the instance's `lease_ms`, 60 s by default). An environment route; the graph scope is not used */
         post: operations["post_v1_workflows_environment_turns_claim"];
         delete?: never;
         options?: never;
@@ -24596,7 +24596,7 @@ export interface components {
             activities: string[];
             /**
              * Format: int64
-             * @description Long-poll timeout, capped at ten seconds.
+             * @description Long-poll timeout in milliseconds, from 0 through 60000.
              */
             wait_ms?: number;
             worker: string;
@@ -26887,7 +26887,10 @@ export interface components {
              *     Ordinary workflow control and SDK defaults remain unchanged.
              */
             include_execution_credential?: boolean;
-            /** Format: int64 */
+            /**
+             * Format: int64
+             * @description Long-poll timeout in milliseconds, from 0 through 60000. The environment claim accepts at most 10000.
+             */
             wait_ms?: number;
             worker: string;
             workflows: components["schemas"]["WorkflowWorkerType"][];

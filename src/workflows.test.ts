@@ -72,6 +72,271 @@ function setup(
   });
   return { client, calls };
 }
+test("continuous claims request 60 seconds and abort on stop; one-shot waits remain configurable", async () => {
+  const waits: number[] = [];
+  let pendingSignal: AbortSignal | null = null;
+  let started!: () => void;
+  const claimed = new Promise<void>((resolve) => {
+    started = resolve;
+  });
+  const client = new LbbClient({
+    baseUrl: "http://localhost:7400",
+    maxRetries: 2,
+    retryDelayMs: 0,
+    fetch: async (_input, init) => {
+      const body = JSON.parse(String(init?.body)) as { wait_ms: number };
+      waits.push(body.wait_ms);
+      if (body.wait_ms === 60_000) {
+        pendingSignal = init?.signal ?? null;
+        started();
+        return new Promise<Response>((_resolve, reject) => {
+          init?.signal?.addEventListener(
+            "abort",
+            () => reject(new Error("aborted")),
+            { once: true },
+          );
+        });
+      }
+      return new Response(JSON.stringify({ task: null }), { status: 200 });
+    },
+  });
+  const definition = workflow({
+    name: "counter",
+    version: "v1",
+    initialState: 0,
+    async onMessage(_ctx, state) {
+      return { state };
+    },
+  });
+  const worker = new WorkflowWorker(client, [definition], { worker: "test" });
+  assert.equal(await worker.runOnce(), false);
+  assert.equal(await worker.runOnce({ waitMs: 250 }), false);
+  const stop = new AbortController();
+  const running = worker.run({ signal: stop.signal });
+  await claimed;
+  stop.abort();
+  await running;
+  assert.equal((pendingSignal as AbortSignal | null)?.aborted, true);
+  assert.deepEqual(waits, [0, 250, 60_000]);
+});
+
+test("continuous claims fall back only after the definitive old-server wait refusal", async () => {
+  const waits: number[] = [];
+  let ready!: () => void;
+  const started = new Promise<void>((resolve) => {
+    ready = resolve;
+  });
+  const stop = new AbortController();
+  const client = new LbbClient({
+    baseUrl: "http://localhost:7400",
+    maxRetries: 2,
+    fetch: async (_input, init) => {
+      const wait = (JSON.parse(String(init?.body)) as { wait_ms: number })
+        .wait_ms;
+      waits.push(wait);
+      if (wait === 60_000)
+        return new Response(
+          JSON.stringify({
+            error: {
+              type: "invalid_request_error",
+              code: "invalid_request",
+              message:
+                "claim requires a worker, 1–64 workflow type/version pairs and wait_ms <= 10000",
+            },
+          }),
+          { status: 400 },
+        );
+      ready();
+      return new Promise<Response>((_resolve, reject) => {
+        init?.signal?.addEventListener(
+          "abort",
+          () => reject(new Error("aborted")),
+          { once: true },
+        );
+      });
+    },
+  });
+  const definition = workflow({
+    name: "counter",
+    version: "v1",
+    initialState: 0,
+    async onMessage(_ctx, state) {
+      return { state };
+    },
+  });
+  const worker = new WorkflowWorker(client, [definition], { worker: "test" });
+  await assert.rejects(worker.runOnce({ waitMs: 60_000 }), LbbError);
+  const running = worker.run({ signal: stop.signal });
+  await started;
+  stop.abort();
+  await running;
+  assert.deepEqual(waits, [60_000, 60_000, 10_000]);
+});
+
+test("continuous claims never replay a lost response or another refusal", async () => {
+  for (const failure of ["network", "other-refusal"]) {
+    let calls = 0;
+    const client = new LbbClient({
+      baseUrl: "http://localhost:7400",
+      maxRetries: 2,
+      fetch: async () => {
+        calls++;
+        if (failure === "network") throw new TypeError("lost response");
+        return new Response(
+          JSON.stringify({ error: { message: "invalid claim" } }),
+          { status: 400 },
+        );
+      },
+    });
+    const definition = workflow({
+      name: "counter",
+      version: "v1",
+      initialState: 0,
+      async onMessage(_ctx, state) {
+        return { state };
+      },
+    });
+    await assert.rejects(
+      new WorkflowWorker(client, [definition], { worker: "test" }).run({
+        signal: new AbortController().signal,
+      }),
+    );
+    assert.equal(calls, 1);
+  }
+});
+
+test("a claim that reaches its own deadline aborts without being replayed", async (t) => {
+  t.mock.timers.enable({ apis: ["setTimeout"] });
+  let calls = 0;
+  let started!: () => void;
+  const claimStarted = new Promise<void>((resolve) => {
+    started = resolve;
+  });
+  const client = new LbbClient({
+    baseUrl: "http://localhost:7400",
+    timeoutMs: 5,
+    maxRetries: 2,
+    fetch: async (_input, init) => {
+      calls++;
+      started();
+      return new Promise<Response>((_resolve, reject) => {
+        init?.signal?.addEventListener(
+          "abort",
+          () => reject(new Error("timeout")),
+          { once: true },
+        );
+      });
+    },
+  });
+  const definition = workflow({
+    name: "counter",
+    version: "v1",
+    initialState: 0,
+    async onMessage(_ctx, state) {
+      return { state };
+    },
+  });
+  const running = new WorkflowWorker(client, [definition], {
+    worker: "test",
+  }).run({ signal: new AbortController().signal });
+  const outcome = assert.rejects(running, { name: "TimeoutError" });
+  await claimStarted;
+  // The claim's deadline is its 60-second wait and a margin, not the client's 5 ms.
+  t.mock.timers.tick(5_000);
+  await Promise.resolve();
+  assert.equal(calls, 1);
+  t.mock.timers.tick(70_000);
+  await outcome;
+  assert.equal(calls, 1);
+});
+
+test("a claim carries a deadline that outlasts a client timeout shorter than its wait", async () => {
+  const waits: number[] = [];
+  const client = new LbbClient({
+    baseUrl: "http://localhost:7400",
+    timeoutMs: 20,
+    maxRetries: 0,
+    fetch: async (_input, init) => {
+      const body = JSON.parse(String(init?.body)) as { wait_ms: number };
+      waits.push(body.wait_ms);
+      await new Promise<void>((resolve, reject) => {
+        const timer = setTimeout(resolve, 100);
+        init?.signal?.addEventListener(
+          "abort",
+          () => {
+            clearTimeout(timer);
+            reject(new Error("aborted"));
+          },
+          { once: true },
+        );
+      });
+      return new Response(JSON.stringify({ task: null }), { status: 200 });
+    },
+  });
+  const definition = workflow({
+    name: "counter",
+    version: "v1",
+    initialState: 0,
+    async onMessage(_ctx, state) {
+      return { state };
+    },
+  });
+  const worker = new WorkflowWorker(client, [definition], { worker: "test" });
+  // An idle claim of 250 ms is not ended by the client's 20 ms timeout.
+  assert.equal(await worker.runOnce({ waitMs: 250 }), false);
+  // An immediate claim keeps the client's own deadline.
+  await assert.rejects(worker.runOnce(), { name: "TimeoutError" });
+  assert.deepEqual(waits, [250, 0]);
+});
+
+test("the legacy fallback can receive and execute a turn", async () => {
+  const waits: number[] = [];
+  const client = new LbbClient({
+    baseUrl: "http://localhost:7400",
+    fetch: async (input, init) => {
+      const path = new URL(input).pathname;
+      if (path.endsWith("/claim")) {
+        const wait = (JSON.parse(String(init?.body)) as { wait_ms: number })
+          .wait_ms;
+        waits.push(wait);
+        if (wait === 60_000)
+          return new Response(
+            JSON.stringify({
+              error: {
+                type: "invalid_request_error",
+                code: "invalid_request",
+                message:
+                  "claim requires a worker, 1–64 workflow type/version pairs and wait_ms <= 10000",
+              },
+            }),
+            { status: 400 },
+          );
+        return new Response(JSON.stringify({ task: task() }), { status: 200 });
+      }
+      return new Response("{}", { status: 200 });
+    },
+  });
+  let executions = 0;
+  const definition = workflow({
+    name: "counter",
+    version: "v1",
+    initialState: 0,
+    async onMessage(_ctx, state) {
+      executions++;
+      return { state };
+    },
+  });
+  assert.equal(
+    await new WorkflowWorker(client, [definition], { worker: "test" }).runOnce({
+      waitMs: 60_000,
+      fallbackOnLegacyServer: true,
+    }),
+    true,
+  );
+  assert.equal(executions, 1);
+  assert.deepEqual(waits, [60_000, 10_000]);
+});
+
 test("replay reuses named results and a lost completion retries the same state/reply", async () => {
   const old = task([{ key: "increment", kind: "step", output: 7, at_ms: 2 }]);
   const { client, calls } = setup([old], true);
