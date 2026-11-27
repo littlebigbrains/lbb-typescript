@@ -124,6 +124,7 @@ export type {
 } from "./namespaces.js";
 export { isDerivationUploadChanged } from "./triggered-workflows.js";
 export type {
+  EvalCocoExport,
   EvalDataset,
   EvalDatasetCreateRequest,
   EvalDatasetDeleted,

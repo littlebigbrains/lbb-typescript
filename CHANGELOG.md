@@ -4,6 +4,10 @@ All notable changes to the `@littlebigbrain/client` package are documented here.
 
 ## Unreleased
 
+- `client.evals.datasets.coco(id)` reads a `boxes` dataset in the COCO object
+  detection format (`GET /v1/evals/datasets/coco`). Read each image with
+  `files.content(image.lbb_file)`.
+
 - `WorkflowWorker.run` requests a 60-second claim wait. `runOnce` still
   defaults to an immediate claim and accepts `waitMs` for a shorter wait.
   An old server's specific wait-limit refusal triggers one 10-second claim,
