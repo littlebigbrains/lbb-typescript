@@ -144,6 +144,14 @@ const LBB_RETRY_AFTER_MAX_MS = 3_600_000;
 const LBB_WAIT_BUDGET_MS = 86_400_000;
 /** The turns a worker remembers LBB waits of; the oldest goes first. */
 const LBB_WAIT_TURNS = 10_000;
+/**
+ * A claim holds its request open for up to its `waitMs`, so the request's own
+ * deadline is that wait plus this margin. The client's default deadline would
+ * end an idle claim early with an error, and the server then holds the
+ * abandoned claim until it sees the disconnect: it can take a turn that no
+ * worker receives.
+ */
+const CLAIM_DEADLINE_MARGIN_MS = 15_000;
 
 /**
  * Whether a handler's error is LBB unavailable or busy: an `LbbError` of
@@ -1043,7 +1051,11 @@ export class WorkflowWorker {
   async run(options: { signal: AbortSignal }): Promise<void> {
     while (!options.signal.aborted) {
       try {
-        await this.runOnce({ signal: options.signal, waitMs: 10_000 });
+        await this.runOnce({
+          signal: options.signal,
+          waitMs: 60_000,
+          fallbackOnLegacyServer: true,
+        });
       } catch (error) {
         if (options.signal.aborted) return;
         throw error;
@@ -1051,25 +1063,56 @@ export class WorkflowWorker {
     }
   }
   async runOnce(
-    options: { signal?: AbortSignal; waitMs?: number } = {},
+    options: {
+      signal?: AbortSignal;
+      waitMs?: number;
+      /** On the old server's specific wait-limit refusal, try a 10-second claim. */
+      fallbackOnLegacyServer?: boolean;
+    } = {},
   ): Promise<boolean> {
-    const claimed = await this.client.request<
-      Schemas["WorkflowTurnClaimResponse"]
-    >("POST", `${base}/turns/claim`, {
-      signal: options.signal,
-      retry: false,
-      body: {
-        worker: this.options.worker,
-        ...(this.options.executionReads
-          ? { include_execution_credential: true }
-          : {}),
-        workflows: this.definitions.map((d) => ({
-          workflow_type: d.name,
-          version: d.version,
-        })),
-        wait_ms: options.waitMs ?? 0,
-      },
-    });
+    const claim = (waitMs: number) =>
+      this.client.request<Schemas["WorkflowTurnClaimResponse"]>(
+        "POST",
+        `${base}/turns/claim`,
+        {
+          signal: options.signal,
+          retry: false,
+          ...(waitMs > 0
+            ? { timeoutMs: waitMs + CLAIM_DEADLINE_MARGIN_MS }
+            : {}),
+          body: {
+            worker: this.options.worker,
+            ...(this.options.executionReads
+              ? { include_execution_credential: true }
+              : {}),
+            workflows: this.definitions.map((d) => ({
+              workflow_type: d.name,
+              version: d.version,
+            })),
+            wait_ms: waitMs,
+          },
+        },
+      );
+    const waitMs = options.waitMs ?? 0;
+    let claimed: Schemas["WorkflowTurnClaimResponse"];
+    try {
+      claimed = await claim(waitMs);
+    } catch (error) {
+      // The old engine validates before claiming. Only its exact refusal
+      // proves that another claim cannot duplicate an awarded turn.
+      if (
+        !options.fallbackOnLegacyServer ||
+        waitMs <= 10_000 ||
+        !(error instanceof LbbError) ||
+        error.status !== 400 ||
+        error.type !== "invalid_request_error" ||
+        error.code !== "invalid_request" ||
+        error.message !==
+          "claim requires a worker, 1–64 workflow type/version pairs and wait_ms <= 10000"
+      )
+        throw error;
+      claimed = await claim(10_000);
+    }
     if (!claimed.task) return false;
     await this.execute(claimed.task, options.signal);
     return true;
