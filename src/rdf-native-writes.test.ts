@@ -379,73 +379,40 @@ test("a graph the client remembers as RDF-native but that takes records is not r
   assert.equal(calls[0]!.body.replace_owned, undefined);
 });
 
-test("confidence and valid time on a link without evidence are refused, not dropped", async () => {
-  const { fetch, calls } = server("rdf_native");
-  const lbb = client(fetch);
+test("confidence, valid time and observed_at on a link without evidence are sent as given", async () => {
   const link = {
     source: { type: "SERVICE", name: "api" },
     relation: "WRITES_TO",
     target: { type: "DATABASE", name: "primary" },
   };
-  const check = (words: RegExp) => (error: unknown) => {
-    assert.ok(error instanceof LbbError);
-    assert.equal(error.status, 400);
-    assert.equal(error.code, "rdf_native_graph");
-    assert.match(error.message, /evidence/);
-    assert.match(error.message, words);
-    assert.match(error.message, /Nothing was written/);
-    return true;
-  };
-  await assert.rejects(
-    lbb.commit({ triplets: [{ ...link, confidence: 0.4 }] }),
-    check(/confidence/),
-  );
-  // Only the refused plain request went out; the owned form was never sent.
-  assert.equal(calls.length, 1);
-  await assert.rejects(
-    lbb.commit({
-      triplets: [{ ...link, valid_time: { start: "2020-01-01" } }],
-    }),
-    check(/valid_time/),
-  );
-  // The start that observed_at would give a link is lost the same way.
-  await assert.rejects(
-    lbb.commit({
-      triplets: [link],
-      observed_at: "2026-11-01T00:00:00Z",
-    }),
-    check(/observed_at/),
-  );
-  assert.ok(calls.every((call) => call.body.replace_owned === undefined));
-});
-
-test("confidence and valid time with evidence go through, and so does a confidence of 1", async () => {
-  const { fetch, calls } = server("rdf_native");
-  const lbb = client(fetch);
-  const link = {
-    source: { type: "SERVICE", name: "api" },
-    relation: "WRITES_TO",
-    target: { type: "DATABASE", name: "primary" },
-  };
-  const triplets = [
+  const bodies: Schemas["TripletCommitFile"][] = [
+    { triplets: [{ ...link, confidence: 0.4 }] },
+    { triplets: [{ ...link, valid_time: { start: "2020-01-01" } }] },
+    { triplets: [link], observed_at: "2026-11-01T00:00:00Z" },
     {
-      ...link,
-      confidence: 0.4,
-      valid_time: { start: "2020-01-01" },
-      evidence: { text: "runbook" },
+      triplets: [
+        {
+          ...link,
+          confidence: 0.4,
+          valid_time: { start: "2020-01-01" },
+          evidence: { text: "runbook" },
+        },
+        // A confidence of 1 is the default.
+        { ...link, confidence: 1 },
+      ],
     },
-    // A confidence of 1 is the default: nothing is lost without evidence.
-    { ...link, confidence: 1 },
   ];
-  await lbb.commit({ triplets });
-  assert.equal(calls.length, 2);
-  assert.notEqual(calls[1]!.body.replace_owned, undefined);
-  // With observed_at the second link would lose its start, so the commit is
-  // refused as a whole.
-  await assert.rejects(
-    lbb.commit({ triplets, observed_at: "2026-11-01T00:00:00Z" }),
-    /observed_at/,
-  );
+  for (const body of bodies) {
+    const { fetch, calls } = server("rdf_native");
+    const done = await client(fetch).commit(body);
+    assert.equal(done.commit_seq, 7);
+    const sent = calls[calls.length - 1]!.body;
+    assert.notEqual(sent.replace_owned, undefined);
+    // The links, the valid time and the observation time are the caller's.
+    const { replace_owned: owned, ...rest } = sent as Record<string, unknown>;
+    assert.deepEqual((owned as { relations: unknown[] }).relations, []);
+    assert.deepEqual(rest, body);
+  }
 });
 
 test("preconditions are refused before an owned commit is sent", async () => {

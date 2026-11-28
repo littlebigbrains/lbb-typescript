@@ -15,8 +15,8 @@
 //   records it names. A record left with no field and no link by such a
 //   replacement loses its type and label. History stays readable. The one
 //   subject only selects the route.
-// - Confidence and valid time live on a link's evidence. A link without
-//   evidence would lose them, so such a commit is refused before it is sent.
+// - Confidence and valid time go as given. The graph stores them on the link,
+//   with or without evidence.
 // - A retract of entities becomes `replace_owned.retract_entities`, only when
 //   the caller asks for `purge_entity_properties`. That removes the whole
 //   record, so it is never done silently.
@@ -133,72 +133,6 @@ function firstSubject(
 }
 
 /**
- * Whether a triplet carries evidence: a string, or an object with a `text`.
- * The server stores nothing of a link's confidence or valid time without it.
- */
-function hasEvidence(triplet: Schemas["TripletInput"]): boolean {
-  const evidence = triplet.evidence as unknown;
-  if (typeof evidence === "string") return true;
-  return (
-    typeof evidence === "object" &&
-    evidence !== null &&
-    typeof (evidence as { text?: unknown }).text === "string"
-  );
-}
-
-/** What a triplet without evidence would lose, as words; empty when nothing. */
-function lostWithoutEvidence(
-  triplet: Schemas["TripletInput"],
-  observedAt: boolean,
-): string[] {
-  const lost: string[] = [];
-  if (
-    triplet.confidence !== undefined &&
-    triplet.confidence !== null &&
-    triplet.confidence !== 1
-  )
-    lost.push("confidence");
-  const valid = triplet.valid_time as
-    Record<string, unknown> | null | undefined;
-  const hasValidTime =
-    !!valid &&
-    Object.values(valid).some((value) => value !== undefined && value !== null);
-  if (hasValidTime) lost.push("valid_time");
-  else if (observedAt) lost.push("the valid-time start from observed_at");
-  return lost;
-}
-
-/**
- * The words of the refusal when some link would lose its confidence or valid
- * time, else undefined. Only a link with evidence keeps them on this graph.
- */
-function droppedFieldsMessage(
-  body: Schemas["TripletCommitFile"],
-): string | undefined {
-  const observedAt = !!body.observed_at?.trim();
-  const offenders: string[] = [];
-  let count = 0;
-  for (const [index, triplet] of (body.triplets ?? []).entries()) {
-    if (hasEvidence(triplet)) continue;
-    const lost = lostWithoutEvidence(triplet, observedAt);
-    if (!lost.length) continue;
-    count += 1;
-    if (offenders.length < 3)
-      offenders.push(
-        `triplets[${index}] (${triplet.source.type} "${triplet.source.name}" ${triplet.relation} ${triplet.target.type} "${triplet.target.name}": ${lost.join(", ")})`,
-      );
-  }
-  if (!count) return undefined;
-  return (
-    `${count} link${count === 1 ? "" : "s"} of this commit carry confidence or valid time and no evidence, ` +
-    "and this graph would store none of it. A graph that stores RDF statements keeps " +
-    "confidence and valid time on the evidence of a link (the observed_at start too). " +
-    "Put the reason for each link in evidence, or leave confidence and valid time out. " +
-    `First: ${offenders.join("; ")}. Nothing was written.`
-  );
-}
-
-/**
  * Why the commit `body` cannot go to an RDF-native graph, as words; undefined
  * when it can. The client sends nothing for such a body.
  */
@@ -208,7 +142,7 @@ export function ownedFormRefusal(
   if (body.entity_embeddings?.length) return EMBEDDINGS_MESSAGE;
   if (body.preconditions) return PRECONDITIONS_MESSAGE;
   if (!firstSubject(body)) return EMPTY_MESSAGE;
-  return droppedFieldsMessage(body);
+  return undefined;
 }
 
 /**
