@@ -1248,11 +1248,12 @@ export class LbbClient {
    * `property_merge: "replace"`, the other fields of the records it names. A
    * record left with no field and no link by such a replacement loses its type
    * and label. History stays readable with `as_of_commit_seq`. A link written
-   * twice is one statement. Confidence and valid time are stored on a link's
-   * evidence only, so a link with them and without evidence is refused before
-   * anything is sent. Writing the same evidence again with another confidence
-   * adds a second value to the evidence node. `entity_embeddings` and
-   * `preconditions` are refused, with the reason in the error.
+   * twice is one statement. A link keeps its confidence and valid time on its
+   * own node, with or without evidence. A later write of the link replaces
+   * them, and a link written with the defaults has none. Writing the same
+   * evidence again with another confidence adds a second value to the evidence
+   * node. `entity_embeddings` and `preconditions` are refused, with the reason
+   * in the error.
    */
   async commit(
     body: Schemas["TripletCommitFile"],
