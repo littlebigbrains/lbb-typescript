@@ -8665,6 +8665,7 @@ export interface components {
                 [key: string]: unknown;
             };
             current_state: components["schemas"]["StateEntry"][];
+            edge_detail?: null | components["schemas"]["EvidenceCompleteness"];
             edge_properties?: null | components["schemas"]["EvidenceCompleteness"];
             entity: components["schemas"]["EntityView"];
             evidence?: null | components["schemas"]["EvidenceCompleteness"];
@@ -17982,6 +17983,13 @@ export interface components {
             rerank_raw_bytes_fetched?: number;
         };
         RdfEntityRelation: {
+            /**
+             * Format: double
+             * @description Confidence from the newest current link statement, ordered by its
+             *     commit and then statement IRI. Omitted for the default 1.0, or when
+             *     detail was not projected; check the response's `edge_detail` coverage.
+             */
+            confidence?: number | null;
             entity: components["schemas"]["EntityView"];
             /**
              * @description The evidence of this relationship, newest commit first: one entry per
@@ -18007,6 +18015,7 @@ export interface components {
                 [key: string]: unknown;
             };
             relation: components["schemas"]["RelationView"];
+            valid_time?: null | components["schemas"]["ValidTime"];
         };
         /** @enum {string} */
         RdfImportCommitObject: "rdf_import_commit";
